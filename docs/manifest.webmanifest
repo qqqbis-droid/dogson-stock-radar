@@ -1,0 +1,9 @@
+{
+  "name": "犬子老師・台股飆股雷達 Free Edition",
+  "short_name": "飆股雷達",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0b0d12",
+  "theme_color": "#0b0d12",
+  "icons": []
+}
