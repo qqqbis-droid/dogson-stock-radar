@@ -1,86 +1,185 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12">
 <link rel="manifest" href="./manifest.webmanifest">
 <title>犬子老師・飆股雷達</title>
 <style>
 :root{--bg:#0b0d12;--card:#151922;--card2:#1b202b;--text:#f4f6fb;--muted:#9ba5b6;--line:#2a3140;--accent:#63a4ff;--green:#75e9a8;--red:#ff9cac;--gold:#ffd477}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"PingFang TC",sans-serif}
-.wrap{max-width:760px;margin:auto;padding:16px 14px 100px}header{display:flex;justify-content:space-between;align-items:flex-start;margin:6px 0 14px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"PingFang TC",sans-serif}
+.wrap{max-width:780px;margin:auto;padding:16px 14px 110px}
+header{display:flex;justify-content:space-between;align-items:flex-start;margin:6px 0 14px}
 h1{font-size:22px;margin:0}.sub{font-size:12px;color:var(--muted);margin-top:4px}.pill{font-size:12px;padding:7px 10px;border-radius:999px;background:#16263a;border:1px solid #24496e;color:#9fd0ff}
+.marketbox{background:linear-gradient(180deg,#19202b,#131820);border:1px solid var(--line);border-radius:18px;padding:13px;margin-bottom:12px}
+.markettop{display:flex;justify-content:space-between;gap:10px}.marketmode{font-size:19px;font-weight:900}.marketscore{font-size:24px;font-weight:900}.marketgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:10px}
+.marketitem{background:#0e131a;border:1px solid #252d39;border-radius:11px;padding:9px}.marketv{font-weight:850}.marketl{font-size:10px;color:var(--muted);margin-top:3px}
 .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#11151c;padding:5px;border-radius:14px;position:sticky;top:5px;z-index:5}.tab{border:0;border-radius:11px;padding:11px;background:transparent;color:var(--muted);font-weight:800;font-size:15px}.tab.active{background:var(--card2);color:white}
 .controls{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px}.row{display:flex;gap:8px}.search{width:100%;background:#0f131a;border:1px solid var(--line);border-radius:12px;padding:12px;color:#fff;font-size:14px}.scan{border:0;background:var(--accent);color:#07101c;font-weight:900;border-radius:12px;padding:12px 15px}
 .suggestions{display:none;background:#0f131a;border:1px solid var(--line);border-radius:12px;margin-top:6px;overflow:hidden}.suggestions.show{display:block}.suggestion{width:100%;text-align:left;background:#0f131a;color:#fff;border:0;border-bottom:1px solid var(--line);padding:10px}.suggestion:last-child{border:0}.suggestion small{color:var(--muted);margin-left:6px}
 .filters{display:flex;gap:7px;overflow:auto;padding-top:10px}.filter{white-space:nowrap;border:1px solid var(--line);background:#242b38;color:#c7cfdb;padding:7px 10px;border-radius:999px;font-size:12px}.filter.on{border-color:#4d8ac7;color:#b9ddff;background:#17304a}
-.meta{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin:12px 2px}.card{background:linear-gradient(180deg,#171c25,#131820);border:1px solid var(--line);border-radius:18px;padding:14px;margin:10px 0}
-.top{display:flex;justify-content:space-between;gap:10px}.stockleft{display:flex;gap:8px}.star{border:0;background:transparent;font-size:24px;color:#8f9aac;padding:0}.star.on{color:#ffd76b}.name{font-size:19px;font-weight:900}.code{font-size:13px;color:var(--muted);margin-left:6px}.score{font-size:26px;font-weight:900}.label{font-size:11px;color:var(--muted);text-align:right}
+.meta{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin:12px 2px}
+.card{background:linear-gradient(180deg,#171c25,#131820);border:1px solid var(--line);border-radius:18px;padding:14px;margin:10px 0}
+.top{display:flex;justify-content:space-between;gap:10px}.stockleft{display:flex;gap:8px}.star{border:0;background:transparent;font-size:24px;color:#8f9aac;padding:0}.star.on{color:#ffd76b}.name{font-size:19px;font-weight:900}.code{font-size:13px;color:var(--muted);margin-left:6px}.score{font-size:27px;font-weight:900}.label{font-size:11px;color:var(--muted);text-align:right}
 .cat{display:inline-block;font-size:12px;font-weight:850;padding:6px 9px;border-radius:999px;margin-top:7px}.start{background:#0f3928;color:#69efa8}.pull{background:#40300f;color:#ffd477}.watch{background:#1b2b42;color:#9cc9ff}.hot{background:#441923;color:#ff9aab}
-.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}.metric{background:#0e131a;border:1px solid #252d39;border-radius:12px;padding:9px}.mval{font-weight:850;font-size:14px}.mlab{font-size:10px;color:var(--muted);margin-top:3px}
+.parts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:11px}.part{background:#0f141c;border:1px solid #29313e;border-radius:10px;padding:8px 5px;text-align:center}.partv{font-size:14px;font-weight:900}.partl{font-size:9px;color:var(--muted);margin-top:3px}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}.metric{background:#0e131a;border:1px solid #252d39;border-radius:12px;padding:9px}.mval{font-weight:850;font-size:14px}.mlab{font-size:10px;color:var(--muted);margin-top:3px}
 .srbox{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.sr{background:#0e131a;border-radius:12px;padding:10px}.support{border:1px solid #244936}.resistance{border:1px solid #56313a}.srtitle{font-size:11px;color:var(--muted)}.srprice{font-size:16px;font-weight:900;margin-top:4px}.support .srprice{color:var(--green)}.resistance .srprice{color:var(--red)}.srbasis{font-size:10px;color:#8994a6;margin-top:4px}
-.reasons{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.reason{background:#202734;border-radius:8px;padding:5px 7px;font-size:11px;color:#d7deea}.warn{color:#ff9baa}.empty{text-align:center;color:var(--muted);padding:35px 10px}.note{font-size:11px;color:var(--muted);line-height:1.5;margin:12px 2px}
-details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summary{font-size:12px;color:#cbd3df}.group{display:grid;gap:6px;margin-top:8px}.g{display:flex;justify-content:space-between;background:#10151d;padding:8px;border-radius:9px;font-size:12px}
+.chips{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}.chip{background:#10151d;padding:9px;border-radius:10px;font-size:12px}.yes{color:var(--green)}.bad{color:var(--red)}
+.reasons{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.reason{background:#202734;border-radius:8px;padding:5px 7px;font-size:11px;color:#d7deea}.warn{color:#ff9baa}
+details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summary{font-size:12px;color:#cbd3df;cursor:pointer}.group{display:grid;gap:6px;margin-top:8px}.g{display:flex;justify-content:space-between;background:#10151d;padding:8px;border-radius:9px;font-size:12px}
+.help{background:#121821;border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:10px}.help summary{font-weight:850;border:0;padding:0}.helptext{color:#cbd3df;font-size:12px;line-height:1.65;margin-top:10px}.helptext b{color:white}
+.empty{text-align:center;color:var(--muted);padding:35px 10px}.note{font-size:11px;color:var(--muted);line-height:1.5;margin:12px 2px}
 .footer{position:fixed;left:0;right:0;bottom:0;background:rgba(11,13,18,.94);backdrop-filter:blur(16px);border-top:1px solid var(--line);padding:8px 14px calc(8px + env(safe-area-inset-bottom));font-size:11px;color:var(--muted);text-align:center}
 </style>
 </head>
-<body><div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition｜GitHub Pages</div></div><div class="pill" id="status">讀取中</div></header>
+<body>
+<div class="wrap">
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.1｜技術＋籌碼＋族群＋大盤</div></div><div class="pill" id="status">讀取中</div></header>
+
+<div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
+
 <div class="tabs"><button class="tab active" data-mode="intraday">⚡ 盤中雷達</button><button class="tab" data-mode="close">🌙 盤後雷達</button></div>
+
 <div class="controls">
  <div class="row"><input id="q" class="search" placeholder="輸入股票代號或名稱，例如 2308、台達電" autocomplete="off"><button id="scan" class="scan">掃描</button></div>
  <div id="suggestions" class="suggestions"></div>
  <div class="filters">
   <button class="filter on" data-f="all">全部</button><button class="filter" data-f="剛啟動">🔥 剛啟動</button><button class="filter" data-f="等回踩">🟡 等回踩</button><button class="filter" data-f="過熱不追">🚫 過熱</button><button class="filter" id="watchOnly">⭐ 我的關注</button>
  </div>
+ <details class="help">
+   <summary>❓ 每個數值怎麼看？點我教學</summary>
+   <div class="helptext">
+    <b>總分不是上漲機率。</b> 總分 82 的意思是「我們設定的強勢條件目前符合很多」，不是 82% 會漲。<br><br>
+    <b>技術 50：</b>突破、均線、量能、RSI、MACD、VWAP 等。<br>
+    <b>籌碼 25：</b>外資連3買、借券賣出連3減、投信、融資。資料缺漏時用中性分，不會亂扣分。<br>
+    <b>族群 10：</b>同產業至少 2～4 檔一起轉強才加分。<br>
+    <b>大盤 15：</b>加權、櫃買、上漲家數比與全市場外資方向。大盤越弱，「剛啟動」門檻會自動提高。<br><br>
+    <b>同時間量速 2.4x：</b>今天此刻的累積量約為過去同時間的 2.4 倍。1.5～3 倍通常最舒服，>5 倍要防過熱。<br>
+    <b>VWAP：</b>今天市場的成交量加權平均成本；站上通常偏強，但離太遠反而容易追高。<br>
+    <b>日量比：</b>今天完整成交量 ÷ 20日平均量。<br>
+    <b>距20MA：</b>股價離20日均線多遠；太遠代表位階可能已高。<br>
+    <b>RSI：</b>55～72 常是「強而還沒太熱」；>82 程式會扣過熱分。<br>
+    <b>支撐／壓力：</b>是區間，不是保證反彈或突破的精準價。
+   </div>
+ </details>
 </div>
+
 <div class="meta"><span id="modeText">盤中：5分K / VWAP / 量速</span><span id="updated">—</span></div>
 <div id="cards"><div class="empty">正在讀取最新資料…</div></div>
-<div class="note">盤中資料由免費資料源定時更新，可能延遲；GitHub Actions 排程也可能晚幾分鐘。盤後外資/投信/融資/借券若資料源未完成或延遲，會顯示為尚未載入，不會假裝成即時籌碼。</div>
-</div><div class="footer">免費版：沒有常駐付費伺服器；資料由 GitHub Actions 排程更新。</div>
+<div class="note">盤中籌碼使用最近已完成交易日的外資／投信／融資／借券資料，不會把尚未公布的今日籌碼冒充成即時資料。免費資料源與 GitHub Actions 排程都可能延遲數分鐘。</div>
+</div>
+<div class="footer">總分 = 技術50 + 籌碼25 + 族群10 + 大盤15</div>
+
 <script>
-let mode="intraday",filter="all",watchOnly=false,universe=[],closeRows=[],intraRows=[],rows=[];
+let mode="intraday",filter="all",watchOnly=false,universe=[],closeRows=[],intraRows=[],rows=[],market={},marketLive={};
 const $=id=>document.getElementById(id);
 function watchlist(){try{return JSON.parse(localStorage.getItem("dogson-watch")||"[]")}catch{return[]}}
 function saveWatch(x){localStorage.setItem("dogson-watch",JSON.stringify(x))}
 function watched(c){return watchlist().includes(String(c))}
 function toggleWatch(c){let w=watchlist();c=String(c);w=w.includes(c)?w.filter(x=>x!==c):[...w,c];saveWatch(w);render()}
 function num(v,d=1){return v===null||v===undefined||Number.isNaN(+v)?"—":(+v).toFixed(d)}
+function lots(v){return v===null||v===undefined?"—":num((+v)/1000,0)+"張"}
+function signed(v,d=1,suffix="%"){if(v===null||v===undefined||Number.isNaN(+v))return "—";return ((+v)>=0?"+":"")+num(v,d)+suffix}
 function cls(c){return c==="剛啟動"?"start":c==="等回踩"?"pull":c==="過熱不追"?"hot":"watch"}
+
+function marketHTML(){
+ const m=market||{},t=m.taiex||{},o=m.otc||{},live=marketLive||{};
+ const lt=live["^TWII"]||{},lo=live["^TWOII"]||{};
+ const modeClass=m.market_mode==="偏多"?"yes":m.market_mode==="防守"?"bad":"";
+ return `<div class="markettop"><div><div class="marketmode ${modeClass}">📊 市場環境：${m.market_mode||"—"}</div><div class="sub">剛啟動門檻：${m.radar_threshold||"—"}分</div></div><div><div class="marketscore">${num(m.market_score,1)}/15</div><div class="label">大盤分</div></div></div>
+ <div class="marketgrid">
+  <div class="marketitem"><div class="marketv">加權 ${lt.change_pct!==undefined?signed(lt.change_pct):signed(t.change_pct)}</div><div class="marketl">${t.trend?"多頭排列":"未完整多頭"} · ${lt.close||t.close||"—"}</div></div>
+  <div class="marketitem"><div class="marketv">櫃買 ${lo.change_pct!==undefined?signed(lo.change_pct):signed(o.change_pct)}</div><div class="marketl">${o.trend?"多頭排列":"未完整多頭"} · ${lo.close||o.close||"—"}</div></div>
+  <div class="marketitem"><div class="marketv">上漲家數 ${m.breadth_up_pct===null||m.breadth_up_pct===undefined?"—":num(m.breadth_up_pct,0)+"%"}</div><div class="marketl">最近完成交易日市場廣度</div></div>
+  <div class="marketitem"><div class="marketv">外資 ${m.foreign_net_lots===null||m.foreign_net_lots===undefined?"—":signed(m.foreign_net_lots,0,"張")}</div><div class="marketl">全市場最近已公布淨買賣</div></div>
+ </div>`;
+}
+
 function srHTML(r){
  const one=(x,t)=>!x?`<div class="sr ${t}"><div class="srtitle">${t==="support"?"🟢 支撐區":"🔴 壓力區"}</div><div class="srprice">暫無近端</div></div>`:
- `<div class="sr ${t}"><div class="srtitle">${t==="support"?"🟢 支撐區":"🔴 壓力區"} · ${(x.distance_pct>=0?"+":"")+num(x.distance_pct,1)}%</div><div class="srprice">${num(x.low,2)}～${num(x.high,2)}</div><div class="srbasis">${x.basis||""}</div></div>`;
- return `<div class="srbox">${one(r.support,"support")}${one(r.resistance,"resistance")}</div>`
+ `<div class="sr ${t}"><div class="srtitle">${t==="support"?"🟢 支撐區":"🔴 壓力區"} · ${signed(x.distance_pct,1)}</div><div class="srprice">${num(x.low,2)}～${num(x.high,2)}</div><div class="srbasis">${x.basis||""}</div></div>`;
+ return `<div class="srbox">${one(r.support,"support")}${one(r.resistance,"resistance")}</div>`;
 }
+
 function groupHTML(r){
  let same=rows.filter(x=>x.industry===r.industry).slice(0,8);
  if(same.length<2)return "";
  return `<details><summary>👥 族群共振 ${r.industry_hot_count||same.length} 檔｜點我展開</summary><div class="group">${same.map(x=>`<div class="g"><span>${x.code} ${x.name}</span><span>${num(x.score,0)}｜${x.category}</span></div>`).join("")}</div></details>`;
 }
-function metrics(r){
- if(mode==="intraday")return [["現價",num(r.close,2)],["同時間量速",num(r.pace,1)+"x"],["距VWAP",(r.vwap_dist>=0?"+":"")+num(r.vwap_dist,1)+"%"],["當日",(r.day_change>=0?"+":"")+num(r.day_change,1)+"%"],["VWAP",num(r.vwap,2)],["族群共振",(r.industry_hot_count||0)+"檔"]];
- return [["收盤",num(r.close,2)],["日量比",num(r.vol_x,1)+"x"],["距20MA",(r.dist20>=0?"+":"")+num(r.dist20,1)+"%"],["5日漲幅",(r.ret5>=0?"+":"")+num(r.ret5,1)+"%"],["20日漲幅",(r.ret20>=0?"+":"")+num(r.ret20,1)+"%"],["RSI",num(r.rsi,0)],["5MA",num(r.ma5,2)],["10MA",num(r.ma10,2)],["20MA",num(r.ma20,2)],["20日突破",r.break20?"是":"否"],["均線多頭",r.trend?"是":"否"],["族群共振",(r.industry_hot_count||0)+"檔"]];
+
+function partsHTML(r){
+ return `<div class="parts">
+ <div class="part"><div class="partv">${num(r.technical_score,0)}/50</div><div class="partl">技術</div></div>
+ <div class="part"><div class="partv">${num(r.chip_score,0)}/25</div><div class="partl">籌碼</div></div>
+ <div class="part"><div class="partv">${num(r.sector_score,0)}/10</div><div class="partl">族群</div></div>
+ <div class="part"><div class="partv">${num(r.market_score,0)}/15</div><div class="partl">大盤</div></div>
+ </div>`;
 }
+
+function chipHTML(r){
+ const f=r.foreign_3buy===true?`<span class="yes">外資連3買 ✓</span>`:r.foreign_3buy===false?`外資未連3買`:`外資資料待補`;
+ const s=r.sbl_3down===true?`<span class="yes">借券連3減 ✓</span>`:r.sbl_3down===false?`借券未連3減`:`借券資料待補`;
+ const trust=r.trust_net_latest===null||r.trust_net_latest===undefined?"—":lots(r.trust_net_latest);
+ const margin=r.margin_status||"—";
+ return `<div class="chips">
+  <div class="chip">${f}<br><small>近3日 ${r.foreign_3d_net===null||r.foreign_3d_net===undefined?"—":lots(r.foreign_3d_net)}</small></div>
+  <div class="chip">${s}<br><small>3日變化 ${r.sbl_3change_pct===null||r.sbl_3change_pct===undefined?"—":signed(r.sbl_3change_pct,1)}</small></div>
+  <div class="chip">投信 ${trust}<br><small>${r.chip_date||"最近交易日"}</small></div>
+  <div class="chip">融資 ${margin}<br><small>3日 ${r.margin_3d_pct===null||r.margin_3d_pct===undefined?"—":signed(r.margin_3d_pct,1)}</small></div>
+ </div>`;
+}
+
+function metrics(r){
+ if(mode==="intraday")return [["現價",num(r.close,2)],["同時間量速",num(r.pace,1)+"x"],["距VWAP",signed(r.vwap_dist,1)],["當日",signed(r.day_change,1)],["VWAP",num(r.vwap,2)],["族群共振",(r.industry_hot_count||0)+"檔"]];
+ return [["收盤",num(r.close,2)],["日量比",num(r.vol_x,1)+"x"],["距20MA",signed(r.dist20,1)],["5日漲幅",signed(r.ret5,1)],["20日漲幅",signed(r.ret20,1)],["RSI",num(r.rsi,0)],["5MA",num(r.ma5,2)],["10MA",num(r.ma10,2)],["20MA",num(r.ma20,2)],["20日突破",r.break20?"是":"否"],["均線多頭",r.trend?"是":"否"],["族群共振",(r.industry_hot_count||0)+"檔"]];
+}
+
 function render(){
  rows=mode==="intraday"?intraRows:closeRows;
  let rr=rows.filter(r=>(filter==="all"||r.category===filter)&&(!watchOnly||watched(r.code)));
  const q=$("q").value.trim().toLowerCase();
- if(q){let hits=rr.filter(r=>String(r.code)===q||r.name.toLowerCase().includes(q));if(hits.length)rr=hits}
- if(!rr.length){$("cards").innerHTML='<div class="empty">目前沒有符合條件的資料。若是盤中搜尋任意股票，免費版只有固定關注池＋日K前150名會有5分K；切到盤後可查全市場。</div>';return}
- $("cards").innerHTML=rr.slice(0,60).map(r=>`<div class="card"><div class="top"><div class="stockleft"><button class="star ${watched(r.code)?"on":""}" onclick="toggleWatch('${r.code}')">${watched(r.code)?"★":"☆"}</button><div><div class="name">${r.name}<span class="code">${r.code}</span></div><div class="sub">${r.industry||"未分類"} · ${mode==="intraday"?(r.time||""):(r.date||"")}</div><span class="cat ${cls(r.category)}">${r.category}</span></div></div><div><div class="score">${num(r.score,0)}</div><div class="label">雷達分數</div></div></div><div class="metrics">${metrics(r).map(m=>`<div class="metric"><div class="mval">${m[1]}</div><div class="mlab">${m[0]}</div></div>`).join("")}</div>${srHTML(r)}<div class="reasons">${(r.reasons||[]).map(x=>`<span class="reason">${x}</span>`).join("")}${(r.overheat_reasons||[]).map(x=>`<span class="reason warn">⚠ ${x}</span>`).join("")}</div>${groupHTML(r)}</div>`).join("");
+ if(q){let hits=rr.filter(r=>String(r.code)===q||String(r.name).toLowerCase().includes(q));if(hits.length)rr=hits}
+ if(!rr.length){$("cards").innerHTML='<div class="empty">目前沒有符合條件的資料。若盤中搜尋任意股票，免費版只掃固定關注池＋前一盤後前150名；切到盤後可查全市場。</div>';return}
+ $("cards").innerHTML=rr.slice(0,70).map(r=>`<div class="card">
+  <div class="top"><div class="stockleft"><button class="star ${watched(r.code)?"on":""}" onclick="toggleWatch('${r.code}')">${watched(r.code)?"★":"☆"}</button><div><div class="name">${r.name}<span class="code">${r.code}</span></div><div class="sub">${r.industry||"未分類"} · ${mode==="intraday"?(r.time||""):(r.date||"")}</div><span class="cat ${cls(r.category)}">${r.category}</span></div></div><div><div class="score">${num(r.score,0)}</div><div class="label">總分 /100</div></div></div>
+  ${partsHTML(r)}
+  <div class="metrics">${metrics(r).map(m=>`<div class="metric"><div class="mval">${m[1]}</div><div class="mlab">${m[0]}</div></div>`).join("")}</div>
+  ${srHTML(r)}
+  ${chipHTML(r)}
+  <div class="reasons">${(r.reasons||[]).map(x=>`<span class="reason">${x}</span>`).join("")}${(r.overheat_reasons||[]).map(x=>`<span class="reason warn">⚠ ${x}</span>`).join("")}</div>
+  ${groupHTML(r)}
+ </div>`).join("");
 }
+
 async function load(){
  try{
-  const [u,c,i,s]=await Promise.all([fetch("./data/universe.json?"+Date.now()),fetch("./data/close.json?"+Date.now()),fetch("./data/intraday.json?"+Date.now()),fetch("./data/status.json?"+Date.now())]);
+  const bust=Date.now();
+  const [u,c,i,s,m]=await Promise.all([
+   fetch("./data/universe.json?"+bust),fetch("./data/close.json?"+bust),
+   fetch("./data/intraday.json?"+bust),fetch("./data/status.json?"+bust),
+   fetch("./data/market.json?"+bust)
+  ]);
   universe=await u.json();let cj=await c.json(),ij=await i.json(),sj=await s.json();
-  closeRows=cj.rows||[];intraRows=ij.rows||[];$("updated").textContent=new Date(sj.updated_at).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});$("status").textContent="已更新";render();
- }catch(e){$("status").textContent="資料尚未建立";$("cards").innerHTML='<div class="empty">第一次部署後需等 GitHub Actions 跑完資料產生流程。</div>'}
+  market=await m.json();marketLive=ij.market_intraday||{};
+  closeRows=cj.rows||[];intraRows=ij.rows||[];
+  $("updated").textContent=sj.updated_at?new Date(sj.updated_at).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
+  $("status").textContent="已更新";$("marketbox").innerHTML=marketHTML();render();
+ }catch(e){
+  $("status").textContent="資料尚未建立";
+  $("cards").innerHTML='<div class="empty">第一次部署或更新中，請等 Actions 完成後再重新整理。</div>';
+ }
 }
-document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;$("modeText").textContent=mode==="intraday"?"盤中：5分K / VWAP / 量速":"盤後：日K / 均線 / 支撐壓力";render()});
+
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;$("modeText").textContent=mode==="intraday"?"盤中：5分K / VWAP / 同時間量速":"盤後：日K / 籌碼 / 大盤 / 支撐壓力";render()});
 document.querySelectorAll(".filter[data-f]").forEach(b=>b.onclick=()=>{document.querySelectorAll(".filter[data-f]").forEach(x=>x.classList.remove("on"));b.classList.add("on");filter=b.dataset.f;render()});
 $("watchOnly").onclick=()=>{watchOnly=!watchOnly;$("watchOnly").classList.toggle("on",watchOnly);render()};
 $("scan").onclick=render;
-$("q").addEventListener("input",()=>{const q=$("q").value.trim().toLowerCase(),box=$("suggestions");if(!q){box.classList.remove("show");return}let h=universe.filter(x=>x.code.startsWith(q)||x.name.toLowerCase().includes(q)).slice(0,10);box.innerHTML=h.map(x=>`<button class="suggestion" data-code="${x.code}">${x.name}<small>${x.code} · ${x.industry}</small></button>`).join("");box.classList.toggle("show",h.length>0);box.querySelectorAll(".suggestion").forEach(b=>b.onclick=()=>{$("q").value=b.dataset.code;box.classList.remove("show");render()})});
+$("q").addEventListener("input",()=>{const q=$("q").value.trim().toLowerCase(),box=$("suggestions");if(!q){box.classList.remove("show");return}let h=universe.filter(x=>String(x.code).startsWith(q)||String(x.name).toLowerCase().includes(q)).slice(0,10);box.innerHTML=h.map(x=>`<button class="suggestion" data-code="${x.code}">${x.name}<small>${x.code} · ${x.industry}</small></button>`).join("");box.classList.toggle("show",h.length>0);box.querySelectorAll(".suggestion").forEach(b=>b.onclick=()=>{$("q").value=b.dataset.code;box.classList.remove("show");render()})});
 if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
 load();
-</script></body></html>
+</script>
+</body>
+</html>
