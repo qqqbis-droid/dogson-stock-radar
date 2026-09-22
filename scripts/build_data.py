@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.3
+犬子老師飆股雷達 Free Edition v1.3.1
 =================================
 總分 = 技術 50 + 籌碼 25 + 族群 10 + 大盤 15
 
@@ -39,6 +39,7 @@ import requests
 import yfinance as yf
 
 from chip_data import build_chip_signals
+from sector_groups import industry_name_for, sector_group_for
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs" / "data"
@@ -261,6 +262,77 @@ def download_intraday(syms):
         auto_adjust=False, threads=True, progress=False, prepost=False
     )
     return split_bulk(raw, syms)
+
+
+
+def official_mis_snapshot(uni):
+    """盤後用 TWSE MIS 覆核今日最終 OHLCV，避免 Yahoo 日K仍停在盤中快照。"""
+    now = now_tw()
+    if (now.hour, now.minute) < (13, 30):
+        return {}
+    out = {}
+    recs = uni[["code", "market"]].astype(str).to_dict("records")
+    for i in range(0, len(recs), 80):
+        part = recs[i:i+80]
+        ex_ch = "|".join(
+            f"{'otc' if r['market'] == '上櫃' else 'tse'}_{r['code']}.tw"
+            for r in part
+        )
+        try:
+            rr = requests.get(
+                "https://mis.twse.com.tw/stock/api/getStockInfo.jsp",
+                params={"ex_ch": ex_ch, "json": "1", "delay": "0", "_": int(now.timestamp()*1000)},
+                headers={"User-Agent": "Mozilla/5.0 DogsonRadar/1.3.1", "Referer": "https://mis.twse.com.tw/stock/index.jsp"},
+                timeout=20,
+            )
+            rr.raise_for_status()
+            arr = rr.json().get("msgArray") or []
+            for x in arr:
+                code = str(x.get("c") or "").strip()
+                d = str(x.get("d") or "").strip()
+                if not code or (d and d != now.strftime("%Y%m%d")):
+                    continue
+                def f(k):
+                    try:
+                        v = str(x.get(k) or "").replace(",", "").strip()
+                        return float(v) if v not in {"", "-", "--"} else None
+                    except Exception:
+                        return None
+                z, o, h, l, v = f("z"), f("o"), f("h"), f("l"), f("v")
+                if z is None or z <= 0:
+                    continue
+                out[code] = {
+                    "date": now.date(), "Close": z,
+                    "Open": o if o and o > 0 else z,
+                    "High": h if h and h > 0 else z,
+                    "Low": l if l and l > 0 else z,
+                    # MIS v 為張數；Yahoo 日K Volume 為股數。
+                    "Volume": (v * 1000.0) if v is not None else None,
+                }
+        except Exception as e:
+            print("MIS close batch", i, e)
+    print("official MIS close snapshot", len(out))
+    return out
+
+
+def overlay_official_today_bar(x, snap):
+    if x is None or x.empty or not snap:
+        return x
+    y = x.copy()
+    target = snap["date"]
+    idx_dates = [pd.Timestamp(v).date() for v in y.index]
+    vals = {k: snap.get(k) for k in ["Open", "High", "Low", "Close", "Volume"]}
+    if target in idx_dates:
+        pos = max(i for i, d in enumerate(idx_dates) if d == target)
+        idx = y.index[pos]
+        for k, v in vals.items():
+            if v is not None:
+                y.loc[idx, k] = v
+    else:
+        row = {k: (v if v is not None else np.nan) for k, v in vals.items()}
+        y.loc[pd.Timestamp(target)] = row
+        y = y.sort_index()
+    return y
 
 
 def rsi(s, n=14):
@@ -733,18 +805,22 @@ def add_component_scores(rows, market, preliminary_intraday=False):
     if not rows:
         return rows
 
+    # 族群共振改用嚴格次產業/題材群組，不再拿整個「半導體業」當同族群。
     hot = {}
     for r in rows:
-        if r.get("technical_score", 0) >= 30 and not r.get("overheat_reasons"):
-            hot[r["industry"]] = hot.get(r["industry"], 0) + 1
+        key = str(r.get("sector_group") or "").strip()
+        if key and r.get("technical_score", 0) >= 30 and not r.get("overheat_reasons"):
+            hot[key] = hot.get(key, 0) + 1
 
     quality_reference = market.get("radar_threshold", 76)
     market_score = float(market.get("market_score", 7.5))
 
     for r in rows:
-        n = int(hot.get(r["industry"], 0))
+        key = str(r.get("sector_group") or "").strip()
+        n = int(hot.get(key, 0)) if key else 0
         sec = sector_score(n)
         r["industry_hot_count"] = n
+        r["sector_hot_count"] = n
         r["sector_score"] = sec
         r["market_score"] = market_score
         r["market_mode"] = market.get("market_mode", "中性")
@@ -754,14 +830,18 @@ def add_component_scores(rows, market, preliminary_intraday=False):
         total = float(r.get("technical_score", 0)) + cs + sec + market_score + liq_adjust
         r["score"] = round(max(0, min(100, total)), 1)
 
-        if r["score"] >= 80:
+        chip_cov = float(r.get("chip_coverage_pct") or 0)
+        r["score_reliable"] = bool(chip_cov >= 60)
+        if not r["score_reliable"]:
+            r["quality_label"] = "資料待補"
+        elif r["score"] >= 80:
             r["quality_label"] = "高共振"
         elif r["score"] >= 70:
             r["quality_label"] = "強"
         else:
             r["quality_label"] = "一般"
         r["quality_reference"] = quality_reference
-        r["quality_pass_market"] = bool(r["score"] >= quality_reference)
+        r["quality_pass_market"] = bool(r["score_reliable"] and r["score"] >= quality_reference)
 
         if r.get("overheat_reasons"):
             r["category"] = "過熱不追"
@@ -827,9 +907,12 @@ def add_component_scores(rows, market, preliminary_intraday=False):
 
 def build_close():
     uni = get_universe()
-    universe_public = uni[["code", "name", "industry", "market"]].astype(str).to_dict("records")
+    uni["industry_name"] = uni["industry"].map(industry_name_for)
+    uni["sector_group"] = [sector_group_for(c, n, i) or "" for c, n, i in zip(uni["code"], uni["name"], uni["industry"])]
+    universe_public = uni[["code", "name", "industry", "industry_name", "sector_group", "market"]].astype(str).to_dict("records")
     dump("universe.json", universe_public)
     meta = uni.set_index("symbol").to_dict("index")
+    official_today = official_mis_snapshot(uni)
 
     rows = []
     breadth_changes = []
@@ -845,6 +928,9 @@ def build_close():
 
         for sym, x in data.items():
             try:
+                m = meta.get(sym, {})
+                code = str(m.get("code", sym.split(".")[0]))
+                x = overlay_official_today_bar(x, official_today.get(code))
                 t = close_technical(x)
                 if not t:
                     continue
@@ -855,12 +941,13 @@ def build_close():
                 t["liquidity_level"] = liq_level
                 t["liquidity_adjust"] = liq_adjust
                 t["avg_turnover20_mn"] = round(t["avg_turnover20"] / 1_000_000, 1)
-                m = meta.get(sym, {})
                 rows.append({
                     "symbol": sym,
-                    "code": str(m.get("code", sym.split(".")[0])),
+                    "code": code,
                     "name": str(m.get("name", sym)),
                     "industry": str(m.get("industry", "未分類")),
+                    "industry_name": str(m.get("industry_name", industry_name_for(m.get("industry")))),
+                    "sector_group": str(m.get("sector_group") or ""),
                     "market": str(m.get("market", "")),
                     **t,
                 })
@@ -904,7 +991,7 @@ def build_close():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "close_updated_at": now_tw().isoformat(timespec="seconds"),
         "daily_count": len(rows),
-        "version": "1.3-free",
+        "version": "1.3.1-free",
     })
     dump("status.json", status)
 
@@ -998,6 +1085,8 @@ def build_intraday():
                     "code": code,
                     "name": str(m.get("name", sym)),
                     "industry": str(m.get("industry", "未分類")),
+                    "industry_name": str(m.get("industry_name", industry_name_for(m.get("industry")))),
+                    "sector_group": str(m.get("sector_group") or sector_group_for(code, m.get("name"), m.get("industry")) or ""),
                     "market": str(m.get("market", "")),
                     **t,
                     # 最近已公布的籌碼從盤後資料沿用
@@ -1039,7 +1128,7 @@ def build_intraday():
                 "updated_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_attempted_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_count": len(previous.get("rows", [])),
-                "version": "1.3-free",
+                "version": "1.3.1-free",
             })
             dump("status.json", status)
             print("intraday source empty; kept previous", len(previous.get("rows", [])))
@@ -1060,7 +1149,7 @@ def build_intraday():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_count": len(rows),
-        "version": "1.3-free",
+        "version": "1.3.1-free",
     })
     dump("status.json", status)
     print("intraday done", len(rows))
