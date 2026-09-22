@@ -6,6 +6,7 @@ on:
     branches: ["main"]
     paths:
       - "scripts/chip_data.py"
+      - ".github/workflows/close.yml"
   schedule:
     # 台灣時間：14:25 先出盤後版；20:30 / 23:40 補晚公布籌碼；次日 08:15 再做一次最終補齊。
     - cron: "25 6 * * 1-5"
@@ -18,9 +19,10 @@ permissions:
   pages: write
   id-token: write
 
+# 籌碼補抓不可被其他 Pages 更新互相取消；否則會出現程式已修正、資料卻永遠沒重建的狀況。
 concurrency:
-  group: dogson-pages
-  cancel-in-progress: true
+  group: dogson-close-pages
+  cancel-in-progress: false
 
 jobs:
   close:
