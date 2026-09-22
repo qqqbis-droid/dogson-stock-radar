@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Run 60K scanner
-        run: python tools/scan_60k.py 300000
+        run: python tools/scan_60k.py 0
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
