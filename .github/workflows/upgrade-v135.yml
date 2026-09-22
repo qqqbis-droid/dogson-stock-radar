@@ -47,7 +47,8 @@ jobs:
           import json
           from pathlib import Path
           h = Path('docs/index.html').read_text(encoding='utf-8')
-          rows = json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          payload = json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          rows = payload.get('rows', []) if isinstance(payload, dict) else payload
           assert 'Free Edition v1.3.5' in h
           assert rows
           assert all(float(r.get('chip_score', 0)).is_integer() for r in rows if r.get('chip_score') is not None)
