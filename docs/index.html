@@ -32,14 +32,16 @@ h1{font-size:22px;margin:0}.sub{font-size:12px;color:var(--muted);margin-top:4px
 details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summary{font-size:12px;color:#cbd3df;cursor:pointer}.group{display:grid;gap:6px;margin-top:8px}.g{display:flex;justify-content:space-between;background:#10151d;padding:8px;border-radius:9px;font-size:12px}
 .help{background:#121821;border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:10px}.help summary{font-weight:850;border:0;padding:0}.helptext{color:#cbd3df;font-size:12px;line-height:1.65;margin-top:10px}.helptext b{color:white}
 .empty{text-align:center;color:var(--muted);padding:35px 10px}.note{font-size:11px;color:var(--muted);line-height:1.5;margin:12px 2px}
+.rotationbox{background:linear-gradient(180deg,#151c27,#111720);border:1px solid var(--line);border-radius:18px;padding:13px;margin:12px 0}.rotationtop{display:flex;justify-content:space-between;align-items:flex-start}.rotationtitle{font-size:18px;font-weight:900}.rotationcols{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.rotationhead{font-size:13px;font-weight:900;margin-bottom:6px}.rotationrow{display:flex;justify-content:space-between;gap:8px;background:#0e131a;border:1px solid #252d39;border-radius:11px;padding:9px;margin:6px 0;font-size:11px}.rotationleaders{color:var(--muted);margin-top:4px}.rotationnums{text-align:right;color:#cbd3df;line-height:1.45;min-width:138px}@media(max-width:620px){.rotationcols{grid-template-columns:1fr}.rotationrow{font-size:10px}}
 .footer{position:fixed;left:0;right:0;bottom:0;background:rgba(11,13,18,.94);backdrop-filter:blur(16px);border-top:1px solid var(--line);padding:8px 14px calc(8px + env(safe-area-inset-bottom));font-size:11px;color:var(--muted);text-align:center}
 </style>
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.3.3｜官方外資現貨＋5日資金流修正版</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.3.4｜盤中純即時＋族群資金輪動</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
+<div id="rotationbox"></div>
 
 <div class="tabs"><button class="tab active" data-mode="intraday">⚡ 盤中雷達</button><button class="tab" data-mode="close">🌙 盤後雷達</button></div>
 
@@ -56,7 +58,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
     <b>技術 50：</b>突破、均線、量能、RSI、MACD、VWAP 等。<br>
     <b>籌碼 25：</b>外資連3買、借券賣出連3減、投信、融資。覆蓋率低於60%時品質總分會標示「資料待補」，不再用假精準分數誤導。盤後會在14:25、20:30、23:40及次日08:15自動重抓，補齊較晚公布的融資與借券資料。<br>
     <b>族群 10：</b>改用較窄的次產業/題材群組；沒有明確分類就不給族群分，避免把整個半導體業混成同一群。<br>
-    <b>大盤 15：</b>加權5＋櫃買4＋上漲家數3＋官方外資現貨3。外資改用 TWSE＋TPEx 當日官方買賣超金額，並加入近5日累計方向；盤中沿用最近已完整公布的盤後資料。大盤影響「品質分」與風險判讀，不會把真正剛突破的股票直接擋掉。<br><br><b>品質標籤：</b>80分以上＝高共振、70～79＝強、70以下＝一般。先看「階段」，再看「品質」。<br><br>
+    <b>大盤 15：</b>盤中改成純即時：加權3＋櫃買3＋今日上漲家數3＋盤中資金動能4＋族群擴散2；昨日外資只顯示背景、不計盤中分。盤後仍用完成交易日的加權／櫃買／廣度／官方外資。<br><b>資金輪動：</b>看族群成交金額占比的近30分鐘變化，再合併漲跌、站VWAP比例、上漲家數與量速；這是吸金熱度，不是法人淨流入。<br><br><b>品質標籤：</b>80分以上＝高共振、70～79＝強、70以下＝一般。先看「階段」，再看「品質」。<br><br>
     <b>同時間量速 2.4x：</b>今天此刻的累積量約為過去同時間的 2.4 倍。1.5～3 倍通常最舒服，>5 倍要防過熱。<br>
     <b>近即時價：</b>搜尋標的、我的關注與目前畫面股票會依優先順序放進最多5檔即時池，每10秒嘗試刷新；不是券商逐筆成交串流。<br><b>5分K結構：</b>VWAP、量速、突破、支撐壓力與階段仍以5分K計算，避免逐筆雜訊讓訊號一直跳。<br><b>VWAP：</b>今天市場的成交量加權平均成本；站上通常偏強，但離太遠反而容易追高。<br>
     <b>日量比：</b>今天完整成交量 ÷ 20日平均量。<br><b>流動性：</b>20日平均成交金額低於3,000萬直接排除；3,000萬～8,000萬標示偏低並降低品質分；8,000萬～2億正常；2億以上活躍。<br>
@@ -70,12 +72,12 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 <div id="liveStatus" class="live-status warn">🟡 近即時報價準備中｜技術結構仍採5分K</div>
 <div class="meta"><span id="modeText">盤中：5分K / VWAP / 量速</span><span id="updated">—</span></div>
 <div id="cards"><div class="empty">正在讀取最新資料…</div></div>
-<div class="note">盤中分成兩層：卡片上方「近即時價／近即時漲跌」由瀏覽器約每10秒嘗試更新、最多追蹤5檔；VWAP、量速、突破、支撐壓力與階段判斷仍採5分K雷達。籌碼使用最近已完成交易日資料，不會把尚未公布的今日籌碼冒充成即時資料。</div>
+<div class="note">盤中大盤分只使用今天即時量價、VWAP、市場廣度與族群資金輪動；昨日外資只保留背景提示，不計入盤中15分。個股籌碼仍使用最近已完成交易日資料。族群資金「流入／流失」代表成交資金集中度與價格結構的變化，不等於法人淨買賣。</div>
 </div>
 <div class="footer">階段看價格行為｜品質分 = 技術50 + 籌碼25 + 族群10 + 大盤15 ± 流動性修正</div>
 
 <script>
-let mode="intraday",filter="all",watchOnly=false,universe=[],closeRows=[],intraRows=[],rows=[],market={},marketLive={};
+let mode="intraday",filter="all",watchOnly=false,universe=[],closeRows=[],intraRows=[],rows=[],market={},marketLive={},closeMarket={},intraMarket={},sectorRotation=[];
 const $=id=>document.getElementById(id);
 function watchlist(){try{return JSON.parse(localStorage.getItem("dogson-watch")||"[]")}catch{return[]}}
 function saveWatch(x){localStorage.setItem("dogson-watch",JSON.stringify(x))}
@@ -90,18 +92,42 @@ function cls(c){return c==="剛啟動"?"start":c==="等回踩"?"pull":c==="過�
 function qualityCls(q){return q==="高共振"?"high":q==="強"?"strong":""}
 
 function marketHTML(){
- const m=market||{},t=m.taiex||{},o=m.otc||{},live=marketLive||{};
- const lt=live["^TWII"]||{},lo=live["^TWOII"]||{};
+ const m=market||{},live=marketLive||{};
  const modeClass=m.market_mode==="偏多"?"yes":m.market_mode==="防守"?"bad":"";
+ if(mode==="intraday"&&m.intraday_only){
+  const c=m.components||{},ta=c.taiex||{},ot=c.otc||{},br=c.breadth||{},fu=c.funds||{},se=c.sector||{};
+  const lt=live["^TWII"]||{},lo=live["^TWOII"]||{};
+  const bg=m.background_foreign_date?`昨日/最近外資僅背景：${m.background_foreign_date} 上市 ${signed(m.background_foreign_twse_billion,1,"億")}｜上櫃 ${signed(m.background_foreign_tpex_billion,1,"億")}（不計分）`:`昨日外資僅背景，不計盤中分`;
+  return `<div class="markettop"><div><div class="marketmode ${modeClass}">📊 盤中市場：${m.market_mode||"—"}</div><div class="sub">純即時評分｜不吃昨日外資</div></div><div><div class="marketscore">${num(m.market_score,1)}/15</div><div class="label">盤中大盤分</div></div></div>
+  <div class="marketgrid">
+   <div class="marketitem"><div class="marketv">加權 ${lt.change_pct!==undefined?signed(lt.change_pct):signed(ta.change_pct)}</div><div class="marketl">即時結構 ${num(ta.score,1)}/3｜站VWAP資金 ${num(ta.above_vwap_pct,0)}%</div></div>
+   <div class="marketitem"><div class="marketv">櫃買 ${lo.change_pct!==undefined?signed(lo.change_pct):signed(ot.change_pct)}</div><div class="marketl">即時結構 ${num(ot.score,1)}/3｜站VWAP資金 ${num(ot.above_vwap_pct,0)}%</div></div>
+   <div class="marketitem"><div class="marketv">上漲家數 ${m.breadth_up_pct===null||m.breadth_up_pct===undefined?"—":num(m.breadth_up_pct,0)+"%"}</div><div class="marketl">市場廣度 ${num(br.score,1)}/3</div></div>
+   <div class="marketitem"><div class="marketv">💰 資金動能 ${num(fu.score,1)}/4</div><div class="marketl">上漲股成交額 ${num(m.turnover_up_pct,0)}%｜站VWAP成交額 ${num(m.above_vwap_turnover_pct,0)}%｜量速 ${num(m.weighted_pace,2)}x</div></div>
+   <div class="marketitem"><div class="marketv">族群擴散 ${num(se.score,1)}/2</div><div class="marketl">轉強族群 ${m.sector_positive_count||0}｜轉弱 ${m.sector_negative_count||0}</div></div>
+   <div class="marketitem"><div class="marketv">昨日外資：背景</div><div class="marketl">${bg}</div></div>
+  </div>`;
+ }
+ const t=m.taiex||{},o=m.otc||{};
  const flowDate=m.foreign_date?`${m.foreign_date} 官方盤後`:`官方資料待補`;
  const flowDays=(+m.foreign_5d_count||0)>0?`近${m.foreign_5d_count}日 ${signed(m.foreign_5d_billion,1,"億")}`:`近5日 —`;
- return `<div class="markettop"><div><div class="marketmode ${modeClass}">📊 市場環境：${m.market_mode||"—"}</div><div class="sub">品質參考線：${m.radar_threshold||"—"}分</div></div><div><div class="marketscore">${num(m.market_score,1)}/15</div><div class="label">大盤分</div></div></div>
+ return `<div class="markettop"><div><div class="marketmode ${modeClass}">📊 盤後市場：${m.market_mode||"—"}</div><div class="sub">品質參考線：${m.radar_threshold||"—"}分</div></div><div><div class="marketscore">${num(m.market_score,1)}/15</div><div class="label">盤後大盤分</div></div></div>
  <div class="marketgrid">
-  <div class="marketitem"><div class="marketv">加權 ${lt.change_pct!==undefined?signed(lt.change_pct):signed(t.change_pct)}</div><div class="marketl">${t.trend?"多頭排列":"未完整多頭"} · ${lt.close||t.close||"—"}</div></div>
-  <div class="marketitem"><div class="marketv">櫃買 ${lo.change_pct!==undefined?signed(lo.change_pct):signed(o.change_pct)}</div><div class="marketl">${o.trend?"多頭排列":"未完整多頭"} · ${lo.close||o.close||"—"}</div></div>
-  <div class="marketitem"><div class="marketv">上漲家數 ${m.breadth_up_pct===null||m.breadth_up_pct===undefined?"—":num(m.breadth_up_pct,0)+"%"}</div><div class="marketl">最近完成交易日市場廣度</div></div>
-  <div class="marketitem"><div class="marketv">外資現貨 ${signed(m.foreign_net_billion,1,"億")}</div><div class="marketl">${flowDate}<br>上市 ${signed(m.foreign_twse_billion,1,"億")}｜上櫃 ${signed(m.foreign_tpex_billion,1,"億")}<br>${flowDays}｜外資分 ${num(m.foreign_score,1)}/3</div></div>
+  <div class="marketitem"><div class="marketv">加權 ${signed(t.change_pct)}</div><div class="marketl">${t.trend?"多頭排列":"未完整多頭"} · ${t.close||"—"}</div></div>
+  <div class="marketitem"><div class="marketv">櫃買 ${signed(o.change_pct)}</div><div class="marketl">${o.trend?"多頭排列":"未完整多頭"} · ${o.close||"—"}</div></div>
+  <div class="marketitem"><div class="marketv">上漲家數 ${m.breadth_up_pct===null||m.breadth_up_pct===undefined?"—":num(m.breadth_up_pct,0)+"%"}</div><div class="marketl">完成交易日市場廣度</div></div>
+  <div class="marketitem"><div class="marketv">外資上市 ${signed(m.foreign_twse_billion,1,"億")}</div><div class="marketl">${flowDate}<br>上櫃 ${signed(m.foreign_tpex_billion,1,"億")}｜合計 ${signed(m.foreign_net_billion,1,"億")}<br>${flowDays}｜外資分 ${num(m.foreign_score,1)}/3</div></div>
  </div>`;
+}
+
+function rotationHTML(){
+ if(mode!=="intraday")return "";
+ const arr=sectorRotation||[];
+ if(!arr.length)return `<div class="rotationbox"><div class="rotationtitle">💰 族群資金輪動</div><div class="sub">目前資料不足，累積更多5分K後會開始顯示。</div></div>`;
+ const hot=arr.filter(x=>(x.heat||0)>=2.5).slice(0,4);
+ const cold=[...arr].sort((a,b)=>(a.heat||0)-(b.heat||0)).filter(x=>(x.heat||0)<=-2.5).slice(0,4);
+ const one=x=>`<div class="rotationrow"><div><b>${x.state}｜${x.sector}</b><div class="rotationleaders">${(x.leaders||[]).map(s=>`${s.name} ${signed(s.change_pct,1)}`).join(" · ")}</div></div><div class="rotationnums">熱度 ${signed(x.heat,1,"")}<br>族群 ${signed(x.change_pct,1)}｜資金占比 ${num(x.turnover_share_pct,1)}%<br>${x.share_change_pp===null||x.share_change_pp===undefined?"占比變化待累積":`近${x.window_min||30}分占比 ${signed(x.share_change_pp,2,"pp")}`}｜VWAP上 ${num(x.above_vwap_pct,0)}%</div></div>`;
+ return `<div class="rotationbox"><div class="rotationtop"><div><div class="rotationtitle">💰 族群資金輪動</div><div class="sub">成交金額占比變化＋價格＋VWAP＋廣度；不是法人淨流入</div></div></div><div class="rotationcols"><div><div class="rotationhead">🔥 吸金中</div>${hot.length?hot.map(one).join(""):`<div class="sub">暫無明顯流入族群</div>`}</div><div><div class="rotationhead">🧊 流失／降溫</div>${cold.length?cold.map(one).join(""):`<div class="sub">暫無明顯流失族群</div>`}</div></div></div>`;
 }
 
 function srHTML(r){
@@ -171,17 +197,17 @@ async function load(){
    fetch("./data/market.json?"+bust)
   ]);
   universe=await u.json();let cj=await c.json(),ij=await i.json(),sj=await s.json();
-  market=await m.json();marketLive=ij.market_intraday||{};
+  closeMarket=await m.json();intraMarket=ij.market||closeMarket;marketLive=ij.market_intraday||{};sectorRotation=ij.sector_rotation||[];market=intraMarket;
   closeRows=cj.rows||[];intraRows=ij.rows||[];
   $("updated").textContent=sj.updated_at?new Date(sj.updated_at).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
-  $("status").textContent="已更新";$("marketbox").innerHTML=marketHTML();render();
+  $("status").textContent="已更新";$("marketbox").innerHTML=marketHTML();$("rotationbox").innerHTML=rotationHTML();render();
  }catch(e){
   $("status").textContent="資料尚未建立";
   $("cards").innerHTML='<div class="empty">第一次部署或更新中，請等 Actions 完成後再重新整理。</div>';
  }
 }
 
-document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;$("modeText").textContent=mode==="intraday"?"盤中：5分K / VWAP / 同時間量速":"盤後：日K / 籌碼 / 大盤 / 支撐壓力";render()});
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;market=mode==="intraday"?intraMarket:closeMarket;$("modeText").textContent=mode==="intraday"?"盤中：純即時大盤 / 5分K / 資金輪動":"盤後：日K / 籌碼 / 大盤 / 支撐壓力";$("marketbox").innerHTML=marketHTML();$("rotationbox").innerHTML=rotationHTML();render()});
 document.querySelectorAll(".filter[data-f]").forEach(b=>b.onclick=()=>{document.querySelectorAll(".filter[data-f]").forEach(x=>x.classList.remove("on"));b.classList.add("on");filter=b.dataset.f;render()});
 $("watchOnly").onclick=()=>{watchOnly=!watchOnly;$("watchOnly").classList.toggle("on",watchOnly);render()};
 $("scan").onclick=render;
