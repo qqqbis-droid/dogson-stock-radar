@@ -1,4 +1,3 @@
-const API_ROOT = 'https://api.fugle.tw/marketdata/v1.0/stock/intraday/quote/';
 const MAX_CODES = 5;
 
 function cors(req, res) {
@@ -9,46 +8,23 @@ function cors(req, res) {
   res.setHeader('Vary', 'Origin');
 }
 
-async function fetchOne(code, apiKey) {
-  const r = await fetch(API_ROOT + encodeURIComponent(code), {
-    headers: {
-      'X-API-KEY': apiKey,
-      'Accept': 'application/json',
-      'User-Agent': 'DogsonStockRadar/1.3'
-    },
-    cache: 'no-store'
-  });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  const data = await r.json();
-  const price = Number(data.closePrice);
-  const prev = Number(data.previousClose ?? data.referencePrice);
-  const changePct = Number.isFinite(price) && Number.isFinite(prev) && prev !== 0
-    ? (price / prev - 1) * 100
-    : null;
-  return {
-    code: String(data.symbol || code),
-    name: data.name ?? null,
-    market: data.market ?? null,
-    price: Number.isFinite(price) ? price : null,
-    previousClose: Number.isFinite(prev) ? prev : null,
-    changePct: changePct == null ? null : Math.round(changePct * 10000) / 10000,
-    open: data.openPrice ?? null,
-    high: data.highPrice ?? null,
-    low: data.lowPrice ?? null,
-    avgPrice: data.avgPrice ?? null,
-    volume: data.total?.tradeVolume ?? null,
-    time: data.closeTime ?? null,
-    source: 'Fugle MarketData'
-  };
+function finite(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeTime(v) {
+  const n = finite(v);
+  if (n == null) return Date.now();
+  if (n > 1e14) return Math.round(n / 1000);
+  if (n < 1e12) return n * 1000;
+  return n;
 }
 
 export default async function handler(req, res) {
   cors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ ok: false, error: 'GET only' });
-
-  const apiKey = String(process.env.FUGLE_API_KEY || '').trim();
-  if (!apiKey) return res.status(503).json({ ok: false, error: 'FUGLE_API_KEY is not configured' });
 
   const raw = Array.isArray(req.query.codes) ? req.query.codes[0] : (req.query.codes || '');
   const codes = [];
@@ -59,18 +35,60 @@ export default async function handler(req, res) {
   }
   if (!codes.length) return res.status(400).json({ ok: false, error: 'codes is required' });
 
-  const settled = await Promise.allSettled(codes.map(c => fetchOne(c, apiKey)));
-  const quotes = [];
-  const errors = [];
-  settled.forEach((x, i) => {
-    if (x.status === 'fulfilled') quotes.push(x.value);
-    else errors.push({ code: codes[i], error: x.reason?.message || 'fetch failed' });
-  });
-  return res.status(quotes.length ? 200 : 502).json({
-    ok: quotes.length > 0,
-    quotes,
-    errors,
-    maxCodes: MAX_CODES,
-    fetchedAt: Date.now()
-  });
+  // 同時嘗試上市與上櫃代碼，實際有資料者才保留。
+  const exCh = codes.flatMap(c => [`tse_${c}.tw`, `otc_${c}.tw`]).join('|');
+  const url = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=${encodeURIComponent(exCh)}&json=1&delay=0&_=${Date.now()}`;
+
+  try {
+    const r = await fetch(url, {
+      cache: 'no-store',
+      headers: {
+        'Accept': 'application/json,text/plain,*/*',
+        'User-Agent': 'Mozilla/5.0 DogsonStockRadar/1.3',
+        'Referer': 'https://mis.twse.com.tw/stock/index.jsp'
+      }
+    });
+    if (!r.ok) throw new Error(`TWSE MIS HTTP ${r.status}`);
+    const data = await r.json();
+    const arr = Array.isArray(data.msgArray) ? data.msgArray : [];
+
+    const byCode = new Map();
+    for (const x of arr) {
+      const code = String(x.c || '').trim();
+      if (!/^\d{4}$/.test(code) || !codes.includes(code)) continue;
+      const price = finite(x.z);
+      const prev = finite(x.y);
+      if (price == null || price <= 0) continue;
+      const changePct = prev != null && prev > 0 ? (price / prev - 1) * 100 : null;
+      const q = {
+        code,
+        name: x.n || null,
+        market: x.ex === 'otc' ? '上櫃' : x.ex === 'tse' ? '上市' : (x.ex || null),
+        price,
+        previousClose: prev,
+        changePct: changePct == null ? null : Math.round(changePct * 10000) / 10000,
+        open: finite(x.o),
+        high: finite(x.h),
+        low: finite(x.l),
+        volume: finite(x.v),
+        time: normalizeTime(x.tlong),
+        source: 'TWSE MIS'
+      };
+      const old = byCode.get(code);
+      if (!old || (x.ex === 'tse' && old.market !== '上市')) byCode.set(code, q);
+    }
+
+    const quotes = codes.map(c => byCode.get(c)).filter(Boolean);
+    const errors = codes.filter(c => !byCode.has(c)).map(code => ({ code, error: 'no valid quote' }));
+    return res.status(quotes.length ? 200 : 502).json({
+      ok: quotes.length > 0,
+      quotes,
+      errors,
+      maxCodes: MAX_CODES,
+      fetchedAt: Date.now(),
+      source: 'TWSE MIS'
+    });
+  } catch (e) {
+    return res.status(502).json({ ok: false, error: e?.message || 'quote fetch failed' });
+  }
 }
