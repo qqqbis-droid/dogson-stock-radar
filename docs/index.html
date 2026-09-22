@@ -23,7 +23,7 @@ h1{font-size:22px;margin:0}.sub{font-size:12px;color:var(--muted);margin-top:4px
 .meta{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin:12px 2px}
 .card{background:linear-gradient(180deg,#171c25,#131820);border:1px solid var(--line);border-radius:18px;padding:14px;margin:10px 0}
 .top{display:flex;justify-content:space-between;gap:10px}.stockleft{display:flex;gap:8px}.star{border:0;background:transparent;font-size:24px;color:#8f9aac;padding:0}.star.on{color:#ffd76b}.name{font-size:19px;font-weight:900}.code{font-size:13px;color:var(--muted);margin-left:6px}.score{font-size:27px;font-weight:900}.label{font-size:11px;color:var(--muted);text-align:right}
-.cat{display:inline-block;font-size:12px;font-weight:850;padding:6px 9px;border-radius:999px;margin-top:7px}.start{background:#0f3928;color:#69efa8}.pull{background:#40300f;color:#ffd477}.watch{background:#1b2b42;color:#9cc9ff}.hot{background:#441923;color:#ff9aab}
+.cat{display:inline-block;font-size:12px;font-weight:850;padding:6px 9px;border-radius:999px;margin-top:7px}.start{background:#0f3928;color:#69efa8}.pull{background:#40300f;color:#ffd477}.watch{background:#1b2b42;color:#9cc9ff}.hot{background:#441923;color:#ff9aab}.quality{display:inline-block;font-size:11px;font-weight:800;padding:5px 8px;border-radius:999px;margin:7px 0 0 5px;background:#222938;color:#cbd6e6}.quality.high{background:#392b0f;color:#ffd477}.quality.strong{background:#192f45;color:#a9d5ff}
 .parts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:11px}.part{background:#0f141c;border:1px solid #29313e;border-radius:10px;padding:8px 5px;text-align:center}.partv{font-size:14px;font-weight:900}.partl{font-size:9px;color:var(--muted);margin-top:3px}
 .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}.metric{background:#0e131a;border:1px solid #252d39;border-radius:12px;padding:9px}.mval{font-weight:850;font-size:14px}.mlab{font-size:10px;color:var(--muted);margin-top:3px}
 .srbox{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.sr{background:#0e131a;border-radius:12px;padding:10px}.support{border:1px solid #244936}.resistance{border:1px solid #56313a}.srtitle{font-size:11px;color:var(--muted)}.srprice{font-size:16px;font-weight:900;margin-top:4px}.support .srprice{color:var(--green)}.resistance .srprice{color:var(--red)}.srbasis{font-size:10px;color:#8994a6;margin-top:4px}
@@ -37,7 +37,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.1｜技術＋籌碼＋族群＋大盤</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.2｜階段＋品質分開判斷</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 
@@ -52,11 +52,11 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
  <details class="help">
    <summary>❓ 每個數值怎麼看？點我教學</summary>
    <div class="helptext">
-    <b>總分不是上漲機率。</b> 總分 82 的意思是「我們設定的強勢條件目前符合很多」，不是 82% 會漲。<br><br>
+    <b>階段和品質現在分開看。</b>「剛啟動」主要看突破、量能、VWAP/均線與位階；總分不再是剛啟動的硬門檻。總分 82 代表品質高，不是 82% 會漲。<br><br>
     <b>技術 50：</b>突破、均線、量能、RSI、MACD、VWAP 等。<br>
     <b>籌碼 25：</b>外資連3買、借券賣出連3減、投信、融資。資料缺漏時用中性分，不會亂扣分。<br>
     <b>族群 10：</b>同產業至少 2～4 檔一起轉強才加分。<br>
-    <b>大盤 15：</b>加權、櫃買、上漲家數比與全市場外資方向。大盤越弱，「剛啟動」門檻會自動提高。<br><br>
+    <b>大盤 15：</b>加權、櫃買、上漲家數比與全市場外資方向。大盤現在影響「品質分」與風險判讀，不會把真正剛突破的股票直接擋掉。<br><br><b>品質標籤：</b>80分以上＝高共振、70～79＝強、70以下＝一般。先看「階段」，再看「品質」。<br><br>
     <b>同時間量速 2.4x：</b>今天此刻的累積量約為過去同時間的 2.4 倍。1.5～3 倍通常最舒服，>5 倍要防過熱。<br>
     <b>VWAP：</b>今天市場的成交量加權平均成本；站上通常偏強，但離太遠反而容易追高。<br>
     <b>日量比：</b>今天完整成交量 ÷ 20日平均量。<br>
@@ -71,7 +71,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 <div id="cards"><div class="empty">正在讀取最新資料…</div></div>
 <div class="note">盤中籌碼使用最近已完成交易日的外資／投信／融資／借券資料，不會把尚未公布的今日籌碼冒充成即時資料。免費資料源與 GitHub Actions 排程都可能延遲數分鐘。</div>
 </div>
-<div class="footer">總分 = 技術50 + 籌碼25 + 族群10 + 大盤15</div>
+<div class="footer">階段看價格行為｜品質分 = 技術50 + 籌碼25 + 族群10 + 大盤15</div>
 
 <script>
 let mode="intraday",filter="all",watchOnly=false,universe=[],closeRows=[],intraRows=[],rows=[],market={},marketLive={};
@@ -84,12 +84,13 @@ function num(v,d=1){return v===null||v===undefined||Number.isNaN(+v)?"—":(+v).
 function lots(v){return v===null||v===undefined?"—":num((+v)/1000,0)+"張"}
 function signed(v,d=1,suffix="%"){if(v===null||v===undefined||Number.isNaN(+v))return "—";return ((+v)>=0?"+":"")+num(v,d)+suffix}
 function cls(c){return c==="剛啟動"?"start":c==="等回踩"?"pull":c==="過熱不追"?"hot":"watch"}
+function qualityCls(q){return q==="高共振"?"high":q==="強"?"strong":""}
 
 function marketHTML(){
  const m=market||{},t=m.taiex||{},o=m.otc||{},live=marketLive||{};
  const lt=live["^TWII"]||{},lo=live["^TWOII"]||{};
  const modeClass=m.market_mode==="偏多"?"yes":m.market_mode==="防守"?"bad":"";
- return `<div class="markettop"><div><div class="marketmode ${modeClass}">📊 市場環境：${m.market_mode||"—"}</div><div class="sub">剛啟動門檻：${m.radar_threshold||"—"}分</div></div><div><div class="marketscore">${num(m.market_score,1)}/15</div><div class="label">大盤分</div></div></div>
+ return `<div class="markettop"><div><div class="marketmode ${modeClass}">📊 市場環境：${m.market_mode||"—"}</div><div class="sub">品質參考線：${m.radar_threshold||"—"}分</div></div><div><div class="marketscore">${num(m.market_score,1)}/15</div><div class="label">大盤分</div></div></div>
  <div class="marketgrid">
   <div class="marketitem"><div class="marketv">加權 ${lt.change_pct!==undefined?signed(lt.change_pct):signed(t.change_pct)}</div><div class="marketl">${t.trend?"多頭排列":"未完整多頭"} · ${lt.close||t.close||"—"}</div></div>
   <div class="marketitem"><div class="marketv">櫃買 ${lo.change_pct!==undefined?signed(lo.change_pct):signed(o.change_pct)}</div><div class="marketl">${o.trend?"多頭排列":"未完整多頭"} · ${lo.close||o.close||"—"}</div></div>
@@ -144,12 +145,12 @@ function render(){
  if(q){let hits=rr.filter(r=>String(r.code)===q||String(r.name).toLowerCase().includes(q));if(hits.length)rr=hits}
  if(!rr.length){$("cards").innerHTML='<div class="empty">目前沒有符合條件的資料。若盤中搜尋任意股票，免費版只掃固定關注池＋前一盤後前150名；切到盤後可查全市場。</div>';return}
  $("cards").innerHTML=rr.slice(0,70).map(r=>`<div class="card">
-  <div class="top"><div class="stockleft"><button class="star ${watched(r.code)?"on":""}" onclick="toggleWatch('${r.code}')">${watched(r.code)?"★":"☆"}</button><div><div class="name">${r.name}<span class="code">${r.code}</span></div><div class="sub">${r.industry||"未分類"} · ${mode==="intraday"?(r.time||""):(r.date||"")}</div><span class="cat ${cls(r.category)}">${r.category}</span></div></div><div><div class="score">${num(r.score,0)}</div><div class="label">總分 /100</div></div></div>
+  <div class="top"><div class="stockleft"><button class="star ${watched(r.code)?"on":""}" onclick="toggleWatch('${r.code}')">${watched(r.code)?"★":"☆"}</button><div><div class="name">${r.name}<span class="code">${r.code}</span></div><div class="sub">${r.industry||"未分類"} · ${mode==="intraday"?(r.time||""):(r.date||"")}</div><span class="cat ${cls(r.category)}">${r.category}</span><span class="quality ${qualityCls(r.quality_label)}">品質：${r.quality_label||"一般"}</span></div></div><div><div class="score">${num(r.score,0)}</div><div class="label">品質總分 /100</div></div></div>
   ${partsHTML(r)}
   <div class="metrics">${metrics(r).map(m=>`<div class="metric"><div class="mval">${m[1]}</div><div class="mlab">${m[0]}</div></div>`).join("")}</div>
   ${srHTML(r)}
   ${chipHTML(r)}
-  <div class="reasons">${(r.reasons||[]).map(x=>`<span class="reason">${x}</span>`).join("")}${(r.overheat_reasons||[]).map(x=>`<span class="reason warn">⚠ ${x}</span>`).join("")}</div>
+  <div class="reasons">${r.stage_reason?`<span class="reason">階段：${r.stage_reason}</span>`:""}${(r.reasons||[]).map(x=>`<span class="reason">${x}</span>`).join("")}${(r.overheat_reasons||[]).map(x=>`<span class="reason warn">⚠ ${x}</span>`).join("")}</div>
   ${groupHTML(r)}
  </div>`).join("");
 }

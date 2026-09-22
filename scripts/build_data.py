@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.1
+犬子老師飆股雷達 Free Edition v1.2
 =================================
 總分 = 技術 50 + 籌碼 25 + 族群 10 + 大盤 15
 
@@ -628,17 +628,21 @@ def intraday_technical(x):
 
 
 def add_component_scores(rows, market, preliminary_intraday=False):
-    """加入族群分、總分與最終分類。"""
+    """加入族群分、總分、階段與品質。
+
+    v1.2 起把「階段」和「品質」拆開：
+    - 階段主要看價格行為、量能與位階。
+    - 品質才用 100 分總分衡量。
+    """
     if not rows:
         return rows
 
-    # 族群共振只用技術本體判斷，不讓「總分」反過來影響族群計數。
     hot = {}
     for r in rows:
         if r.get("technical_score", 0) >= 30 and not r.get("overheat_reasons"):
             hot[r["industry"]] = hot.get(r["industry"], 0) + 1
 
-    threshold = market.get("radar_threshold", 76)
+    quality_reference = market.get("radar_threshold", 76)
     market_score = float(market.get("market_score", 7.5))
 
     for r in rows:
@@ -649,30 +653,79 @@ def add_component_scores(rows, market, preliminary_intraday=False):
         r["market_score"] = market_score
         r["market_mode"] = market.get("market_mode", "中性")
 
-        # chip_score 已在 close 或從 close row 帶入 intraday
         cs = float(r.get("chip_score", 12.5))
         total = float(r.get("technical_score", 0)) + cs + sec + market_score
         r["score"] = round(max(0, min(100, total)), 1)
 
+        if r["score"] >= 80:
+            r["quality_label"] = "高共振"
+        elif r["score"] >= 70:
+            r["quality_label"] = "強"
+        else:
+            r["quality_label"] = "一般"
+        r["quality_reference"] = quality_reference
+        r["quality_pass_market"] = bool(r["score"] >= quality_reference)
+
         if r.get("overheat_reasons"):
             r["category"] = "過熱不追"
+            r["stage_reason"] = "位階或動能已進入過熱區"
+
         elif preliminary_intraday:
-            if r["score"] >= threshold and r.get("break3") and r.get("close", 0) > r.get("vwap", 1e99):
+            launch = bool(
+                r.get("break3")
+                and r.get("close", 0) > r.get("vwap", 1e99)
+                and r.get("pace", 0) >= 1.2
+                and (r.get("trend5") or r.get("break12") or r.get("technical_score", 0) >= 30)
+            )
+            pullback = bool(
+                (r.get("trend5") or r.get("technical_score", 0) >= 25)
+                and r.get("close", 0) >= r.get("vwap", 0) * 0.995
+            )
+
+            if launch:
                 r["category"] = "剛啟動"
-            elif r["score"] >= threshold - 10:
+                r["stage_reason"] = "3K突破＋站上VWAP＋量速放大"
+            elif pullback:
                 r["category"] = "等回踩"
+                r["stage_reason"] = "短線結構仍強，等待VWAP/短均承接"
             else:
                 r["category"] = "觀察"
+                r["stage_reason"] = "已有部分條件，但尚未形成明確盤中啟動"
+
         else:
-            if r["score"] >= threshold and r.get("break20") and r.get("dist20", 999) <= 10 and r.get("ret5", 999) <= 15:
+            launch_structure = bool(
+                r.get("break20")
+                or (r.get("break3") and r.get("trend"))
+            )
+            launch = bool(
+                launch_structure
+                and r.get("vol_x", 0) >= 1.2
+                and r.get("dist20", 999) <= 12
+                and r.get("ret5", 999) <= 18
+            )
+            pullback = bool(
+                (r.get("trend") or r.get("break3") or r.get("technical_score", 0) >= 28)
+                and r.get("dist20", 999) <= 15
+                and r.get("ret5", 999) <= 22
+            )
+
+            if launch:
                 r["category"] = "剛啟動"
-            elif r["score"] >= threshold - 10 and r.get("dist20", 999) <= 15:
+                r["stage_reason"] = "20日突破" if r.get("break20") else "3日平台突破＋均線多頭"
+            elif pullback:
                 r["category"] = "等回踩"
+                r["stage_reason"] = "趨勢仍強，但較適合等支撐/均線承接"
             else:
                 r["category"] = "觀察"
+                r["stage_reason"] = "條件尚未集中到啟動階段"
 
     order = {"剛啟動": 0, "等回踩": 1, "觀察": 2, "過熱不追": 3}
-    rows.sort(key=lambda r: (order.get(r["category"], 9), -r["score"]))
+    quality_order = {"高共振": 0, "強": 1, "一般": 2}
+    rows.sort(key=lambda r: (
+        order.get(r["category"], 9),
+        quality_order.get(r.get("quality_label"), 9),
+        -r["score"]
+    ))
     return rows
 
 
@@ -751,7 +804,7 @@ def build_close():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "close_updated_at": now_tw().isoformat(timespec="seconds"),
         "daily_count": len(rows),
-        "version": "1.1-free",
+        "version": "1.2-free",
     })
     dump("status.json", status)
 
@@ -880,7 +933,7 @@ def build_intraday():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_count": len(rows),
-        "version": "1.1-free",
+        "version": "1.2-free",
     })
     dump("status.json", status)
     print("intraday done", len(rows))
