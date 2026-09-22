@@ -960,6 +960,10 @@ def build_intraday():
                     "avg_turnover20_mn": prev.get("avg_turnover20_mn"),
                     "liquidity_level": prev.get("liquidity_level", "未知"),
                     "liquidity_adjust": prev.get("liquidity_adjust", 0),
+                    "avg_turnover20": prev.get("avg_turnover20"),
+                    "avg_turnover20_mn": prev.get("avg_turnover20_mn"),
+                    "liquidity_level": prev.get("liquidity_level", "未知"),
+                    "liquidity_adjust": prev.get("liquidity_adjust", 0),
                 })
             except Exception as e:
                 print("intra stock", sym, e)
