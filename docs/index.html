@@ -37,7 +37,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.3.1｜收盤覆核＋嚴格族群修正版</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.3.2｜收盤覆核＋籌碼狀態修正版</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 
@@ -54,7 +54,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
    <div class="helptext">
     <b>階段和品質現在分開看。</b>「剛啟動」主要看突破、量能、VWAP/均線與位階；總分不再是剛啟動的硬門檻。總分 82 代表品質高，不是 82% 會漲。<br><br>
     <b>技術 50：</b>突破、均線、量能、RSI、MACD、VWAP 等。<br>
-    <b>籌碼 25：</b>外資連3買、借券賣出連3減、投信、融資。覆蓋率低於60%時品質總分會標示「資料待補」，不再用假精準分數誤導。<br>
+    <b>籌碼 25：</b>外資連3買、借券賣出連3減、投信、融資。覆蓋率低於60%時品質總分會標示「資料待補」，不再用假精準分數誤導。盤後會在14:25、20:30、23:40及次日08:15自動重抓，補齊較晚公布的融資與借券資料。<br>
     <b>族群 10：</b>改用較窄的次產業/題材群組；沒有明確分類就不給族群分，避免把整個半導體業混成同一群。<br>
     <b>大盤 15：</b>加權、櫃買、上漲家數比與全市場外資方向。大盤現在影響「品質分」與風險判讀，不會把真正剛突破的股票直接擋掉。<br><br><b>品質標籤：</b>80分以上＝高共振、70～79＝強、70以下＝一般。先看「階段」，再看「品質」。<br><br>
     <b>同時間量速 2.4x：</b>今天此刻的累積量約為過去同時間的 2.4 倍。1.5～3 倍通常最舒服，>5 倍要防過熱。<br>
@@ -83,6 +83,7 @@ function watched(c){return watchlist().includes(String(c))}
 function toggleWatch(c){let w=watchlist();c=String(c);w=w.includes(c)?w.filter(x=>x!==c):[...w,c];saveWatch(w);render()}
 function num(v,d=1){return v===null||v===undefined||Number.isNaN(+v)?"—":(+v).toFixed(d)}
 function lots(v){return v===null||v===undefined?"—":num((+v)/1000,0)+"張"}
+function marketLots(v){if(v===null||v===undefined||Number.isNaN(+v))return "—";v=+v;return Math.abs(v)>=10000?signed(v/10000,1,"萬張"):signed(v,0,"張")}
 function signed(v,d=1,suffix="%"){if(v===null||v===undefined||Number.isNaN(+v))return "—";return ((+v)>=0?"+":"")+num(v,d)+suffix}
 function moneyTw(v){if(v===null||v===undefined||Number.isNaN(+v))return "—";v=+v;if(v>=1e8)return num(v/1e8,1)+"億";if(v>=1e7)return num(v/1e7,1)+"千萬";return num(v/1e6,1)+"百萬"}
 function cls(c){return c==="剛啟動"?"start":c==="等回踩"?"pull":c==="過熱不追"?"hot":"watch"}
@@ -97,7 +98,7 @@ function marketHTML(){
   <div class="marketitem"><div class="marketv">加權 ${lt.change_pct!==undefined?signed(lt.change_pct):signed(t.change_pct)}</div><div class="marketl">${t.trend?"多頭排列":"未完整多頭"} · ${lt.close||t.close||"—"}</div></div>
   <div class="marketitem"><div class="marketv">櫃買 ${lo.change_pct!==undefined?signed(lo.change_pct):signed(o.change_pct)}</div><div class="marketl">${o.trend?"多頭排列":"未完整多頭"} · ${lo.close||o.close||"—"}</div></div>
   <div class="marketitem"><div class="marketv">上漲家數 ${m.breadth_up_pct===null||m.breadth_up_pct===undefined?"—":num(m.breadth_up_pct,0)+"%"}</div><div class="marketl">最近完成交易日市場廣度</div></div>
-  <div class="marketitem"><div class="marketv">外資 ${m.foreign_net_lots===null||m.foreign_net_lots===undefined?"—":signed(m.foreign_net_lots,0,"張")}</div><div class="marketl">全市場最近已公布淨買賣</div></div>
+  <div class="marketitem"><div class="marketv">外資 ${marketLots(m.foreign_net_lots)}</div><div class="marketl">全市場最近已公布淨買賣</div></div>
  </div>`;
 }
 

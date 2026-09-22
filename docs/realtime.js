@@ -77,6 +77,8 @@
 
   function checkRadarFreshness(){
     try{
+      // 盤後頁看的是完整日K/籌碼，不應拿盤中5分K最後時間當成錯誤警示。
+      if(typeof mode!=='undefined'&&mode==='close'){setRadarPill('盤後資料','ok');return;}
       const rs=typeof intraRows!=='undefined'&&Array.isArray(intraRows)?intraRows:[];
       if(!rs.length)return;
       const now=taipeiClock();
@@ -174,6 +176,7 @@
     document.addEventListener('visibilitychange',()=>{if(!document.hidden){refresh();checkRadarFreshness()}});
     document.getElementById('q')?.addEventListener('change',refresh);
     document.getElementById('scan')?.addEventListener('click',()=>setTimeout(refresh,150));
+    document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setTimeout(checkRadarFreshness,30)));
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
