@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""One-time v1.3.7 patch: use official TPEx OpenAPI history for the OTC index."""
+"""One-time v1.3.7 patch: use official TPEx monthly history for the OTC index."""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,7 +21,7 @@ if start < 0 or end < 0:
     raise SystemExit("index_state block not found")
 
 new_block = r'''def _parse_tpex_index_date(value):
-    """Parse TPEx OpenAPI Date defensively (Gregorian or ROC formats)."""
+    """Parse TPEx index date defensively (Gregorian or ROC formats)."""
     s = str(value or "").strip()
     if not s:
         return None
@@ -49,59 +49,121 @@ new_block = r'''def _parse_tpex_index_date(value):
     return None
 
 
-def tpex_index_history():
-    """Official TPEx OpenAPI history for the OTC index.
+def _month_start(d, back=0):
+    y = d.year
+    m = d.month - int(back)
+    while m <= 0:
+        m += 12
+        y -= 1
+    return datetime(y, m, 1).date()
 
-    Yahoo's ^TWOII feed is intermittent.  The official TPEx endpoint exposes
-    Date/Open/High/Low/Close and is therefore the canonical daily history used
-    for the market-environment score.
+
+def tpex_index_history(months=4):
+    """Official TPEx monthly history for the OTC index.
+
+    The TPEx OpenAPI route can be blocked from GitHub-hosted runners.  The
+    official historical endpoint /www/zh-tw/indexInfo/inx accepts a month and
+    returns that month's daily OTC index OHLC values, so it is used as the
+    primary source for MA5/10/20 and the market-environment score.
     """
-    try:
-        rr = requests.get(
-            "https://www.tpex.org.tw/openapi/v1/tpex_index",
-            headers={
-                "User-Agent": "Mozilla/5.0 DogsonRadar/1.3.7",
-                "Accept": "application/json,text/plain,*/*",
-                "Referer": "https://www.tpex.org.tw/",
-            },
-            timeout=30,
-        )
-        rr.raise_for_status()
-        rows = rr.json()
-        if not isinstance(rows, list) or not rows:
-            return pd.DataFrame()
-        df = pd.DataFrame(rows)
-        required = ["Date", "Open", "High", "Low", "Close"]
-        if any(c not in df.columns for c in required):
-            print("TPEx index schema mismatch", list(df.columns))
-            return pd.DataFrame()
+    cutoff = _latest_completed_cutoff()
+    frames = []
+    url = "https://www.tpex.org.tw/www/zh-tw/indexInfo/inx"
+    headers = {
+        "User-Agent": "Mozilla/5.0 DogsonRadar/1.3.7",
+        "Accept": "application/json,text/plain,*/*",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "Referer": "https://www.tpex.org.tw/zh-tw/index.html",
+        "Origin": "https://www.tpex.org.tw",
+    }
 
-        parsed = df["Date"].map(_parse_tpex_index_date)
-        out = pd.DataFrame(index=pd.to_datetime(parsed))
-        for c in ["Open", "High", "Low", "Close"]:
-            out[c] = pd.to_numeric(
-                df[c].astype(str).str.replace(",", "", regex=False), errors="coerce"
-            ).to_numpy()
-        # Volume is not required for index scoring; keep the normalized shape.
-        out["Volume"] = 0.0
-        out = out[~out.index.isna()].dropna(subset=["Close"])
-        out = out[~out.index.duplicated(keep="last")].sort_index()
-        cutoff = _latest_completed_cutoff()
-        out = out[[pd.Timestamp(i).date() <= cutoff for i in out.index]]
-        return out
-    except Exception as e:
-        print("TPEx official index history", e)
+    for back in range(max(2, int(months))):
+        first = _month_start(cutoff, back)
+        try:
+            rr = requests.post(
+                url,
+                data={"response": "json", "date": first.strftime("%Y/%m/%d")},
+                headers=headers,
+                timeout=25,
+            )
+            rr.raise_for_status()
+            obj = rr.json()
+            tables = obj.get("tables") or []
+            if not tables:
+                print("TPEx index no tables", first)
+                continue
+            table = tables[0] or {}
+            fields = table.get("fields") or []
+            data = table.get("data") or []
+            if not fields or not data:
+                print("TPEx index empty month", first)
+                continue
+
+            fmap = {str(v).strip(): i for i, v in enumerate(fields)}
+            aliases = {
+                "Date": ["日期", "Date"],
+                "Open": ["開市", "開盤", "Open"],
+                "High": ["最高", "High"],
+                "Low": ["最低", "Low"],
+                "Close": ["收市", "收盤", "Close"],
+            }
+            pos = {}
+            for key, names in aliases.items():
+                hit = next((fmap[n] for n in names if n in fmap), None)
+                if hit is None:
+                    raise ValueError(f"TPEx index missing {key}; fields={fields}")
+                pos[key] = hit
+
+            rows = []
+            for row in data:
+                if not isinstance(row, (list, tuple)):
+                    continue
+                try:
+                    td = _parse_tpex_index_date(row[pos["Date"]])
+                except Exception:
+                    td = None
+                if td is None or td > cutoff:
+                    continue
+
+                def num(key):
+                    try:
+                        s = str(row[pos[key]]).replace(",", "").replace("+", "").strip()
+                        return float(s)
+                    except Exception:
+                        return None
+
+                o, h, l, c = num("Open"), num("High"), num("Low"), num("Close")
+                if c is None:
+                    continue
+                rows.append({
+                    "Date": pd.Timestamp(td),
+                    "Open": o if o is not None else c,
+                    "High": h if h is not None else c,
+                    "Low": l if l is not None else c,
+                    "Close": c,
+                    "Volume": 0.0,
+                })
+            if rows:
+                f = pd.DataFrame(rows).set_index("Date")
+                frames.append(f)
+                print("TPEx official index month", first.strftime("%Y-%m"), len(f))
+        except Exception as e:
+            print("TPEx official index month failed", first, e)
+
+    if not frames:
         return pd.DataFrame()
+    out = pd.concat(frames).sort_index()
+    out = out[~out.index.duplicated(keep="last")]
+    return out
 
 
 def index_state(symbol, label, snap=None):
     try:
-        # OTC index uses the official TPEx history first because Yahoo ^TWOII is
-        # frequently missing/stale.  TWSE keeps Yahoo history with official MIS
-        # close overlay for now.
+        # OTC index uses official TPEx monthly history first because Yahoo ^TWOII
+        # is intermittent. TWSE keeps Yahoo history with official MIS overlay.
         if symbol == "^TWOII":
             d = tpex_index_history()
-            source = "TPEx OpenAPI"
+            source = "TPEx official monthly history"
             if d is None or len(d) < 24:
                 d = download_daily([symbol], "3mo").get(symbol)
                 source = "Yahoo daily fallback"
@@ -120,7 +182,7 @@ def index_state(symbol, label, snap=None):
             else:
                 c.loc[pd.Timestamp(td)] = float(snap["close"])
                 c = c.sort_index()
-            source = ("TPEx OpenAPI + MIS overlay" if symbol == "^TWOII" else "TWSE MIS overlay")
+            source = ("TPEx official history + MIS overlay" if symbol == "^TWOII" else "TWSE MIS overlay")
         if len(c) < 25:
             return None
         ma5 = float(c.rolling(5).mean().iloc[-1])
