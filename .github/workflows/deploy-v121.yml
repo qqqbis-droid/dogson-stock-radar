@@ -1,0 +1,50 @@
+name: Deploy Radar v1.2.1
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v121-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event.head_commit.message == 'Deploy v1.2.1 live'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - name: Load latest close/chip data
+        run: python scripts/sync_live_data.py || true
+      - name: Rebuild intraday radar with v1.2.1
+        run: python scripts/build_data.py --mode intraday
+      - name: Verify v1.2.1 and non-empty intraday data
+        run: |
+          grep -q 'Free Edition v1.2.1' docs/index.html
+          python - <<'PY'
+          import json
+          d=json.load(open('docs/data/intraday.json',encoding='utf-8'))
+          rows=d.get('rows',[])
+          assert rows, 'intraday rows are empty'
+          print('intraday rows',len(rows),'6213',sum(str(r.get('code'))=='6213' for r in rows))
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
