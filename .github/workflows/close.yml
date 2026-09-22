@@ -2,10 +2,8 @@ name: Radar - Close Update
 
 on:
   workflow_dispatch:
-  push:
-    branches: ["main"]
   schedule:
-    # 台灣時間週一至週五約 14:25
+    # 台灣時間週一至週五約 14:25。只在盤後跑，避免每次改程式都重建盤後資料覆蓋盤中版本。
     - cron: "25 6 * * 1-5"
 
 permissions:
