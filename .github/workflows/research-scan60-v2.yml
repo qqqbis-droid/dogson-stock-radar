@@ -1,0 +1,171 @@
+name: Research - 60m Radar V2
+
+on:
+  push:
+    branches:
+      - research/scan60-20260922
+    paths:
+      - .github/workflows/research-scan60-v2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -q 'yfinance>=0.2.54' pandas numpy
+      - name: Full market scan v2
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, math, time
+          from pathlib import Path
+          import pandas as pd
+          import yfinance as yf
+
+          uni=json.loads(Path('docs/data/universe.json').read_text(encoding='utf-8'))
+          meta={}
+          for x in uni:
+              code=str(x.get('code','')).strip(); market=str(x.get('market') or '').strip()
+              if not (code.isdigit() and len(code)==4): continue
+              sym=code+('.TWO' if market=='上櫃' else '.TW')
+              meta[sym]={'code':code,'name':str(x.get('name') or code),'market':market}
+          syms=list(meta)
+          close_data=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          radar={str(r.get('code')):r for r in close_data.get('rows',[]) if isinstance(r,dict) and r.get('code')}
+
+          def frame(raw,sym,batch):
+              if raw is None or raw.empty: return None
+              try:
+                  if isinstance(raw.columns,pd.MultiIndex):
+                      l0=set(map(str,raw.columns.get_level_values(0))); l1=set(map(str,raw.columns.get_level_values(1)))
+                      if sym in l0: d=raw[sym].copy()
+                      elif sym in l1: d=raw.xs(sym,axis=1,level=1).copy()
+                      else: return None
+                  elif len(batch)==1: d=raw.copy()
+                  else: return None
+                  if isinstance(d.columns,pd.MultiIndex): d.columns=[str(c[0]) for c in d.columns]
+                  if 'Close' not in d.columns or 'Volume' not in d.columns: return None
+                  d=d[['Close','Volume']].copy()
+                  d['Close']=pd.to_numeric(d['Close'],errors='coerce'); d['Volume']=pd.to_numeric(d['Volume'],errors='coerce').fillna(0)
+                  d=d.dropna(subset=['Close']); d=d[d['Close']>0]
+                  return d if len(d)>=246 else None
+              except Exception:
+                  return None
+
+          rows=[]; failed=[]; bs=50
+          for st in range(0,len(syms),bs):
+              batch=syms[st:st+bs]
+              try:
+                  raw=yf.download(batch,period='3mo',interval='60m',group_by='ticker',auto_adjust=False,threads=True,progress=False,prepost=False)
+              except Exception:
+                  failed += batch; continue
+              for sym in batch:
+                  d=frame(raw,sym,batch)
+                  if d is None: failed.append(sym); continue
+                  c=d['Close']; v=d['Volume']
+                  ma20=c.rolling(20).mean(); ma60=c.rolling(60).mean(); ma240=c.rolling(240).mean()
+                  if any(pd.isna(s.iloc[-6]) or pd.isna(s.iloc[-1]) for s in (ma20,ma60,ma240)): continue
+
+                  # Local direction: latest bar and last 3 completed bars must agree for an UP label.
+                  def dirs(s):
+                      one=(s.iloc[-1]/s.iloc[-2]-1)*100
+                      three=(s.iloc[-1]/s.iloc[-3]-1)*100
+                      five=(s.iloc[-1]/s.iloc[-6]-1)*100
+                      # flat band avoids classifying tiny noise as down/up
+                      if one > 0 and three > 0.03: lab='UP'
+                      elif one >= -0.02 and three >= -0.05: lab='FLAT'
+                      else: lab='DOWN'
+                      return lab,one,three,five
+                  d20,o20,t20,s20=dirs(ma20); d60,o60,t60,s60=dirs(ma60); d240,o240,t240,s240=dirs(ma240)
+
+                  cross_age=None
+                  for age in range(0,min(80,len(d)-60)):
+                      i=len(d)-1-age
+                      if i<=0: break
+                      if ma20.iloc[i-1] <= ma60.iloc[i-1] and ma20.iloc[i] > ma60.iloc[i]:
+                          cross_age=age; break
+
+                  price=float(c.iloc[-1]); m20=float(ma20.iloc[-1]); m60=float(ma60.iloc[-1]); m240=float(ma240.iloc[-1])
+                  gap2060=(m20/m60-1)*100
+                  price20=(price/m20-1)*100
+                  overhead240=((m240/price)-1)*100 if price<m240 else 0.0
+                  above240=price>=m240
+                  orderly=price>m20>m60>m240
+                  slope_diff=abs(s20-s60)
+                  parallel='GREEN' if slope_diff<=0.30 else ('YELLOW' if slope_diff<=0.60 else 'WIDE')
+                  gap_band='GREEN' if 0<=gap2060<=3 else ('YELLOW' if 3<gap2060<=6 else 'WIDE')
+
+                  idx=pd.to_datetime(d.index); dates=pd.Series([z.date() for z in idx],index=d.index)
+                  day_vol=v.groupby(dates).sum(); day_turn=(c*v).groupby(dates).sum(); day_close=c.groupby(dates).last()
+                  avgvol=float(day_vol.tail(10).mean())/1000 if len(day_vol) else 0
+                  avgturn=float(day_turn.tail(10).mean())/1e6 if len(day_turn) else 0
+                  if not (avgturn>=50 and avgvol>=300): continue
+                  ret5=(day_close.iloc[-1]/day_close.iloc[-6]-1)*100 if len(day_close)>=6 else None
+                  ret20=(day_close.iloc[-1]/day_close.iloc[-21]-1)*100 if len(day_close)>=21 else None
+
+                  # 240T gate: near overhead + flat/down 240 is rejected. Far overhead can stay only as early-stage watch.
+                  reject240=(not above240 and overhead240<=3 and d240!='UP')
+
+                  cat=None; reason=None
+                  # pre-cross: 20 rising, 60 no longer falling, within 0.8%
+                  if m20<=m60 and -0.8<=gap2060<=0 and d20=='UP' and d60 in ('UP','FLAT') and not reject240:
+                      cat='PRE_CROSS'
+                  # early cross: crossed in latest 0-3 bars, 20 up, 60 not down
+                  elif m20>m60 and cross_age is not None and cross_age<=3 and d20=='UP' and d60 in ('UP','FLAT') and not reject240:
+                      cat='EARLY'
+                  # continuation: old cross or unknown/older than 3; both 20/60 truly up, reasonable separation, 240 no near-overhead rejection
+                  elif m20>m60 and (cross_age is None or cross_age>3) and d20=='UP' and d60=='UP' and gap2060<=6 and not reject240:
+                      cat='CONTINUATION'
+                  else:
+                      continue
+
+                  # quality flags, not hard exclusions
+                  extension='OK'
+                  if price20>8 or (ret5 is not None and ret5>15): extension='HOT'
+                  elif price20>5 or (ret5 is not None and ret5>10): extension='WARM'
+                  trend_quality=0
+                  trend_quality += 3 if d20=='UP' else 0
+                  trend_quality += 3 if d60=='UP' else (1 if d60=='FLAT' else 0)
+                  trend_quality += 2 if d240=='UP' else (1 if d240=='FLAT' else 0)
+                  trend_quality += 2 if parallel=='GREEN' else (1 if parallel=='YELLOW' else 0)
+                  trend_quality += 2 if orderly else (1 if above240 else 0)
+                  trend_quality += 1 if extension=='OK' else 0
+
+                  m=meta[sym]; r=radar.get(m['code'],{})
+                  rows.append({**m,'category60':cat,'price':round(price,2),'ma20':round(m20,3),'ma60':round(m60,3),'ma240':round(m240,3),
+                               'dir20':d20,'dir60':d60,'dir240':d240,'one20':round(o20,4),'one60':round(o60,4),'one240':round(o240,4),
+                               's20_5':round(s20,3),'s60_5':round(s60,3),'s240_5':round(s240,3),'slope_diff':round(slope_diff,3),'parallel':parallel,
+                               'gap20_60_pct':round(gap2060,3),'gap_band':gap_band,'cross_age':cross_age,'above240':above240,'overhead240_pct':round(overhead240,2),
+                               'orderly':orderly,'price_vs20_pct':round(price20,2),'extension':extension,'avgturn10_m':round(avgturn,1),'avgvol10_lots':round(avgvol,1),
+                               'ret5d':None if ret5 is None else round(float(ret5),2),'ret20d':None if ret20 is None else round(float(ret20),2),
+                               'trend_quality':trend_quality,'radar_score':r.get('score'),'sector_score':r.get('sector_score'),'industry_hot_count':r.get('industry_hot_count'),
+                               'rsi':round(float(r.get('rsi')),1) if r.get('rsi') is not None else None,'vol_x':round(float(r.get('vol_x')),2) if r.get('vol_x') is not None else None})
+              time.sleep(.25)
+
+          def rank(r):
+              # prioritize clean structure, then category fit and existing radar
+              ext={'OK':0,'WARM':1,'HOT':2}[r['extension']]
+              par={'GREEN':0,'YELLOW':1,'WIDE':2}[r['parallel']]
+              return (-r['trend_quality'], ext, par, -(r['radar_score'] or 0), -r['avgturn10_m'])
+          groups={k:sorted([r for r in rows if r['category60']==k],key=rank) for k in ['PRE_CROSS','EARLY','CONTINUATION']}
+          result={'asof':'2026-09-22 close','rule':'60m radar v2: local 20/60 direction + pre/early/continuation + 240T overhead gate + slope parallelism + extension flags',
+                  'universe':len(syms),'failed':len(set(failed)),'counts':{k:len(v) for k,v in groups.items()},'groups':groups}
+          Path('/tmp/scan60_v2.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+          print('RESULT_JSON_BEGIN')
+          print(json.dumps(result,ensure_ascii=False,separators=(',',':')))
+          print('RESULT_JSON_END')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scan60-v2-20260922
+          path: /tmp/scan60_v2.json
+          retention-days: 3
