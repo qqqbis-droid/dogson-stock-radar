@@ -1,0 +1,82 @@
+name: Install Radar v1.3.5 Score and SR Upgrade
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v135-upgrade
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'Install v1.3.5 score and support resistance upgrade'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+
+      - name: Apply v1.3.5 patch
+        run: python scripts/patch_v135.py
+
+      - name: Syntax check
+        run: python -m py_compile scripts/build_data.py scripts/chip_data.py
+
+      - name: Rebuild close radar
+        run: python scripts/build_data.py --mode close
+
+      - name: Verify integer chips sector fallback and stronger SR
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          h = Path('docs/index.html').read_text(encoding='utf-8')
+          rows = json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          assert 'Free Edition v1.3.5' in h
+          assert rows
+          assert all(float(r.get('chip_score', 0)).is_integer() for r in rows if r.get('chip_score') is not None)
+          j = next((r for r in rows if str(r.get('code')) == '3044'), None)
+          assert j is not None
+          assert j.get('sector_score_source') in {'次產業','官方產業代理','待分類'}
+          assert j.get('sector_score_label')
+          sr_rows = [r for r in rows if r.get('support') or r.get('resistance')]
+          assert sr_rows
+          sample = next((r for r in sr_rows if (r.get('support') or {}).get('strength') is not None), sr_rows[0])
+          if sample.get('support'):
+              assert 1 <= int(sample['support'].get('strength', 0)) <= 5
+          print('3044 sector=', j.get('sector_score'), j.get('sector_score_source'), j.get('sector_score_label'), j.get('sector_hot_count'), j.get('sector_hot_ratio'))
+          print('3044 chip=', j.get('chip_score'))
+          print('3044 support=', j.get('support'))
+          print('3044 resistance=', j.get('resistance'))
+          PY
+
+      - name: Commit source UI and rebuilt data
+        run: |
+          git config user.name "qqqbis-droid"
+          git config user.email "qqqbis@gmail.com"
+          git add scripts/build_data.py docs/index.html docs/data
+          git diff --cached --quiet || git commit -m "Apply v1.3.5 integer chips sector fallback and stronger SR"
+          git push
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
