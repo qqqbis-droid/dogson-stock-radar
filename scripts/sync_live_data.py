@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """從目前 GitHub Pages 把上一版 data JSON 拉回 Actions 工作目錄。
-讓盤中 workflow 不必每 5 分鐘重跑全市場日K/籌碼，並保留逐日籌碼歷史。
+讓盤中 workflow 不必每 5 分鐘重跑全市場日K/籌碼，並保留逐日籌碼歷史與60K盤後快照。
 """
 from pathlib import Path
 import os
@@ -18,7 +18,7 @@ if "/" not in repo_full:
 owner, repo = repo_full.split("/", 1)
 base = f"https://{owner}.github.io/{repo}/data/"
 files = [
-    "universe.json", "close.json", "market.json", "intraday.json", "status.json",
+    "universe.json", "close.json", "market.json", "intraday.json", "hourly.json", "status.json",
     "chip_history.json", "chip_status.json",
 ]
 

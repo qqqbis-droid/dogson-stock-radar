@@ -6,6 +6,10 @@ on:
     branches: ["main"]
     paths:
       - "scripts/chip_data.py"
+      - "scripts/build_hourly.py"
+      - "scripts/sync_live_data.py"
+      - "docs/hourly.js"
+      - "docs/realtime-config.js"
       - ".github/workflows/close.yml"
   schedule:
     # 台灣時間：14:25 先出盤後版；20:30 / 23:40 補晚公布籌碼；次日 08:15 再做一次最終補齊。
@@ -38,10 +42,12 @@ jobs:
           python-version: "3.12"
           cache: "pip"
       - run: pip install -r requirements.txt
-      - name: Keep last live intraday data if available
+      - name: Keep last live intraday/hourly data if available
         run: python scripts/sync_live_data.py || true
       - name: Build full close + chips + market
         run: python scripts/build_data.py --mode close
+      - name: Build 60m lifecycle + entry-position lights
+        run: python scripts/build_hourly.py
       - name: Verify chip recovery
         run: |
           python - <<'PY'
@@ -58,6 +64,9 @@ jobs:
             print('5483:', {k:x.get(k) for k in keys})
           if rows and not covered:
             raise SystemExit('chip coverage is still 0% for all rows')
+          h = Path('docs/data/hourly.json')
+          hj = json.loads(h.read_text(encoding='utf-8')) if h.exists() else {}
+          print('60K rows:', len(hj.get('rows') or []), 'lights:', hj.get('entry_light_counts'))
           PY
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
