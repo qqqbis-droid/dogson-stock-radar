@@ -1,0 +1,203 @@
+name: Research - 60m Radar V3 Scored
+
+on:
+  push:
+    branches:
+      - research/scan60-20260922
+    paths:
+      - '.github/workflows/research-scan60-v3-score.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -q 'yfinance>=0.2.54' pandas numpy
+      - name: Full market scan v3
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, time, math
+          from pathlib import Path
+          import pandas as pd
+          import yfinance as yf
+
+          uni=json.loads(Path('docs/data/universe.json').read_text(encoding='utf-8'))
+          meta={}
+          for x in uni:
+              code=str(x.get('code','')).strip(); market=str(x.get('market') or '').strip()
+              if not (code.isdigit() and len(code)==4): continue
+              sym=code+('.TWO' if market=='上櫃' else '.TW')
+              meta[sym]={'code':code,'name':str(x.get('name') or code),'market':market}
+          syms=list(meta)
+          close_data=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          radar={str(r.get('code')):r for r in close_data.get('rows',[]) if isinstance(r,dict) and r.get('code')}
+
+          def frame(raw,sym,batch):
+              if raw is None or raw.empty: return None
+              try:
+                  if isinstance(raw.columns,pd.MultiIndex):
+                      l0=set(map(str,raw.columns.get_level_values(0))); l1=set(map(str,raw.columns.get_level_values(1)))
+                      if sym in l0: d=raw[sym].copy()
+                      elif sym in l1: d=raw.xs(sym,axis=1,level=1).copy()
+                      else: return None
+                  elif len(batch)==1: d=raw.copy()
+                  else: return None
+                  if isinstance(d.columns,pd.MultiIndex): d.columns=[str(c[0]) for c in d.columns]
+                  if 'Close' not in d.columns or 'Volume' not in d.columns: return None
+                  d=d[['Close','Volume']].copy()
+                  d['Close']=pd.to_numeric(d['Close'],errors='coerce'); d['Volume']=pd.to_numeric(d['Volume'],errors='coerce').fillna(0)
+                  d=d.dropna(subset=['Close']); d=d[d['Close']>0]
+                  return d if len(d)>=246 else None
+              except Exception:
+                  return None
+
+          def dirs(s):
+              one=(s.iloc[-1]/s.iloc[-2]-1)*100
+              three=(s.iloc[-1]/s.iloc[-3]-1)*100
+              five=(s.iloc[-1]/s.iloc[-6]-1)*100
+              if one > 0 and three > 0.03: lab='UP'
+              elif one >= -0.02 and three >= -0.05: lab='FLAT'
+              else: lab='DOWN'
+              return lab,one,three,five
+
+          rows=[]; failed=[]; bs=50
+          for st in range(0,len(syms),bs):
+              batch=syms[st:st+bs]
+              try:
+                  raw=yf.download(batch,period='3mo',interval='60m',group_by='ticker',auto_adjust=False,threads=True,progress=False,prepost=False)
+              except Exception:
+                  failed += batch; continue
+              for sym in batch:
+                  d=frame(raw,sym,batch)
+                  if d is None: failed.append(sym); continue
+                  c=d['Close']; v=d['Volume']
+                  ma20=c.rolling(20).mean(); ma60=c.rolling(60).mean(); ma240=c.rolling(240).mean()
+                  if any(pd.isna(s.iloc[-6]) or pd.isna(s.iloc[-1]) for s in (ma20,ma60,ma240)): continue
+                  d20,o20,t20,s20=dirs(ma20); d60,o60,t60,s60=dirs(ma60); d240,o240,t240,s240=dirs(ma240)
+
+                  cross_age=None
+                  for age in range(0,min(120,len(d)-60)):
+                      i=len(d)-1-age
+                      if i<=0: break
+                      if ma20.iloc[i-1] <= ma60.iloc[i-1] and ma20.iloc[i] > ma60.iloc[i]:
+                          cross_age=age; break
+
+                  price=float(c.iloc[-1]); m20=float(ma20.iloc[-1]); m60=float(ma60.iloc[-1]); m240=float(ma240.iloc[-1])
+                  gap2060=(m20/m60-1)*100
+                  price20=(price/m20-1)*100
+                  above240=price>=m240
+                  overhead240=((m240/price)-1)*100 if not above240 else 0.0
+                  orderly=price>m20>m60>m240
+                  slope_diff=abs(s20-s60)
+
+                  idx=pd.to_datetime(d.index); dates=pd.Series([z.date() for z in idx],index=d.index)
+                  day_vol=v.groupby(dates).sum(); day_turn=(c*v).groupby(dates).sum(); day_close=c.groupby(dates).last()
+                  avgvol=float(day_vol.tail(10).mean())/1000 if len(day_vol) else 0
+                  avgturn=float(day_turn.tail(10).mean())/1e6 if len(day_turn) else 0
+                  if not (avgturn>=50 and avgvol>=300): continue
+                  last_day_vol=float(day_vol.iloc[-1]) if len(day_vol) else 0
+                  prev9=float(day_vol.iloc[-10:-1].mean()) if len(day_vol)>=10 else float(day_vol.mean()) if len(day_vol)>1 else 0
+                  vol_ratio=(last_day_vol/prev9) if prev9>0 else None
+                  ret5=(day_close.iloc[-1]/day_close.iloc[-6]-1)*100 if len(day_close)>=6 else None
+                  ret20=(day_close.iloc[-1]/day_close.iloc[-21]-1)*100 if len(day_close)>=21 else None
+
+                  reject240=(not above240 and overhead240<=3 and d240!='UP')
+                  if reject240: continue
+
+                  cat=None
+                  if m20<=m60 and -0.8<=gap2060<=0 and d20=='UP' and d60 in ('UP','FLAT'):
+                      cat='PRE_CROSS'
+                  elif m20>m60 and cross_age is not None and cross_age<=3 and d20=='UP' and d60 in ('UP','FLAT'):
+                      cat='EARLY'
+                  elif m20>m60 and d20=='UP' and d60=='UP':
+                      if s20>=s60 and slope_diff>0.60:
+                          cat='ACCEL_CONT'
+                      else:
+                          cat='STABLE_CONT'
+                  else:
+                      continue
+
+                  # Severe extension is kept but penalized; category remains visible.
+                  abs_p20=abs(price20)
+
+                  # 100-point quality score
+                  score=0
+                  # 1) 20T/60T direction & structure: 25
+                  score += 12 if d20=='UP' else 0
+                  score += 10 if d60=='UP' else (5 if d60=='FLAT' else 0)
+                  score += 3 if m20>m60 else 1
+
+                  # 2) crossover/trend persistence: 15
+                  if cat=='PRE_CROSS': score += 8
+                  elif cat=='EARLY': score += 12
+                  else: score += 15
+
+                  # 3) 240T position/direction: 20
+                  if above240: score += 10
+                  elif overhead240>5: score += 4
+                  else: score += 2
+                  score += 8 if d240=='UP' else (5 if d240=='FLAT' else 2)
+                  if orderly: score += 2
+
+                  # 4) 20/60 slope relationship: 10
+                  if slope_diff<=0.30: score += 10
+                  elif slope_diff<=0.60: score += 8
+                  elif slope_diff<=1.20: score += 6
+                  elif slope_diff<=2.00: score += 3
+                  else: score += 1
+
+                  # 5) price extension vs 20T: 15
+                  if abs_p20<=3: score += 15
+                  elif abs_p20<=5: score += 12
+                  elif abs_p20<=8: score += 7
+                  elif abs_p20<=12: score += 3
+                  else: score += 1
+
+                  # 6) 20T/60T separation: 10
+                  if cat=='PRE_CROSS':
+                      ag=abs(gap2060)
+                      if ag<=0.30: score += 10
+                      elif ag<=0.80: score += 8
+                      else: score += 3
+                  else:
+                      if 0<=gap2060<=3: score += 10
+                      elif 3<gap2060<=6: score += 6
+                      else: score += 2
+
+                  # 7) volume confirmation: 5
+                  if vol_ratio is None: score += 2
+                  elif 0.8<=vol_ratio<=2.5: score += 5
+                  elif 0.5<=vol_ratio<0.8 or 2.5<vol_ratio<=4: score += 3
+                  else: score += 1
+
+                  m=meta[sym]; r=radar.get(m['code'],{})
+                  rows.append({**m,'category60':cat,'score60':int(score),'price':round(price,2),'ma20':round(m20,3),'ma60':round(m60,3),'ma240':round(m240,3),
+                      'dir20':d20,'dir60':d60,'dir240':d240,'s20_5':round(float(s20),3),'s60_5':round(float(s60),3),'s240_5':round(float(s240),3),
+                      'slope_diff':round(float(slope_diff),3),'gap20_60_pct':round(float(gap2060),3),'cross_age':cross_age,'above240':above240,'overhead240_pct':round(float(overhead240),2),
+                      'orderly':orderly,'price_vs20_pct':round(float(price20),2),'vol_ratio':None if vol_ratio is None else round(float(vol_ratio),2),
+                      'avgturn10_m':round(avgturn,1),'avgvol10_lots':round(avgvol,1),'ret5d':None if ret5 is None else round(float(ret5),2),'ret20d':None if ret20 is None else round(float(ret20),2),
+                      'radar_score':r.get('score'),'sector_score':r.get('sector_score'),'industry_hot_count':r.get('industry_hot_count'),'rsi':round(float(r.get('rsi')),1) if r.get('rsi') is not None else None})
+              time.sleep(.25)
+
+          groups={k:sorted([r for r in rows if r['category60']==k],key=lambda x:(-x['score60'],-(x['radar_score'] or 0),-x['avgturn10_m'])) for k in ['PRE_CROSS','EARLY','STABLE_CONT','ACCEL_CONT']}
+          # compact top15 per bucket for logs, full artifact keeps all rows
+          result={'asof':'2026-09-22 close','rule':'60m V3 four lifecycle buckets + 100-point quality score','universe':len(syms),'failed':len(set(failed)),
+                  'counts':{k:len(v) for k,v in groups.items()},'top15':{k:v[:15] for k,v in groups.items()},'groups':groups}
+          Path('/tmp/scan60_v3.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+          print('SUMMARY_JSON_BEGIN')
+          print(json.dumps({'asof':result['asof'],'counts':result['counts'],'top15':result['top15']},ensure_ascii=False,separators=(',',':')))
+          print('SUMMARY_JSON_END')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scan60-v3-20260922
+          path: /tmp/scan60_v3.json
+          retention-days: 3
