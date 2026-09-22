@@ -3,6 +3,7 @@ name: Install Radar v1.3.4 Intraday Capital Rotation
 on:
   push:
     branches: ["main"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -10,12 +11,12 @@ permissions:
   id-token: write
 
 concurrency:
-  group: dogson-pages
+  group: dogson-v134-upgrade
   cancel-in-progress: false
 
 jobs:
   upgrade:
-    if: github.event.head_commit.message == 'Install v1.3.4 intraday capital rotation'
+    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'Install v1.3.4 intraday capital rotation'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     environment:
