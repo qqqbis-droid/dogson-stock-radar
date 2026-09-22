@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.2.1
+犬子老師飆股雷達 Free Edition v1.2.2
 =================================
 總分 = 技術 50 + 籌碼 25 + 族群 10 + 大盤 15
 
@@ -16,7 +16,7 @@
 
 --mode intraday
     交易時段每 5 分鐘：
-    * 固定關注池 + 前一盤後雷達前 150 名
+    * 固定關注池 + 所有通過流動性門檻的股票
     * 5 分 K / VWAP / 同時間量速
     * 沿用最近已公布的籌碼
     * 沿用最近完成交易日的大盤結構分數
@@ -84,7 +84,11 @@ def pick_col(df, names):
 
 
 def get_universe():
+    """取得上市 + 上櫃股票清單，支援 TWSE / TPEx 不同欄位名稱。"""
     frames = []
+    old = load_json("universe.json", [])
+    old_df = pd.DataFrame(old) if old else pd.DataFrame()
+
     for url, suffix, market in [
         (TWSE_COMPANY_URL, ".TW", "上市"),
         (TPEX_COMPANY_URL, ".TWO", "上櫃"),
@@ -93,11 +97,21 @@ def get_universe():
             r = requests.get(url, timeout=25, headers={"User-Agent": "Mozilla/5.0"})
             r.raise_for_status()
             df = pd.DataFrame(r.json())
-            cc = pick_col(df, ["公司代號", "股票代號", "代號"])
-            nc = pick_col(df, ["公司簡稱", "公司名稱", "名稱"])
-            ic = pick_col(df, ["產業別", "產業"])
+            cc = pick_col(df, [
+                "公司代號", "股票代號", "代號",
+                "SecuritiesCompanyCode", "CompanyCode", "StockCode"
+            ])
+            nc = pick_col(df, [
+                "公司簡稱", "公司名稱", "名稱",
+                "CompanyAbbreviation", "SecuritiesCompanyName", "CompanyName"
+            ])
+            ic = pick_col(df, [
+                "產業別", "產業",
+                "SecuritiesIndustryCode", "IndustryCode", "Industry"
+            ])
             if cc is None:
-                continue
+                raise ValueError(f"{market} 找不到股票代號欄位: {list(df.columns)}")
+
             o = pd.DataFrame()
             o["code"] = df[cc].astype(str).str.strip()
             o["name"] = df[nc].astype(str).str.strip() if nc else o["code"]
@@ -105,22 +119,26 @@ def get_universe():
             o["market"] = market
             o = o[o["code"].str.fullmatch(r"\d{4}", na=False)].copy()
             o["symbol"] = o["code"] + suffix
+            if o.empty:
+                raise ValueError(f"{market} 股票清單為空")
             frames.append(o)
+            print("universe", market, len(o))
         except Exception as e:
-            print("universe", market, e)
+            print("universe", market, "fallback", e)
+            if not old_df.empty and "market" in old_df.columns:
+                fb = old_df[old_df["market"].astype(str).eq(market)].copy()
+                if not fb.empty:
+                    fb["code"] = fb["code"].astype(str)
+                    fb["name"] = fb["name"].astype(str)
+                    if "industry" not in fb.columns:
+                        fb["industry"] = "未分類"
+                    fb["industry"] = fb["industry"].astype(str)
+                    fb["symbol"] = fb["code"] + suffix
+                    frames.append(fb[["code", "name", "industry", "market", "symbol"]])
 
     if not frames:
-        # If the company endpoint is temporarily unavailable, preserve the last
-        # deployed universe so the app does not go blank.
-        old = load_json("universe.json", [])
-        if old:
-            o = pd.DataFrame(old)
-            o["symbol"] = o["code"].astype(str) + np.where(o["market"].eq("上櫃"), ".TWO", ".TW")
-            return o
         raise RuntimeError("無法取得上市上櫃公司清單")
-
     return pd.concat(frames, ignore_index=True).drop_duplicates("code")
-
 
 def normalize(df):
     if df is None or df.empty:
@@ -444,6 +462,21 @@ def sector_score(n):
     return 0
 
 
+def liquidity_profile(avg_turnover20):
+    """20日平均成交金額流動性分級。"""
+    try:
+        x = float(avg_turnover20)
+    except Exception:
+        return "未知", 0
+    if x < 30_000_000:
+        return "不足", -999
+    if x < 80_000_000:
+        return "偏低", -5
+    if x < 200_000_000:
+        return "正常", 0
+    return "活躍", 2
+
+
 def index_state(symbol, label):
     try:
         d = download_daily([symbol], "3mo").get(symbol)
@@ -660,7 +693,8 @@ def add_component_scores(rows, market, preliminary_intraday=False):
         r["market_mode"] = market.get("market_mode", "中性")
 
         cs = float(r.get("chip_score", 12.5))
-        total = float(r.get("technical_score", 0)) + cs + sec + market_score
+        liq_adjust = float(r.get("liquidity_adjust", 0))
+        total = float(r.get("technical_score", 0)) + cs + sec + market_score + liq_adjust
         r["score"] = round(max(0, min(100, total)), 1)
 
         if r["score"] >= 80:
@@ -758,8 +792,12 @@ def build_close():
                 if not t:
                     continue
                 breadth_changes.append(t["day_change"])
-                if t["avg_turnover20"] < 30_000_000:
+                liq_level, liq_adjust = liquidity_profile(t["avg_turnover20"])
+                if liq_level == "不足":
                     continue
+                t["liquidity_level"] = liq_level
+                t["liquidity_adjust"] = liq_adjust
+                t["avg_turnover20_mn"] = round(t["avg_turnover20"] / 1_000_000, 1)
                 m = meta.get(sym, {})
                 rows.append({
                     "symbol": sym,
@@ -809,7 +847,7 @@ def build_close():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "close_updated_at": now_tw().isoformat(timespec="seconds"),
         "daily_count": len(rows),
-        "version": "1.2.1-free",
+        "version": "1.2.2-free",
     })
     dump("status.json", status)
 
@@ -918,6 +956,10 @@ def build_intraday():
                     "chip_combo": prev.get("chip_combo"),
                     "chip_score": prev.get("chip_score", 12.5),
                     "chip_coverage_pct": prev.get("chip_coverage_pct", 0),
+                    "avg_turnover20": prev.get("avg_turnover20"),
+                    "avg_turnover20_mn": prev.get("avg_turnover20_mn"),
+                    "liquidity_level": prev.get("liquidity_level", "未知"),
+                    "liquidity_adjust": prev.get("liquidity_adjust", 0),
                 })
             except Exception as e:
                 print("intra stock", sym, e)
@@ -936,7 +978,7 @@ def build_intraday():
                 "updated_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_attempted_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_count": len(previous.get("rows", [])),
-                "version": "1.2.1-free",
+                "version": "1.2.2-free",
             })
             dump("status.json", status)
             print("intraday source empty; kept previous", len(previous.get("rows", [])))
@@ -957,7 +999,7 @@ def build_intraday():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_count": len(rows),
-        "version": "1.2.1-free",
+        "version": "1.2.2-free",
     })
     dump("status.json", status)
     print("intraday done", len(rows))
