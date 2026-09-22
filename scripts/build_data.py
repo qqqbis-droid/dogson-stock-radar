@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.3.4
+犬子老師飆股雷達 Free Edition v1.3.5
 =================================
 總分 = 技術 50 + 籌碼 25 + 族群 10 + 大盤 15
 
@@ -377,64 +377,174 @@ def pivots(df, lookback=70, order=2):
 
 
 def zone(current, candidates, atr, side, intraday=False):
-    c = []
-    for p, label in candidates:
+    """Weighted support/resistance clustering.
+
+    Candidates may be (price, label) or (price, label, weight).  We no longer
+    blindly pick the closest line: nearby evidence is clustered, weighted by
+    structural importance, then penalised for distance from current price.
+    """
+    items = []
+    for item in candidates:
         try:
-            p = float(p)
+            p = float(item[0])
+            label = str(item[1])
+            weight = float(item[2]) if len(item) >= 3 else 1.0
         except Exception:
             continue
         if not np.isfinite(p) or p <= 0:
             continue
         if side == "support" and p <= current * 1.002:
-            c.append((p, label))
+            items.append((p, label, max(.2, weight)))
         elif side == "resistance" and p >= current * .998:
-            c.append((p, label))
-    if not c:
+            items.append((p, label, max(.2, weight)))
+    if not items:
         return None
-    c.sort(key=lambda x: abs(x[0] - current))
-    seed = c[0][0]
-    pct = .007 if intraday else .012
-    cluster = [x for x in c if abs(x[0]/seed - 1) <= pct]
-    center = float(np.median([x[0] for x in cluster]))
+
+    # Keep meaningful nearby levels; if none fall inside the normal window,
+    # retain the closest candidates rather than returning an arbitrary far line.
+    max_dist = .055 if intraday else .16
+    near = [x for x in items if abs(x[0] / current - 1) <= max_dist]
+    if near:
+        items = near
+    items.sort(key=lambda x: abs(x[0] - current))
+    items = items[:24]
+
+    atr_pct = (atr / current) if atr and current else 0
+    cluster_pct = max(.005 if intraday else .007,
+                      min(.015 if intraday else .022, atr_pct * (.35 if intraday else .55)))
+
+    best = None
+    for seed, _, _ in items:
+        cluster = [x for x in items if abs(x[0] / seed - 1) <= cluster_pct]
+        if not cluster:
+            continue
+        sw = sum(x[2] for x in cluster)
+        center = sum(x[0] * x[2] for x in cluster) / max(sw, 1e-9)
+        dist = abs(center / current - 1)
+        labels = []
+        for _, label, _ in sorted(cluster, key=lambda x: x[2], reverse=True):
+            if label not in labels:
+                labels.append(label)
+        # Evidence first, distance second.  This lets a strong breakout platform
+        # beat a weak single MA a little closer to price.
+        quality = sw + .35 * len(labels) - dist * (20 if intraday else 14)
+        candidate = (quality, -dist, center, cluster, labels, sw)
+        if best is None or candidate[:2] > best[:2]:
+            best = candidate
+
+    if best is None:
+        return None
+    quality, _, center, cluster, labels, sw = best
+    spread = (max(x[0] for x in cluster) - min(x[0] for x in cluster)) if len(cluster) > 1 else 0
     half = max(
-        current * (.0025 if intraday else .004),
-        (atr or 0) * (.20 if intraday else .25)
+        current * (.0020 if intraday else .0028),
+        (atr or 0) * (.14 if intraday else .18),
+        spread * .55,
     )
-    labels = []
-    for _, label in cluster:
-        if label not in labels:
-            labels.append(label)
+    strength = 5 if sw >= 7 else 4 if sw >= 5 else 3 if sw >= 3.4 else 2 if sw >= 2 else 1
     return {
-        "low": round(max(0, center-half), 2),
-        "high": round(center+half, 2),
+        "low": round(max(0, center - half), 2),
+        "high": round(center + half, 2),
         "center": round(center, 2),
-        "distance_pct": round((center/current-1)*100, 2),
-        "basis": "＋".join(labels[:3]),
+        "distance_pct": round((center / current - 1) * 100, 2),
+        "basis": "＋".join(labels[:4]),
+        "strength": strength,
+        "evidence_count": len(labels),
     }
 
 
 def daily_sr(x):
+    """Multi-evidence daily support/resistance.
+
+    Inputs include pivots, moving averages, prior highs/lows, breakout-retest
+    levels, volume-by-price nodes, high-volume cost zones and recent gaps.
+    """
     if len(x) < 25:
         return {"support": None, "resistance": None}
     cur = float(x["Close"].iloc[-1])
     atr = float(true_range(x).rolling(14).mean().iloc[-1])
-    sup, res = pivots(x)
+    raw_sup, raw_res = pivots(x)
+    sup = [(p, label, 1.5) for p, label in raw_sup]
+    res = [(p, label, 1.5) for p, label in raw_res]
+
+    def place(p, label, weight):
+        try:
+            p = float(p)
+        except Exception:
+            return
+        if not np.isfinite(p) or p <= 0:
+            return
+        (sup if p <= cur else res).append((p, label, weight))
+
     c = x["Close"]
-    for n, label in [(5, "5MA"), (10, "10MA"), (20, "20MA")]:
-        p = float(c.rolling(n).mean().iloc[-1])
-        (sup if p <= cur else res).append((p, label))
+    for n, label, weight in [
+        (5, "5MA", 1.1), (10, "10MA", 1.35), (20, "20MA", 1.8),
+        (60, "60MA", 2.0), (120, "120MA", 1.8),
+    ]:
+        if len(c) >= n:
+            v = c.rolling(n).mean().iloc[-1]
+            if pd.notna(v):
+                place(v, label, weight)
+
     hist = x.iloc[:-1]
-    if len(hist) >= 20:
-        sup.append((float(hist["Low"].tail(20).min()), "20日低"))
-        res.append((float(hist["High"].tail(20).max()), "20日高"))
     if len(hist):
-        sup.append((float(hist["Low"].iloc[-1]), "前日低"))
-        res.append((float(hist["High"].iloc[-1]), "前日高"))
+        place(hist["Low"].iloc[-1], "前日低", 1.35)
+        place(hist["High"].iloc[-1], "前日高", 1.35)
+
+    if len(hist) >= 20:
+        low20 = float(hist["Low"].tail(20).min())
+        high20 = float(hist["High"].tail(20).max())
+        place(low20, "20日低", 2.1)
+        place(high20, "20日高", 2.3)
+        if cur > high20 * 1.003:
+            sup.append((high20, "突破平台", 3.2))
+    if len(hist) >= 60:
+        place(float(hist["Low"].tail(60).min()), "60日低", 2.0)
+        place(float(hist["High"].tail(60).max()), "60日高", 2.0)
+
+    # Volume-by-price: approximate recent cost concentration with 24 price bins.
+    z = x.tail(60).copy()
+    try:
+        lo = float(z["Low"].min()); hi = float(z["High"].max())
+        if hi > lo:
+            edges = np.linspace(lo, hi, 25)
+            tp = (z["High"] + z["Low"] + z["Close"]) / 3
+            ids = np.clip(np.digitize(tp.to_numpy(), edges) - 1, 0, len(edges) - 2)
+            vols = {}
+            for idx, vol in zip(ids, z["Volume"].fillna(0).to_numpy()):
+                vols[int(idx)] = vols.get(int(idx), 0.0) + float(vol)
+            for idx, _ in sorted(vols.items(), key=lambda kv: kv[1], reverse=True)[:5]:
+                center = (edges[idx] + edges[idx + 1]) / 2
+                place(center, "成交密集區", 2.7)
+    except Exception:
+        pass
+
+    # High-volume sessions are often meaningful cost zones.
+    try:
+        for idx in z.nlargest(min(5, len(z)), "Volume").index:
+            row = z.loc[idx]
+            p = (float(row["High"]) + float(row["Low"]) + float(row["Close"])) / 3
+            place(p, "大量成交區", 2.0)
+    except Exception:
+        pass
+
+    # Recent gaps: midpoint is a practical proxy for the unfilled gap zone.
+    try:
+        g = x.tail(45)
+        for i in range(1, len(g)):
+            ph = float(g["High"].iloc[i-1]); pl = float(g["Low"].iloc[i-1])
+            ch = float(g["High"].iloc[i]); cl = float(g["Low"].iloc[i])
+            if cl > ph * 1.005:
+                place((cl + ph) / 2, "跳空缺口", 2.15)
+            elif ch < pl * .995:
+                place((ch + pl) / 2, "跳空缺口", 2.15)
+    except Exception:
+        pass
+
     return {
         "support": zone(cur, sup, atr, "support"),
         "resistance": zone(cur, res, atr, "resistance"),
     }
-
 
 def close_technical(x):
     """技術分 0~50。"""
@@ -579,18 +689,40 @@ def chip_score(chip):
     else:
         score += 2.5
 
-    return round(min(25, score), 1), round(coverage/25*100, 0)
+    return int(math.floor(min(25, score) + 0.5)), round(coverage/25*100, 0)
 
 
-def sector_score(n):
-    if n >= 4:
-        return 10
-    if n == 3:
-        return 8
-    if n == 2:
+def sector_score(n, ratio=None, fallback=False):
+    """Sector score 0~10.
+
+    Specific topic groups keep the original strict resonance logic.  Stocks not
+    yet mapped to a narrow group use official-industry breadth as a capped proxy,
+    so 'not mapped' is no longer automatically interpreted as 'sector weak'.
+    """
+    n = int(n or 0)
+    if not fallback:
+        if n >= 4:
+            return 10
+        if n == 3:
+            return 8
+        if n == 2:
+            return 5
+        if n == 1:
+            return 2
+        return 0
+
+    r = float(ratio or 0)
+    if n >= 4 and r >= .45:
+        return 6
+    if n >= 3 and r >= .30:
         return 5
+    if n >= 2 and r >= .20:
+        return 4
+    if n >= 2 and r >= .12:
+        return 2
+    if n >= 1 and r >= .10:
+        return 1
     return 0
-
 
 def liquidity_profile(avg_turnover20):
     """20日平均成交金額流動性分級。"""
@@ -989,23 +1121,47 @@ def add_component_scores(rows, market, preliminary_intraday=False):
     if not rows:
         return rows
 
-    # 族群共振改用嚴格次產業/題材群組，不再拿整個「半導體業」當同族群。
+    # 次產業/題材優先；沒有窄群組時，用官方產業廣度作為「代理分」，且上限 6 分。
     hot = {}
+    industry_hot = {}
+    industry_total = {}
     for r in rows:
         key = str(r.get("sector_group") or "").strip()
-        if key and r.get("technical_score", 0) >= 30 and not r.get("overheat_reasons"):
-            hot[key] = hot.get(key, 0) + 1
+        industry = str(r.get("industry_name") or "").strip()
+        if industry and industry != "未分類":
+            industry_total[industry] = industry_total.get(industry, 0) + 1
+        is_hot = r.get("technical_score", 0) >= 30 and not r.get("overheat_reasons")
+        if is_hot:
+            if key:
+                hot[key] = hot.get(key, 0) + 1
+            if industry and industry != "未分類":
+                industry_hot[industry] = industry_hot.get(industry, 0) + 1
 
     quality_reference = market.get("radar_threshold", 76)
     market_score = float(market.get("market_score", 7.5))
 
     for r in rows:
         key = str(r.get("sector_group") or "").strip()
-        n = int(hot.get(key, 0)) if key else 0
-        sec = sector_score(n)
-        r["industry_hot_count"] = n
+        industry = str(r.get("industry_name") or "").strip()
+        if key:
+            n = int(hot.get(key, 0))
+            sec = sector_score(n)
+            source = "次產業"
+            label = key
+            ratio = None
+        else:
+            n = int(industry_hot.get(industry, 0)) if industry and industry != "未分類" else 0
+            total_n = int(industry_total.get(industry, 0)) if industry and industry != "未分類" else 0
+            ratio = (n / total_n) if total_n else 0
+            sec = sector_score(n, ratio, True)
+            source = "官方產業代理" if total_n else "待分類"
+            label = industry if total_n else "待分類"
+        r["industry_hot_count"] = int(industry_hot.get(industry, 0)) if industry else 0
         r["sector_hot_count"] = n
         r["sector_score"] = sec
+        r["sector_score_source"] = source
+        r["sector_score_label"] = label
+        r["sector_hot_ratio"] = round(ratio * 100, 1) if ratio is not None else None
         r["market_score"] = market_score
         r["market_mode"] = market.get("market_mode", "中性")
 
