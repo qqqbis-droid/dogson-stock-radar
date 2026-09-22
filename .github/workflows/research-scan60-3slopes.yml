@@ -1,0 +1,127 @@
+name: Research - 60m 20/60/240 All Up
+
+on:
+  push:
+    branches:
+      - research/scan60-20260922
+    paths:
+      - .github/workflows/research-scan60-3slopes.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -q 'yfinance>=0.2.54' pandas numpy
+      - name: Full market scan
+        run: |
+          python - <<'PY'
+          import json, math, time
+          from pathlib import Path
+          import pandas as pd
+          import yfinance as yf
+
+          uni=json.loads(Path('docs/data/universe.json').read_text(encoding='utf-8'))
+          meta={}
+          for x in uni:
+              code=str(x.get('code','')).strip(); market=str(x.get('market') or '').strip()
+              if not (code.isdigit() and len(code)==4): continue
+              sym=code+('.TWO' if market=='上櫃' else '.TW')
+              meta[sym]={'code':code,'name':str(x.get('name') or code),'market':market}
+          syms=list(meta)
+          close_data=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          radar={str(r.get('code')):r for r in close_data.get('rows',[]) if isinstance(r,dict) and r.get('code')}
+
+          def frame(raw,sym,batch):
+              if raw is None or raw.empty: return None
+              try:
+                  if isinstance(raw.columns,pd.MultiIndex):
+                      l0=set(map(str,raw.columns.get_level_values(0))); l1=set(map(str,raw.columns.get_level_values(1)))
+                      if sym in l0: d=raw[sym].copy()
+                      elif sym in l1: d=raw.xs(sym,axis=1,level=1).copy()
+                      else: return None
+                  elif len(batch)==1: d=raw.copy()
+                  else: return None
+                  if isinstance(d.columns,pd.MultiIndex): d.columns=[str(c[0]) for c in d.columns]
+                  if 'Close' not in d.columns or 'Volume' not in d.columns: return None
+                  d=d[['Close','Volume']].copy()
+                  d['Close']=pd.to_numeric(d['Close'],errors='coerce'); d['Volume']=pd.to_numeric(d['Volume'],errors='coerce').fillna(0)
+                  d=d.dropna(subset=['Close']); d=d[d['Close']>0]
+                  return d if len(d)>=246 else None
+              except Exception:
+                  return None
+
+          rows=[]; failed=[]; bs=50
+          for st in range(0,len(syms),bs):
+              batch=syms[st:st+bs]
+              try:
+                  raw=yf.download(batch,period='3mo',interval='60m',group_by='ticker',auto_adjust=False,threads=True,progress=False,prepost=False)
+              except Exception as e:
+                  failed += batch; continue
+              for sym in batch:
+                  d=frame(raw,sym,batch)
+                  if d is None: failed.append(sym); continue
+                  c=d['Close']; v=d['Volume']
+                  ma20=c.rolling(20).mean(); ma60=c.rolling(60).mean(); ma240=c.rolling(240).mean()
+                  if any(pd.isna(s.iloc[-6]) or pd.isna(s.iloc[-1]) for s in (ma20,ma60,ma240)): continue
+                  cross_age=None
+                  for age in range(0,min(8,len(d)-60)):
+                      i=len(d)-1-age
+                      if i<=0: break
+                      if ma20.iloc[i-1] <= ma60.iloc[i-1] and ma20.iloc[i] > ma60.iloc[i]: cross_age=age; break
+                  gap=(ma20.iloc[-1]/ma60.iloc[-1]-1)*100
+                  s20=(ma20.iloc[-1]/ma20.iloc[-6]-1)*100
+                  s60=(ma60.iloc[-1]/ma60.iloc[-6]-1)*100
+                  s240=(ma240.iloc[-1]/ma240.iloc[-6]-1)*100
+                  price=float(c.iloc[-1]); m240=float(ma240.iloc[-1])
+                  above240=price>=m240
+                  overhead=((m240/price)-1)*100 if not above240 else 0.0
+                  # same 240T resistance rule as previous scan
+                  if above240: pressure='PASS_ABOVE_240'
+                  elif overhead>5: pressure='PASS_240_FAR_GT5'
+                  elif overhead>3: pressure='WATCH_240_3_5'
+                  elif overhead<=1.5: pressure='REJECT_240_NEAR_LE1_5'
+                  elif s240<=0: pressure='REJECT_240_1_5_3_DOWNFLAT'
+                  else: pressure='WATCH_240_1_5_3_UP'
+
+                  idx=pd.to_datetime(d.index); dates=pd.Series([z.date() for z in idx],index=d.index)
+                  day_vol=v.groupby(dates).sum(); day_turn=(c*v).groupby(dates).sum(); day_close=c.groupby(dates).last()
+                  avgvol=float(day_vol.tail(10).mean())/1000 if len(day_vol) else 0
+                  avgturn=float(day_turn.tail(10).mean())/1e6 if len(day_turn) else 0
+                  if not (avgturn>=50 and avgvol>=300): continue
+                  status='OTHER'
+                  if cross_age==0 and ma20.iloc[-1]>ma60.iloc[-1]: status='EXACT'
+                  elif cross_age is not None and cross_age<=2 and ma20.iloc[-1]>ma60.iloc[-1]: status='RECENT3'
+                  elif ma20.iloc[-1]<=ma60.iloc[-1] and -0.8<=gap<=0 and s20>0: status='NEAR'
+                  if status=='OTHER': continue
+
+                  m=meta[sym]; r=radar.get(m['code'],{})
+                  rows.append({**m,'status':status,'price':round(price,2),'ma20':round(float(ma20.iloc[-1]),3),'ma60':round(float(ma60.iloc[-1]),3),'ma240':round(m240,3),'gap20_60_pct':round(float(gap),3),'s20_5bar':round(float(s20),3),'s60_5bar':round(float(s60),3),'s240_5bar':round(float(s240),3),'all3_up':bool(s20>0 and s60>0 and s240>0),'above240':above240,'overhead240_pct':round(float(overhead),2),'pressure':pressure,'avgturn10_m':round(avgturn,1),'avgvol10_lots':round(avgvol,1),'ret5d':round(float((day_close.iloc[-1]/day_close.iloc[-6]-1)*100),2) if len(day_close)>=6 else None,'ret20d':round(float((day_close.iloc[-1]/day_close.iloc[-21]-1)*100),2) if len(day_close)>=21 else None,'radar_score':r.get('score'),'sector_score':r.get('sector_score'),'industry_hot_count':r.get('industry_hot_count'),'rsi':round(float(r.get('rsi')),1) if r.get('rsi') is not None else None,'vol_x':round(float(r.get('vol_x')),2) if r.get('vol_x') is not None else None,'category':r.get('category')})
+              time.sleep(.25)
+
+          def rk(r):
+              return ({'EXACT':0,'RECENT3':1,'NEAR':2}[r['status']], -(r['radar_score'] or 0), abs(r['gap20_60_pct']), -r['avgturn10_m'])
+          eligible=[r for r in rows if r['pressure'].startswith('PASS')]
+          strict=sorted([r for r in eligible if r['all3_up']],key=rk)
+          fail240=sorted([r for r in eligible if r['s20_5bar']>0 and r['s60_5bar']>0 and r['s240_5bar']<=0],key=rk)
+          fail60=sorted([r for r in eligible if r['s20_5bar']>0 and r['s60_5bar']<=0],key=rk)
+          result={'asof':'2026-09-22 close','rule':'60m 20T/60T cross or near + 240T resistance gate + MA20/MA60/MA240 all rising over last 5 completed 60m bars','universe':len(syms),'failed':len(set(failed)),'base_candidates':len(rows),'eligible_after_240':len(eligible),'strict_all3_up_count':len(strict),'strict_all3_up':strict,'fails_only_240_slope':fail240,'fails_60_slope':fail60}
+          Path('/tmp/scan60_3slopes.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+          print('RESULT_JSON_BEGIN')
+          print(json.dumps(result,ensure_ascii=False,separators=(',',':')))
+          print('RESULT_JSON_END')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scan60-3slopes-20260922
+          path: /tmp/scan60_3slopes.json
+          retention-days: 3
