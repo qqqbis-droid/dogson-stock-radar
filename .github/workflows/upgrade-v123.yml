@@ -1,0 +1,82 @@
+name: Radar v1.2.3 OTC CSV Fallback
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v123
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    if: github.event.head_commit.message == 'Install v1.2.3 OTC CSV fallback'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Apply v1.2.3 patch
+        run: python scripts/patch_v123.py
+
+      - name: Verify source
+        run: |
+          python -m py_compile scripts/build_data.py
+          grep -q 'Free Edition v1.2.3' docs/index.html
+          grep -q 't187ap03_O.csv' scripts/build_data.py
+          grep -q 'liquidity_profile' scripts/build_data.py
+
+      - name: Commit patched source
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/build_data.py docs/index.html
+          git commit -m 'Apply v1.2.3 OTC CSV fallback' || true
+          git push origin main
+
+      - run: pip install -r requirements.txt
+
+      - name: Load prior live data
+        run: python scripts/sync_live_data.py || true
+
+      - name: Build full close + intraday
+        run: python scripts/build_data.py --mode all
+
+      - name: Verify OTC universe, 3498 and liquidity
+        run: |
+          python - <<'PY'
+          import json
+          u=json.load(open('docs/data/universe.json',encoding='utf-8'))
+          otc=[x for x in u if x.get('market')=='上櫃']
+          hit=[x for x in u if str(x.get('code'))=='3498']
+          c=json.load(open('docs/data/close.json',encoding='utf-8')).get('rows',[])
+          i=json.load(open('docs/data/intraday.json',encoding='utf-8')).get('rows',[])
+          print('universe',len(u),'OTC',len(otc),'3498',hit[:1])
+          print('close rows',len(c),'3498 close',sum(str(r.get('code'))=='3498' for r in c))
+          print('intraday rows',len(i),'3498 intraday',sum(str(r.get('code'))=='3498' for r in i))
+          assert len(otc) > 300, f'OTC universe too small: {len(otc)}'
+          assert hit, '3498 陽程不在 universe'
+          assert any('liquidity_level' in r for r in c), 'close rows missing liquidity fields'
+          PY
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
