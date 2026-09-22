@@ -1,0 +1,99 @@
+name: Install Radar v1.3.1 Accuracy Upgrade
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-pages
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    if: github.event.head_commit.message == 'Install v1.3.1 accuracy upgrade'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+
+      - name: Apply v1.3.1 patch
+        run: python scripts/patch_v131.py
+
+      - name: Static checks
+        run: |
+          python -m py_compile scripts/build_data.py scripts/chip_data.py scripts/sector_groups.py scripts/patch_v131.py
+          grep -q 'Free Edition v1.3.1' docs/index.html
+          grep -q 'sector_group' scripts/build_data.py
+          grep -q 'official_mis_snapshot' scripts/build_data.py
+
+      - name: Build fresh official close radar
+        run: python scripts/build_data.py --mode close
+
+      - name: Verify close, sector groups and score reliability
+        run: |
+          python - <<'PY'
+          import json, urllib.request
+          from pathlib import Path
+
+          j=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          rows={str(r['code']):r for r in j.get('rows',[])}
+          assert '3711' in rows, '3711 missing'
+          r=rows['3711']
+          print('3711 close=',r.get('close'),'industry=',r.get('industry_name'),'group=',r.get('sector_group'),'chip coverage=',r.get('chip_coverage_pct'),'quality=',r.get('quality_label'))
+          assert r.get('industry_name')=='半導體業'
+          assert r.get('sector_group')=='IC封裝測試'
+
+          # 日月光的族群成員只能是同一個嚴格群組，不再混九暘/世界/中美晶/合晶。
+          bad={'8040','5347','5483','6182'}
+          peers={c for c,x in rows.items() if x.get('sector_group')==r.get('sector_group')}
+          assert not (peers & bad), f'wrong peers in ASE group: {peers & bad}'
+          print('ASE strict peers sample=',sorted(peers)[:20])
+
+          # 籌碼覆蓋不足時不可標高共振/強，也不可通過市場品質線。
+          for x in j.get('rows',[]):
+              if float(x.get('chip_coverage_pct') or 0)<60:
+                  assert x.get('quality_label')=='資料待補', (x.get('code'),x.get('chip_coverage_pct'),x.get('quality_label'))
+                  assert x.get('quality_pass_market') is False
+
+          # 收盤價與近即時官方代理交叉驗證；若官方端點暫時不可用，只記警告，不阻斷部署。
+          try:
+              with urllib.request.urlopen('https://dogson-stock-radar-live.vercel.app/api/quote?codes=3711',timeout=15) as resp:
+                  q=json.loads(resp.read().decode('utf-8'))
+              qs=q.get('quotes') or []
+              if qs:
+                  live=float(qs[0]['price']); close=float(r['close'])
+                  print('3711 official proxy=',live,'close radar=',close)
+                  assert abs(live-close)<1e-6, f'3711 close mismatch: official={live}, radar={close}'
+          except Exception as e:
+              print('official proxy verification warning:',repr(e))
+          PY
+
+      - name: Commit source fixes
+        run: |
+          git config user.name "qqqbis-droid"
+          git config user.email "qqqbis@gmail.com"
+          git add scripts/build_data.py scripts/sector_groups.py scripts/patch_v131.py docs/index.html
+          git diff --cached --quiet || git commit -m "Apply v1.3.1 accuracy fixes"
+          git push
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
