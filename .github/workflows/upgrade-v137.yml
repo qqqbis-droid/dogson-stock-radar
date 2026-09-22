@@ -34,7 +34,7 @@ jobs:
       - name: Syntax check
         run: python -m py_compile scripts/build_data.py
 
-      - name: Verify TPEx official index endpoint
+      - name: Verify TPEx official monthly index history
         run: |
           python - <<'PY'
           import sys
@@ -42,8 +42,8 @@ jobs:
           import build_data
           x = build_data.tpex_index_history()
           print('TPEx rows=', len(x))
-          print(x.tail(3).to_string())
-          assert len(x) >= 25, 'TPEx official index history has fewer than 25 rows'
+          print(x.tail(5).to_string())
+          assert len(x) >= 25, 'TPEx official monthly index history has fewer than 25 rows'
           latest = str(x.index[-1].date())
           print('TPEx latest=', latest, 'close=', float(x['Close'].iloc[-1]))
           PY
@@ -68,7 +68,7 @@ jobs:
           print('otc=', otc)
           assert otc, 'OTC index still missing'
           assert otc.get('date') == trade, f"OTC date mismatch: {otc.get('date')} != {trade}"
-          assert 'TPEx OpenAPI' in str(otc.get('source')), f"unexpected OTC source: {otc.get('source')}"
+          assert 'TPEx official' in str(otc.get('source')), f"unexpected OTC source: {otc.get('source')}"
           assert otc.get('close') is not None, 'OTC close missing'
           PY
 
