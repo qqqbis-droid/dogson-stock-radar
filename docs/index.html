@@ -37,7 +37,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.2｜階段＋品質分開判斷</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.2.1｜盤中搜尋修正版</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 
@@ -143,7 +143,7 @@ function render(){
  let rr=rows.filter(r=>(filter==="all"||r.category===filter)&&(!watchOnly||watched(r.code)));
  const q=$("q").value.trim().toLowerCase();
  if(q){let hits=rr.filter(r=>String(r.code)===q||String(r.name).toLowerCase().includes(q));if(hits.length)rr=hits}
- if(!rr.length){$("cards").innerHTML='<div class="empty">目前沒有符合條件的資料。若盤中搜尋任意股票，免費版只掃固定關注池＋前一盤後前150名；切到盤後可查全市場。</div>';return}
+ if(!rr.length){$("cards").innerHTML='<div class="empty">目前沒有符合條件的資料。盤中會掃描所有通過流動性門檻的股票；若個別免費行情源暫缺，切到盤後仍可查完整日K資料。</div>';return}
  $("cards").innerHTML=rr.slice(0,70).map(r=>`<div class="card">
   <div class="top"><div class="stockleft"><button class="star ${watched(r.code)?"on":""}" onclick="toggleWatch('${r.code}')">${watched(r.code)?"★":"☆"}</button><div><div class="name">${r.name}<span class="code">${r.code}</span></div><div class="sub">${r.industry||"未分類"} · ${mode==="intraday"?(r.time||""):(r.date||"")}</div><span class="cat ${cls(r.category)}">${r.category}</span><span class="quality ${qualityCls(r.quality_label)}">品質：${r.quality_label||"一般"}</span></div></div><div><div class="score">${num(r.score,0)}</div><div class="label">品質總分 /100</div></div></div>
   ${partsHTML(r)}

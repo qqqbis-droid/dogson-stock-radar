@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.2
+犬子老師飆股雷達 Free Edition v1.2.1
 =================================
 總分 = 技術 50 + 籌碼 25 + 族群 10 + 大盤 15
 
@@ -545,7 +545,8 @@ def intraday_sr(x, vwap):
 
 
 def intraday_technical(x):
-    if len(x) < 20:
+    # 開盤早段也要能掃描；只要累積至少 4 根 5 分K 就可開始判斷。
+    if len(x) < 4:
         return None
     x = x.copy()
     x.index = pd.to_datetime(x.index)
@@ -566,7 +567,12 @@ def intraday_technical(x):
     b3 = bool(cur > p3.iloc[-1]) if pd.notna(p3.iloc[-1]) else False
     b12 = bool(cur > p12.iloc[-1]) if pd.notna(p12.iloc[-1]) else False
     ma5, ma10 = c.rolling(5).mean(), c.rolling(10).mean()
-    trend = bool(cur > ma5.iloc[-1] > ma10.iloc[-1]) if pd.notna(ma10.iloc[-1]) else False
+    if pd.notna(ma10.iloc[-1]):
+        trend = bool(cur > ma5.iloc[-1] > ma10.iloc[-1])
+    elif pd.notna(ma5.iloc[-1]):
+        trend = bool(cur > ma5.iloc[-1])
+    else:
+        trend = bool(cur >= float(c.iloc[0]))
 
     n = len(today)
     vals = []
@@ -674,8 +680,7 @@ def add_component_scores(rows, market, preliminary_intraday=False):
             launch = bool(
                 r.get("break3")
                 and r.get("close", 0) > r.get("vwap", 1e99)
-                and r.get("pace", 0) >= 1.2
-                and (r.get("trend5") or r.get("break12") or r.get("technical_score", 0) >= 30)
+                and (r.get("trend5") or r.get("break12") or r.get("technical_score", 0) >= 22)
             )
             pullback = bool(
                 (r.get("trend5") or r.get("technical_score", 0) >= 25)
@@ -804,7 +809,7 @@ def build_close():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "close_updated_at": now_tw().isoformat(timespec="seconds"),
         "daily_count": len(rows),
-        "version": "1.2-free",
+        "version": "1.2.1-free",
     })
     dump("status.json", status)
 
@@ -869,7 +874,7 @@ def build_intraday():
 
     pool = [code_to_sym[c] for c in watch if c in code_to_sym]
     pool += [
-        code_to_sym[r["code"]] for r in close_rows[:150]
+        code_to_sym[r["code"]] for r in close_rows
         if r.get("code") in code_to_sym
     ]
     pool = list(dict.fromkeys(pool))
@@ -918,6 +923,25 @@ def build_intraday():
                 print("intra stock", sym, e)
 
     rows = add_component_scores(rows, market, preliminary_intraday=True)
+
+    if not rows:
+        previous = load_json("intraday.json", {})
+        if previous.get("rows"):
+            previous["stale"] = True
+            previous["attempted_at"] = now_tw().isoformat(timespec="seconds")
+            previous["note"] = "本輪免費盤中資料源暫時沒有有效5分K，已保留上一輪資料，不再顯示空白。"
+            dump("intraday.json", previous)
+            status = load_json("status.json", {})
+            status.update({
+                "updated_at": now_tw().isoformat(timespec="seconds"),
+                "intraday_attempted_at": now_tw().isoformat(timespec="seconds"),
+                "intraday_count": len(previous.get("rows", [])),
+                "version": "1.2.1-free",
+            })
+            dump("status.json", status)
+            print("intraday source empty; kept previous", len(previous.get("rows", [])))
+            return
+
     market_live = intraday_index_snapshot()
 
     dump("intraday.json", {
@@ -933,7 +957,7 @@ def build_intraday():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_count": len(rows),
-        "version": "1.2-free",
+        "version": "1.2.1-free",
     })
     dump("status.json", status)
     print("intraday done", len(rows))
