@@ -1,0 +1,31 @@
+name: Scan 60K MA20 MA60
+
+on:
+  push:
+    branches:
+      - scan-60k-20260922
+    paths:
+      - 'tools/scan_60k.py'
+      - '.github/workflows/scan-60k.yml'
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run 60K scanner
+        run: python tools/scan_60k.py 300000
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-60k-results
+          path: |
+            scan_60k_results.json
+            scan_60k_exact.csv
