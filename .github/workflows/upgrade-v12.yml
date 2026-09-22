@@ -6,8 +6,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
   group: dogson-v12-upgrade
@@ -17,10 +15,7 @@ jobs:
   upgrade:
     if: github.event.head_commit.message == 'Install v1.2 upgrader'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,23 +23,23 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
       - name: Patch v1.2 stage-quality classification
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
+          import re, textwrap
 
           p = Path('scripts/build_data.py')
           s = p.read_text(encoding='utf-8')
           s = s.replace('犬子老師飆股雷達 Free Edition v1.1', '犬子老師飆股雷達 Free Edition v1.2', 1)
 
-          new_func = r'''def add_component_scores(rows, market, preliminary_intraday=False):
+          new_func = textwrap.dedent(r'''
+          def add_component_scores(rows, market, preliminary_intraday=False):
               """加入族群分、總分、階段與品質。
 
               v1.2 起把「階段」和「品質」拆開：
-              - 階段（剛啟動 / 等回踩 / 觀察 / 過熱）主要看價格行為與位階。
-              - 品質（一般 / 強 / 高共振）才用 100 分總分衡量。
+              - 階段主要看價格行為、量能與位階。
+              - 品質才用 100 分總分衡量。
               """
               if not rows:
                   return rows
@@ -139,8 +134,8 @@ jobs:
                   -r["score"]
               ))
               return rows
-          '''
-          new_func = re.sub(r'^          ', '', new_func, flags=re.M)
+          ''').lstrip()
+
           s2, n = re.subn(
               r'def add_component_scores\(rows, market, preliminary_intraday=False\):.*?\n\ndef build_close\(\):',
               new_func + '\n\ndef build_close():',
@@ -191,32 +186,20 @@ jobs:
           sw = Path('docs/sw.js')
           if sw.exists():
               x = sw.read_text(encoding='utf-8')
-              x = x.replace("dogson-free-v12", "dogson-free-v13")
+              x = x.replace('dogson-free-v12', 'dogson-free-v13')
               sw.write_text(x, encoding='utf-8')
           PY
 
-      - name: Verify syntax and version
+      - name: Verify source changes
         run: |
           python -m py_compile scripts/build_data.py
           grep -q 'Free Edition v1.2' docs/index.html
           grep -q 'quality_label' scripts/build_data.py
-
-      - run: pip install -r requirements.txt
-
-      - name: Build fresh data with v1.2 rules
-        run: python scripts/build_data.py --mode all
 
       - name: Commit v1.2 source changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add scripts/build_data.py docs/index.html docs/sw.js
-          git commit -m "Apply v1.2 stage-quality classification" || true
+          git commit -m "Apply v1.2 stage-quality classification"
           git push origin main
-
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs
-      - id: deployment
-        uses: actions/deploy-pages@v4
