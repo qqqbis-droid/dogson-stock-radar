@@ -17,7 +17,7 @@ jobs:
   upgrade:
     if: github.event.head_commit.message == 'Install v1.3 realtime hybrid'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -31,6 +31,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: pip install -r requirements.txt
 
       - name: Apply v1.3 UI patch
         run: python scripts/patch_v130.py
@@ -52,6 +53,12 @@ jobs:
           git add docs/index.html docs/sw.js scripts/build_data.py
           git commit -m 'Apply v1.3 realtime hybrid UI' || true
           git push origin main
+
+      # Preserve the newest live JSON instead of deploying repository snapshots.
+      - name: Sync newest published radar data
+        run: python scripts/sync_live_data.py || true
+      - name: Rebuild current 5-minute radar
+        run: python scripts/build_data.py --mode intraday
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
