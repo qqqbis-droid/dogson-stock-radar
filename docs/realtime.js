@@ -1,6 +1,7 @@
 (()=>{
   const REFRESH_MS = 10000;
   const MAX_CODES = 5;
+  const FRESHNESS_MS = 60000;
   const quotes = new Map();
   let lastSuccessAt = 0;
   let busy = false;
@@ -50,6 +51,63 @@
     if(!el)return;
     el.className=`live-status ${cls}`;
     el.textContent=text;
+  }
+
+  function setRadarPill(text,level='ok'){
+    const el=document.getElementById('status');
+    if(!el)return;
+    el.textContent=text;
+    if(level==='bad'){
+      el.style.background='#2c141a';el.style.borderColor='#61303a';el.style.color='#ff9cac';
+    }else if(level==='warn'){
+      el.style.background='#2a230f';el.style.borderColor='#66521f';el.style.color='#ffd477';
+    }else{
+      el.style.background='#16263a';el.style.borderColor='#24496e';el.style.color='#9fd0ff';
+    }
+  }
+
+  function taipeiClock(){
+    const parts=new Intl.DateTimeFormat('en-CA',{
+      timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',
+      hour:'2-digit',minute:'2-digit',hourCycle:'h23'
+    }).formatToParts(new Date());
+    const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));
+    return {year:+p.year,month:+p.month,day:+p.day,hour:+p.hour,minute:+p.minute};
+  }
+
+  function checkRadarFreshness(){
+    try{
+      const rs=typeof intraRows!=='undefined'&&Array.isArray(intraRows)?intraRows:[];
+      if(!rs.length)return;
+      const now=taipeiClock();
+      const date=`${now.year}-${String(now.month).padStart(2,'0')}-${String(now.day).padStart(2,'0')}`;
+      let latest=-1;
+      for(const r of rs){
+        if(String(r.date||'')!==date)continue;
+        const m=String(r.time||'').match(/^(\d{1,2}):(\d{2})/);
+        if(!m)continue;
+        latest=Math.max(latest,(+m[1])*60+(+m[2]));
+      }
+      if(latest<0){setRadarPill('盤後資料','ok');return;}
+      const nowMin=now.hour*60+now.minute;
+      const dow=new Date(Date.UTC(now.year,now.month-1,now.day)).getUTCDay();
+      const weekday=dow>=1&&dow<=5;
+      const hh=String(Math.floor(latest/60)).padStart(2,'0');
+      const mm=String(latest%60).padStart(2,'0');
+      const label=`${hh}:${mm}`;
+      if(weekday&&nowMin>=540&&nowMin<=825){
+        const age=nowMin-latest;
+        if(age>15)setRadarPill(`⚠️ 雷達延遲 ${age}分`,'bad');
+        else setRadarPill(`雷達 ${label}`,'ok');
+        return;
+      }
+      if(weekday&&nowMin>825){
+        if(latest<800)setRadarPill(`⚠️ 雷達提早停在 ${label}`,'warn');
+        else setRadarPill(`已收盤 · ${label}`,'ok');
+        return;
+      }
+      setRadarPill(`盤後資料 · ${label}`,'ok');
+    }catch{}
   }
 
   function ensureStyles(){
@@ -108,9 +166,12 @@
   }
 
   function boot(){
-    ensureStyles();applyQuotes();refresh();setInterval(refresh,REFRESH_MS);
-    const cards=document.getElementById('cards');if(cards){let t;new MutationObserver(()=>{clearTimeout(t);t=setTimeout(()=>{applyQuotes();refresh()},250)}).observe(cards,{childList:true,subtree:true})}
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
+    ensureStyles();applyQuotes();refresh();
+    setTimeout(checkRadarFreshness,1200);
+    setInterval(refresh,REFRESH_MS);
+    setInterval(checkRadarFreshness,FRESHNESS_MS);
+    const cards=document.getElementById('cards');if(cards){let t;new MutationObserver(()=>{clearTimeout(t);t=setTimeout(()=>{applyQuotes();refresh();checkRadarFreshness()},250)}).observe(cards,{childList:true,subtree:true})}
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden){refresh();checkRadarFreshness()}});
     document.getElementById('q')?.addEventListener('change',refresh);
     document.getElementById('scan')?.addEventListener('click',()=>setTimeout(refresh,150));
   }
