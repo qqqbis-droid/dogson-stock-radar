@@ -1,0 +1,87 @@
+name: Install Radar v1.3.6 Data-Date Consistency Repair
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v136-upgrade
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'Install v1.3.6 data-date consistency repair'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+
+      - name: Apply v1.3.6 patch
+        run: python scripts/patch_v136.py
+
+      - name: Syntax check
+        run: python -m py_compile scripts/build_data.py scripts/chip_data.py
+
+      - name: Rebuild close radar
+        run: python scripts/build_data.py --mode close
+
+      - name: Verify one completed trading date and close-mode repair
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          h = Path('docs/index.html').read_text(encoding='utf-8')
+          rt = Path('docs/realtime.js').read_text(encoding='utf-8')
+          p = json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          rows = p.get('rows') or []
+          m = p.get('market') or {}
+          td = p.get('trade_date') or m.get('trade_date')
+          assert 'Free Edition v1.3.6' in h
+          assert '交易日一致性＋正式收盤覆核' in h
+          assert "mode!=='intraday'" in rt and "liveEl.style.display='none'" in rt
+          assert td, 'missing completed trade_date'
+          assert rows, 'no close rows'
+          bad = [r for r in rows if str(r.get('date')) != str(td)]
+          assert not bad, f'mixed trading dates: {len(bad)} rows do not match {td}'
+          assert (m.get('taiex') or {}).get('date') == td, (m.get('taiex'), td)
+          assert (m.get('otc') or {}).get('date') == td, (m.get('otc'), td)
+          assert m.get('foreign_date') == td, (m.get('foreign_date'), td)
+          j = next((r for r in rows if str(r.get('code')) == '3044'), None)
+          assert j is not None, '3044 missing'
+          assert str(j.get('date')) == td
+          print('trade_date=', td, 'rows=', len(rows), 'market_complete=', m.get('data_complete'))
+          print('3044=', {k:j.get(k) for k in ['date','close','technical_score','chip_score','sector_score','market_score','score','category','vol_x','dist20','ret5','ma5','ma10','ma20','break20']})
+          print('index=', m.get('taiex'), m.get('otc'))
+          print('foreign=', m.get('foreign_date'), m.get('foreign_twse_billion'), m.get('foreign_tpex_billion'))
+          PY
+
+      - name: Commit source UI and rebuilt data
+        run: |
+          git config user.name "qqqbis-droid"
+          git config user.email "qqqbis@gmail.com"
+          git add scripts/build_data.py docs/index.html docs/realtime.js docs/sw.js docs/data
+          git diff --cached --quiet || git commit -m "Apply v1.3.6 completed trading-day consistency repair"
+          git push
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
