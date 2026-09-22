@@ -3,28 +3,10 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
+from http.server import BaseHTTPRequestHandler
 
 API_ROOT = "https://api.fugle.tw/marketdata/v1.0/stock/intraday/quote/"
 MAX_CODES = 5
-
-
-def _headers(origin="*"):
-    return {
-        "Access-Control-Allow-Origin": origin or "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-        "Content-Type": "application/json; charset=utf-8",
-        "Vary": "Origin",
-    }
-
-
-def _json(handler, status, obj, origin="*"):
-    handler.send_response(status)
-    for k, v in _headers(origin).items():
-        handler.send_header(k, v)
-    handler.end_headers()
-    handler.wfile.write(json.dumps(obj, ensure_ascii=False).encode("utf-8"))
 
 
 def _fetch_one(code, api_key):
@@ -62,27 +44,34 @@ def _fetch_one(code, api_key):
     }
 
 
-class handler:
-    def __init__(self, request, response):
-        self.request = request
-        self.response = response
+class handler(BaseHTTPRequestHandler):
+    def _origin(self):
+        return self.headers.get("Origin") or "*"
 
-    def __call__(self):
-        origin = self.request.headers.get("origin", "*")
-        if self.request.method == "OPTIONS":
-            self.response.status_code = 204
-            for k, v in _headers(origin).items():
-                self.response.headers[k] = v
-            return ""
+    def _send(self, status, obj=None):
+        self.send_response(status)
+        self.send_header("Access-Control-Allow-Origin", self._origin())
+        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Vary", "Origin")
+        if obj is not None:
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.end_headers()
+        if obj is not None:
+            self.wfile.write(json.dumps(obj, ensure_ascii=False).encode("utf-8"))
 
+    def do_OPTIONS(self):
+        self._send(204)
+
+    def do_GET(self):
         api_key = os.environ.get("FUGLE_API_KEY", "").strip()
         if not api_key:
-            self.response.status_code = 503
-            for k, v in _headers(origin).items():
-                self.response.headers[k] = v
-            return {"ok": False, "error": "FUGLE_API_KEY is not configured"}
+            self._send(503, {"ok": False, "error": "FUGLE_API_KEY is not configured"})
+            return
 
-        raw = (self.request.args.get("codes") or "").strip()
+        qs = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        raw = (qs.get("codes", [""])[0] or "").strip()
         codes = []
         for x in raw.split(","):
             x = x.strip()
@@ -90,10 +79,8 @@ class handler:
                 codes.append(x)
         codes = codes[:MAX_CODES]
         if not codes:
-            self.response.status_code = 400
-            for k, v in _headers(origin).items():
-                self.response.headers[k] = v
-            return {"ok": False, "error": "codes is required"}
+            self._send(400, {"ok": False, "error": "codes is required"})
+            return
 
         quotes, errors = [], []
         for code in codes:
@@ -104,7 +91,9 @@ class handler:
             except Exception as e:
                 errors.append({"code": code, "error": type(e).__name__})
 
-        self.response.status_code = 200 if quotes else 502
-        for k, v in _headers(origin).items():
-            self.response.headers[k] = v
-        return {"ok": bool(quotes), "quotes": quotes, "errors": errors, "maxCodes": MAX_CODES}
+        self._send(200 if quotes else 502, {
+            "ok": bool(quotes),
+            "quotes": quotes,
+            "errors": errors,
+            "maxCodes": MAX_CODES,
+        })
