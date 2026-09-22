@@ -2,6 +2,10 @@ name: Radar - Close Update
 
 on:
   workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "scripts/chip_data.py"
   schedule:
     # 台灣時間：14:25 先出盤後版；20:30 / 23:40 補晚公布籌碼；次日 08:15 再做一次最終補齊。
     - cron: "25 6 * * 1-5"
@@ -36,6 +40,23 @@ jobs:
         run: python scripts/sync_live_data.py || true
       - name: Build full close + chips + market
         run: python scripts/build_data.py --mode close
+      - name: Verify chip recovery
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('docs/data/close.json')
+          obj = json.loads(p.read_text(encoding='utf-8'))
+          rows = obj.get('rows') or []
+          covered = [r for r in rows if float(r.get('chip_coverage_pct') or 0) > 0]
+          print('chip covered rows:', len(covered), '/', len(rows))
+          x = next((r for r in rows if str(r.get('code')) == '5483'), None)
+          if x:
+            keys = ['chip_date','foreign_net_latest','foreign_3d_net','trust_net_latest','sbl_balance_latest','sbl_3change_pct','margin_3d_pct','margin_status','chip_coverage_pct','chip_history_days']
+            print('5483:', {k:x.get(k) for k in keys})
+          if rows and not covered:
+            raise SystemExit('chip coverage is still 0% for all rows')
+          PY
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
