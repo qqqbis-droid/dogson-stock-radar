@@ -1,0 +1,117 @@
+name: Fix Intraday Scan v1.2.1
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-pages
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    if: github.event.head_commit.message == 'Fix intraday scan v1.2.1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Patch early-market scan and full liquid universe
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('scripts/build_data.py')
+          s = p.read_text(encoding='utf-8')
+
+          s = s.replace('犬子老師飆股雷達 Free Edition v1.2', '犬子老師飆股雷達 Free Edition v1.2.1', 1)
+          s = s.replace('"version": "1.2-free"', '"version": "1.2.1-free"')
+
+          old = '''def intraday_technical(x):\n    if len(x) < 20:\n        return None'''
+          new = '''def intraday_technical(x):\n    # 開盤早段也要能掃描；只要累積至少 4 根 5 分K 就可開始判斷。\n    if len(x) < 4:\n        return None'''
+          if old not in s:
+              raise SystemExit('missing intraday minimum-bars pattern')
+          s = s.replace(old, new, 1)
+
+          old = 'trend = bool(cur > ma5.iloc[-1] > ma10.iloc[-1]) if pd.notna(ma10.iloc[-1]) else False'
+          new = '''if pd.notna(ma10.iloc[-1]):\n        trend = bool(cur > ma5.iloc[-1] > ma10.iloc[-1])\n    elif pd.notna(ma5.iloc[-1]):\n        trend = bool(cur > ma5.iloc[-1])\n    else:\n        trend = bool(cur >= float(c.iloc[0]))'''
+          if old not in s:
+              raise SystemExit('missing early trend pattern')
+          s = s.replace(old, new, 1)
+
+          # v1.2 的「剛啟動」階段不應被量速硬卡死；量速仍保留在技術/品質分。
+          old = '''                    r.get("break3")\n                    and r.get("close", 0) > r.get("vwap", 1e99)\n                    and r.get("pace", 0) >= 1.2\n                    and (r.get("trend5") or r.get("break12") or r.get("technical_score", 0) >= 30)'''
+          new = '''                    r.get("break3")\n                    and r.get("close", 0) > r.get("vwap", 1e99)\n                    and (r.get("trend5") or r.get("break12") or r.get("technical_score", 0) >= 22)'''
+          if old not in s:
+              raise SystemExit('missing launch condition pattern')
+          s = s.replace(old, new, 1)
+
+          # 不再只掃前150名；改掃所有通過盤後流動性門檻的股票（目前約數百檔）。
+          old = '''    pool += [\n        code_to_sym[r["code"]] for r in close_rows[:150]\n        if r.get("code") in code_to_sym\n    ]'''
+          new = '''    pool += [\n        code_to_sym[r["code"]] for r in close_rows\n        if r.get("code") in code_to_sym\n    ]'''
+          if old not in s:
+              raise SystemExit('missing top150 pool pattern')
+          s = s.replace(old, new, 1)
+
+          # 防止單次免費資料源異常時，把原本盤中清單整份洗成空白。
+          anchor = '''    rows = add_component_scores(rows, market, preliminary_intraday=True)\n    market_live = intraday_index_snapshot()'''
+          repl = '''    rows = add_component_scores(rows, market, preliminary_intraday=True)\n\n    if not rows:\n        previous = load_json("intraday.json", {})\n        if previous.get("rows"):\n            previous["stale"] = True\n            previous["attempted_at"] = now_tw().isoformat(timespec="seconds")\n            previous["note"] = "本輪免費盤中資料源暫時沒有有效5分K，已保留上一輪資料，不再顯示空白。"\n            dump("intraday.json", previous)\n            status = load_json("status.json", {})\n            status.update({\n                "updated_at": now_tw().isoformat(timespec="seconds"),\n                "intraday_attempted_at": now_tw().isoformat(timespec="seconds"),\n                "intraday_count": len(previous.get("rows", [])),\n                "version": "1.2.1-free",\n            })\n            dump("status.json", status)\n            print("intraday source empty; kept previous", len(previous.get("rows", [])))\n            return\n\n    market_live = intraday_index_snapshot()'''
+          if anchor not in s:
+              raise SystemExit('missing intraday fallback anchor')
+          s = s.replace(anchor, repl, 1)
+
+          p.write_text(s, encoding='utf-8')
+
+          ip = Path('docs/index.html')
+          h = ip.read_text(encoding='utf-8')
+          h = h.replace('Free Edition v1.2｜階段＋品質分開判斷', 'Free Edition v1.2.1｜盤中搜尋修正版')
+          h = h.replace('若盤中搜尋任意股票，免費版只掃固定關注池＋前一盤後前150名；切到盤後可查全市場。', '盤中會掃描所有通過流動性門檻的股票；若個別免費行情源暫缺，切到盤後仍可查完整日K資料。')
+          h = h.replace('免費版只掃固定關注池＋前一盤後前150名；切到盤後可查全市場。', '盤中會掃描所有通過流動性門檻的股票；若個別免費行情源暫缺，切到盤後仍可查完整日K資料。')
+          ip.write_text(h, encoding='utf-8')
+
+          sw = Path('docs/sw.js')
+          if sw.exists():
+              x = sw.read_text(encoding='utf-8')
+              x = x.replace('dogson-free-v13', 'dogson-free-v121').replace('dogson-free-v12', 'dogson-free-v121')
+              sw.write_text(x, encoding='utf-8')
+          PY
+
+      - name: Verify source
+        run: |
+          python -m py_compile scripts/build_data.py
+          grep -q 'v1.2.1' docs/index.html
+          grep -q 'for r in close_rows' scripts/build_data.py
+
+      - name: Commit source fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py docs/index.html docs/sw.js
+          git commit -m "Apply intraday scan v1.2.1" || true
+          git push origin main
+
+      - run: pip install -r requirements.txt
+      - name: Sync existing close/chip data
+        run: python scripts/sync_live_data.py || true
+      - name: Build fixed intraday radar
+        run: python scripts/build_data.py --mode intraday
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
