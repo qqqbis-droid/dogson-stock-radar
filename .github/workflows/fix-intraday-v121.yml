@@ -10,7 +10,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: dogson-pages
+  group: dogson-intraday-fix-v121
   cancel-in-progress: false
 
 jobs:
@@ -53,21 +53,18 @@ jobs:
               raise SystemExit('missing early trend pattern')
           s = s.replace(old, new, 1)
 
-          # v1.2 的「剛啟動」階段不應被量速硬卡死；量速仍保留在技術/品質分。
           old = '''                    r.get("break3")\n                    and r.get("close", 0) > r.get("vwap", 1e99)\n                    and r.get("pace", 0) >= 1.2\n                    and (r.get("trend5") or r.get("break12") or r.get("technical_score", 0) >= 30)'''
           new = '''                    r.get("break3")\n                    and r.get("close", 0) > r.get("vwap", 1e99)\n                    and (r.get("trend5") or r.get("break12") or r.get("technical_score", 0) >= 22)'''
           if old not in s:
               raise SystemExit('missing launch condition pattern')
           s = s.replace(old, new, 1)
 
-          # 不再只掃前150名；改掃所有通過盤後流動性門檻的股票（目前約數百檔）。
           old = '''    pool += [\n        code_to_sym[r["code"]] for r in close_rows[:150]\n        if r.get("code") in code_to_sym\n    ]'''
           new = '''    pool += [\n        code_to_sym[r["code"]] for r in close_rows\n        if r.get("code") in code_to_sym\n    ]'''
           if old not in s:
               raise SystemExit('missing top150 pool pattern')
           s = s.replace(old, new, 1)
 
-          # 防止單次免費資料源異常時，把原本盤中清單整份洗成空白。
           anchor = '''    rows = add_component_scores(rows, market, preliminary_intraday=True)\n    market_live = intraday_index_snapshot()'''
           repl = '''    rows = add_component_scores(rows, market, preliminary_intraday=True)\n\n    if not rows:\n        previous = load_json("intraday.json", {})\n        if previous.get("rows"):\n            previous["stale"] = True\n            previous["attempted_at"] = now_tw().isoformat(timespec="seconds")\n            previous["note"] = "本輪免費盤中資料源暫時沒有有效5分K，已保留上一輪資料，不再顯示空白。"\n            dump("intraday.json", previous)\n            status = load_json("status.json", {})\n            status.update({\n                "updated_at": now_tw().isoformat(timespec="seconds"),\n                "intraday_attempted_at": now_tw().isoformat(timespec="seconds"),\n                "intraday_count": len(previous.get("rows", [])),\n                "version": "1.2.1-free",\n            })\n            dump("status.json", status)\n            print("intraday source empty; kept previous", len(previous.get("rows", [])))\n            return\n\n    market_live = intraday_index_snapshot()'''
           if anchor not in s:
