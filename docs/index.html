@@ -38,7 +38,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.3.5｜整數籌碼＋族群代理＋強化支撐壓力</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.3.6｜交易日一致性＋正式收盤覆核</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -111,7 +111,7 @@ function marketHTML(){
  const t=m.taiex||{},o=m.otc||{};
  const flowDate=m.foreign_date?`${m.foreign_date} 官方盤後`:`官方資料待補`;
  const flowDays=(+m.foreign_5d_count||0)>0?`近${m.foreign_5d_count}日 ${signed(m.foreign_5d_billion,1,"億")}`:`近5日 —`;
- return `<div class="markettop"><div><div class="marketmode ${modeClass}">📊 盤後市場：${m.market_mode||"—"}</div><div class="sub">品質參考線：${m.radar_threshold||"—"}分</div></div><div><div class="marketscore">${num(m.market_score,1)}/15</div><div class="label">盤後大盤分</div></div></div>
+ return `<div class="markettop"><div><div class="marketmode ${modeClass}">📊 盤後市場：${m.market_mode||"—"}</div><div class="sub">交易日 ${m.trade_date||"待確認"}｜${m.data_complete===false?"資料未齊，不採信總分":"同交易日資料已核對"}</div></div><div><div class="marketscore">${m.data_complete===false?"待補":num(m.market_score,1)+"/15"}</div><div class="label">盤後大盤分</div></div></div>
  <div class="marketgrid">
   <div class="marketitem"><div class="marketv">加權 ${signed(t.change_pct)}</div><div class="marketl">${t.trend?"多頭排列":"未完整多頭"} · ${t.close||"—"}</div></div>
   <div class="marketitem"><div class="marketv">櫃買 ${signed(o.change_pct)}</div><div class="marketl">${o.trend?"多頭排列":"未完整多頭"} · ${o.close||"—"}</div></div>
@@ -149,7 +149,7 @@ function partsHTML(r){
  <div class="part"><div class="partv">${num(r.technical_score,0)}/50</div><div class="partl">技術</div></div>
  <div class="part"><div class="partv">${(+r.chip_coverage_pct||0)<60?"待補":num(r.chip_score,0)+"/25"}</div><div class="partl">籌碼${(+r.chip_coverage_pct||0)<60?" · 資料不足":""}</div></div>
  <div class="part"><div class="partv">${num(r.sector_score,0)}/10</div><div class="partl">族群</div></div>
- <div class="part"><div class="partv">${num(r.market_score,0)}/15</div><div class="partl">大盤</div></div>
+ <div class="part"><div class="partv">${r.market_data_complete===false?"待補":num(r.market_score,0)+"/15"}</div><div class="partl">大盤${r.market_data_complete===false?" · 日期未齊":""}</div></div>
  </div>`;
 }
 
@@ -207,7 +207,7 @@ async function load(){
  }
 }
 
-document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;market=mode==="intraday"?intraMarket:closeMarket;$("modeText").textContent=mode==="intraday"?"盤中：純即時大盤 / 5分K / 資金輪動":"盤後：日K / 籌碼 / 大盤 / 支撐壓力";$("marketbox").innerHTML=marketHTML();$("rotationbox").innerHTML=rotationHTML();render()});
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;market=mode==="intraday"?intraMarket:closeMarket;$("modeText").textContent=mode==="intraday"?"盤中：純即時大盤 / 5分K / 資金輪動":"盤後：正式收盤日K / 籌碼 / 同交易日大盤 / 支撐壓力";$("marketbox").innerHTML=marketHTML();$("rotationbox").innerHTML=rotationHTML();render()});
 document.querySelectorAll(".filter[data-f]").forEach(b=>b.onclick=()=>{document.querySelectorAll(".filter[data-f]").forEach(x=>x.classList.remove("on"));b.classList.add("on");filter=b.dataset.f;render()});
 $("watchOnly").onclick=()=>{watchOnly=!watchOnly;$("watchOnly").classList.toggle("on",watchOnly);render()};
 $("scan").onclick=render;
@@ -215,7 +215,7 @@ $("q").addEventListener("input",()=>{const q=$("q").value.trim().toLowerCase(),b
 if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
 load();
 </script>
-<script src="./realtime-config.js?v=130"></script>
-<script src="./realtime.js?v=130"></script>
+<script src="./realtime-config.js?v=136"></script>
+<script src="./realtime.js?v=136"></script>
 </body>
 </html>

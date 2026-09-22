@@ -125,6 +125,13 @@
 
   function applyQuotes(){
     ensureStyles();
+    const liveEl=document.getElementById('liveStatus');
+    if(typeof mode!=='undefined'&&mode!=='intraday'){
+      if(liveEl)liveEl.style.display='none';
+      document.querySelectorAll('.livequote').forEach(x=>x.remove());
+      return;
+    }
+    if(liveEl)liveEl.style.display='block';
     document.querySelectorAll('.card').forEach(card=>{
       const code=codeFromCard(card);if(!code)return;
       const q=quotes.get(code);
@@ -142,7 +149,7 @@
 
   async function refresh(){
     if(busy||document.hidden)return;
-    if(typeof mode!=='undefined'&&mode!=='intraday')return;
+    if(typeof mode!=='undefined'&&mode!=='intraday'){applyQuotes();return;}
     const endpoint=apiUrl();
     const codes=selectedCodes();
     if(!codes.length){status('🟡 尚無即時追蹤標的｜搜尋或加入關注後會追蹤最多5檔','warn');return;}

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.3.5
+犬子老師飆股雷達 Free Edition v1.3.6
 =================================
 總分 = 技術 50 + 籌碼 25 + 族群 10 + 大盤 15
 
@@ -266,11 +266,30 @@ def download_intraday(syms):
 
 
 
-def official_mis_snapshot(uni):
-    """盤後用 TWSE MIS 覆核今日最終 OHLCV，避免 Yahoo 日K仍停在盤中快照。"""
+def _latest_completed_cutoff():
+    """Latest calendar date that may contain a fully completed Taiwan cash session."""
     now = now_tw()
-    if (now.hour, now.minute) < (13, 30):
-        return {}
+    # Before 13:35, today's cash session is not considered completed.  This also
+    # fixes the midnight/08:15 rebuild case: 9/23 should still accept 9/22 data.
+    if (now.hour, now.minute) < (13, 35):
+        return now.date() - timedelta(days=1)
+    return now.date()
+
+
+def _parse_mis_trade_date(raw):
+    s = str(raw or "").strip().replace("-", "").replace("/", "")
+    if len(s) != 8 or not s.isdigit():
+        return None
+    try:
+        return datetime.strptime(s, "%Y%m%d").date()
+    except Exception:
+        return None
+
+
+def official_mis_snapshot(uni):
+    """Use TWSE MIS to overlay the latest *completed* official OHLCV session."""
+    now = now_tw()
+    cutoff = _latest_completed_cutoff()
     out = {}
     recs = uni[["code", "market"]].astype(str).to_dict("records")
     for i in range(0, len(recs), 80):
@@ -283,15 +302,18 @@ def official_mis_snapshot(uni):
             rr = requests.get(
                 "https://mis.twse.com.tw/stock/api/getStockInfo.jsp",
                 params={"ex_ch": ex_ch, "json": "1", "delay": "0", "_": int(now.timestamp()*1000)},
-                headers={"User-Agent": "Mozilla/5.0 DogsonRadar/1.3.1", "Referer": "https://mis.twse.com.tw/stock/index.jsp"},
+                headers={"User-Agent": "Mozilla/5.0 DogsonRadar/1.3.6", "Referer": "https://mis.twse.com.tw/stock/index.jsp"},
                 timeout=20,
             )
             rr.raise_for_status()
             arr = rr.json().get("msgArray") or []
             for x in arr:
                 code = str(x.get("c") or "").strip()
-                d = str(x.get("d") or "").strip()
-                if not code or (d and d != now.strftime("%Y%m%d")):
+                trade_date = _parse_mis_trade_date(x.get("d"))
+                if not code or trade_date is None or trade_date > cutoff:
+                    continue
+                # Ignore obviously stale snapshots; holidays/weekends are still safe.
+                if (cutoff - trade_date).days > 10:
                     continue
                 def f(k):
                     try:
@@ -303,18 +325,69 @@ def official_mis_snapshot(uni):
                 if z is None or z <= 0:
                     continue
                 out[code] = {
-                    "date": now.date(), "Close": z,
+                    "date": trade_date, "Close": z,
                     "Open": o if o and o > 0 else z,
                     "High": h if h and h > 0 else z,
                     "Low": l if l and l > 0 else z,
-                    # MIS v 為張數；Yahoo 日K Volume 為股數。
+                    # MIS v is lots; Yahoo daily Volume is shares.
                     "Volume": (v * 1000.0) if v is not None else None,
                 }
         except Exception as e:
             print("MIS close batch", i, e)
-    print("official MIS close snapshot", len(out))
+
+    # One build must never mix trading dates. Keep only the newest completed date.
+    if out:
+        latest = max(v["date"] for v in out.values())
+        out = {k: v for k, v in out.items() if v["date"] == latest}
+        print("official MIS close snapshot", len(out), "trade_date", latest)
+    else:
+        print("official MIS close snapshot 0")
     return out
 
+
+def official_index_snapshot():
+    """Completed-session TWSE/TPEx index closes from TWSE MIS."""
+    now = now_tw()
+    cutoff = _latest_completed_cutoff()
+    out = {}
+    try:
+        rr = requests.get(
+            "https://mis.twse.com.tw/stock/api/getStockInfo.jsp",
+            params={"ex_ch": "tse_t00.tw|otc_o00.tw", "json": "1", "delay": "0", "_": int(now.timestamp()*1000)},
+            headers={"User-Agent": "Mozilla/5.0 DogsonRadar/1.3.6", "Referer": "https://mis.twse.com.tw/stock/index.jsp"},
+            timeout=15,
+        )
+        rr.raise_for_status()
+        for x in rr.json().get("msgArray") or []:
+            ch = str(x.get("ch") or x.get("ex") or "")
+            name = str(x.get("n") or "")
+            key = None
+            if "tse_t00" in ch or "發行量加權" in name:
+                key = "^TWII"
+            elif "otc_o00" in ch or "櫃買" in name:
+                key = "^TWOII"
+            if not key:
+                continue
+            trade_date = _parse_mis_trade_date(x.get("d"))
+            if trade_date is None or trade_date > cutoff or (cutoff - trade_date).days > 10:
+                continue
+            try:
+                cur = float(str(x.get("z") or "").replace(",", ""))
+                prev = float(str(x.get("y") or "").replace(",", ""))
+            except Exception:
+                continue
+            if cur <= 0:
+                continue
+            out[key] = {
+                "date": trade_date.isoformat(),
+                "close": cur,
+                "prev_close": prev if prev > 0 else None,
+                "change_pct": ((cur / prev - 1) * 100) if prev > 0 else None,
+                "source": "TWSE MIS completed session",
+            }
+    except Exception as e:
+        print("MIS completed index", e)
+    return out
 
 def overlay_official_today_bar(x, snap):
     if x is None or x.empty or not snap:
@@ -739,29 +812,43 @@ def liquidity_profile(avg_turnover20):
     return "活躍", 2
 
 
-def index_state(symbol, label):
+def index_state(symbol, label, snap=None):
     try:
         d = download_daily([symbol], "3mo").get(symbol)
-        if d is None or len(d) < 25:
+        if d is None or len(d) < 24:
             return None
-        c = d["Close"]
+        c = d["Close"].copy().dropna()
+        source = "Yahoo daily"
+        if snap and snap.get("date") and snap.get("close"):
+            td = datetime.strptime(str(snap["date"]), "%Y-%m-%d").date()
+            hits = [idx for idx in c.index if pd.Timestamp(idx).date() == td]
+            if hits:
+                c.loc[hits[-1]] = float(snap["close"])
+            else:
+                c.loc[pd.Timestamp(td)] = float(snap["close"])
+                c = c.sort_index()
+            source = "TWSE MIS overlay"
+        if len(c) < 25:
+            return None
         ma5 = float(c.rolling(5).mean().iloc[-1])
         ma10 = float(c.rolling(10).mean().iloc[-1])
         ma20 = float(c.rolling(20).mean().iloc[-1])
         close = float(c.iloc[-1])
-        change = float((c.iloc[-1]/c.iloc[-2]-1)*100)
+        if snap and snap.get("date") == str(c.index[-1].date()) and snap.get("change_pct") is not None:
+            change = float(snap["change_pct"])
+        else:
+            change = float((c.iloc[-1]/c.iloc[-2]-1)*100)
         return {
             "label": label, "symbol": symbol, "close": round(close, 2),
             "change_pct": round(change, 2),
             "ma5": round(ma5, 2), "ma10": round(ma10, 2), "ma20": round(ma20, 2),
             "trend": bool(close > ma5 > ma10 > ma20),
             "above20": bool(close > ma20),
-            "date": str(d.index[-1].date()),
+            "date": str(c.index[-1].date()), "source": source,
         }
     except Exception as e:
         print("index", symbol, e)
         return None
-
 
 def _market_num(x):
     if x is None:
@@ -926,20 +1013,29 @@ def _foreign_market_score(flow):
     return round(min(3.0, max(0.0, base + bonus)), 1)
 
 
-def build_market(breadth_pct, chips=None):
-    taiex = index_state("^TWII", "加權")
-    otc = index_state("^TWOII", "櫃買")
+def build_market(breadth_pct, chips=None, expected_trade_date=None):
+    expected = expected_trade_date.isoformat() if hasattr(expected_trade_date, "isoformat") else (str(expected_trade_date) if expected_trade_date else None)
+    idx = official_index_snapshot()
+    taiex = index_state("^TWII", "加權", idx.get("^TWII"))
+    otc = index_state("^TWOII", "櫃買", idx.get("^TWOII"))
 
-    # v1.3.3: market foreign score must use the official all-market cash-flow summary,
-    # not a sum of 4-digit stock-pool share counts.
+    # Never combine index data from a different session into one market score.
+    if expected and taiex and taiex.get("date") != expected:
+        print("market date mismatch taiex", taiex.get("date"), expected)
+        taiex = None
+    if expected and otc and otc.get("date") != expected:
+        print("market date mismatch otc", otc.get("date"), expected)
+        otc = None
+
     foreign = fetch_market_foreign_flow()
-    foreign_score = _foreign_market_score(foreign)
+    foreign_same_day = bool(expected and foreign.get("date") == expected)
+    foreign_score = _foreign_market_score(foreign) if (foreign_same_day or not expected) else 1.5
 
     score = 0.0
     if taiex:
         score += 5 if taiex["trend"] else 2.5 if taiex["above20"] else 0
     else:
-        score += 2.5  # 缺資料中性
+        score += 2.5
     if otc:
         score += 4 if otc["trend"] else 2 if otc["above20"] else 0
     else:
@@ -954,7 +1050,8 @@ def build_market(breadth_pct, chips=None):
     score += foreign_score
 
     score = round(min(15, score), 1)
-    mode = "偏多" if score >= 11 else "中性" if score >= 7 else "防守"
+    complete = bool(expected and taiex and otc and breadth_pct is not None and foreign_same_day)
+    mode = ("偏多" if score >= 11 else "中性" if score >= 7 else "防守") if complete else "資料待補"
     threshold = 70 if mode == "偏多" else 76 if mode == "中性" else 82
 
     def billion(v):
@@ -962,11 +1059,14 @@ def build_market(breadth_pct, chips=None):
 
     return {
         "updated_at": now_tw().isoformat(timespec="seconds"),
+        "trade_date": expected,
+        "data_complete": complete,
         "market_score": score,
         "market_mode": mode,
         "radar_threshold": threshold,
         "breadth_up_pct": round(breadth_pct, 1) if breadth_pct is not None else None,
         "foreign_date": foreign.get("date"),
+        "foreign_same_trade_date": foreign_same_day,
         "foreign_net_billion": billion(foreign.get("total_net")),
         "foreign_twse_billion": billion(foreign.get("twse_net")),
         "foreign_tpex_billion": billion(foreign.get("tpex_net")),
@@ -981,7 +1081,7 @@ def build_market(breadth_pct, chips=None):
             "taiex": "加權趨勢最多5分",
             "otc": "櫃買趨勢最多4分",
             "breadth": "上漲家數比最多3分",
-            "foreign": "官方外資現貨：當日方向最多2分＋近5日累計最多1分",
+            "foreign": "官方外資現貨：同交易日當日方向最多2分＋近5日累計最多1分",
         },
     }
 
@@ -1164,6 +1264,8 @@ def add_component_scores(rows, market, preliminary_intraday=False):
         r["sector_hot_ratio"] = round(ratio * 100, 1) if ratio is not None else None
         r["market_score"] = market_score
         r["market_mode"] = market.get("market_mode", "中性")
+        r["market_data_complete"] = bool(market.get("data_complete", True))
+        r["market_trade_date"] = market.get("trade_date")
 
         cs = float(r.get("chip_score", 12.5))
         liq_adjust = float(r.get("liquidity_adjust", 0))
@@ -1171,7 +1273,8 @@ def add_component_scores(rows, market, preliminary_intraday=False):
         r["score"] = round(max(0, min(100, total)), 1)
 
         chip_cov = float(r.get("chip_coverage_pct") or 0)
-        r["score_reliable"] = bool(chip_cov >= 60)
+        same_day = (not r.get("market_trade_date")) or str(r.get("date")) == str(r.get("market_trade_date"))
+        r["score_reliable"] = bool(chip_cov >= 60 and r.get("market_data_complete", True) and same_day)
         if not r["score_reliable"]:
             r["quality_label"] = "資料待補"
         elif r["score"] >= 80:
@@ -1253,6 +1356,7 @@ def build_close():
     dump("universe.json", universe_public)
     meta = uni.set_index("symbol").to_dict("index")
     official_today = official_mis_snapshot(uni)
+    official_trade_date = max((v.get("date") for v in official_today.values() if v.get("date")), default=None)
 
     rows = []
     breadth_changes = []
@@ -1294,6 +1398,20 @@ def build_close():
             except Exception as e:
                 print("daily stock", sym, e)
 
+    # Lock the entire close radar to one completed trading date.  If MIS is temporarily
+    # unavailable, use the newest date present in downloaded daily data, then discard older rows.
+    trade_date = official_trade_date
+    if trade_date is None and rows:
+        try:
+            trade_date = max(datetime.strptime(str(r.get("date")), "%Y-%m-%d").date() for r in rows if r.get("date"))
+        except Exception:
+            trade_date = None
+    if trade_date is not None:
+        td = trade_date.isoformat()
+        before = len(rows)
+        rows = [r for r in rows if str(r.get("date")) == td]
+        print("close trade-date lock", td, "kept", len(rows), "of", before)
+
     market_map = dict(zip(uni["code"].astype(str), uni["market"].astype(str)))
 
     # All-market chip fetch is table-based, not 1000 individual HTTP calls.
@@ -1303,11 +1421,13 @@ def build_close():
         CACHE / "chips"
     )
 
+    # Recompute breadth only from the rows that survived the same-date lock.
+    breadth_changes = [float(r.get("day_change", 0)) for r in rows]
     breadth_pct = None
     if breadth_changes:
         breadth_pct = sum(1 for x in breadth_changes if x > 0) / len(breadth_changes) * 100
 
-    market = build_market(breadth_pct, chips)
+    market = build_market(breadth_pct, chips, trade_date)
 
     for r in rows:
         chip = chips.get(r["code"], {})
@@ -1320,6 +1440,8 @@ def build_close():
 
     dump("close.json", {
         "updated_at": now_tw().isoformat(timespec="seconds"),
+        "trade_date": market.get("trade_date"),
+        "data_complete": bool(market.get("data_complete")),
         "market": market,
         "score_formula": {"technical": 50, "chip": 25, "sector": 10, "market": 15},
         "rows": rows,
@@ -1331,7 +1453,7 @@ def build_close():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "close_updated_at": now_tw().isoformat(timespec="seconds"),
         "daily_count": len(rows),
-        "version": "1.3.4-free",
+        "version": "1.3.6-free",
     })
     dump("status.json", status)
 
@@ -1714,7 +1836,7 @@ def build_intraday():
                 "updated_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_attempted_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_count": len(previous.get("rows", [])),
-                "version": "1.3.4-free",
+                "version": "1.3.6-free",
             })
             dump("status.json", status)
             print("intraday source empty; kept previous", len(previous.get("rows", [])))
@@ -1739,7 +1861,7 @@ def build_intraday():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_count": len(rows),
-        "version": "1.3.4-free",
+        "version": "1.3.6-free",
     })
     dump("status.json", status)
     print("intraday done", len(rows))
