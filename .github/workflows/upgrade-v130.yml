@@ -1,0 +1,61 @@
+name: Radar v1.3 Realtime Hybrid
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-pages
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    if: github.event.head_commit.message == 'Install v1.3 realtime hybrid'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Apply v1.3 UI patch
+        run: python scripts/patch_v130.py
+
+      - name: Verify v1.3 files
+        run: |
+          python -m py_compile scripts/build_data.py scripts/patch_v130.py
+          node --check docs/realtime.js
+          node --check api/quote.js
+          grep -q 'Free Edition v1.3' docs/index.html
+          grep -q 'realtime-config.js?v=130' docs/index.html
+          grep -q 'realtime.js?v=130' docs/index.html
+          grep -q 'dogson-free-v130' docs/sw.js
+
+      - name: Commit v1.3 source
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/index.html docs/sw.js scripts/build_data.py
+          git commit -m 'Apply v1.3 realtime hybrid UI' || true
+          git push origin main
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
