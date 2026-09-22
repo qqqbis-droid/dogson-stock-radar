@@ -1,0 +1,76 @@
+name: Install Radar v1.3.2 Status Display Upgrade
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-pages
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    if: github.event.head_commit.message == 'Install v1.3.2 status display upgrade'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+
+      - name: Apply v1.3.2 patch
+        run: python scripts/patch_v132.py
+
+      - name: Preserve latest close/chips and rebuild final intraday snapshot
+        run: |
+          python scripts/sync_live_data.py || true
+          python scripts/build_data.py --mode intraday
+
+      - name: Verify status, units and end-of-day 5-minute snapshot
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          h=Path('docs/index.html').read_text(encoding='utf-8')
+          r=Path('docs/realtime.js').read_text(encoding='utf-8')
+          assert 'Free Edition v1.3.2' in h
+          assert 'marketLots' in h and '萬張' in h
+          assert "mode==='close'" in r and '盤後資料' in r
+          j=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
+          times=[]
+          for x in j.get('rows',[]):
+              if str(x.get('date'))=='2026-09-22' and x.get('time'):
+                  times.append(str(x['time']))
+          assert times, 'no 2026-09-22 intraday rows'
+          latest=max(times)
+          print('latest intraday time=',latest)
+          assert latest >= '13:20', f'intraday still stopped too early: {latest}'
+          PY
+
+      - name: Commit source/UI fixes
+        run: |
+          git config user.name "qqqbis-droid"
+          git config user.email "qqqbis@gmail.com"
+          git add scripts/patch_v132.py docs/index.html docs/realtime.js .github/workflows/close.yml
+          git diff --cached --quiet || git commit -m "Apply v1.3.2 status and display fixes"
+          git push
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
