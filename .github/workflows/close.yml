@@ -3,8 +3,11 @@ name: Radar - Close Update
 on:
   workflow_dispatch:
   schedule:
-    # 台灣時間週一至週五約 14:25。只在盤後跑，避免每次改程式都重建盤後資料覆蓋盤中版本。
+    # 台灣時間：14:25 先出盤後版；20:30 / 23:40 補晚公布籌碼；次日 08:15 再做一次最終補齊。
     - cron: "25 6 * * 1-5"
+    - cron: "30 12 * * 1-5"
+    - cron: "40 15 * * 1-5"
+    - cron: "15 0 * * 1-5"
 
 permissions:
   contents: read
