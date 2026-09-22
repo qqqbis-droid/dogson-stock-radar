@@ -1,0 +1,222 @@
+name: Upgrade Radar to v1.2
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v12-upgrade
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    if: github.event.head_commit.message == 'Install v1.2 upgrader'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Patch v1.2 stage-quality classification
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('scripts/build_data.py')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('犬子老師飆股雷達 Free Edition v1.1', '犬子老師飆股雷達 Free Edition v1.2', 1)
+
+          new_func = r'''def add_component_scores(rows, market, preliminary_intraday=False):
+              """加入族群分、總分、階段與品質。
+
+              v1.2 起把「階段」和「品質」拆開：
+              - 階段（剛啟動 / 等回踩 / 觀察 / 過熱）主要看價格行為與位階。
+              - 品質（一般 / 強 / 高共振）才用 100 分總分衡量。
+              """
+              if not rows:
+                  return rows
+
+              hot = {}
+              for r in rows:
+                  if r.get("technical_score", 0) >= 30 and not r.get("overheat_reasons"):
+                      hot[r["industry"]] = hot.get(r["industry"], 0) + 1
+
+              quality_reference = market.get("radar_threshold", 76)
+              market_score = float(market.get("market_score", 7.5))
+
+              for r in rows:
+                  n = int(hot.get(r["industry"], 0))
+                  sec = sector_score(n)
+                  r["industry_hot_count"] = n
+                  r["sector_score"] = sec
+                  r["market_score"] = market_score
+                  r["market_mode"] = market.get("market_mode", "中性")
+
+                  cs = float(r.get("chip_score", 12.5))
+                  total = float(r.get("technical_score", 0)) + cs + sec + market_score
+                  r["score"] = round(max(0, min(100, total)), 1)
+
+                  if r["score"] >= 80:
+                      r["quality_label"] = "高共振"
+                  elif r["score"] >= 70:
+                      r["quality_label"] = "強"
+                  else:
+                      r["quality_label"] = "一般"
+                  r["quality_reference"] = quality_reference
+                  r["quality_pass_market"] = bool(r["score"] >= quality_reference)
+
+                  if r.get("overheat_reasons"):
+                      r["category"] = "過熱不追"
+                      r["stage_reason"] = "位階或動能已進入過熱區"
+
+                  elif preliminary_intraday:
+                      launch = bool(
+                          r.get("break3")
+                          and r.get("close", 0) > r.get("vwap", 1e99)
+                          and r.get("pace", 0) >= 1.2
+                          and (r.get("trend5") or r.get("break12") or r.get("technical_score", 0) >= 30)
+                      )
+                      pullback = bool(
+                          (r.get("trend5") or r.get("technical_score", 0) >= 25)
+                          and r.get("close", 0) >= r.get("vwap", 0) * 0.995
+                      )
+
+                      if launch:
+                          r["category"] = "剛啟動"
+                          r["stage_reason"] = "3K突破＋站上VWAP＋量速放大"
+                      elif pullback:
+                          r["category"] = "等回踩"
+                          r["stage_reason"] = "短線結構仍強，等待VWAP/短均承接"
+                      else:
+                          r["category"] = "觀察"
+                          r["stage_reason"] = "已有部分條件，但尚未形成明確盤中啟動"
+
+                  else:
+                      launch_structure = bool(
+                          r.get("break20")
+                          or (r.get("break3") and r.get("trend"))
+                      )
+                      launch = bool(
+                          launch_structure
+                          and r.get("vol_x", 0) >= 1.2
+                          and r.get("dist20", 999) <= 12
+                          and r.get("ret5", 999) <= 18
+                      )
+                      pullback = bool(
+                          (r.get("trend") or r.get("break3") or r.get("technical_score", 0) >= 28)
+                          and r.get("dist20", 999) <= 15
+                          and r.get("ret5", 999) <= 22
+                      )
+
+                      if launch:
+                          r["category"] = "剛啟動"
+                          r["stage_reason"] = "20日突破" if r.get("break20") else "3日平台突破＋均線多頭"
+                      elif pullback:
+                          r["category"] = "等回踩"
+                          r["stage_reason"] = "趨勢仍強，但較適合等支撐/均線承接"
+                      else:
+                          r["category"] = "觀察"
+                          r["stage_reason"] = "條件尚未集中到啟動階段"
+
+              order = {"剛啟動": 0, "等回踩": 1, "觀察": 2, "過熱不追": 3}
+              quality_order = {"高共振": 0, "強": 1, "一般": 2}
+              rows.sort(key=lambda r: (
+                  order.get(r["category"], 9),
+                  quality_order.get(r.get("quality_label"), 9),
+                  -r["score"]
+              ))
+              return rows
+          '''
+          new_func = re.sub(r'^          ', '', new_func, flags=re.M)
+          s2, n = re.subn(
+              r'def add_component_scores\(rows, market, preliminary_intraday=False\):.*?\n\ndef build_close\(\):',
+              new_func + '\n\ndef build_close():',
+              s,
+              count=1,
+              flags=re.S
+          )
+          if n != 1:
+              raise SystemExit('Could not patch add_component_scores')
+          s2 = s2.replace('"version": "1.1-free"', '"version": "1.2-free"')
+          p.write_text(s2, encoding='utf-8')
+
+          ip = Path('docs/index.html')
+          h = ip.read_text(encoding='utf-8')
+          h = h.replace('Free Edition v1.1｜技術＋籌碼＋族群＋大盤', 'Free Edition v1.2｜階段＋品質分開判斷')
+          h = h.replace('剛啟動門檻：${m.radar_threshold||"—"}分', '品質參考線：${m.radar_threshold||"—"}分')
+          h = h.replace(
+              '.cat{display:inline-block;font-size:12px;font-weight:850;padding:6px 9px;border-radius:999px;margin-top:7px}.start{background:#0f3928;color:#69efa8}.pull{background:#40300f;color:#ffd477}.watch{background:#1b2b42;color:#9cc9ff}.hot{background:#441923;color:#ff9aab}',
+              '.cat{display:inline-block;font-size:12px;font-weight:850;padding:6px 9px;border-radius:999px;margin-top:7px}.start{background:#0f3928;color:#69efa8}.pull{background:#40300f;color:#ffd477}.watch{background:#1b2b42;color:#9cc9ff}.hot{background:#441923;color:#ff9aab}.quality{display:inline-block;font-size:11px;font-weight:800;padding:5px 8px;border-radius:999px;margin:7px 0 0 5px;background:#222938;color:#cbd6e6}.quality.high{background:#392b0f;color:#ffd477}.quality.strong{background:#192f45;color:#a9d5ff}'
+          )
+          h = h.replace(
+              '<b>總分不是上漲機率。</b> 總分 82 的意思是「我們設定的強勢條件目前符合很多」，不是 82% 會漲。<br><br>',
+              '<b>階段和品質現在分開看。</b>「剛啟動」主要看突破、量能、VWAP/均線與位階；總分不再是剛啟動的硬門檻。總分 82 代表品質高，不是 82% 會漲。<br><br>'
+          )
+          h = h.replace(
+              '<b>大盤 15：</b>加權、櫃買、上漲家數比與全市場外資方向。大盤越弱，「剛啟動」門檻會自動提高。<br><br>',
+              '<b>大盤 15：</b>加權、櫃買、上漲家數比與全市場外資方向。大盤現在影響「品質分」與風險判讀，不會把真正剛突破的股票直接擋掉。<br><br><b>品質標籤：</b>80分以上＝高共振、70～79＝強、70以下＝一般。先看「階段」，再看「品質」。<br><br>'
+          )
+          h = h.replace(
+              'function cls(c){return c==="剛啟動"?"start":c==="等回踩"?"pull":c==="過熱不追"?"hot":"watch"}\n',
+              'function cls(c){return c==="剛啟動"?"start":c==="等回踩"?"pull":c==="過熱不追"?"hot":"watch"}\nfunction qualityCls(q){return q==="高共振"?"high":q==="強"?"strong":""}\n'
+          )
+          old_card = '<span class="cat ${cls(r.category)}">${r.category}</span></div></div><div><div class="score">${num(r.score,0)}</div><div class="label">總分 /100</div></div></div>'
+          new_card = '<span class="cat ${cls(r.category)}">${r.category}</span><span class="quality ${qualityCls(r.quality_label)}">品質：${r.quality_label||"一般"}</span></div></div><div><div class="score">${num(r.score,0)}</div><div class="label">品質總分 /100</div></div></div>'
+          if old_card not in h:
+              raise SystemExit('Could not patch card quality badge')
+          h = h.replace(old_card, new_card, 1)
+          h = h.replace(
+              '<div class="reasons">${(r.reasons||[]).map(x=>`<span class="reason">${x}</span>`).join("")}${(r.overheat_reasons||[]).map(x=>`<span class="reason warn">⚠ ${x}</span>`).join("")}</div>',
+              '<div class="reasons">${r.stage_reason?`<span class="reason">階段：${r.stage_reason}</span>`:""}${(r.reasons||[]).map(x=>`<span class="reason">${x}</span>`).join("")}${(r.overheat_reasons||[]).map(x=>`<span class="reason warn">⚠ ${x}</span>`).join("")}</div>'
+          )
+          h = h.replace(
+              '<div class="footer">總分 = 技術50 + 籌碼25 + 族群10 + 大盤15</div>',
+              '<div class="footer">階段看價格行為｜品質分 = 技術50 + 籌碼25 + 族群10 + 大盤15</div>'
+          )
+          ip.write_text(h, encoding='utf-8')
+
+          sw = Path('docs/sw.js')
+          if sw.exists():
+              x = sw.read_text(encoding='utf-8')
+              x = x.replace("dogson-free-v12", "dogson-free-v13")
+              sw.write_text(x, encoding='utf-8')
+          PY
+
+      - name: Verify syntax and version
+        run: |
+          python -m py_compile scripts/build_data.py
+          grep -q 'Free Edition v1.2' docs/index.html
+          grep -q 'quality_label' scripts/build_data.py
+
+      - run: pip install -r requirements.txt
+
+      - name: Build fresh data with v1.2 rules
+        run: python scripts/build_data.py --mode all
+
+      - name: Commit v1.2 source changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py docs/index.html docs/sw.js
+          git commit -m "Apply v1.2 stage-quality classification" || true
+          git push origin main
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
