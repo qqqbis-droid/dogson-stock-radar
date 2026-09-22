@@ -1,5 +1,6 @@
 name: Radar - Close Update
 
+# Production refresh marker: keep the 60K lifecycle/entry-light deployment newer than installer workflows.
 on:
   workflow_dispatch:
   push:
