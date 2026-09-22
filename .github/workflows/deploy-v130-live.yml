@@ -17,15 +17,70 @@ jobs:
   deploy:
     if: github.event.head_commit.message == 'Deploy v1.3 live endpoint to GitHub Pages'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Verify v1.3 realtime endpoint
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+
+      # UI / version deploys must never publish repository-stored stale JSON.
+      # First preserve the newest live close/chip data, then rebuild the 5-minute radar.
+      - name: Sync latest published radar data
+        run: python scripts/sync_live_data.py || true
+      - name: Rebuild latest 5-minute radar before deploy
+        run: python scripts/build_data.py --mode intraday
+
+      - name: Verify v1.3 and block stale intraday rollback
         run: |
           grep -q 'dogson-stock-radar-live.vercel.app' docs/realtime.js
           grep -q 'Free Edition v1.3' docs/index.html
+          python - <<'PY'
+          import json
+          from datetime import datetime, time
+          from pathlib import Path
+          from zoneinfo import ZoneInfo
+
+          p = Path('docs/data/intraday.json')
+          j = json.loads(p.read_text(encoding='utf-8'))
+          rows = j.get('rows') or []
+          if not rows:
+              raise SystemExit('intraday.json has no rows; refusing Pages deploy')
+
+          tw = ZoneInfo('Asia/Taipei')
+          now = datetime.now(tw)
+          today = now.date().isoformat()
+          today_times = []
+          for r in rows:
+              if str(r.get('date') or '') != today:
+                  continue
+              t = str(r.get('time') or '')[:5]
+              try:
+                  hh, mm = map(int, t.split(':'))
+                  today_times.append(datetime(now.year, now.month, now.day, hh, mm, tzinfo=tw))
+              except Exception:
+                  pass
+
+          # If today has trading data, prevent a UI deploy from rolling the radar back
+          # to a much older snapshot. If there is no today data, do not fail because
+          # Taiwan holidays / non-trading days are valid.
+          if today_times and now.weekday() < 5:
+              latest = max(today_times)
+              age_min = (now - latest).total_seconds() / 60
+              if time(9, 0) <= now.time() <= time(13, 45) and age_min > 20:
+                  raise SystemExit(f'intraday radar is stale by {age_min:.1f} minutes; refusing deploy')
+              if now.time() > time(13, 45) and latest.time() < time(13, 20):
+                  raise SystemExit(f'intraday radar ended too early at {latest:%H:%M}; refusing deploy')
+              print('intraday freshness OK:', latest.isoformat(), 'rows=', len(rows))
+          else:
+              print('freshness guard: no same-day trading rows; holiday/off-day safe path, rows=', len(rows))
+          PY
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
