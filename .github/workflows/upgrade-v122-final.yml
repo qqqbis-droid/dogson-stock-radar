@@ -6,9 +6,6 @@ permissions:
   contents: write
   pages: write
   id-token: write
-concurrency:
-  group: dogson-pages
-  cancel-in-progress: false
 jobs:
   upgrade:
     if: github.event.head_commit.message == 'Run v1.2.2 final upgrade'
