@@ -37,7 +37,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.3.2｜收盤覆核＋籌碼狀態修正版</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.3.3｜官方外資現貨＋5日資金流修正版</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 
@@ -56,7 +56,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
     <b>技術 50：</b>突破、均線、量能、RSI、MACD、VWAP 等。<br>
     <b>籌碼 25：</b>外資連3買、借券賣出連3減、投信、融資。覆蓋率低於60%時品質總分會標示「資料待補」，不再用假精準分數誤導。盤後會在14:25、20:30、23:40及次日08:15自動重抓，補齊較晚公布的融資與借券資料。<br>
     <b>族群 10：</b>改用較窄的次產業/題材群組；沒有明確分類就不給族群分，避免把整個半導體業混成同一群。<br>
-    <b>大盤 15：</b>加權、櫃買、上漲家數比與全市場外資方向。大盤現在影響「品質分」與風險判讀，不會把真正剛突破的股票直接擋掉。<br><br><b>品質標籤：</b>80分以上＝高共振、70～79＝強、70以下＝一般。先看「階段」，再看「品質」。<br><br>
+    <b>大盤 15：</b>加權5＋櫃買4＋上漲家數3＋官方外資現貨3。外資改用 TWSE＋TPEx 當日官方買賣超金額，並加入近5日累計方向；盤中沿用最近已完整公布的盤後資料。大盤影響「品質分」與風險判讀，不會把真正剛突破的股票直接擋掉。<br><br><b>品質標籤：</b>80分以上＝高共振、70～79＝強、70以下＝一般。先看「階段」，再看「品質」。<br><br>
     <b>同時間量速 2.4x：</b>今天此刻的累積量約為過去同時間的 2.4 倍。1.5～3 倍通常最舒服，>5 倍要防過熱。<br>
     <b>近即時價：</b>搜尋標的、我的關注與目前畫面股票會依優先順序放進最多5檔即時池，每10秒嘗試刷新；不是券商逐筆成交串流。<br><b>5分K結構：</b>VWAP、量速、突破、支撐壓力與階段仍以5分K計算，避免逐筆雜訊讓訊號一直跳。<br><b>VWAP：</b>今天市場的成交量加權平均成本；站上通常偏強，但離太遠反而容易追高。<br>
     <b>日量比：</b>今天完整成交量 ÷ 20日平均量。<br><b>流動性：</b>20日平均成交金額低於3,000萬直接排除；3,000萬～8,000萬標示偏低並降低品質分；8,000萬～2億正常；2億以上活躍。<br>
@@ -93,12 +93,14 @@ function marketHTML(){
  const m=market||{},t=m.taiex||{},o=m.otc||{},live=marketLive||{};
  const lt=live["^TWII"]||{},lo=live["^TWOII"]||{};
  const modeClass=m.market_mode==="偏多"?"yes":m.market_mode==="防守"?"bad":"";
+ const flowDate=m.foreign_date?`${m.foreign_date} 官方盤後`:`官方資料待補`;
+ const flowDays=(+m.foreign_5d_count||0)>0?`近${m.foreign_5d_count}日 ${signed(m.foreign_5d_billion,1,"億")}`:`近5日 —`;
  return `<div class="markettop"><div><div class="marketmode ${modeClass}">📊 市場環境：${m.market_mode||"—"}</div><div class="sub">品質參考線：${m.radar_threshold||"—"}分</div></div><div><div class="marketscore">${num(m.market_score,1)}/15</div><div class="label">大盤分</div></div></div>
  <div class="marketgrid">
   <div class="marketitem"><div class="marketv">加權 ${lt.change_pct!==undefined?signed(lt.change_pct):signed(t.change_pct)}</div><div class="marketl">${t.trend?"多頭排列":"未完整多頭"} · ${lt.close||t.close||"—"}</div></div>
   <div class="marketitem"><div class="marketv">櫃買 ${lo.change_pct!==undefined?signed(lo.change_pct):signed(o.change_pct)}</div><div class="marketl">${o.trend?"多頭排列":"未完整多頭"} · ${lo.close||o.close||"—"}</div></div>
   <div class="marketitem"><div class="marketv">上漲家數 ${m.breadth_up_pct===null||m.breadth_up_pct===undefined?"—":num(m.breadth_up_pct,0)+"%"}</div><div class="marketl">最近完成交易日市場廣度</div></div>
-  <div class="marketitem"><div class="marketv">外資 ${marketLots(m.foreign_net_lots)}</div><div class="marketl">全市場最近已公布淨買賣</div></div>
+  <div class="marketitem"><div class="marketv">外資現貨 ${signed(m.foreign_net_billion,1,"億")}</div><div class="marketl">${flowDate}<br>上市 ${signed(m.foreign_twse_billion,1,"億")}｜上櫃 ${signed(m.foreign_tpex_billion,1,"億")}<br>${flowDays}｜外資分 ${num(m.foreign_score,1)}/3</div></div>
  </div>`;
 }
 
