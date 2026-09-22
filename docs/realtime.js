@@ -8,8 +8,7 @@
   function apiUrl(){
     const configured=String(window.DOGSON_REALTIME_API||'').trim();
     if(configured) return configured.replace(/\/$/,'') + '/api/quote';
-    if(location.hostname.endsWith('vercel.app')) return '/api/quote';
-    return '';
+    return 'https://dogson-stock-radar-live.vercel.app/api/quote';
   }
 
   function codeFromCard(card){
@@ -77,7 +76,7 @@
         return;
       }
       const stale=Date.now()-q.receivedAt>30000;box.classList.toggle('stale',stale);
-      box.innerHTML=`<div class="livecell"><div class="liveval">${fmtPrice(q.price)}</div><div class="livelab">近即時價</div></div><div class="livecell"><div class="liveval">${fmtPct(q.change)}</div><div class="livelab">近即時漲跌</div></div><div class="livecell"><div class="liveval">${fmtTime(q.time)}</div><div class="livelab">Fugle${stale?' · 可能延遲':''}</div></div>`;
+      box.innerHTML=`<div class="livecell"><div class="liveval">${fmtPrice(q.price)}</div><div class="livelab">近即時價</div></div><div class="livecell"><div class="liveval">${fmtPct(q.change)}</div><div class="livelab">近即時漲跌</div></div><div class="livecell"><div class="liveval">${fmtTime(q.time)}</div><div class="livelab">TWSE MIS${stale?' · 可能延遲':''}</div></div>`;
     });
   }
 
@@ -85,7 +84,6 @@
     if(busy||document.hidden)return;
     if(typeof mode!=='undefined'&&mode!=='intraday')return;
     const endpoint=apiUrl();
-    if(!endpoint){status('🟡 v1.3 即時層待啟用｜目前仍使用5分K雷達','warn');applyQuotes();return;}
     const codes=selectedCodes();
     if(!codes.length){status('🟡 尚無即時追蹤標的｜搜尋或加入關注後會追蹤最多5檔','warn');return;}
     busy=true;
