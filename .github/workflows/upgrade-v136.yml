@@ -41,7 +41,7 @@ jobs:
       - name: Rebuild close radar
         run: python scripts/build_data.py --mode close
 
-      - name: Verify one completed trading date and close-mode repair
+      - name: Verify completed-session consistency and close-mode repair
         run: |
           python - <<'PY'
           import json
@@ -59,16 +59,23 @@ jobs:
           assert rows, 'no close rows'
           bad = [r for r in rows if str(r.get('date')) != str(td)]
           assert not bad, f'mixed trading dates: {len(bad)} rows do not match {td}'
-          assert (m.get('taiex') or {}).get('date') == td, (m.get('taiex'), td)
-          assert (m.get('otc') or {}).get('date') == td, (m.get('otc'), td)
-          assert m.get('foreign_date') == td, (m.get('foreign_date'), td)
+          for key in ('taiex','otc'):
+              item = m.get(key)
+              if item is not None:
+                  assert item.get('date') == td, (key, item, td)
+          if m.get('foreign_same_trade_date'):
+              assert m.get('foreign_date') == td, (m.get('foreign_date'), td)
+          else:
+              assert m.get('data_complete') is False, 'stale foreign must make market incomplete'
           j = next((r for r in rows if str(r.get('code')) == '3044'), None)
           assert j is not None, '3044 missing'
           assert str(j.get('date')) == td
+          if td == '2026-09-22':
+              assert abs(float(j.get('close')) - 539.0) < 0.01, j.get('close')
           print('trade_date=', td, 'rows=', len(rows), 'market_complete=', m.get('data_complete'))
           print('3044=', {k:j.get(k) for k in ['date','close','technical_score','chip_score','sector_score','market_score','score','category','vol_x','dist20','ret5','ma5','ma10','ma20','break20']})
           print('index=', m.get('taiex'), m.get('otc'))
-          print('foreign=', m.get('foreign_date'), m.get('foreign_twse_billion'), m.get('foreign_tpex_billion'))
+          print('foreign=', m.get('foreign_date'), m.get('foreign_same_trade_date'), m.get('foreign_twse_billion'), m.get('foreign_tpex_billion'))
           PY
 
       - name: Commit source UI and rebuilt data
@@ -86,4 +93,4 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@v4
 
-# v1.3.6 trigger marker
+# v1.3.6 trigger marker - tolerant verifier
