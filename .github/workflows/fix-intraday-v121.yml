@@ -53,8 +53,8 @@ jobs:
               raise SystemExit('missing early trend pattern')
           s = s.replace(old, new, 1)
 
-          old = '''                    r.get("break3")\n                    and r.get("close", 0) > r.get("vwap", 1e99)\n                    and r.get("pace", 0) >= 1.2\n                    and (r.get("trend5") or r.get("break12") or r.get("technical_score", 0) >= 30)'''
-          new = '''                    r.get("break3")\n                    and r.get("close", 0) > r.get("vwap", 1e99)\n                    and (r.get("trend5") or r.get("break12") or r.get("technical_score", 0) >= 22)'''
+          old = '''                r.get("break3")\n                and r.get("close", 0) > r.get("vwap", 1e99)\n                and r.get("pace", 0) >= 1.2\n                and (r.get("trend5") or r.get("break12") or r.get("technical_score", 0) >= 30)'''
+          new = '''                r.get("break3")\n                and r.get("close", 0) > r.get("vwap", 1e99)\n                and (r.get("trend5") or r.get("break12") or r.get("technical_score", 0) >= 22)'''
           if old not in s:
               raise SystemExit('missing launch condition pattern')
           s = s.replace(old, new, 1)
