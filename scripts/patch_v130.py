@@ -37,7 +37,16 @@ if sw.exists():
     s = sw.read_text(encoding='utf-8')
     s = re.sub(r"const CACHE='[^']+'", "const CACHE='dogson-free-v130'", s, count=1)
     # Ensure realtime client can be available offline after first successful load.
-    s = s.replace("cache.addAll(['./manifest.webmanifest'])", "cache.addAll(['./manifest.webmanifest','./realtime.js?v=130'])")
+    if "./realtime.js?v=130" not in s:
+        s = s.replace("cache.addAll(['./manifest.webmanifest'])", "cache.addAll(['./manifest.webmanifest','./realtime.js?v=130'])")
     sw.write_text(s, encoding='utf-8')
+
+# Future 5-minute Actions updates must keep the v1.3 status instead of reverting to 1.2.3.
+b = Path('scripts/build_data.py')
+if b.exists():
+    x = b.read_text(encoding='utf-8')
+    x = x.replace('Free Edition v1.2.3', 'Free Edition v1.3')
+    x = x.replace('"version": "1.2.3-free"', '"version": "1.3-free"')
+    b.write_text(x, encoding='utf-8')
 
 print('v1.3 UI patch applied')
