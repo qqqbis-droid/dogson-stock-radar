@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""盤後籌碼資料層（v0.4 / v1.3.5 repair）
+"""盤後籌碼資料層（v0.5 / v1.3.5 repair-2）
 
 資料來源：
 - TWSE 三大法人 T86（可查歷史日）
@@ -20,6 +20,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
+import io
 import json
 import re
 
@@ -42,13 +43,11 @@ TWSE_T86 = "https://www.twse.com.tw/rwd/zh/fund/T86"
 TWSE_MARGIN = "https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN"
 TWSE_SBL = "https://www.twse.com.tw/exchangeReport/TWT93U"
 
-# TPEx 舊三大法人端點已失效，改用新版 JSON historical endpoint。
 TPEX_INST_MODERN = "https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade"
 TPEX_INST_OPENAPI = "https://www.tpex.org.tw/openapi/v1/tpex_3insti_daily_trading"
 TPEX_MARGIN_OPENAPI = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_margin_balance"
 TPEX_SBL_OPENAPI = "https://www.tpex.org.tw/openapi/v1/tpex_margin_sbl"
 
-# 舊版融資/借券頁面仍留做歷史備援；若官方關閉，OpenAPI + 持久化歷史仍可繼續累積。
 TPEX_MARGIN_LEGACY = "https://www.tpex.org.tw/web/stock/margin_trading/margin_balance/margin_bal_result.php"
 TPEX_SBL_LEGACY = "https://www.tpex.org.tw/web/stock/margin_trading/margin_sbl/margin_sbl_result.php"
 
@@ -75,7 +74,6 @@ def _num(x):
     s = s.replace("−", "-").replace("－", "-").replace("＋", "+")
     if s in {"", "-", "--", "nan", "None", "null", "<NA>"}:
         return None
-    # 括號負數
     if s.startswith("(") and s.endswith(")"):
         s = "-" + s[1:-1]
     s = re.sub(r"[^0-9.\-]", "", s)
@@ -109,8 +107,18 @@ def _recent_calendar_days(n=18) -> List[date]:
     return out
 
 
+def _table_from_fields_data(fields, data) -> Optional[pd.DataFrame]:
+    if not fields or not isinstance(data, list):
+        return None
+    try:
+        df = pd.DataFrame(data, columns=fields)
+        return df if not df.empty else None
+    except Exception:
+        return None
+
+
 def _json_table(url: str, params: Optional[dict] = None, label: str = "json") -> Optional[pd.DataFrame]:
-    """同時支援 TWSE {fields,data} 與 TPEx OpenAPI list[dict]。"""
+    """支援 TWSE {fields,data}/{tables:[...]} 與 TPEx OpenAPI list[dict]。"""
     try:
         r = requests.get(url, params=params or {}, headers=HEADERS, timeout=22)
         r.raise_for_status()
@@ -125,11 +133,27 @@ def _json_table(url: str, params: Optional[dict] = None, label: str = "json") ->
                 df = pd.DataFrame(data)
                 _diag(f"{label}: {len(df)} rows")
                 return df
-            fields = obj.get("fields") or obj.get("field")
-            if fields and isinstance(data, list):
-                df = pd.DataFrame(data, columns=fields)
+            df = _table_from_fields_data(obj.get("fields") or obj.get("field"), data)
+            if df is not None:
                 _diag(f"{label}: {len(df)} rows")
-                return df if not df.empty else None
+                return df
+
+            # MI_MARGN 等 TWSE API 會把個股明細放在 tables 陣列；
+            # 選最大表，避開只有數列彙總的前置小表。
+            tables = obj.get("tables")
+            candidates = []
+            if isinstance(tables, list):
+                for t in tables:
+                    if not isinstance(t, dict):
+                        continue
+                    z = _table_from_fields_data(t.get("fields") or t.get("field"), t.get("data"))
+                    if z is not None:
+                        candidates.append(z)
+                if candidates:
+                    df = max(candidates, key=lambda x: x.shape[0] * max(1, x.shape[1]))
+                    _diag(f"{label}: {len(df)} rows from tables")
+                    return df
+
             stat = obj.get("stat") or obj.get("message") or obj.get("msg")
             _diag(f"{label}: no table ({stat or 'empty response'})")
     except Exception as e:
@@ -176,8 +200,10 @@ def _html_table(url: str, params: dict, expected_roc: Optional[str] = None, labe
                 expected_tuple = (str(int(y)), str(int(m)), str(int(d)))
                 normalized = {(str(int(a)), str(int(b)), str(int(c))) for a, b, c in found_dates}
                 if expected_tuple not in normalized:
+                    _diag(f"{label}: response date mismatch")
                     return None
-        tables = pd.read_html(text)
+        # pandas 3 不再把 HTML 字串當內容讀，必須包 StringIO。
+        tables = pd.read_html(io.StringIO(text))
         candidates = [t for t in tables if t.shape[0] >= 2 and t.shape[1] >= 4]
         if not candidates:
             return None
@@ -231,6 +257,23 @@ def _code_col(df):
     )
 
 
+def _col_index(df: pd.DataFrame, col, prefer_last=False):
+    if col is None:
+        return None
+    hits = [i for i, c in enumerate(df.columns) if c == col]
+    if not hits:
+        return None
+    return hits[-1] if prefer_last else hits[0]
+
+
+def _fallback_index(df: pd.DataFrame, exact_norms: Iterable[str], prefer_last=False):
+    wanted = {_norm(x) for x in exact_norms}
+    hits = [i for i, c in enumerate(df.columns) if _norm(c) in wanted]
+    if not hits:
+        return None
+    return hits[-1] if prefer_last else hits[0]
+
+
 def _twse_institution(d: date) -> Optional[pd.DataFrame]:
     return _json_table(TWSE_T86, {"date": _ymd(d), "selectType": "ALLBUT0999", "response": "json"}, f"TWSE T86 {d}")
 
@@ -261,7 +304,6 @@ def _tpex_inst_modern(d: date) -> Optional[pd.DataFrame]:
         rows = table.get("data") or []
         if not rows:
             return None
-        # 官方表格欄位順序：0代號 1名稱；2~4 外資及陸資(不含外資自營商)；11~13 投信。
         recs = []
         for row in rows:
             if not row or len(row) < 14:
@@ -282,7 +324,6 @@ def _tpex_inst_modern(d: date) -> Optional[pd.DataFrame]:
 
 
 def _tpex_institution(d: date) -> Optional[pd.DataFrame]:
-    # 歷史日優先新版 dailyTrade；若暫時失敗，最新日再用 OpenAPI 備援。
     df = _tpex_inst_modern(d)
     if df is not None and not df.empty:
         return df
@@ -290,7 +331,6 @@ def _tpex_institution(d: date) -> Optional[pd.DataFrame]:
 
 
 def _tpex_margin(d: date) -> Optional[pd.DataFrame]:
-    # 最新日用官方 OpenAPI；歷史日嘗試舊頁面，並由 chip_history 跨日累積補強。
     df = _openapi_latest(TPEX_MARGIN_OPENAPI, d, f"TPEx margin OpenAPI {d}")
     if df is not None and not df.empty:
         return df
@@ -370,19 +410,29 @@ def _extract_margin(df: pd.DataFrame, codes: set) -> Dict[str, dict]:
         or _find_col(x, ["marginpurchase", "prev", "balance"])
         or _find_col(x, ["前資餘額"])
     )
-    if bal is None:
-        # OpenAPI 欄位偶爾改名；記錄實際欄位便於下一版立即修正。
+
+    cc_idx = _col_index(x, cc)
+    bal_idx = _col_index(x, bal)
+    prev_idx = _col_index(x, prev)
+
+    # 某些官方表的群組標題在 JSON 轉表格後會被拿掉；融資欄位通常是第一組餘額。
+    if bal_idx is None:
+        bal_idx = _fallback_index(x, ["今日餘額", "當日餘額", "餘額"], prefer_last=False)
+    if prev_idx is None:
+        prev_idx = _fallback_index(x, ["前日餘額", "昨日餘額"], prefer_last=False)
+
+    if cc_idx is None or bal_idx is None:
         _diag(f"margin parser: balance column missing; cols={list(x.columns)[:20]}")
         return {}
 
     out = {}
-    for _, r in x.iterrows():
-        code = str(r.get(cc, "")).strip().strip("=").strip('"')
+    for row in x.itertuples(index=False, name=None):
+        code = str(row[cc_idx]).strip().strip("=").strip('"')
         if code not in codes:
             continue
         out[code] = {
-            "margin_balance": _num(r.get(bal)),
-            "margin_prev": _num(r.get(prev)) if prev else None,
+            "margin_balance": _num(row[bal_idx]),
+            "margin_prev": _num(row[prev_idx]) if prev_idx is not None else None,
         }
     return out
 
@@ -400,21 +450,31 @@ def _extract_sbl(df: pd.DataFrame, codes: set) -> Dict[str, dict]:
         _find_col(x, ["借券賣出", "當日餘額"])
         or _find_col(x, ["借券賣出", "今日餘額"])
         or _find_col(x, ["借券賣出當日餘額"])
+        or _find_col(x, ["借券賣出餘額"])
         or _find_col(x, ["sbl", "short", "balance"])
         or _find_col(x, ["securitieslending", "short", "balance"])
         or _find_col(x, ["borrow", "short", "balance"])
         or _find_col(x, ["shortsale", "balance"], exclude=["margin"])
     )
-    if bal is None:
+
+    cc_idx = _col_index(x, cc)
+    bal_idx = _col_index(x, bal, prefer_last=True)
+
+    # TWT93U / TPEx margin_sbl 有時只回傳「前日餘額、今日餘額 ... 前日餘額、當日餘額」，
+    # 第二組才是借券賣出，所以缺群組標題時取最後一個當日/今日餘額。
+    if bal_idx is None:
+        bal_idx = _fallback_index(x, ["借券賣出餘額", "當日餘額", "今日餘額", "餘額"], prefer_last=True)
+
+    if cc_idx is None or bal_idx is None:
         _diag(f"SBL parser: balance column missing; cols={list(x.columns)[:20]}")
         return {}
 
     out = {}
-    for _, r in x.iterrows():
-        code = str(r.get(cc, "")).strip().strip("=").strip('"')
+    for row in x.itertuples(index=False, name=None):
+        code = str(row[cc_idx]).strip().strip("=").strip('"')
         if code not in codes:
             continue
-        out[code] = {"sbl_short_balance": _num(r.get(bal))}
+        out[code] = {"sbl_short_balance": _num(row[bal_idx])}
     return out
 
 
@@ -473,7 +533,6 @@ def _load_persisted_history(codes: set) -> Dict[str, List[dict]]:
 
 def _merge_history(existing: List[dict], new_rows: List[dict]) -> List[dict]:
     by_date: Dict[str, dict] = {}
-    # 舊資料先放，新資料同日覆蓋非 None 欄位。
     for r in existing + new_rows:
         ds = str(r.get("date") or "")
         if not ds:
@@ -535,15 +594,12 @@ def build_chip_signals(codes: Iterable[str], market_map: dict, cache_dir: Path) 
     persisted = _load_persisted_history(codes)
     fetched = {c: [] for c in codes}
 
-    # 回看 18 個日曆日中的平日；TWSE 與 TPEx 三大法人可補歷史，
-    # TPEx 融資/借券若歷史頁失效則用 OpenAPI 最新日 + 持久化歷史逐日累積。
     for d in _recent_calendar_days(18):
         day = _fetch_day(d, codes, market_map)
         for c, vals in day.items():
             if any(v is not None for v in vals.values()):
                 fetched[c].append({"date": d.isoformat(), **vals})
 
-        # 若每檔都已有至少 4 個「有資料日」，就不用再打官方站。
         enough = True
         for c in codes:
             merged_tmp = _merge_history(persisted.get(c, []), fetched.get(c, []))
