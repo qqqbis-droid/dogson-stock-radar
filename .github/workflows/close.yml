@@ -49,7 +49,7 @@ jobs:
         run: python scripts/build_data.py --mode close
       - name: Build 60m lifecycle + entry-position lights
         run: python scripts/build_hourly.py
-      - name: Verify chip recovery
+      - name: Verify chip and 60K recovery
         run: |
           python - <<'PY'
           import json
@@ -67,7 +67,10 @@ jobs:
             raise SystemExit('chip coverage is still 0% for all rows')
           h = Path('docs/data/hourly.json')
           hj = json.loads(h.read_text(encoding='utf-8')) if h.exists() else {}
-          print('60K rows:', len(hj.get('rows') or []), 'lights:', hj.get('entry_light_counts'))
+          hrows = hj.get('rows') or []
+          print('60K rows:', len(hrows), 'lights:', hj.get('entry_light_counts'))
+          if not hrows:
+            raise SystemExit('60K radar is empty; abort Pages deploy instead of publishing a blank panel')
           PY
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
