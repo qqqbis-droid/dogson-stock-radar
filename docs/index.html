@@ -66,7 +66,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.26｜庫存決策層＋多時間框架</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.27｜Step 6 個股動態門檻</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -309,6 +309,12 @@ function portfolioSummaryHTML(){
  const pc=pnl>0?"pnl up":pnl<0?"pnl down":"pnl";
  return `<div class="portfolio-summary"><div class="portfolio-summary-title">💼 我的庫存｜${entries.length} 檔</div><div class="portfolio-summary-sub">本機資料，不上傳 GitHub｜目前可取得行情 ${quoted}/${entries.length} 檔</div><div class="portfolio-summary-grid"><div class="portfolio-summary-item"><div class="portfolio-summary-v">${portfolioMoney(totalCost)}</div><div class="portfolio-summary-l">成本總額</div></div><div class="portfolio-summary-item"><div class="portfolio-summary-v">${portfolioMoney(coveredValue)}</div><div class="portfolio-summary-l">可計目前市值</div></div><div class="portfolio-summary-item"><div class="portfolio-summary-v ${pc}">${portfolioMoney(pnl)}</div><div class="portfolio-summary-l">可計未實現損益</div></div><div class="portfolio-summary-item"><div class="portfolio-summary-v ${pc}">${pct===null?"—":signed(pct,2)}</div><div class="portfolio-summary-l">可計報酬率</div></div></div></div>`;
 }
+function dynamicThresholdHTML(r){
+ const d=r?.dynamic_thresholds||{}; if(!Object.keys(d).length)return "";
+ const mode=d.mode==="personalized"?"✅ 個股化":d.mode==="warming"?"🟡 暖機中":"⚪ 固定門檻";
+ const ev=(d.evidence||[]).join("＋")||"舊版固定值";
+ return `<div class="mtf-note"><b>🎚️ 動態門檻 ${mode}</b>　漲幅 ${num(d.day_hot_pct,1)}%｜VWAP ${num(d.vwap_hot_pct,1)}%｜15分 ${num(d.ret15_hot_pct,1)}%｜量速 ${num(d.pace_hot_x,1)}x<br><span class="muted">依據：${escHTML(ev)}；ATR14 ${d.atr14_pct==null?"—":num(d.atr14_pct,1)+"%"}，同時段樣本 ${d.sample_days??0} 日。只改門檻，不改 30/25/15/20/10 權重。</span></div>`;
+}
 function portfolioDecision(r,h){
  const st=stageKey(r?.category),score=+(r?.intraday_score??r?.score??0),amp=String(r?.amplitude_regime||"");
  const mtf=r?.multi_timeframe||{},mstate=String(mtf.state||""),h60=mtf["60m"]||{},daily=mtf.daily||{};
@@ -368,7 +374,7 @@ function portfolioHTML(r){
  const pc=p.pnl>0?"pnl up":p.pnl<0?"pnl down":"pnl";
  const st=stageKey(r.category),sys=st==="結構失效"?`<span class="portfolio-system bad">系統目前：❌ 結構失效，請對照你的失效條件</span>`:st==="轉弱警戒"?`<span class="portfolio-system warn">系統目前：⚠️ 轉弱警戒，請檢查持有理由</span>`:`<span class="portfolio-system">系統目前：${st||"觀察"}</span>`;
  const reason=x=>escHTML(x||"尚未填寫").replace(/\n/g,"<br>");
- return `<div class="portfoliobox"><div class="portfolio-top"><div><div class="portfolio-title">💼 我的庫存</div><div class="portfolio-statusline"><span class="portfolio-status ${reasonStatusClass(h.reason_status)}">${reasonStatusText(h.reason_status)}</span>${sys}</div></div><button class="portfolio-editbtn" type="button" data-portfolio-edit="${r.code}">編輯庫存</button></div><div class="portfolio-grid"><div class="portfolio-metric"><div class="portfolio-metric-v">${sh>0?num(sh,0)+"股":"—"}</div><div class="portfolio-metric-l">持有股數</div></div><div class="portfolio-metric"><div class="portfolio-metric-v">${co&&co>0?num(co,2):"—"}</div><div class="portfolio-metric-l">平均成本</div></div><div class="portfolio-metric"><div class="portfolio-metric-v ${pc}">${portfolioMoney(p.pnl)}</div><div class="portfolio-metric-l">未實現損益</div></div><div class="portfolio-metric"><div class="portfolio-metric-v ${pc}">${p.pct===null?"—":signed(p.pct,2)}</div><div class="portfolio-metric-l">報酬率</div></div></div>${portfolioDecisionHTML(r,h)}<div class="portfolio-reasons"><div class="portfolio-reason"><b>🎯 進場理由</b>${reason(h.entry_reason)}</div><div class="portfolio-reason"><b>🧩 持有理由</b>${reason(h.hold_reason)}</div><div class="portfolio-reason"><b>🛑 結構失效條件</b>${reason(h.invalidation)}</div></div>${r._portfolio_fallback?`<div class="portfolio-fallback">⚠️ ${escHTML(r._portfolio_fallback)}</div>`:""}</div>`;
+ return `<div class="portfoliobox"><div class="portfolio-top"><div><div class="portfolio-title">💼 我的庫存</div><div class="portfolio-statusline"><span class="portfolio-status ${reasonStatusClass(h.reason_status)}">${reasonStatusText(h.reason_status)}</span>${sys}</div></div><button class="portfolio-editbtn" type="button" data-portfolio-edit="${r.code}">編輯庫存</button></div><div class="portfolio-grid"><div class="portfolio-metric"><div class="portfolio-metric-v">${sh>0?num(sh,0)+"股":"—"}</div><div class="portfolio-metric-l">持有股數</div></div><div class="portfolio-metric"><div class="portfolio-metric-v">${co&&co>0?num(co,2):"—"}</div><div class="portfolio-metric-l">平均成本</div></div><div class="portfolio-metric"><div class="portfolio-metric-v ${pc}">${portfolioMoney(p.pnl)}</div><div class="portfolio-metric-l">未實現損益</div></div><div class="portfolio-metric"><div class="portfolio-metric-v ${pc}">${p.pct===null?"—":signed(p.pct,2)}</div><div class="portfolio-metric-l">報酬率</div></div></div>${dynamicThresholdHTML(r)}${portfolioDecisionHTML(r,h)}<div class="portfolio-reasons"><div class="portfolio-reason"><b>🎯 進場理由</b>${reason(h.entry_reason)}</div><div class="portfolio-reason"><b>🧩 持有理由</b>${reason(h.hold_reason)}</div><div class="portfolio-reason"><b>🛑 結構失效條件</b>${reason(h.invalidation)}</div></div>${r._portfolio_fallback?`<div class="portfolio-fallback">⚠️ ${escHTML(r._portfolio_fallback)}</div>`:""}</div>`;
 }
 function showPortfolioEditor(code){
  code=String(code);const r=currentHoldingRow(code)||universe.find(x=>String(x.code)===code)||{code,name:code};const h=holding(code)||{};
@@ -790,14 +796,14 @@ document.addEventListener("click",e=>{
 if("serviceWorker" in navigator){
  window.addEventListener("load",async()=>{
   try{
-   const reg=await navigator.serviceWorker.register("./sw.js?v=1526",{updateViaCache:"none"});
+   const reg=await navigator.serviceWorker.register("./sw.js?v=1527",{updateViaCache:"none"});
    await reg.update();
    let reloading=false;
    navigator.serviceWorker.addEventListener("controllerchange",()=>{
     if(reloading)return;
-    if(sessionStorage.getItem("dogsonSwReloaded1526")==="1")return;
+    if(sessionStorage.getItem("dogsonSwReloaded1527")==="1")return;
     reloading=true;
-    sessionStorage.setItem("dogsonSwReloaded1526","1");
+    sessionStorage.setItem("dogsonSwReloaded1527","1");
     location.reload();
    });
   }catch(e){}
@@ -805,7 +811,7 @@ if("serviceWorker" in navigator){
 }
 load();
 </script>
-<script src="./hourly.js?v=1526"></script>
+<script src="./hourly.js?v=1527"></script>
 <script src="./realtime-config.js?v=151"></script>
 <script src="./realtime.js?v=151"></script>
 </body>

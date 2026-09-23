@@ -259,6 +259,7 @@ def main():
     out_rows = bd._attach_multitimeframe_context(out_rows, close_map, bd.load_json("hourly.json", {}))
     market_live = bd.intraday_index_snapshot()
     out_rows = bd._attach_relative_multitimeframe(out_rows, close_map, close_market, market_live)
+    out_rows = bd._refresh_dynamic_thresholds(out_rows, close_map)
     rotation = bd.build_sector_rotation(out_rows)
     intraday_market = bd.build_intraday_market(out_rows, market_live, rotation, close_market)
     out_rows = bd.add_component_scores(out_rows, intraday_market, preliminary_intraday=True)
@@ -285,6 +286,7 @@ def main():
         "change_radar": change_radar,
         "multi_timeframe_version": "1.1",
         "relative_multiframe_version": "1.0",
+        "dynamic_threshold_version": "1.0",
         "rows": out_rows,
         "bridge": {
             "version": "1.4.2",
@@ -317,7 +319,8 @@ def main():
         "change_radar_version": "1.0",
         "multi_timeframe_version": "1.1",
         "relative_multiframe_version": "1.0",
-        "version": "1.5.25-free",
+        "dynamic_threshold_version": "1.0",
+        "version": "1.5.27-free",
     })
     bd.dump("status.json", status)
     print("MIS bridge done", "rows", bridged, "volume_ok", volume_ok, "quote", quote_latest, "structure", structure_latest)

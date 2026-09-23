@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.5.25
+犬子老師飆股雷達 Free Edition v1.5.27
 =================================
 盤中＝執行雷達（即時動能100，籌碼只作背景）；盤後＝波段雷達（延續品質直接100分＋進場位置）；大盤15分獨立
 
@@ -701,6 +701,20 @@ def close_technical(x):
     if row["rsi"] > 82:
         score -= 5; over.append("RSI過熱")
 
+    # Step 6：建立每檔自己的日波動基準，供盤中動態門檻使用。
+    tr14 = true_range(x).rolling(14).mean()
+    atr14 = float(tr14.iloc[-1]) if pd.notna(tr14.iloc[-1]) else None
+    hist_ret = ret1.tail(60).dropna().abs()
+    hist_vx = vx.tail(60).dropna()
+    row["dynamic_profile"] = {
+        "version": "1.0",
+        "ready": bool(len(hist_ret) >= 35 and atr14 is not None and row["close"] > 0),
+        "sample_days": int(len(hist_ret)),
+        "atr14_pct": round(atr14 / row["close"] * 100, 3) if atr14 is not None and row["close"] > 0 else None,
+        "abs_ret1_p90": round(float(hist_ret.quantile(.90)), 3) if len(hist_ret) >= 10 else None,
+        "abs_ret1_median": round(float(hist_ret.median()), 3) if len(hist_ret) >= 10 else None,
+        "vol_x_p90": round(float(hist_vx.quantile(.90)), 3) if len(hist_vx) >= 10 else None,
+    }
     row["technical_score"] = max(0, min(50, round(score, 1)))
     row["reasons"] = reasons
     row["overheat_reasons"] = over
@@ -1342,6 +1356,38 @@ def intraday_technical(x):
     amplitude_multiple = (amplitude_pct / same_time_amp_avg_pct) if same_time_amp_avg_pct and same_time_amp_avg_pct > 1e-9 else None
     amp_baseline_ready = bool(amp_sample_days >= 3 and amplitude_multiple is not None)
 
+    # Step 6：同一個股、同一時間點的歷史分布。
+    day_abs_samples, vwap_abs_samples, ret15_abs_samples = [], [], []
+    prior_dates = [d for d in all_dates if d < latest][-20:]
+    for d0 in prior_dates:
+        hist = x[x.index.date == d0]
+        hist = hist[[ts.time() <= cutoff_time for ts in hist.index]]
+        if hist.empty:
+            continue
+        earlier = [d for d in all_dates if d < d0]
+        if not earlier:
+            continue
+        pday = x[x.index.date == earlier[-1]]
+        if pday.empty:
+            continue
+        hpclose = float(pday["Close"].iloc[-1])
+        if hpclose <= 0:
+            continue
+        hclose = float(hist["Close"].iloc[-1])
+        htyp = (hist["High"] + hist["Low"] + hist["Close"]) / 3
+        hvwap_s = (htyp * hist["Volume"]).cumsum() / hist["Volume"].cumsum().replace(0, np.nan)
+        hvwap = _finite(hvwap_s.iloc[-1])
+        day_abs_samples.append(abs((hclose / hpclose - 1) * 100))
+        if hvwap and hvwap > 0:
+            vwap_abs_samples.append(abs((hclose / hvwap - 1) * 100))
+        if len(hist) >= 4:
+            ret15_abs_samples.append(abs((hclose / float(hist["Close"].iloc[-4]) - 1) * 100))
+
+    dynamic_sample_days = len(day_abs_samples)
+    same_time_day_abs_p90 = float(np.quantile(day_abs_samples, .90)) if len(day_abs_samples) >= 3 else None
+    same_time_vwap_abs_p90 = float(np.quantile(vwap_abs_samples, .90)) if len(vwap_abs_samples) >= 3 else None
+    same_time_ret15_abs_p90 = float(np.quantile(ret15_abs_samples, .90)) if len(ret15_abs_samples) >= 3 else None
+
     # 狀態只用來修正既有量價25與追價風險10，不形成新的分數桶。
     expanded = bool((amp_baseline_ready and amplitude_multiple >= 1.25) or (not amp_baseline_ready and amplitude_pct >= 4.5))
     compressed = bool(amp_baseline_ready and amplitude_multiple <= 0.90)
@@ -1417,6 +1463,10 @@ def intraday_technical(x):
         "amplitude_multiple": round(amplitude_multiple, 3) if amplitude_multiple is not None else None,
         "amp_sample_days": amp_sample_days,
         "amp_baseline_ready": amp_baseline_ready,
+        "dynamic_sample_days": dynamic_sample_days,
+        "same_time_day_abs_p90": round(same_time_day_abs_p90, 3) if same_time_day_abs_p90 is not None else None,
+        "same_time_vwap_abs_p90": round(same_time_vwap_abs_p90, 3) if same_time_vwap_abs_p90 is not None else None,
+        "same_time_ret15_abs_p90": round(same_time_ret15_abs_p90, 3) if same_time_ret15_abs_p90 is not None else None,
         "amplitude_regime": amplitude_regime,
         "break3": b3, "break12": b12, "trend5": trend,
         "current_turnover": round(current_turnover, 0),
@@ -1426,6 +1476,125 @@ def intraday_technical(x):
         "technical_score": max(0, min(50, round(score, 1))),
         "reasons": reasons, "overheat_reasons": over, **sr,
     }
+
+
+
+def _finite(v):
+    try:
+        z = float(v)
+        return z if np.isfinite(z) else None
+    except Exception:
+        return None
+
+
+def _clamp(v, lo, hi):
+    return max(float(lo), min(float(hi), float(v)))
+
+
+def _dynamic_threshold_values(r, daily_profile=None):
+    """個股動態門檻；只替換門檻，不改任何分數桶權重。"""
+    dp = daily_profile or r.get("dynamic_profile") or {}
+    atr = _finite(dp.get("atr14_pct"))
+    d1p90 = _finite(dp.get("abs_ret1_p90"))
+    vxp90 = _finite(dp.get("vol_x_p90"))
+    same_day = _finite(r.get("same_time_day_abs_p90"))
+    same_vwap = _finite(r.get("same_time_vwap_abs_p90"))
+    same_ret15 = _finite(r.get("same_time_ret15_abs_p90"))
+    same_n = int(r.get("dynamic_sample_days") or r.get("amp_sample_days") or 0)
+    daily_ready = bool(dp.get("ready"))
+
+    evidence = []
+    if atr is not None:
+        evidence.append("ATR14")
+    if daily_ready:
+        evidence.append("近60日個股分布")
+    if same_n >= 3:
+        evidence.append("同時段歷史分布")
+    ready = bool(daily_ready and atr is not None and same_n >= 3)
+
+    if not evidence:
+        return {
+            "version": "1.0", "ready": False, "mode": "fallback",
+            "day_hot_pct": 8.5, "vwap_hot_pct": 4.5,
+            "ret15_hot_pct": 4.0, "pace_hot_x": 5.0,
+            "day_good_high_pct": 6.5, "ret15_good_high_pct": 2.5,
+            "atr14_pct": None, "sample_days": same_n,
+            "evidence": [], "note": "歷史基準尚未建立，暫用舊版固定門檻",
+        }
+
+    day_candidates = [6.0]
+    if atr is not None:
+        day_candidates.append(atr * 2.0)
+    if d1p90 is not None:
+        day_candidates.append(d1p90 * 1.15)
+    if same_day is not None:
+        day_candidates.append(same_day * 1.25)
+    day_hot = _clamp(max(day_candidates), 6.0, 9.5)
+
+    vwap_candidates = [2.2]
+    if atr is not None:
+        vwap_candidates.append(atr * 0.90)
+    if same_vwap is not None:
+        vwap_candidates.append(same_vwap * 1.25)
+    vwap_hot = _clamp(max(vwap_candidates), 2.2, 6.0)
+
+    ret15_candidates = [2.0]
+    if atr is not None:
+        ret15_candidates.append(atr * 0.70)
+    if same_ret15 is not None:
+        ret15_candidates.append(same_ret15 * 1.30)
+    ret15_hot = _clamp(max(ret15_candidates), 2.0, 5.0)
+
+    pace_candidates = [3.5]
+    if vxp90 is not None:
+        pace_candidates.append(vxp90 * 1.10)
+    pace_hot = _clamp(max(pace_candidates), 3.5, 6.5)
+
+    return {
+        "version": "1.0", "ready": ready,
+        "mode": "personalized" if ready else "warming",
+        "day_hot_pct": round(day_hot, 2),
+        "vwap_hot_pct": round(vwap_hot, 2),
+        "ret15_hot_pct": round(ret15_hot, 2),
+        "pace_hot_x": round(pace_hot, 2),
+        "day_good_high_pct": round(_clamp(day_hot * 0.72, 3.5, 7.0), 2),
+        "ret15_good_high_pct": round(_clamp(ret15_hot * 0.62, 1.3, 3.0), 2),
+        "atr14_pct": round(atr, 2) if atr is not None else None,
+        "sample_days": same_n,
+        "evidence": evidence,
+        "note": "個股自己的ATR／歷史分布門檻" if ready else "部分個股化；樣本不足的部分仍採保守下限",
+    }
+
+
+def _apply_dynamic_thresholds(r, daily_profile=None):
+    dyn = _dynamic_threshold_values(r, daily_profile)
+    r["dynamic_thresholds"] = dyn
+    day = _finite(r.get("day_change")) or 0.0
+    vwap_dist = _finite(r.get("vwap_dist")) or 0.0
+    pace = _finite(r.get("pace")) or 0.0
+    ret15 = _finite(r.get("ret15")) or 0.0
+    over = []
+    if day >= float(dyn["day_hot_pct"]):
+        over.append(f"漲幅超過個股門檻 {dyn['day_hot_pct']:.1f}%")
+    if vwap_dist > float(dyn["vwap_hot_pct"]):
+        over.append(f"距VWAP超過個股門檻 {dyn['vwap_hot_pct']:.1f}%")
+    if pace > float(dyn["pace_hot_x"]):
+        over.append(f"量速超過個股門檻 {dyn['pace_hot_x']:.1f}x")
+    if ret15 > float(dyn["ret15_hot_pct"]):
+        over.append(f"15分鐘漲幅超過個股門檻 {dyn['ret15_hot_pct']:.1f}%")
+    amp = str(r.get("amplitude_regime") or "")
+    if amp == "高震盪":
+        over.append("高振幅低效率")
+    elif amp == "沖高回落":
+        over.append("振幅擴大後沖高回落")
+    r["overheat_reasons"] = over
+    return r
+
+
+def _refresh_dynamic_thresholds(rows, close_map):
+    for r in rows or []:
+        _apply_dynamic_thresholds(r, (close_map or {}).get(str(r.get("code") or "")) or {})
+    return rows
 
 
 def _chip_background_label(score, coverage):
@@ -1457,6 +1626,10 @@ def _intraday_score_parts(r, market, sector_score_10):
     amp_multiple = r.get("amplitude_multiple")
     amp_ready = bool(r.get("amp_baseline_ready"))
     range_pos = float(r.get("range_position_pct") or 50)
+    dyn = r.get("dynamic_thresholds") or {}
+    day_good_high = float(dyn.get("day_good_high_pct") or 6.5)
+    ret15_good_high = float(dyn.get("ret15_good_high_pct") or 2.5)
+    pace_hot = float(dyn.get("pace_hot_x") or 5.0)
 
     price = 0.0
     if vwap > 0 and close > vwap:
@@ -1475,7 +1648,7 @@ def _intraday_score_parts(r, market, sector_score_10):
         pace_points = 15.0
     elif 1.2 <= pace < 1.5:
         pace_points = 10.0
-    elif 3.5 <= pace <= 5:
+    elif 3.5 <= pace <= pace_hot:
         pace_points = 10.0
     elif pace >= 1.0:
         pace_points = 5.0
@@ -1490,11 +1663,11 @@ def _intraday_score_parts(r, market, sector_score_10):
         pace_points = max(0.0, pace_points - 6.0)
     flow += pace_points
 
-    if 0.2 <= ret15 <= 2.5:
+    if 0.2 <= ret15 <= ret15_good_high:
         flow += 6
     elif ret15 > 0:
         flow += 3
-    if 0.5 <= day <= 6.5:
+    if 0.5 <= day <= day_good_high:
         flow += 4
     elif 0 < day < 0.5:
         flow += 2
@@ -3274,7 +3447,7 @@ def build_intraday():
                 "updated_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_attempted_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_count": len(previous.get("rows", [])),
-                "version": "1.5.25-free",
+                "version": "1.5.27-free",
             })
             dump("status.json", status)
             print("intraday source empty; kept previous", len(previous.get("rows", [])))
@@ -3311,6 +3484,7 @@ def build_intraday():
 
     market_live = intraday_index_snapshot()
     rows = _attach_relative_multitimeframe(rows, close_map, market, market_live)
+    rows = _refresh_dynamic_thresholds(rows, close_map)
     sector_rotation = build_sector_rotation(rows)
     intraday_market = build_intraday_market(rows, market_live, sector_rotation, market)
     rows = add_component_scores(rows, intraday_market, preliminary_intraday=True)
@@ -3329,6 +3503,7 @@ def build_intraday():
         },
         "multi_timeframe_version": "1.1",
         "relative_multiframe_version": "1.0",
+        "dynamic_threshold_version": "1.0",
         "score_formula": {"mode": "intraday_execution", "price_structure": 30, "flow_volume": 25, "relative_strength": 15, "sector": 20, "liquidity_risk": 10, "amplitude_efficiency": "inside_flow_and_liquidity_risk_no_new_weight", "multi_timeframe": "decision_context_no_new_weight", "relative_multiframe": "decision_context_no_new_weight", "chip": "background_only", "market_separate": 15},
         "rows": rows,
     })
@@ -3338,9 +3513,11 @@ def build_intraday():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_count": len(rows),
-        "version": "1.5.25-free",
+        "version": "1.5.27-free",
         "multi_timeframe_version": "1.1",
         "relative_multiframe_version": "1.0",
+        "dynamic_threshold_version": "1.0",
+        "version": "1.5.27-free",
     })
     dump("status.json", status)
     print("intraday done", len(rows))
