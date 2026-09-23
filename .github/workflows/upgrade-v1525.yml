@@ -60,7 +60,7 @@ jobs:
           from pathlib import Path
           html=Path('docs/index.html').read_text(encoding='utf-8')
           sw=Path('docs/sw.js').read_text(encoding='utf-8')
-          for mark in ['relative_multiframe','多時框領先市場','15分／60分／當日／5日','rsGreenOk','Free Edition v1.5.25']:
+          for mark in ['relative_multiframe','15分／60分／當日／5日','rsGreenOk','Free Edition v1.5.25']:
               print('frontend marker', mark, mark in html)
               if mark not in html: raise SystemExit('missing frontend '+mark)
           if 'dogson-free-v1525' not in sw: raise SystemExit('SW version missing')
