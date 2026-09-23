@@ -1,0 +1,82 @@
+name: Install Radar v1.5.11 Intraday Sector Rotation Collapse
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/upgrade-v1511.yml"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1511-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Apply v1.5.11 intraday rotation collapse patch
+        run: python scripts/patch_v1511.py
+
+      - name: Verify collapsible intraday sector rotation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          sw=Path('docs/sw.js').read_text(encoding='utf-8')
+          required=[
+            'v1.5.11',
+            'dogsonSectorRotationOpen',
+            'function toggleIntradaySectorRotation()',
+            '展開完整輪動',
+            '收合族群輪動',
+            '整個盤中族群輪動區可展開／收合',
+          ]
+          for m in required:
+              if m not in html:
+                  raise SystemExit('missing UI marker: '+m)
+          if 'dogson-free-v1511' not in sw:
+              raise SystemExit('service worker cache not bumped')
+          # Ensure score architecture text remains untouched.
+          for marker in ['價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10',
+                         '波段延續＝日K技術50＋籌碼25＋族群15＋流動性10']:
+              if marker not in html:
+                  raise SystemExit('score formula text changed/missing: '+marker)
+          print('v1.5.11 UI verification OK')
+          PY
+
+      - name: Commit v1.5.11 UI
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html docs/sw.js
+          git diff --cached --quiet || git commit -m "Apply v1.5.11 intraday sector rotation collapse"
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 4
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
