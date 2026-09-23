@@ -9,6 +9,7 @@ on:
       - "scripts/chip_data.py"
       - "scripts/build_hourly.py"
       - "scripts/sync_live_data.py"
+      - "scripts/build_validation.py"
       - "docs/hourly.js"
       - "docs/realtime-config.js"
       - ".github/workflows/close.yml"
@@ -49,6 +50,8 @@ jobs:
         run: python scripts/build_data.py --mode close
       - name: Build 60m lifecycle + entry-position lights
         run: python scripts/build_hourly.py
+      - name: Step 7 archive signals + resolve real outcomes
+        run: python scripts/build_validation.py --mode close
       - name: Verify chip and 60K recovery
         run: |
           python - <<'PY'
