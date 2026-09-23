@@ -23,7 +23,7 @@ h1{font-size:22px;margin:0}.sub{font-size:12px;color:var(--muted);margin-top:4px
 .meta{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin:12px 2px}
 .card{background:linear-gradient(180deg,#171c25,#131820);border:1px solid var(--line);border-radius:18px;padding:14px;margin:10px 0}
 .top{display:flex;justify-content:space-between;gap:10px}.stockleft{display:flex;gap:8px}.star{border:0;background:transparent;font-size:24px;color:#8f9aac;padding:0}.star.on{color:#ffd76b}.name{font-size:19px;font-weight:900}.code{font-size:13px;color:var(--muted);margin-left:6px}.score{font-size:27px;font-weight:900}.label{font-size:11px;color:var(--muted);text-align:right}
-.cat{display:inline-block;font-size:12px;font-weight:850;padding:6px 9px;border-radius:999px;margin-top:7px}.start{background:#0f3928;color:#69efa8}.pull{background:#40300f;color:#ffd477}.watch{background:#1b2b42;color:#9cc9ff}.hot{background:#441923;color:#ff9aab}.quality{display:inline-block;font-size:11px;font-weight:800;padding:5px 8px;border-radius:999px;margin:7px 0 0 5px;background:#222938;color:#cbd6e6}.quality.high{background:#392b0f;color:#ffd477}.quality.strong{background:#192f45;color:#a9d5ff}
+.cat{display:inline-block;font-size:12px;font-weight:850;padding:6px 9px;border-radius:999px;margin-top:7px}.setup{background:#173527;color:#9ef0bd}.start{background:#0f3928;color:#69efa8}.pull{background:#40300f;color:#ffd477}.trendhold{background:#17304a;color:#b9ddff}.watch{background:#1b2b42;color:#9cc9ff}.weak{background:#4a3213;color:#ffd08a}.invalid{background:#471820;color:#ff9cac}.hot{background:#3c1d3f;color:#eab4ff}.quality{display:inline-block;font-size:11px;font-weight:800;padding:5px 8px;border-radius:999px;margin:7px 0 0 5px;background:#222938;color:#cbd6e6}.quality.high{background:#392b0f;color:#ffd477}.quality.strong{background:#192f45;color:#a9d5ff}
 .parts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:11px}.part{background:#0f141c;border:1px solid #29313e;border-radius:10px;padding:8px 5px;text-align:center}.partv{font-size:14px;font-weight:900}.partl{font-size:9px;color:var(--muted);margin-top:3px}
 .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}.metric{background:#0e131a;border:1px solid #252d39;border-radius:12px;padding:9px}.mval{font-weight:850;font-size:14px}.mlab{font-size:10px;color:var(--muted);margin-top:3px}
 .srbox{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.sr{background:#0e131a;border-radius:12px;padding:10px}.support{border:1px solid #244936}.resistance{border:1px solid #56313a}.srtitle{font-size:11px;color:var(--muted)}.srprice{font-size:16px;font-weight:900;margin-top:4px}.support .srprice{color:var(--green)}.resistance .srprice{color:var(--red)}.srbasis{font-size:10px;color:#8994a6;margin-top:4px}
@@ -41,7 +41,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.16｜新手教學重寫＋盤後今日法人金額排名＋盤中成交資金輪動透明化</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.17｜Stage Engine 2.0＋新手教學＋法人金額力度</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -52,7 +52,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
  <div class="row"><input id="q" class="search" placeholder="輸入股票代號或名稱，例如 2308、台達電" autocomplete="off"><button id="scan" class="scan">掃描</button></div>
  <div id="suggestions" class="suggestions"></div>
  <div class="filters">
-  <button class="filter on" data-f="all">全部</button><button class="filter" data-f="剛啟動">🔥 剛啟動</button><button class="filter" data-f="等回踩">🟡 等回踩</button><button class="filter" data-f="過熱不追">🚫 過熱</button><button class="filter" id="watchOnly">⭐ 我的關注</button>
+  <button class="filter on" data-f="all">全部</button><button class="filter" data-f="蓄勢待發">🌱 蓄勢</button><button class="filter" data-f="剛啟動">🔥 剛啟動</button><button class="filter" data-f="回踩承接">🟡 回踩</button><button class="filter" data-f="趨勢持有">🚂 趨勢</button><button class="filter" data-f="轉弱警戒">⚠️ 轉弱</button><button class="filter" data-f="結構失效">❌ 失效</button><button class="filter" data-f="過熱不追">🚫 過熱</button><button class="filter" id="watchOnly">⭐ 我的關注</button>
  </div>
  <details class="help">
    <summary>❓ 每個數值怎麼看？第一次使用請點我</summary>
@@ -170,10 +170,14 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
       <div class="guide-line"><span class="guide-key">支撐</span>：價格回落時，較可能出現承接的區域。</div>
       <div class="guide-line"><span class="guide-key">壓力</span>：價格往上時，較容易遇到賣壓的區域。</div>
       <div class="guide-line">系統不是只抓一條均線，而是綜合前高前低、均線、成交密集區、突破平台、缺口等證據，整理成「區域」。所以請把它當決策區，不是保證反彈的精準價格。</div>
-      <div class="guide-line"><span class="guide-key">🔥 剛啟動</span>：條件剛開始轉強，重點看突破能不能守住。</div>
-      <div class="guide-line"><span class="guide-key">🟡 等回踩</span>：趨勢可能仍好，但位置不適合直接追，等回測比較安全。</div>
-      <div class="guide-line"><span class="guide-key">🔵 觀察</span>：條件還沒完整，先放清單。</div>
-      <div class="guide-line"><span class="guide-key">🚫 過熱不追</span>：短線延伸太大或追價風險偏高，不代表公司不好，只代表現在的位置不漂亮。</div>
+      <div class="guide-line"><span class="guide-key">🌱 蓄勢待發</span>：還沒正式突破，但均線、動能、量能、相對強弱、籌碼或族群已開始集中，適合放進「蹲車名單」。</div>
+      <div class="guide-line"><span class="guide-key">🔥 剛啟動</span>：突破已出現，而且量能／VWAP／趨勢有同步確認，開始找第一筆進場機會。</div>
+      <div class="guide-line"><span class="guide-key">🟡 回踩承接</span>：已經有過一段強勢，現在回到VWAP、20MA或支撐附近，結構尚未破壞。</div>
+      <div class="guide-line"><span class="guide-key">🚂 趨勢持有</span>：不是新的追價訊號，而是既有上升趨勢仍健康；持有者重點看主要支撐有沒有守住。</div>
+      <div class="guide-line"><span class="guide-key">🔵 觀察</span>：多空證據還不夠集中，暫時沒有必要急著動作。</div>
+      <div class="guide-line"><span class="guide-key">⚠️ 轉弱警戒</span>：已有多項條件惡化，但還沒有確認結構失效；持有者應停止追價並提高警覺。</div>
+      <div class="guide-line"><span class="guide-key">❌ 結構失效</span>：VWAP／20MA、短均、動能等多項條件同步失守。系統採多證據確認，不會因單一黑K就判定失效。</div>
+      <div class="guide-line"><span class="guide-key">🚫 過熱不追</span>：股票可能仍強，但短線延伸或波動過大；意思是「現在不適合追」，不是看空。</div>
     </div>
 
     <div class="guide-title">⑬ 第一次使用，照這個順序最快</div>
@@ -208,7 +212,7 @@ function marketLots(v){if(v===null||v===undefined||Number.isNaN(+v))return "—"
 function signed(v,d=1,suffix="%"){if(v===null||v===undefined||Number.isNaN(+v))return "—";return ((+v)>=0?"+":"")+num(v,d)+suffix}
 function moneyTw(v){if(v===null||v===undefined||Number.isNaN(+v))return "—";v=+v;if(v>=1e8)return num(v/1e8,1)+"億";if(v>=1e7)return num(v/1e7,1)+"千萬";return num(v/1e6,1)+"百萬"}
 function flowMoney(v){if(v===null||v===undefined||Number.isNaN(+v))return "—";v=+v;if(v===0)return "0";const a=Math.abs(v);if(a>=1)return signed(v,2,"億");if(a>=.1)return signed(v*10,1,"千萬");return signed(v*100,1,"百萬")}
-function cls(c){return c==="剛啟動"?"start":c==="等回踩"?"pull":c==="過熱不追"?"hot":"watch"}
+function cls(c){return c==="蓄勢待發"?"setup":c==="剛啟動"?"start":c==="回踩承接"?"pull":c==="趨勢持有"?"trendhold":c==="轉弱警戒"?"weak":c==="結構失效"?"invalid":c==="過熱不追"?"hot":"watch"}
 function qualityCls(q){return (q==="高共振"||q==="高延續"||q==="強動能")?"high":(q==="強"||q==="轉強")?"strong":""}
 function updateFooter(){
  const el=$("footerText");if(!el)return;
@@ -460,14 +464,14 @@ document.addEventListener("click",e=>{
 if("serviceWorker" in navigator){
  window.addEventListener("load",async()=>{
   try{
-   const reg=await navigator.serviceWorker.register("./sw.js?v=1516",{updateViaCache:"none"});
+   const reg=await navigator.serviceWorker.register("./sw.js?v=1517",{updateViaCache:"none"});
    await reg.update();
    let reloading=false;
    navigator.serviceWorker.addEventListener("controllerchange",()=>{
     if(reloading)return;
-    if(sessionStorage.getItem("dogsonSwReloaded1516")==="1")return;
+    if(sessionStorage.getItem("dogsonSwReloaded1517")==="1")return;
     reloading=true;
-    sessionStorage.setItem("dogsonSwReloaded1516","1");
+    sessionStorage.setItem("dogsonSwReloaded1517","1");
     location.reload();
    });
   }catch(e){}

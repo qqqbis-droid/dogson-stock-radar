@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.5.12
+犬子老師飆股雷達 Free Edition v1.5.17
 =================================
 盤中＝執行雷達（即時動能100，籌碼只作背景）；盤後＝波段雷達（延續品質直接100分＋進場位置）；大盤15分獨立
 
@@ -1625,6 +1625,270 @@ def _close_entry_position_score(r):
     score -= min(25.0, 10.0 * len(r.get("overheat_reasons") or []))
     return round(max(0.0, min(100.0, score)), 1)
 
+
+def _assign_stage_v2(r, preliminary_intraday, sector_score_10):
+    """Stage Engine 2.0：只判斷生命週期，不改任何100分權重。
+
+    原則：
+    1) 發動與蓄勢要有多項證據，不因單一指標亮燈。
+    2) 轉弱與失效分開；失效採保守多證據確認，避免一根雜訊K誤殺。
+    3) 盤中看 VWAP / 5分結構 / 相對市場 / 族群；盤後看均線 / MACD / 量價 / 籌碼 / 族群。
+    """
+    def f(key, default=0.0):
+        try:
+            v = r.get(key)
+            return float(v) if v is not None else float(default)
+        except Exception:
+            return float(default)
+
+    r["stage_version"] = "2.0"
+    r["stage_signals"] = []
+    r["stage_risks"] = []
+
+    over = list(r.get("overheat_reasons") or [])
+    if over:
+        r["category"] = "過熱不追"
+        r["stage_reason"] = "趨勢可能仍強，但短線延伸或波動已不適合追價"
+        r["stage_risks"] = over[:4]
+        return
+
+    sec = float(sector_score_10 or 0)
+
+    if preliminary_intraday:
+        close = f("close")
+        vwap = f("vwap")
+        pace = f("pace")
+        ret15 = f("ret15")
+        tech = f("technical_score")
+        score = f("intraday_score", f("score"))
+        rel = float(((r.get("intraday_components") or {}).get("relative_strength_pct")) or 0)
+        trend5 = bool(r.get("trend5"))
+        break3 = bool(r.get("break3"))
+        break12 = bool(r.get("break12"))
+        above_vwap = bool(vwap > 0 and close >= vwap)
+        near_vwap = bool(vwap > 0 and close >= vwap * 0.995 and close <= vwap * 1.02)
+
+        invalid_flags = [
+            (vwap > 0 and close < vwap * 0.985, "明顯跌破VWAP"),
+            (ret15 <= -1.0, "近15分鐘明顯走弱"),
+            (not trend5, "5分短均未維持多頭"),
+            (rel <= -1.0, "明顯弱於所屬市場"),
+            (score < 50, "盤中動能低於50"),
+        ]
+        invalid_hits = [txt for ok, txt in invalid_flags if ok]
+        if vwap > 0 and close < vwap * 0.975 and len(invalid_hits) >= 4 and score < 45 and rel <= -0.5:
+            r["category"] = "結構失效"
+            r["stage_reason"] = "價格明顯跌離VWAP，且短線動能、趨勢與相對強弱多項同步失守"
+            r["stage_risks"] = invalid_hits[:4]
+            return
+
+        launch = bool(
+            break3 and above_vwap and pace >= 1.1 and rel >= 0
+            and (trend5 or break12 or tech >= 22)
+        )
+        if launch:
+            r["category"] = "剛啟動"
+            r["stage_reason"] = "突破＋站上VWAP＋量速與相對強度同步轉強"
+            r["stage_signals"] = ["3K突破", "站上VWAP", f"量速{pace:.1f}x", f"相對市場{rel:+.1f}%"]
+            return
+
+        pullback = bool(
+            (break12 or score >= 70)
+            and near_vwap
+            and -1.0 <= ret15 <= 1.2
+            and rel >= -0.3
+            and (trend5 or tech >= 25)
+        )
+        if pullback:
+            r["category"] = "回踩承接"
+            r["stage_reason"] = "原結構仍強，價格回到VWAP附近測試承接"
+            r["stage_signals"] = ["靠近VWAP", "短線結構未破", "相對市場未明顯轉弱"]
+            return
+
+        trend_hold = bool(
+            score >= 70 and above_vwap and rel >= 0
+            and (trend5 or break12)
+        )
+        if trend_hold:
+            r["category"] = "趨勢持有"
+            r["stage_reason"] = "動能、VWAP與相對市場仍支持既有上升趨勢"
+            r["stage_signals"] = ["站上VWAP", f"盤中動能{score:.0f}", f"相對市場{rel:+.1f}%"]
+            return
+
+        setup_flags = [
+            (near_vwap, "價格貼近VWAP"),
+            (0.8 <= pace <= 2.5, "量速溫和升溫"),
+            (rel >= -0.2, "沒有明顯落後市場"),
+            (sec >= 5.0, "族群有共振"),
+            (trend5 or break12 or tech >= 20, "短線結構正在靠攏"),
+            (-0.5 <= ret15 <= 1.5, "15分鐘未急拉急殺"),
+        ]
+        setup_hits = [txt for ok, txt in setup_flags if ok]
+        if not break3 and score >= 55 and len(setup_hits) >= 4:
+            r["category"] = "蓄勢待發"
+            r["stage_reason"] = "尚未正式突破，但價格、量能、相對強弱與族群條件正在集中"
+            r["stage_signals"] = setup_hits[:4]
+            return
+
+        weak_flags = [
+            (vwap > 0 and close < vwap, "跌回VWAP下方"),
+            (ret15 < -0.3, "近15分鐘轉弱"),
+            (rel < -0.3, "開始落後所屬市場"),
+            (pace < 0.8, "量能降溫"),
+            (sec < 4.0, "族群共振偏弱"),
+            (not trend5, "5分短均未維持多頭"),
+        ]
+        weak_hits = [txt for ok, txt in weak_flags if ok]
+        core_weak = bool(
+            (vwap > 0 and close < vwap)
+            or ret15 <= -0.8
+            or rel <= -0.8
+            or score < 50
+        )
+        if core_weak and len(weak_hits) >= 4:
+            r["category"] = "轉弱警戒"
+            r["stage_reason"] = "價格／相對強弱已有弱化，且量能、短線趨勢或族群等訊號同步轉差"
+            r["stage_risks"] = weak_hits[:4]
+            return
+
+        r["category"] = "觀察"
+        r["stage_reason"] = "目前沒有形成明確蓄勢、發動或轉弱共識"
+        return
+
+    # ---- 盤後波段 Stage 2.0 ----
+    close = f("close")
+    ma5 = f("ma5")
+    ma10 = f("ma10")
+    ma20 = f("ma20")
+    dist20 = f("dist20", 999)
+    ret5 = f("ret5", 999)
+    day = f("day_change")
+    vol = f("vol_x")
+    rsi_v = f("rsi")
+    macd_h = f("macd_h")
+    macd_acc = f("macd_acc")
+    tech = f("technical_score")
+    swing = f("swing_quality_score", f("score"))
+    chip = f("chip_score", 12.5)
+    chip_cov = f("chip_coverage_pct")
+    trend = bool(r.get("trend"))
+    break3 = bool(r.get("break3"))
+    break20 = bool(r.get("break20"))
+
+    below20 = bool(ma20 > 0 and close < ma20)
+    invalid_flags = [
+        (ma20 > 0 and close < ma20 * 0.97, "收盤明顯跌破20MA"),
+        (ma5 > 0 and ma10 > 0 and ma5 < ma10, "5MA跌破10MA"),
+        (ma10 > 0 and ma20 > 0 and ma10 < ma20, "10MA跌破20MA"),
+        (macd_h < 0, "MACD柱體在零軸下"),
+        (ret5 <= -5, "近5日明顯回落"),
+        (tech < 18, "日K技術分偏低"),
+    ]
+    invalid_hits = [txt for ok, txt in invalid_flags if ok]
+    hard_break20 = bool(ma20 > 0 and close < ma20 * 0.96)
+    midtrend_broken = bool(ma10 > 0 and ma20 > 0 and ma10 < ma20)
+    deep_momentum_loss = bool(ret5 <= -8 or (macd_h < 0 and tech < 14))
+    if hard_break20 and midtrend_broken and deep_momentum_loss and len(invalid_hits) >= 4:
+        r["category"] = "結構失效"
+        r["stage_reason"] = "明顯跌破20MA，且中期均線與動能同步失守；原波段結構需重新評估"
+        r["stage_risks"] = invalid_hits[:4]
+        return
+
+    launch_structure = bool(break20 or (break3 and trend))
+    launch = bool(
+        launch_structure and vol >= 1.2 and dist20 <= 12 and ret5 <= 18
+        and close >= ma20 and (tech >= 28 or swing >= 65)
+    )
+    if launch:
+        r["category"] = "剛啟動"
+        r["stage_reason"] = "突破結構成立，量能與波段品質同步支持發動"
+        r["stage_signals"] = ["20日突破" if break20 else "3日平台突破", f"量比{vol:.1f}x", f"距20MA {dist20:+.1f}%"]
+        return
+
+    pullback = bool(
+        close >= ma20 * 0.995
+        and -0.5 <= dist20 <= 8
+        and ret5 <= 12
+        and day <= 1.5
+        and vol <= 1.8
+        and (trend or swing >= 72 or tech >= 30)
+    )
+    if pullback:
+        r["category"] = "回踩承接"
+        r["stage_reason"] = "既有趨勢尚未破壞，價格回到20MA／支撐附近等待承接"
+        r["stage_signals"] = ["守在20MA附近", "短線未過度延伸", "量能未失控"]
+        return
+
+    trend_structure = bool(
+        ma20 > 0 and close >= ma20
+        and ma5 > 0 and ma10 > 0
+        and ma5 >= ma10
+        and ma10 >= ma20 * 0.995
+    )
+    trend_hold = bool(
+        (trend or trend_structure)
+        and (swing >= 60 or tech >= 30)
+        and 1.5 <= dist20 <= 15
+        and -2 <= ret5 <= 22
+    )
+    if trend_hold:
+        r["category"] = "趨勢持有"
+        r["stage_reason"] = "均線與波段延續分仍支持上升趨勢，重點是守住主要支撐"
+        r["stage_signals"] = ["均線多頭", f"波段延續{swing:.0f}", f"距20MA {dist20:+.1f}%"]
+        return
+
+    # 蓄勢分不是新的交易總分，只用來確認「突破前條件集中度」。
+    setup_points = 0
+    setup_hits = []
+    def add_setup(ok, pts, label):
+        nonlocal setup_points
+        if ok:
+            setup_points += pts
+            setup_hits.append(label)
+
+    add_setup(ma20 > 0 and close >= ma20 * 0.99, 20, "守在20MA附近或上方")
+    add_setup(ma5 > 0 and ma10 > 0 and ma5 >= ma10 * 0.995, 15, "5MA與10MA靠攏偏多")
+    add_setup(macd_acc > 0 or macd_h > 0, 15, "MACD動能改善")
+    add_setup(48 <= rsi_v <= 68, 10, "RSI位於健康蓄力區")
+    add_setup(0.6 <= vol <= 1.8, 10, "量能沒有失控")
+    add_setup(-1.5 <= dist20 <= 8, 10, "位置未過度延伸")
+    add_setup(-3 <= ret5 <= 10, 10, "近5日仍在可蓄勢區")
+    add_setup(chip_cov < 60 or chip >= 12.5, 5, "籌碼未明顯拖累")
+    add_setup(sec >= 5.0, 5, "族群已有共振")
+
+    if not trend and not break20 and setup_points >= 65 and tech >= 20:
+        r["category"] = "蓄勢待發"
+        r["stage_reason"] = "尚未完成正式突破，但均線、動能、位置、量能與籌碼／族群條件正在集中"
+        r["stage_signals"] = setup_hits[:5]
+        r["setup_evidence_score"] = setup_points
+        return
+
+    weak_flags = [
+        (below20, "收盤跌到20MA下方"),
+        (ma5 > 0 and ma10 > 0 and ma5 < ma10, "5MA低於10MA"),
+        (macd_acc < 0, "MACD動能下降"),
+        (ret5 < 0, "近5日報酬轉負"),
+        (chip_cov >= 60 and chip < 10, "籌碼分偏弱"),
+        (sec < 4.0, "族群共振偏弱"),
+        (swing < 60, "波段延續分下降"),
+    ]
+    weak_hits = [txt for ok, txt in weak_flags if ok]
+    core_weak = bool(
+        below20
+        or (ma5 > 0 and ma10 > 0 and ma5 < ma10)
+        or swing < 52
+        or (macd_h < 0 and macd_acc < 0)
+    )
+    if core_weak and len(weak_hits) >= 4:
+        r["category"] = "轉弱警戒"
+        r["stage_reason"] = "價格／均線已有弱化，且動能、籌碼或族群等多項訊號同步轉差；尚未確認結構失效"
+        r["stage_risks"] = weak_hits[:4]
+        return
+
+    r["category"] = "觀察"
+    r["stage_reason"] = "目前條件尚未集中成蓄勢／發動，也沒有足夠證據判定轉弱"
+
+
 def add_component_scores(rows, market, preliminary_intraday=False):
     """加入族群分、總分、階段與品質。
 
@@ -1806,59 +2070,12 @@ def add_component_scores(rows, market, preliminary_intraday=False):
             r["quality_reference"] = quality_reference
             r["quality_pass_market"] = bool(r["score_reliable"] and swing >= quality_reference)
 
-        if r.get("overheat_reasons"):
-            r["category"] = "過熱不追"
-            r["stage_reason"] = "位階或動能已進入過熱區"
+        _assign_stage_v2(r, preliminary_intraday, sec)
 
-        elif preliminary_intraday:
-            launch = bool(
-                r.get("break3")
-                and r.get("close", 0) > r.get("vwap", 1e99)
-                and (r.get("trend5") or r.get("break12") or r.get("technical_score", 0) >= 22)
-            )
-            pullback = bool(
-                (r.get("trend5") or r.get("technical_score", 0) >= 25)
-                and r.get("close", 0) >= r.get("vwap", 0) * 0.995
-            )
-
-            if launch:
-                r["category"] = "剛啟動"
-                r["stage_reason"] = "3K突破＋站上VWAP＋量速放大"
-            elif pullback:
-                r["category"] = "等回踩"
-                r["stage_reason"] = "短線結構仍強，等待VWAP/短均承接"
-            else:
-                r["category"] = "觀察"
-                r["stage_reason"] = "已有部分條件，但尚未形成明確盤中啟動"
-
-        else:
-            launch_structure = bool(
-                r.get("break20")
-                or (r.get("break3") and r.get("trend"))
-            )
-            launch = bool(
-                launch_structure
-                and r.get("vol_x", 0) >= 1.2
-                and r.get("dist20", 999) <= 12
-                and r.get("ret5", 999) <= 18
-            )
-            pullback = bool(
-                (r.get("trend") or r.get("break3") or r.get("technical_score", 0) >= 28)
-                and r.get("dist20", 999) <= 15
-                and r.get("ret5", 999) <= 22
-            )
-
-            if launch:
-                r["category"] = "剛啟動"
-                r["stage_reason"] = "20日突破" if r.get("break20") else "3日平台突破＋均線多頭"
-            elif pullback:
-                r["category"] = "等回踩"
-                r["stage_reason"] = "趨勢仍強，但較適合等支撐/均線承接"
-            else:
-                r["category"] = "觀察"
-                r["stage_reason"] = "條件尚未集中到啟動階段"
-
-    order = {"剛啟動": 0, "等回踩": 1, "觀察": 2, "過熱不追": 3}
+    order = {
+        "剛啟動": 0, "蓄勢待發": 1, "回踩承接": 2, "趨勢持有": 3,
+        "觀察": 4, "轉弱警戒": 5, "結構失效": 6, "過熱不追": 7,
+    }
     quality_order = {"強動能": 0, "高延續": 0, "轉強": 1, "強": 1, "中性": 2, "一般": 2, "轉弱": 3, "資料待補": 4}
     rows.sort(key=lambda r: (
         order.get(r["category"], 9),
@@ -1988,7 +2205,7 @@ def build_close():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "close_updated_at": now_tw().isoformat(timespec="seconds"),
         "daily_count": len(rows),
-        "version": "1.5.14-free",
+        "version": "1.5.17-free",
     })
     dump("status.json", status)
 
