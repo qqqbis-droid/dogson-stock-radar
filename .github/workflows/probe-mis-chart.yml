@@ -13,28 +13,31 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Probe TWSE MIS chart endpoints
+      - name: Probe TWSE MIS stock OHLC endpoint
         shell: bash
         run: |
           python - <<'PY'
-          import requests
-          endpoints = [
-            ("stock_8021", "https://mis.twse.com.tw/stock/api/getChartOhlcStatis.jsp", {"ex":"otc","ch":"8021.tw","fqy":"1"}),
-            ("stock_2330", "https://mis.twse.com.tw/stock/api/getChartOhlcStatis.jsp", {"ex":"tse","ch":"2330.tw","fqy":"1"}),
-            ("index_t00", "https://mis.twse.com.tw/stock/api/getChartOhlcStatis.jsp", {"ex":"tse","ch":"t00.tw","fqy":"1"}),
-            ("chart_statis_8021", "https://mis.twse.com.tw/stock/api/getChartStatis.jsp", {"ex":"otc","ch":"8021.tw"}),
-          ]
-          h={"User-Agent":"Mozilla/5.0 DogsonRadar/1.4.1","Referer":"https://mis.twse.com.tw/stock/index.jsp","Accept":"application/json,text/plain,*/*"}
+          import json, time, requests
+          h={"User-Agent":"Mozilla/5.0 DogsonRadar/1.4.1","Referer":"https://mis.twse.com.tw/stock/fibest.jsp","Accept":"application/json,text/plain,*/*"}
           s=requests.Session()
-          try:
-            s.get("https://mis.twse.com.tw/stock/index.jsp",headers=h,timeout=10)
-          except Exception as e:
-            print("warmup",type(e).__name__,e)
-          for name,url,params in endpoints:
-            try:
-              r=s.get(url,params=params,headers=h,timeout=15)
-              print("\n===",name,"status",r.status_code,"ct",r.headers.get("content-type"),"===")
-              print(r.text[:12000])
-            except Exception as e:
-              print("\n===",name,"ERROR",type(e).__name__,e,"===")
+          s.get("https://mis.twse.com.tw/stock/index.jsp",headers=h,timeout=10)
+          for code in ["8021","2330"]:
+            print("\n=====",code,"=====")
+            r=s.get("https://mis.twse.com.tw/stock/api/getStock.jsp",params={"ch":code+".tw","json":"1","_":int(time.time()*1000)},headers=h,timeout=15)
+            print("getStock",r.status_code,r.text[:3000])
+            try: obj=r.json()
+            except Exception: continue
+            arr=obj.get("msgArray") or []
+            if not arr: continue
+            key=arr[0].get("key")
+            d0=arr[0].get("d")
+            print("key",key,"d0",d0)
+            for params in [
+              {"ex_ch":key,"d0":d0},
+              {"ex_ch":key,"d0":d0,"json":"1"},
+              {"ex_ch":key},
+            ]:
+              q=s.get("https://mis.twse.com.tw/stock/api/getOhlc.jsp",params=params,headers=h,timeout=15)
+              print("getOhlc",q.status_code,q.url,"ct",q.headers.get("content-type"))
+              print(q.text[:12000])
           PY
