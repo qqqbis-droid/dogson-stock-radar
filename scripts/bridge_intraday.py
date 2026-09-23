@@ -309,7 +309,7 @@ def main():
         "intraday_count": len(out_rows),
         "mis_bridge_count": bridged,
         "mis_bridge_structure_time": structure_latest,
-        "version": "1.4.2-free",
+        "change_radar_version": "1.0",
     })
     bd.dump("status.json", status)
     print("MIS bridge done", "rows", bridged, "volume_ok", volume_ok, "quote", quote_latest, "structure", structure_latest)
