@@ -41,7 +41,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.19｜生命週期可解釋化＋Stage Engine 2.0</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.20｜生命週期可解釋化＋Stage Engine 2.0</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -491,14 +491,14 @@ document.addEventListener("click",e=>{
 if("serviceWorker" in navigator){
  window.addEventListener("load",async()=>{
   try{
-   const reg=await navigator.serviceWorker.register("./sw.js?v=1519",{updateViaCache:"none"});
+   const reg=await navigator.serviceWorker.register("./sw.js?v=1520",{updateViaCache:"none"});
    await reg.update();
    let reloading=false;
    navigator.serviceWorker.addEventListener("controllerchange",()=>{
     if(reloading)return;
-    if(sessionStorage.getItem("dogsonSwReloaded1519")==="1")return;
+    if(sessionStorage.getItem("dogsonSwReloaded1520")==="1")return;
     reloading=true;
-    sessionStorage.setItem("dogsonSwReloaded1519","1");
+    sessionStorage.setItem("dogsonSwReloaded1520","1");
     location.reload();
    });
   }catch(e){}
