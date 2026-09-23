@@ -1,0 +1,40 @@
+name: Probe MIS intraday chart
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/probe-mis-chart.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe TWSE MIS chart endpoints
+        shell: bash
+        run: |
+          python - <<'PY'
+          import requests
+          endpoints = [
+            ("stock_8021", "https://mis.twse.com.tw/stock/api/getChartOhlcStatis.jsp", {"ex":"otc","ch":"8021.tw","fqy":"1"}),
+            ("stock_2330", "https://mis.twse.com.tw/stock/api/getChartOhlcStatis.jsp", {"ex":"tse","ch":"2330.tw","fqy":"1"}),
+            ("index_t00", "https://mis.twse.com.tw/stock/api/getChartOhlcStatis.jsp", {"ex":"tse","ch":"t00.tw","fqy":"1"}),
+            ("chart_statis_8021", "https://mis.twse.com.tw/stock/api/getChartStatis.jsp", {"ex":"otc","ch":"8021.tw"}),
+          ]
+          h={"User-Agent":"Mozilla/5.0 DogsonRadar/1.4.1","Referer":"https://mis.twse.com.tw/stock/index.jsp","Accept":"application/json,text/plain,*/*"}
+          s=requests.Session()
+          try:
+            s.get("https://mis.twse.com.tw/stock/index.jsp",headers=h,timeout=10)
+          except Exception as e:
+            print("warmup",type(e).__name__,e)
+          for name,url,params in endpoints:
+            try:
+              r=s.get(url,params=params,headers=h,timeout=15)
+              print("\n===",name,"status",r.status_code,"ct",r.headers.get("content-type"),"===")
+              print(r.text[:12000])
+            except Exception as e:
+              print("\n===",name,"ERROR",type(e).__name__,e,"===")
+          PY
