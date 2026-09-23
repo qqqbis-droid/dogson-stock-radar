@@ -1,0 +1,134 @@
+name: Install Radar v1.5.17 Stage Engine 2.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1517.trigger"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1517-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+
+      - name: Require v1.5.16 first
+        run: |
+          grep -q 'Free Edition v1.5.16' docs/index.html
+          grep -q 'def add_component_scores' scripts/build_data.py
+          grep -q 'data-f="等回踩"' docs/index.html
+
+      - name: Apply Stage Engine 2.0
+        run: python scripts/patch_v1517.py
+
+      - name: Verify Stage Engine code and synthetic cases
+        run: |
+          python -m py_compile scripts/build_data.py scripts/patch_v1517.py
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, 'scripts')
+          import build_data as b
+
+          def stage(r, intraday, sec=6):
+              b._assign_stage_v2(r, intraday, sec)
+              return r['category']
+
+          close_setup = dict(close=100,ma5=100.5,ma10=100.4,ma20=99,dist20=1,ret5=3,day_change=.5,
+              vol_x=1,rsi=57,macd_h=.1,macd_acc=.05,technical_score=27,swing_quality_score=68,score=68,
+              chip_score=15,chip_coverage_pct=100,trend=False,break3=False,break20=False,overheat_reasons=[])
+          assert stage(close_setup, False) == '蓄勢待發', close_setup
+
+          close_trend = dict(close=110,ma5=108,ma10=105,ma20=102,dist20=7.8,ret5=15,day_change=2.5,
+              vol_x=2,rsi=68,macd_h=1,macd_acc=.2,technical_score=38,swing_quality_score=82,score=82,
+              chip_score=18,chip_coverage_pct=100,trend=True,break3=False,break20=False,overheat_reasons=[])
+          assert stage(close_trend, False) == '趨勢持有', close_trend
+
+          close_bad = dict(close=90,ma5=93,ma10=96,ma20=100,dist20=-10,ret5=-8,day_change=-3,
+              vol_x=1,rsi=38,macd_h=-1,macd_acc=-.2,technical_score=14,swing_quality_score=42,score=42,
+              chip_score=7,chip_coverage_pct=100,trend=False,break3=False,break20=False,overheat_reasons=[])
+          assert stage(close_bad, False) == '結構失效', close_bad
+
+          intra_launch = dict(close=102,vwap=100,pace=1.6,ret15=1.0,technical_score=30,intraday_score=80,score=80,
+              intraday_components={'relative_strength_pct':1.0},trend5=True,break3=True,break12=False,overheat_reasons=[])
+          assert stage(intra_launch, True) == '剛啟動', intra_launch
+
+          intra_setup = dict(close=100.5,vwap=100,pace=1.2,ret15=.2,technical_score=22,intraday_score=60,score=60,
+              intraday_components={'relative_strength_pct':.2},trend5=True,break3=False,break12=False,overheat_reasons=[])
+          assert stage(intra_setup, True) == '蓄勢待發', intra_setup
+          print('synthetic Stage Engine 2.0 cases OK')
+          PY
+          grep -q 'data-f="蓄勢待發"' docs/index.html
+          grep -q 'data-f="結構失效"' docs/index.html
+          grep -q 'dogson-free-v1517' docs/sw.js
+
+      - name: Keep live data before rebuilding close
+        run: python scripts/sync_live_data.py || true
+
+      - name: Rebuild close radar with Stage Engine 2.0
+        run: python scripts/build_data.py --mode close
+
+      - name: Rebuild 60m companion data
+        run: python scripts/build_hourly.py
+
+      - name: Verify real close stage distribution
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          o=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          rows=o.get('rows') or []
+          if not rows:
+              raise SystemExit('close radar is empty')
+          bad=[r.get('code') for r in rows if r.get('stage_version')!='2.0']
+          if bad:
+              raise SystemExit(f'rows missing Stage 2.0: {bad[:10]}')
+          counts=Counter(r.get('category') for r in rows)
+          print('Stage Engine 2.0 counts:', dict(counts))
+          allowed={'蓄勢待發','剛啟動','回踩承接','趨勢持有','觀察','轉弱警戒','結構失效','過熱不追'}
+          unknown=set(counts)-allowed
+          if unknown:
+              raise SystemExit(f'unknown stages: {unknown}')
+          print('setup candidates:', counts.get('蓄勢待發',0), 'warning:', counts.get('轉弱警戒',0), 'failed:', counts.get('結構失效',0))
+          PY
+
+      - name: Commit v1.5.17 code
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py docs/index.html docs/sw.js
+          git diff --cached --quiet || git commit -m "Apply v1.5.17 Stage Engine 2.0"
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 4
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
