@@ -62,11 +62,12 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 /* v1.5.26 portfolio decision */
 .portfolio-decision{margin-top:9px;border:1px solid #34455a;background:#0f1721;border-radius:11px;padding:9px}.portfolio-decision-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.portfolio-decision-title{font-size:10px;color:#9ba5b6;font-weight:850}.portfolio-decision-badge{border-radius:999px;padding:5px 8px;font-size:11px;font-weight:900;white-space:nowrap}.portfolio-decision-badge.hold{background:#173527;color:#a5efbf}.portfolio-decision-badge.cool{background:#173049;color:#b7ddff}.portfolio-decision-badge.pause{background:#40300f;color:#ffd477}.portfolio-decision-badge.reduce{background:#43251c;color:#ffc29f}.portfolio-decision-badge.exit{background:#471820;color:#ff9cac}.portfolio-decision-head{font-size:12px;font-weight:900;margin-top:6px}.portfolio-decision-reasons{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}.portfolio-decision-reasons span{font-size:9px;background:#151f2a;border:1px solid #2a394a;border-radius:8px;padding:5px 7px;color:#c2ccda}.portfolio-decision-note{font-size:9px;color:var(--muted);line-height:1.45;margin-top:7px}
 
+.validationbox{background:linear-gradient(180deg,#171d27,#111720);border:1px solid #314056;border-radius:16px;padding:12px;margin:12px 0}.validationtop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.validationtitle{font-size:16px;font-weight:900}.validationbadge{font-size:10px;font-weight:900;padding:5px 8px;border-radius:999px;background:#40300f;color:#ffd477}.validationbadge.active{background:#173527;color:#a5efbf}.validationgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:9px}.validationitem{background:#0e141c;border:1px solid #293442;border-radius:10px;padding:8px}.validationv{font-size:13px;font-weight:900}.validationl{font-size:9px;color:var(--muted);margin-top:3px}.validationnote{font-size:9px;color:var(--muted);line-height:1.5;margin-top:8px}.validationweights{font-size:10px;color:#cfe2f7;margin-top:8px;line-height:1.6}
 </style>
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.27｜Step 6 個股動態門檻</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.28｜Step 7 歷史驗證校準</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -243,7 +244,15 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
       <div class="guide-tip">60K 20T／60T與多時框相對強弱都不新增總分權重，而是正式接進 Stage 與盤中三燈。已黃金交叉一段、只要20T／60T斜率仍向上，也會保留為「穩定／加速續航」，不會因為不是剛金叉就被排除。</div>
     </div>
 
-    <div class="guide-title">⑰ 第一次使用，照這個順序最快</div>
+    <div class="guide-title">⑰ Step 7｜歷史驗證：讓分數接受真實結果檢驗</div>
+    <div class="guide-card">
+      <div class="guide-line"><span class="guide-key">保存當時狀態</span>：每個盤後快照保存分數、Stage、族群、市場、籌碼與四大波段 component；盤中每次掃描保存高資訊候選。</div>
+      <div class="guide-line"><span class="guide-key">真實 Outcome</span>：等未來交易日實際發生後，才計算 1／3／5／10 日報酬與 10 日 MFE／MAE；未成熟的 horizon 不會當成 0。</div>
+      <div class="guide-line"><span class="guide-key">權重校準</span>：用 5 日相對報酬檢查技術／籌碼／族群／流動性 component 的有效性；至少 15 個成熟交易日、3000 筆成熟樣本後，下一輪才啟用受限幅校準。</div>
+      <div class="guide-tip">盤中歷史只保存與驗證，不參與波段權重校準；Step 8 的當沖模式也會另做，避免邏輯互相污染。</div>
+    </div>
+
+    <div class="guide-title">⑱ 第一次使用，照這個順序最快</div>
     <div class="guide-card">
       <div class="guide-line"><b>盤中：</b>① 看大盤 15 分 → ② 看族群成交資金輪動 → ③ 找同族群高動能個股 → ④ 看 VWAP、量速、相對強弱與階段 → ⑤ 最後才決定要不要追、等回踩或只觀察。</div>
       <div class="guide-line"><b>盤後：</b>① 看大盤環境 → ② 看法人族群資金流 → ③ 看個股波段延續 → ④ 再看進場位置 → ⑤ 用籌碼、支撐壓力確認隔日計畫。</div>
@@ -253,6 +262,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
  </details>
 </div>
 
+<div id="validationbox"></div>
 <div id="changebox"></div>
 <div id="entrySummary"></div>
 <div id="liveStatus" class="live-status warn">🟡 近即時報價準備中｜技術結構仍採5分K</div>
@@ -264,7 +274,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 <div class="footer" id="footerText">盤中動能100＝價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10｜籌碼只作背景｜大盤15分獨立</div>
 
 <script>
-let mode="intraday",filter="all",watchOnly=false,portfolioOnly=false,portfolioData={},universe=[],closeRows=[],intraRows=[],rows=[],market={},marketLive={},closeMarket={},intraMarket={},sectorRotation=[],sectorFunds=[],changeRadar={};
+let mode="intraday",filter="all",watchOnly=false,portfolioOnly=false,portfolioData={},universe=[],closeRows=[],intraRows=[],rows=[],market={},marketLive={},closeMarket={},intraMarket={},sectorRotation=[],sectorFunds=[],changeRadar={},validationReport={};
 let sectorFundsOpen=localStorage.getItem("dogsonSectorFundsOpen")==="1";
 let sectorRotationOpen=localStorage.getItem("dogsonSectorRotationOpen")==="1";
 const $=id=>document.getElementById(id);
@@ -405,6 +415,13 @@ function moneyTw(v){if(v===null||v===undefined||Number.isNaN(+v))return "—";v=
 function flowMoney(v){if(v===null||v===undefined||Number.isNaN(+v))return "—";v=+v;if(v===0)return "0";const a=Math.abs(v);if(a>=1)return signed(v,2,"億");if(a>=.1)return signed(v*10,1,"千萬");return signed(v*100,1,"百萬")}
 function cls(c){return c==="蓄勢待發"?"setup":c==="剛啟動"?"start":c==="回踩承接"?"pull":c==="趨勢持有"?"trendhold":c==="轉弱警戒"?"weak":c==="結構失效"?"invalid":c==="過熱不追"?"hot":"watch"}
 function qualityCls(q){return (q==="高共振"||q==="高延續"||q==="強動能")?"high":(q==="強"||q==="轉強")?"strong":""}
+function validationHTML(){
+ const v=validationReport||{},c=v.calibration||{};
+ if(!v.version)return `<div class="validationtop"><div><div class="validationtitle">🧪 Step 7 歷史驗證</div><div class="sub">歷史樣本開始累積</div></div><span class="validationbadge">暖機中</span></div>`;
+ const active=!!c.active,w=c.active_weights||c.baseline_weights||{};
+ const h=v.high_quality_5d||{};
+ return `<div class="validationtop"><div><div class="validationtitle">🧪 Step 7｜真實結果校準</div><div class="sub">1／3／5／10日＋10日 MFE／MAE｜只用已發生結果</div></div><span class="validationbadge ${active?"active":""}">${active?"✅ 校準啟用":"🟡 暖機中"}</span></div><div class="validationgrid"><div class="validationitem"><div class="validationv">${v.close_snapshot_days??0} 日</div><div class="validationl">盤後快照</div></div><div class="validationitem"><div class="validationv">${c.sample_rows??0} / ${c.minimum_rows??3000}</div><div class="validationl">成熟校準樣本</div></div><div class="validationitem"><div class="validationv">${c.sample_dates??0} / ${c.minimum_dates??15}</div><div class="validationl">成熟交易日</div></div><div class="validationitem"><div class="validationv">${h.n?num(h.win_rate,1)+"%":"—"}</div><div class="validationl">70分↑訊號 5日正報酬率（${h.n||0}筆）</div></div></div><div class="validationweights">目前波段權重：技術 ${num(w.technical??50,1)}｜籌碼 ${num(w.chip??25,1)}｜族群 ${num(w.sector??15,1)}｜流動性 ${num(w.liquidity??10,1)}</div><div class="validationnote">${escHTML(c.guardrail||v.note||"樣本不足時正式權重維持50/25/15/10。")}</div>`;
+}
 function updateFooter(){
  const el=$("footerText");if(!el)return;
  el.textContent=mode==="intraday"
@@ -760,16 +777,16 @@ function render(){
 async function load(){
  try{
   const bust=Date.now();
-  const [u,c,i,s,m]=await Promise.all([
+  const [u,c,i,s,m,v]=await Promise.all([
    fetch("./data/universe.json?"+bust),fetch("./data/close.json?"+bust),
    fetch("./data/intraday.json?"+bust),fetch("./data/status.json?"+bust),
-   fetch("./data/market.json?"+bust)
+   fetch("./data/market.json?"+bust),fetch("./data/validation.json?"+bust)
   ]);
-  universe=await u.json();let cj=await c.json(),ij=await i.json(),sj=await s.json();
+  universe=await u.json();let cj=await c.json(),ij=await i.json(),sj=await s.json();validationReport=await v.json();
   closeMarket=await m.json();intraMarket=ij.market||closeMarket;marketLive=ij.market_intraday||{};sectorRotation=ij.sector_rotation||[];changeRadar=ij.change_radar||{};market=intraMarket;
   closeRows=cj.rows||[];sectorFunds=cj.sector_funds||[];intraRows=ij.rows||[];
   $("updated").textContent=sj.updated_at?new Date(sj.updated_at).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
-  $("status").textContent="已更新";$("marketbox").innerHTML=marketHTML();$("rotationbox").innerHTML=rotationHTML();$("changebox").innerHTML=changeRadarHTML();render();
+  $("status").textContent="已更新";$("marketbox").innerHTML=marketHTML();$("validationbox").innerHTML=validationHTML();$("rotationbox").innerHTML=rotationHTML();$("changebox").innerHTML=changeRadarHTML();render();
  }catch(e){
   $("status").textContent="資料尚未建立";
   $("cards").innerHTML='<div class="empty">第一次部署或更新中，請等 Actions 完成後再重新整理。</div>';
@@ -796,14 +813,14 @@ document.addEventListener("click",e=>{
 if("serviceWorker" in navigator){
  window.addEventListener("load",async()=>{
   try{
-   const reg=await navigator.serviceWorker.register("./sw.js?v=1527",{updateViaCache:"none"});
+   const reg=await navigator.serviceWorker.register("./sw.js?v=1528",{updateViaCache:"none"});
    await reg.update();
    let reloading=false;
    navigator.serviceWorker.addEventListener("controllerchange",()=>{
     if(reloading)return;
-    if(sessionStorage.getItem("dogsonSwReloaded1527")==="1")return;
+    if(sessionStorage.getItem("dogsonSwReloaded1528")==="1")return;
     reloading=true;
-    sessionStorage.setItem("dogsonSwReloaded1527","1");
+    sessionStorage.setItem("dogsonSwReloaded1528","1");
     location.reload();
    });
   }catch(e){}
@@ -811,7 +828,7 @@ if("serviceWorker" in navigator){
 }
 load();
 </script>
-<script src="./hourly.js?v=1527"></script>
+<script src="./hourly.js?v=1528"></script>
 <script src="./realtime-config.js?v=151"></script>
 <script src="./realtime.js?v=151"></script>
 </body>

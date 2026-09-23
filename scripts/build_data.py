@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.5.27
+犬子老師飆股雷達 Free Edition v1.5.28
 =================================
 盤中＝執行雷達（即時動能100，籌碼只作背景）；盤後＝波段雷達（延續品質直接100分＋進場位置）；大盤15分獨立
 
@@ -623,7 +623,7 @@ def close_technical(x):
     """技術分 0~50。"""
     if len(x) < 35:
         return None
-    c, h, v = x["Close"], x["High"], x["Volume"]
+    c, h, l, v = x["Close"], x["High"], x["Low"], x["Volume"]
     ma5, ma10, ma20 = c.rolling(5).mean(), c.rolling(10).mean(), c.rolling(20).mean()
     vx = v / v.rolling(20).mean().shift(1).replace(0, np.nan)
     ret1 = (c/c.shift(1)-1)*100
@@ -637,6 +637,8 @@ def close_technical(x):
 
     row = {
         "close": float(c.iloc[-1]),
+        "high": float(h.iloc[-1]),
+        "low": float(l.iloc[-1]),
         "ma5": float(ma5.iloc[-1]),
         "ma10": float(ma10.iloc[-1]),
         "ma20": float(ma20.iloc[-1]),
@@ -2172,6 +2174,21 @@ def add_component_scores(rows, market, preliminary_intraday=False):
     quality_reference = 76
     market_score = float(market.get("market_score", 7.5))
 
+    # Step 7：只讀「上一輪已完成」的歷史校準，確保今天的結果不會回頭改今天的分數。
+    _baseline_swing_weights = {"technical": 50.0, "chip": 25.0, "sector": 15.0, "liquidity": 10.0}
+    _validation = load_json("validation.json", {}) if not preliminary_intraday else {}
+    _calibration = (_validation.get("calibration") or {}) if isinstance(_validation, dict) else {}
+    _calibration_active = bool(_calibration.get("active"))
+    _candidate_weights = _calibration.get("active_weights") or {}
+    _swing_weights = {}
+    for _k, _base in _baseline_swing_weights.items():
+        try:
+            _swing_weights[_k] = float(_candidate_weights.get(_k, _base)) if _calibration_active else _base
+        except Exception:
+            _swing_weights[_k] = _base
+    _wsum = sum(_swing_weights.values()) or 100.0
+    _swing_weights = {k: v / _wsum * 100.0 for k, v in _swing_weights.items()}
+
     for r in rows:
         key = str(r.get("sector_group") or "").strip()
         industry = str(r.get("industry_name") or "").strip()
@@ -2254,13 +2271,28 @@ def add_component_scores(rows, market, preliminary_intraday=False):
             chip_component = max(0.0, min(25.0, cs))
             sector_component = max(0.0, min(15.0, float(sec or 0) * 1.5))
             liquidity_component = _swing_liquidity_score(r)
-            swing = round(min(100.0, tech_component + chip_component + sector_component + liquidity_component), 1)
+            # 原始 component 尺度仍是 50/25/15/10；校準只調整它們在100分內的相對權重。
+            _component_caps = {"technical": 50.0, "chip": 25.0, "sector": 15.0, "liquidity": 10.0}
+            _raw_components = {
+                "technical": tech_component, "chip": chip_component,
+                "sector": sector_component, "liquidity": liquidity_component,
+            }
+            _weighted_components = {
+                k: max(0.0, min(1.0, float(_raw_components[k]) / _component_caps[k])) * float(_swing_weights[k])
+                for k in _component_caps
+            }
+            swing = round(min(100.0, sum(_weighted_components.values())), 1)
             r["swing_components"] = {
                 "technical": round(tech_component, 1),
                 "chip": round(chip_component, 1),
                 "sector": round(sector_component, 1),
                 "liquidity": round(liquidity_component, 1),
             }
+            r["swing_weighted_components"] = {k: round(v, 1) for k, v in _weighted_components.items()}
+            r["swing_weights"] = {k: round(v, 1) for k, v in _swing_weights.items()}
+            r["swing_weight_source"] = "historical_calibration" if _calibration_active else "baseline"
+            r["calibration_sample_rows"] = int(_calibration.get("sample_rows") or 0)
+            r["calibration_sample_dates"] = int(_calibration.get("sample_dates") or 0)
             r["stock_raw_score"] = swing
             r["score"] = swing
             r["swing_quality_score"] = swing
@@ -3447,7 +3479,7 @@ def build_intraday():
                 "updated_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_attempted_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_count": len(previous.get("rows", [])),
-                "version": "1.5.27-free",
+                "version": "1.5.28-free",
             })
             dump("status.json", status)
             print("intraday source empty; kept previous", len(previous.get("rows", [])))
@@ -3513,11 +3545,11 @@ def build_intraday():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_count": len(rows),
-        "version": "1.5.27-free",
+        "version": "1.5.28-free",
         "multi_timeframe_version": "1.1",
         "relative_multiframe_version": "1.0",
         "dynamic_threshold_version": "1.0",
-        "version": "1.5.27-free",
+        "version": "1.5.28-free",
     })
     dump("status.json", status)
     print("intraday done", len(rows))

@@ -346,6 +346,15 @@ def main():
     calibration = calibrated_weights(records)
     report = summarize(records, calibration, history)
     dump(REPORT_PATH, report)
+    status_path = DATA / "status.json"
+    status = load(status_path, {})
+    status["validation_version"] = "1.0"
+    status["validation_updated_at"] = report.get("updated_at")
+    status["validation_close_days"] = report.get("close_snapshot_days")
+    status["validation_matured_5d_rows"] = report.get("matured_5d_rows")
+    status["calibration_active"] = bool(calibration.get("active"))
+    # 不在這裡覆蓋 app version；由正式 build_data 版本負責。
+    dump(status_path, status)
     print("validation", args.mode, "close_days", report["close_snapshot_days"], "intraday_scans", report["intraday_scan_snapshots"], "matured5", report["matured_5d_rows"], "calibration", calibration["status"], "changed", changed)
 
 
