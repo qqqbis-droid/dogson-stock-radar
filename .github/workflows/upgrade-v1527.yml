@@ -1,0 +1,83 @@
+name: Install Radar v1.5.27 Step 6 Dynamic Thresholds
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1527.trigger"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1527-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Require v1.5.26
+        run: |
+          grep -q 'Free Edition v1.5.26' docs/index.html
+          grep -q '"portfolio_mode_version":"1.1"' docs/data/status.json
+      - name: Apply Step 6 patch
+        run: python scripts/patch_v1527.py
+      - name: Verify Step 6 contract
+        run: |
+          python -m py_compile scripts/build_data.py scripts/bridge_intraday.py scripts/patch_v1527.py
+          python - <<'PY'
+          from pathlib import Path
+          import json,re
+          b=Path('scripts/build_data.py').read_text(encoding='utf-8')
+          h=Path('docs/index.html').read_text(encoding='utf-8')
+          st=json.loads(Path('docs/data/status.json').read_text(encoding='utf-8'))
+          required=[
+            'def _dynamic_threshold_values', 'def _apply_dynamic_thresholds',
+            'atr14_pct', 'same_time_day_abs_p90', 'same_time_vwap_abs_p90',
+            'same_time_ret15_abs_p90', 'dynamic_thresholds',
+            'day_good_high_pct', 'ret15_good_high_pct', 'pace_hot_x'
+          ]
+          for x in required:
+              if x not in b: raise SystemExit('missing '+x)
+          if '30/25/15/20/10' not in h: raise SystemExit('UI weight guard missing')
+          if st.get('version')!='1.5.27-free' or st.get('dynamic_threshold_version')!='1.0': raise SystemExit('status mismatch')
+          # Keep official score weights unchanged.
+          for x in ['"price_structure": 30','"flow_volume": 25','"relative_strength": 15','"sector": 20','"liquidity_risk": 10']:
+              if x not in b: raise SystemExit('weight changed/missing '+x)
+          m=re.search(r'<script>\s*(.*?)</script>\s*<script src="./hourly.js',h,re.S)
+          if not m: raise SystemExit('inline JS missing')
+          Path('/tmp/dogson-inline.js').write_text(m.group(1),encoding='utf-8')
+          print('Step 6 contract OK')
+          PY
+          node --check /tmp/dogson-inline.js
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py scripts/bridge_intraday.py docs/index.html docs/sw.js docs/data/status.json
+          git diff --cached --quiet || git commit -m "Apply v1.5.27 Step 6 dynamic thresholds"
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true; sleep 4
+          done
+          test "$ok" = 1
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
