@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.5.17
+犬子老師飆股雷達 Free Edition v1.5.24
 =================================
 盤中＝執行雷達（即時動能100，籌碼只作背景）；盤後＝波段雷達（延續品質直接100分＋進場位置）；大盤15分獨立
 
@@ -1667,6 +1667,15 @@ def _assign_stage_v2(r, preliminary_intraday, sector_score_10):
         break12 = bool(r.get("break12"))
         above_vwap = bool(vwap > 0 and close >= vwap)
         near_vwap = bool(vwap > 0 and close >= vwap * 0.995 and close <= vwap * 1.02)
+        mtf = r.get("multi_timeframe") or {}
+        mtf60 = mtf.get("60m") or {}
+        mtfd = mtf.get("daily") or {}
+        mtf_60_available = bool(mtf60.get("available"))
+        mtf_60_state = str(mtf60.get("state") or "")
+        mtf_60_supportive = bool(mtf60.get("supportive"))
+        mtf_60_bearish = bool(mtf60.get("bearish"))
+        mtf_daily_weak = str(mtfd.get("state") or "") == "WEAK"
+        mtf_daily_supportive = str(mtfd.get("state") or "") == "BULLISH"
 
         invalid_flags = [
             (vwap > 0 and close < vwap * 0.985, "明顯跌破VWAP"),
@@ -1685,11 +1694,17 @@ def _assign_stage_v2(r, preliminary_intraday, sector_score_10):
         launch = bool(
             break3 and above_vwap and pace >= 1.1 and rel >= 0
             and (trend5 or break12 or tech >= 22)
+            and not (mtf_60_available and mtf_60_bearish)
         )
         if launch:
             r["category"] = "剛啟動"
             r["stage_reason"] = "突破＋站上VWAP＋量速與相對強度同步轉強"
-            r["stage_signals"] = ["3K突破", "站上VWAP", f"量速{pace:.1f}x", f"相對市場{rel:+.1f}%"]
+            launch_signals = ["3K突破", "站上VWAP", f"量速{pace:.1f}x", f"相對市場{rel:+.1f}%"]
+            if mtf_60_supportive:
+                launch_signals.append(f"60K {mtf60.get('label') or '20T/60T支持'}")
+            if mtf_daily_supportive:
+                launch_signals.append("日K背景偏多")
+            r["stage_signals"] = launch_signals[:5]
             return
 
         pullback = bool(
@@ -1708,6 +1723,7 @@ def _assign_stage_v2(r, preliminary_intraday, sector_score_10):
         trend_hold = bool(
             score >= 70 and above_vwap and rel >= 0
             and (trend5 or break12)
+            and not (mtf_60_available and mtf_60_bearish)
         )
         if trend_hold:
             r["category"] = "趨勢持有"
@@ -1722,9 +1738,12 @@ def _assign_stage_v2(r, preliminary_intraday, sector_score_10):
             (sec >= 5.0, "族群有共振"),
             (trend5 or break12 or tech >= 20, "短線結構正在靠攏"),
             (-0.5 <= ret15 <= 1.5, "15分鐘未急拉急殺"),
+            (mtf_60_supportive, f"60K {mtf60.get('label') or '20T/60T結構支持'}"),
+            (mtf_daily_supportive, "日K背景仍支持"),
         ]
         setup_hits = [txt for ok, txt in setup_flags if ok]
-        if not break3 and score >= 55 and len(setup_hits) >= 4:
+        mtf_setup_ok = (not mtf_60_available) or mtf_60_supportive or mtf_60_state == "PRE_CROSS"
+        if not break3 and score >= 55 and len(setup_hits) >= 4 and mtf_setup_ok:
             r["category"] = "蓄勢待發"
             r["stage_reason"] = "尚未正式突破，但價格、量能、相對強弱與族群條件正在集中"
             r["stage_signals"] = setup_hits[:4]
@@ -1737,6 +1756,8 @@ def _assign_stage_v2(r, preliminary_intraday, sector_score_10):
             (pace < 0.8, "量能降溫"),
             (sec < 4.0, "族群共振偏弱"),
             (not trend5, "5分短均未維持多頭"),
+            (mtf_60_available and mtf_60_bearish, "60K 20T/60T結構偏弱"),
+            (mtf_daily_weak, "日K背景偏弱"),
         ]
         weak_hits = [txt for ok, txt in weak_flags if ok]
         core_weak = bool(
@@ -2892,6 +2913,152 @@ def build_change_radar(rows, rotation, previous_obj):
     })
     return base
 
+
+def _attach_multitimeframe_context(rows, close_map, hourly_obj):
+    """Attach 5m + prior completed 60m + daily context without changing any score weight."""
+    if not rows:
+        return rows
+    hourly_rows = (hourly_obj or {}).get("all_rows") or (hourly_obj or {}).get("rows") or []
+    hmap = {str(x.get("code")): x for x in hourly_rows if isinstance(x, dict) and x.get("code")}
+
+    def fv(obj, key, default=0.0):
+        try:
+            v = obj.get(key)
+            return float(v) if v is not None else float(default)
+        except Exception:
+            return float(default)
+
+    for r in rows:
+        code = str(r.get("code") or "")
+        h = hmap.get(code) or {}
+        d = (close_map or {}).get(code) or {}
+
+        close = fv(r, "close")
+        vwap = fv(r, "vwap")
+        ret15 = fv(r, "ret15")
+        five_bull = bool(vwap > 0 and close >= vwap and (r.get("trend5") or r.get("break3") or r.get("break12")))
+        five_bear = bool(vwap > 0 and close < vwap and not r.get("trend5") and ret15 < 0)
+        five_state = "BULLISH" if five_bull else "BEARISH" if five_bear else "NEUTRAL"
+
+        h_available = bool(h and h.get("data_status") == "OK")
+        hcat = str(h.get("category60") or "")
+        dir20 = str(h.get("dir20") or "")
+        dir60 = str(h.get("dir60") or "")
+        h_ma20 = fv(h, "ma20_60")
+        h_ma60 = fv(h, "ma60_60")
+        h_price = fv(h, "price")
+        if not h_available:
+            h_state = "UNAVAILABLE"
+        elif hcat in {"PRE_CROSS", "EARLY", "STABLE_CONT", "ACCEL_CONT"}:
+            h_state = hcat
+        elif dir20 == "DOWN" and dir60 == "DOWN" and (not h_ma20 or h_price < h_ma20):
+            h_state = "BEARISH"
+        elif dir20 == "UP" and dir60 == "UP" and h_ma20 > h_ma60:
+            h_state = "BULLISH"
+        elif dir20 == "UP" and dir60 in {"UP", "FLAT"}:
+            h_state = "IMPROVING"
+        else:
+            h_state = "NEUTRAL"
+        h_supportive = h_state in {"PRE_CROSS", "EARLY", "STABLE_CONT", "ACCEL_CONT", "BULLISH", "IMPROVING"}
+        h_bearish = h_state == "BEARISH"
+
+        dclose = fv(d, "close")
+        dma20 = fv(d, "ma20")
+        dma5 = fv(d, "ma5")
+        dma10 = fv(d, "ma10")
+        dcat = str(d.get("category") or "")
+        daily_weak = bool(
+            dcat in {"轉弱警戒", "結構失效"}
+            or (dma20 > 0 and dclose < dma20 and dma5 > 0 and dma10 > 0 and dma5 < dma10)
+        )
+        daily_bull = bool(
+            not daily_weak and (
+                d.get("trend") or d.get("break20")
+                or (dma20 > 0 and dclose >= dma20 and dma5 > 0 and dma10 > 0 and dma5 >= dma10)
+            )
+        )
+        daily_state = "WEAK" if daily_weak else "BULLISH" if daily_bull else "NEUTRAL"
+
+        if five_bull and h_supportive and not daily_weak:
+            state = "ALIGNED"
+        elif h_state in {"PRE_CROSS", "IMPROVING"} and not daily_weak:
+            state = "SETUP"
+        elif five_bull and h_bearish:
+            state = "CONFLICT"
+        elif h_bearish and daily_weak:
+            state = "WEAK"
+        elif h_supportive and not daily_weak:
+            state = "SUPPORTIVE"
+        else:
+            state = "MIXED"
+
+        labels = {
+            "ALIGNED": "三框共振",
+            "SETUP": "60K蓄勢／等5分觸發",
+            "SUPPORTIVE": "60K＋日K支持",
+            "CONFLICT": "5分轉強但60K未跟上",
+            "WEAK": "60K＋日K偏弱",
+            "MIXED": "框架混合／等確認",
+        }
+        hlabels = {
+            "PRE_CROSS": "20T/60T金叉前夕",
+            "EARLY": "20T/60T初升金叉",
+            "STABLE_CONT": "20T/60T穩定續航",
+            "ACCEL_CONT": "20T/60T加速續航",
+            "BULLISH": "20T/60T多頭",
+            "IMPROVING": "20T轉上／60T改善",
+            "BEARISH": "20T/60T偏弱",
+            "NEUTRAL": "20T/60T中性",
+            "UNAVAILABLE": "60K資料待補",
+        }
+        dlabels = {"BULLISH": "日K偏多", "WEAK": "日K偏弱", "NEUTRAL": "日K中性"}
+        flabels = {"BULLISH": "5分轉強", "BEARISH": "5分轉弱", "NEUTRAL": "5分等待"}
+
+        r["multi_timeframe"] = {
+            "version": "1.0",
+            "state": state,
+            "label": labels[state],
+            "5m": {
+                "state": five_state,
+                "label": flabels[five_state],
+                "above_vwap": bool(vwap > 0 and close >= vwap),
+                "trend5": bool(r.get("trend5")),
+                "break3": bool(r.get("break3")),
+                "break12": bool(r.get("break12")),
+            },
+            "60m": {
+                "available": h_available,
+                "state": h_state,
+                "label": hlabels[h_state],
+                "category": hcat or None,
+                "ma20": h.get("ma20_60"),
+                "ma60": h.get("ma60_60"),
+                "dir20": h.get("dir20"),
+                "dir60": h.get("dir60"),
+                "gap20_60_pct": h.get("gap20_60_pct"),
+                "cross_age": h.get("cross_age"),
+                "price_vs20_pct": h.get("price_vs20_60_pct"),
+                "supportive": h_supportive,
+                "bearish": h_bearish,
+                "source_trade_date": (hourly_obj or {}).get("trade_date"),
+            },
+            "daily": {
+                "state": daily_state,
+                "label": dlabels[daily_state],
+                "stage": dcat or None,
+                "ma5": d.get("ma5"),
+                "ma10": d.get("ma10"),
+                "ma20": d.get("ma20"),
+                "dist20": d.get("dist20"),
+                "trend": bool(d.get("trend")),
+                "break20": bool(d.get("break20")),
+                "source_date": d.get("date"),
+            },
+            "score_weight": 0,
+            "note": "多時間框架只作Stage/進場決策確認，不新增100分權重",
+        }
+    return rows
+
 def build_intraday():
     # v1.5.21：sync_live_data 已先抓回上一輪正式 intraday.json。
     # 先留一份到 .cache，讓 build_data 與後續 MIS bridge 都能和同一個基準比較。
@@ -2994,7 +3161,7 @@ def build_intraday():
                 "updated_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_attempted_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_count": len(previous.get("rows", [])),
-                "version": "1.5.1-free",
+                "version": "1.5.24-free",
             })
             dump("status.json", status)
             print("intraday source empty; kept previous", len(previous.get("rows", [])))
@@ -3026,6 +3193,9 @@ def build_intraday():
     quote_latest = max(quote_times) if quote_times else None
     structure_latest = max(structure_times) if structure_times else None
 
+    hourly_obj = load_json("hourly.json", {})
+    rows = _attach_multitimeframe_context(rows, close_map, hourly_obj)
+
     market_live = intraday_index_snapshot()
     sector_rotation = build_sector_rotation(rows)
     intraday_market = build_intraday_market(rows, market_live, sector_rotation, market)
@@ -3043,7 +3213,8 @@ def build_intraday():
             "latest_time": quote_latest, "structure_latest_time": structure_latest,
             "note": "現價/當日漲跌採官方MIS；VWAP/突破/量速/支撐壓力仍採5分K結構",
         },
-        "score_formula": {"mode": "intraday_execution", "price_structure": 30, "flow_volume": 25, "relative_strength": 15, "sector": 20, "liquidity_risk": 10, "amplitude_efficiency": "inside_flow_and_liquidity_risk_no_new_weight", "chip": "background_only", "market_separate": 15},
+        "multi_timeframe_version": "1.0",
+        "score_formula": {"mode": "intraday_execution", "price_structure": 30, "flow_volume": 25, "relative_strength": 15, "sector": 20, "liquidity_risk": 10, "amplitude_efficiency": "inside_flow_and_liquidity_risk_no_new_weight", "multi_timeframe": "decision_context_no_new_weight", "chip": "background_only", "market_separate": 15},
         "rows": rows,
     })
 
@@ -3052,7 +3223,8 @@ def build_intraday():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_count": len(rows),
-        "version": "1.5.1-free",
+        "version": "1.5.24-free",
+        "multi_timeframe_version": "1.0",
     })
     dump("status.json", status)
     print("intraday done", len(rows))

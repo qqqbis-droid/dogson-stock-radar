@@ -169,6 +169,7 @@ def main():
     rows = obj.get("rows") or []
     universe_list = bd.load_json("universe.json", [])
     close_obj = bd.load_json("close.json", {"rows": []})
+    close_map = {str(r.get("code")): r for r in (close_obj.get("rows") or []) if r.get("code")}
     close_market = bd.load_json("market.json", close_obj.get("market", {}))
     if not rows or not universe_list:
         raise SystemExit("missing intraday/universe data")
@@ -255,6 +256,7 @@ def main():
             fresh_times.append(str(t.get("time"))[:5])
 
     out_rows = list(by_code.values())
+    out_rows = bd._attach_multitimeframe_context(out_rows, close_map, bd.load_json("hourly.json", {}))
     market_live = bd.intraday_index_snapshot()
     rotation = bd.build_sector_rotation(out_rows)
     intraday_market = bd.build_intraday_market(out_rows, market_live, rotation, close_market)
@@ -280,6 +282,7 @@ def main():
         "market_intraday": market_live,
         "sector_rotation": rotation,
         "change_radar": change_radar,
+        "multi_timeframe_version": "1.0",
         "rows": out_rows,
         "bridge": {
             "version": "1.4.2",
@@ -310,6 +313,8 @@ def main():
         "mis_bridge_count": bridged,
         "mis_bridge_structure_time": structure_latest,
         "change_radar_version": "1.0",
+        "multi_timeframe_version": "1.0",
+        "version": "1.5.24-free",
     })
     bd.dump("status.json", status)
     print("MIS bridge done", "rows", bridged, "volume_ok", volume_ok, "quote", quote_latest, "structure", structure_latest)
