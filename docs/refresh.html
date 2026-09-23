@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<title>犬子老師・更新雷達</title>
+<style>
+body{margin:0;background:#0b0d12;color:#f4f6fb;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC",sans-serif;display:grid;place-items:center;min-height:100vh}.box{max-width:520px;padding:28px;text-align:center}.title{font-size:24px;font-weight:900}.sub{margin-top:12px;color:#9ba5b6;line-height:1.65}.spin{font-size:38px;margin-bottom:14px}
+</style>
+</head>
+<body>
+<div class="box"><div class="spin">🔄</div><div class="title">正在切換到最新版…</div><div class="sub">會解除舊版 Service Worker、清除網站快取，完成後自動回到犬子老師飆股雷達。</div></div>
+<script>
+(async()=>{
+ try{
+  if("serviceWorker" in navigator){
+   const regs=await navigator.serviceWorker.getRegistrations();
+   await Promise.all(regs.map(r=>r.unregister()));
+  }
+  if("caches" in window){
+   const keys=await caches.keys();
+   await Promise.all(keys.map(k=>caches.delete(k)));
+  }
+ }catch(e){}
+ const u=new URL("./",location.href);
+ u.searchParams.set("force","1515");
+ u.searchParams.set("t",Date.now().toString());
+ location.replace(u.toString());
+})();
+</script>
+</body>
+</html>

@@ -41,7 +41,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.14｜盤後今日法人金額排名＋盤中成交資金輪動透明化</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.15｜Safari強制換版修復＋盤後今日法人金額排名＋盤中成交資金輪動透明化</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -344,7 +344,22 @@ document.addEventListener("click",e=>{
  const open=e.target.closest("[data-peer-open]");if(open){focusPeer(open.dataset.peerOpen);return}
  if(e.target.closest("[data-peer-close]")||e.target.id==="peerPeekBack")document.getElementById("peerPeekBack")?.remove();
 });
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
+if("serviceWorker" in navigator){
+ window.addEventListener("load",async()=>{
+  try{
+   const reg=await navigator.serviceWorker.register("./sw.js?v=1515",{updateViaCache:"none"});
+   await reg.update();
+   let reloading=false;
+   navigator.serviceWorker.addEventListener("controllerchange",()=>{
+    if(reloading)return;
+    if(sessionStorage.getItem("dogsonSwReloaded1515")==="1")return;
+    reloading=true;
+    sessionStorage.setItem("dogsonSwReloaded1515","1");
+    location.reload();
+   });
+  }catch(e){}
+ });
+}
 load();
 </script>
 <script src="./realtime-config.js?v=151"></script>
