@@ -1,0 +1,145 @@
+name: Install Intraday Amplitude Efficiency
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/upgrade-amplitude-efficiency.yml"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: amplitude-efficiency-upgrade
+  cancel-in-progress: true
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - run: pip install -r requirements.txt
+
+      - name: Sync latest deployed data
+        run: python scripts/sync_live_data.py || true
+
+      - name: Apply amplitude-efficiency patch
+        run: python scripts/patch_amplitude_efficiency.py
+
+      - name: Syntax check
+        run: python -m py_compile scripts/build_data.py scripts/patch_amplitude_efficiency.py
+
+      - name: Unit-check amplitude logic
+        run: |
+          python - <<'PY'
+          import pandas as pd
+          from scripts.build_data import intraday_technical, _intraday_score_parts
+
+          idx = [pd.Timestamp("2026-09-22 13:30")]
+          rows = [[100,100.2,99.8,100,100000]]
+          for i, close in enumerate([100.5,101,101.5,102,102.5,103]):
+              t = pd.Timestamp("2026-09-23 09:00") + pd.Timedelta(minutes=5*i)
+              idx.append(t)
+              rows.append([close-0.2, close+0.2, close-0.3, close, 120000])
+          high_df = pd.DataFrame(rows, index=idx, columns=["Open","High","Low","Close","Volume"])
+          hi = intraday_technical(high_df)
+          assert hi is not None
+          assert 0 <= hi["amplitude_efficiency"] <= 100
+          assert 0 <= hi["range_position_pct"] <= 100
+          assert hi["amplitude_state"] in {"高效推進","有效推進","一般","效率惡化","低效震盪","未形成上攻"}
+
+          idx2 = [pd.Timestamp("2026-09-22 13:30")]
+          rows2 = [[100,100.2,99.8,100,100000]]
+          bars = [
+              (101,102,100.0,101.5),
+              (102,104,101.0,103.5),
+              (103,106,102.0,105.0),
+              (104,105,101.0,102.0),
+              (102,103,99.8,100.8),
+              (101,102,99.7,100.9),
+          ]
+          for i, (o,h,l,c) in enumerate(bars):
+              t = pd.Timestamp("2026-09-23 09:00") + pd.Timedelta(minutes=5*i)
+              idx2.append(t); rows2.append([o,h,l,c,140000])
+          low_df = pd.DataFrame(rows2, index=idx2, columns=["Open","High","Low","Close","Volume"])
+          lo = intraday_technical(low_df)
+          assert lo is not None
+          assert lo["amplitude_efficiency"] < hi["amplitude_efficiency"]
+          assert len(lo.get("chase_risk_reasons") or []) >= 1
+
+          market = {"components": {}}
+          score_hi, parts_hi = _intraday_score_parts({**hi, "market":"上市", "liquidity_level":"正常"}, market, 5)
+          score_lo, parts_lo = _intraday_score_parts({**lo, "market":"上市", "liquidity_level":"正常"}, market, 5)
+          assert 0 <= score_hi <= 100 and 0 <= score_lo <= 100
+          assert parts_hi["flow_volume"] <= 25
+          assert parts_hi["liquidity_risk"] <= 10
+          assert parts_lo["flow_volume"] <= 25
+          assert parts_lo["liquidity_risk"] <= 10
+          print("high", hi["amplitude_efficiency"], hi["range_position_pct"], hi["amplitude_state"], score_hi)
+          print("low", lo["amplitude_efficiency"], lo["range_position_pct"], lo["amplitude_state"], lo["chase_risk_reasons"], score_lo)
+          PY
+
+      - name: Rebuild intraday radar
+        run: python scripts/build_data.py --mode intraday
+
+      - name: Verify amplitude fields and unchanged 100-point model
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          obj=json.loads(Path("docs/data/intraday.json").read_text(encoding="utf-8"))
+          rows=obj.get("rows") or []
+          if not rows:
+              raise SystemExit("intraday rows empty")
+          sample=next((r for r in rows if r.get("amplitude_efficiency") is not None),None)
+          if not sample:
+              raise SystemExit("no amplitude-efficiency row")
+          for k in ["amplitude_efficiency","range_position_pct","amplitude_state","chase_risk_reasons"]:
+              if k not in sample:
+                  raise SystemExit("missing amplitude field: "+k)
+          comp=sample.get("intraday_components") or {}
+          for k,cap in [("price_structure",30),("flow_volume",25),("relative_strength",15),("sector",20),("liquidity_risk",10)]:
+              v=float(comp.get(k,0))
+              if v < 0 or v > cap:
+                  raise SystemExit(f"{k} out of cap: {v}>{cap}")
+          if float(sample.get("intraday_score") or 0) > 100:
+              raise SystemExit("intraday score exceeds 100")
+
+          html=Path("docs/index.html").read_text(encoding="utf-8")
+          for marker in ["振幅效率","振幅判讀","追價：","不另加權"]:
+              if marker not in html:
+                  raise SystemExit("UI marker missing: "+marker)
+
+          print("sample", {k:sample.get(k) for k in ["code","name","amplitude_efficiency","range_position_pct","amplitude_state","intraday_score"]})
+          print("components", comp)
+          PY
+
+      - name: Commit source and refreshed intraday data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py docs/index.html docs/sw.js docs/data/intraday.json docs/data/status.json || true
+          git diff --cached --quiet || git commit -m "Integrate intraday amplitude efficiency"
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
