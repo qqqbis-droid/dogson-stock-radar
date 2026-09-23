@@ -1,0 +1,101 @@
+name: Retry Radar v1.5.12 Close Sector Money Flow
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/retry-v1512.yml"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1512-retry
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+
+      - name: Sync latest deployed data
+        run: python scripts/sync_live_data.py || true
+
+      - name: Apply corrected v1.5.12 money-flow patch
+        run: python scripts/patch_v1512_fixed.py
+
+      - name: Syntax check
+        run: python -m py_compile scripts/build_data.py scripts/patch_v1512.py scripts/patch_v1512_fixed.py
+
+      - name: Rebuild close radar
+        run: python scripts/build_data.py --mode close
+
+      - name: Verify estimated sector money flow
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          close=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          funds=close.get('sector_funds') or []
+          if not funds:
+              raise SystemExit('sector_funds empty')
+          samples=[x for x in funds if x.get('today_amount_100m') is not None]
+          if not samples:
+              raise SystemExit('no estimated today money flow')
+          sample=samples[0]
+          for k in ['today_lots','today_amount_100m','amount_coverage_pct','amount_method']:
+              if k not in sample:
+                  raise SystemExit('missing field: '+k)
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          for m in ['v1.5.12','function flowMoney(v)','當日估算淨額','近 5 日估算淨額','金額用來比較資金力度']:
+              if m not in html:
+                  raise SystemExit('missing UI marker: '+m)
+          for m in ['價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10',
+                    '波段延續＝日K技術50＋籌碼25＋族群15＋流動性10']:
+              if m not in html:
+                  raise SystemExit('score marker changed: '+m)
+          sw=Path('docs/sw.js').read_text(encoding='utf-8')
+          if 'dogson-free-v1512' not in sw:
+              raise SystemExit('service worker cache not bumped')
+          print('sample', {k:sample.get(k) for k in ['sector','today_amount_100m','net5_amount_100m','net20_amount_100m','today_lots','amount_coverage_pct']})
+          print('v1.5.12 money flow verification OK')
+          PY
+
+      - name: Commit v1.5.12 source and rebuilt data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py docs/index.html docs/sw.js \
+            docs/data/close.json docs/data/market.json docs/data/status.json \
+            docs/data/chip_history.json docs/data/chip_status.json docs/data/universe.json
+          git diff --cached --quiet || git commit -m "Apply v1.5.12 close sector estimated money flow"
+          git reset --hard HEAD
+          git clean -fd .cache || true
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 5
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
