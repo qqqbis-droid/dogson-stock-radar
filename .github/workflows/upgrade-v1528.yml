@@ -71,11 +71,15 @@ jobs:
           print('Step 7 contract OK')
           PY
           node --check /tmp/dogson-inline.js
-      - name: Commit
+      - name: Commit non-workflow Step 7 files
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add scripts/build_data.py scripts/build_validation.py scripts/sync_live_data.py .github/workflows/close.yml .github/workflows/intraday.yml docs/index.html docs/sw.js docs/data/status.json docs/data/validation.json docs/data/validation_history.json
+          # Production workflows were wired directly on main. Reset local duplicate
+          # patching before commit so GITHUB_TOKEN never needs to update workflow files.
+          git fetch origin main
+          git checkout origin/main -- .github/workflows/close.yml .github/workflows/intraday.yml
+          git add scripts/build_data.py scripts/build_validation.py scripts/sync_live_data.py docs/index.html docs/sw.js docs/data/status.json docs/data/validation.json docs/data/validation_history.json
           git diff --cached --quiet || git commit -m "Apply v1.5.28 Step 7 historical validation"
           ok=0
           for n in $(seq 1 12); do
@@ -83,8 +87,6 @@ jobs:
             if git rebase origin/main; then
               if git push origin HEAD:main; then ok=1; break; fi
             else
-              # Legacy installers may still touch old shared files. Step 7 is the newer
-              # validated state, so keep this rebased commit's versions on conflicts.
               conflicted=$(git diff --name-only --diff-filter=U || true)
               if [ -n "$conflicted" ]; then
                 while IFS= read -r f; do
