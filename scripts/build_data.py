@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.5.7
+犬子老師飆股雷達 Free Edition v1.5.10
 =================================
 盤中＝執行雷達（即時動能100，籌碼只作背景）；盤後＝波段雷達（延續品質直接100分＋進場位置）；大盤15分獨立
 
@@ -1719,6 +1719,13 @@ def add_component_scores(rows, market, preliminary_intraday=False):
             sec = sector_score(n, ratio, True)
             source = "官方產業代理" if total_n else "待分類"
             label = industry if total_n else "待分類"
+            # v1.5.10：官方產業代理原本只有分數、沒有 peers，導致前端無法展開。
+            # 只補同產業成分股清單，不改 sec / ratio / 任何評分公式。
+            if total_n:
+                group_rows = [
+                    x for x in rows
+                    if str(x.get("industry_name") or "").strip() == industry
+                ]
         r["industry_hot_count"] = int(industry_hot.get(industry, 0)) if industry else 0
         r["sector_hot_count"] = n
         r["sector_score"] = sec
@@ -1727,7 +1734,7 @@ def add_component_scores(rows, market, preliminary_intraday=False):
         r["sector_hot_ratio"] = round(ratio * 100, 1) if ratio is not None else None
         r["sector_detail"] = stat
         if group_rows:
-            peers = sorted(group_rows, key=lambda x: (float(x.get("technical_score") or 0), float(x.get("day_change") or 0), float(x.get("current_turnover") or 0)), reverse=True)[:10]
+            peers = sorted(group_rows, key=lambda x: (float(x.get("technical_score") or 0), float(x.get("day_change") or 0), float(x.get("current_turnover") or 0)), reverse=True)[:15]
             r["sector_peers"] = [{
                 "code": x.get("code"), "name": x.get("name"),
                 "technical_score": x.get("technical_score"),
@@ -1969,7 +1976,7 @@ def build_close():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "close_updated_at": now_tw().isoformat(timespec="seconds"),
         "daily_count": len(rows),
-        "version": "1.5.7-free",
+        "version": "1.5.10-free",
     })
     dump("status.json", status)
 
