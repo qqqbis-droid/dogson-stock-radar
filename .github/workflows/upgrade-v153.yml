@@ -1,0 +1,84 @@
+name: Install Radar v1.5.3 Sector Flow Drilldown
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "scripts/patch_v153.py"
+      - ".github/workflows/upgrade-v153.yml"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v153-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - name: Sync latest deployed data
+        run: python scripts/sync_live_data.py || true
+      - name: Apply v1.5.3 patch
+        run: python scripts/patch_v153.py
+      - name: Syntax check
+        run: python -m py_compile scripts/chip_data.py scripts/build_data.py scripts/build_hourly.py
+      - name: Rebuild close radar and 20-day institution history
+        run: python scripts/build_data.py --mode close
+      - name: Rebuild intraday radar for new drilldown fields
+        run: python scripts/build_data.py --mode intraday
+      - name: Verify sector flow and relative-strength details
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          close=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          intra=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
+          funds=close.get('sector_funds') or []
+          rot=intra.get('sector_rotation') or []
+          rows=intra.get('rows') or []
+          print('sector funds:',len(funds),'rotation:',len(rot),'intraday rows:',len(rows))
+          if not funds:
+              raise SystemExit('sector_funds is empty')
+          print('sample fund:', {k:funds[0].get(k) for k in ['sector','today_lots','net5_lots','net20_lots','history_days','flow_text','action','ret5_pct']})
+          if not any(x.get('members') for x in funds):
+              raise SystemExit('close sector flow has no member drilldown')
+          if rot and not any(x.get('members') for x in rot):
+              raise SystemExit('intraday sector rotation has no member drilldown')
+          comps=[r.get('intraday_components') or {} for r in rows]
+          if rows and not any('relative_base' in c and 'relative_confirmation' in c for c in comps):
+              raise SystemExit('relative strength detail fields missing')
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          for marker in ['v1.5.3','盤後族群法人資金流','data-rotation-code','相對強弱 15']:
+              if marker not in html:
+                  raise SystemExit('UI marker missing: '+marker)
+          print('v1.5.3 verification OK')
+          PY
+      - name: Commit v1.5.3 source and refreshed data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/chip_data.py scripts/build_data.py docs/index.html docs/sw.js .github/workflows/close.yml docs/data/close.json docs/data/intraday.json docs/data/chip_history.json docs/data/chip_status.json || true
+          git diff --cached --quiet || git commit -m "Apply v1.5.3 sector flow drilldown"
+          git pull --rebase origin main
+          git push origin HEAD:main
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
