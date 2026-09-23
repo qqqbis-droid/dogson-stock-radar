@@ -72,8 +72,15 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add scripts/chip_data.py scripts/build_data.py docs/index.html docs/sw.js .github/workflows/close.yml docs/data/close.json docs/data/intraday.json docs/data/chip_history.json docs/data/chip_status.json || true
+          git add scripts/chip_data.py scripts/build_data.py docs/index.html docs/sw.js .github/workflows/close.yml \
+            docs/data/close.json docs/data/intraday.json docs/data/chip_history.json docs/data/chip_status.json \
+            docs/data/universe.json docs/data/market.json docs/data/status.json || true
           git diff --cached --quiet || git commit -m "Apply v1.5.3 sector flow drilldown"
+          # Build steps may leave other tracked/generated files dirty. The intended
+          # v1.5.3 files are already committed above, so clean the ephemeral runner
+          # before rebasing to avoid "cannot pull with rebase: unstaged changes".
+          git reset --hard HEAD
+          git clean -fd .cache || true
           git pull --rebase origin main
           git push origin HEAD:main
       - uses: actions/configure-pages@v5
