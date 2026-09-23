@@ -1,0 +1,97 @@
+name: Install Radar v1.5.25 Step 5B Relative Strength
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1525.trigger"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1525-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Require Step 5A first
+        run: |
+          grep -q 'Free Edition v1.5.24' docs/index.html
+          grep -q 'def _attach_multitimeframe_context' scripts/build_data.py
+          grep -q 'multi_timeframe_version":"1.0"' docs/data/status.json
+
+      - name: Apply Step 5B
+        run: python scripts/patch_v1525.py
+
+      - name: Verify syntax and contracts
+        run: |
+          python -m py_compile scripts/patch_v1525.py scripts/build_data.py scripts/bridge_intraday.py
+          python - <<'PY'
+          from pathlib import Path
+          import json,re
+          bd=Path('scripts/build_data.py').read_text(encoding='utf-8')
+          br=Path('scripts/bridge_intraday.py').read_text(encoding='utf-8')
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          sw=Path('docs/sw.js').read_text(encoding='utf-8')
+          intra=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
+          status=json.loads(Path('docs/data/status.json').read_text(encoding='utf-8'))
+          for mark in ['ret60 =','def _attach_relative_multitimeframe','relative_multiframe','DEATH_CROSS','ret5 = float((c.iloc[-1]/c.iloc[-6]-1)*100)']:
+              if mark not in bd: raise SystemExit('missing backend '+mark)
+          for mark in ['relative_multiframe','多時框領先市場','15分／60分／當日／5日','rsGreenOk','Free Edition v1.5.25']:
+              if mark not in html: raise SystemExit('missing frontend '+mark)
+          if 'bd._attach_relative_multitimeframe' not in br: raise SystemExit('bridge not refreshing relative MTF')
+          if 'dogson-free-v1525' not in sw: raise SystemExit('SW version missing')
+          if status.get('version')!='1.5.25-free' or status.get('multi_timeframe_version')!='1.1' or status.get('relative_multiframe_version')!='1.0': raise SystemExit('status mismatch')
+          rows=intra.get('rows') or []
+          cov=[r for r in rows if isinstance(r.get('relative_multiframe'),dict)]
+          print('relative MTF current coverage',len(cov),'/',len(rows))
+          if rows and len(cov)<int(len(rows)*.95): raise SystemExit('relative MTF coverage too low')
+          sf=intra.get('score_formula') or {}
+          expected={'price_structure':30,'flow_volume':25,'relative_strength':15,'sector':20,'liquidity_risk':10}
+          for k,v in expected.items():
+              if sf.get(k)!=v: raise SystemExit(f'original score weight changed {k}')
+          if sf.get('relative_multiframe')!='decision_context_no_new_weight': raise SystemExit('relative MTF must have zero new weight')
+          m=re.search(r'<script>\s*(.*?)</script>\s*<script src="./hourly.js',html,re.S)
+          if not m: raise SystemExit('inline JS missing')
+          Path('/tmp/dogson-inline.js').write_text(m.group(1),encoding='utf-8')
+          print('contracts OK')
+          PY
+          node --check /tmp/dogson-inline.js
+          node --check docs/hourly.js
+
+      - name: Commit Step 5B
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py scripts/bridge_intraday.py docs/index.html docs/sw.js docs/data/intraday.json docs/data/status.json
+          git diff --cached --quiet || git commit -m "Apply v1.5.25 Step 5B multi-timeframe relative strength"
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 4
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
