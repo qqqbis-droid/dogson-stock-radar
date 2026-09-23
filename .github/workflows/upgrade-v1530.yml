@@ -36,10 +36,22 @@ jobs:
           grep -q 'def _dynamic_threshold_values' scripts/build_data.py
           grep -q 'def calibrated_weights' scripts/build_validation.py
 
-      - name: Apply v1.5.30 completion patch
-        run: |
-          python scripts/patch_v1530.py
-          python scripts/build_daytrade.py
+      - name: Patch backend decision engine
+        run: python -c 'import scripts.patch_v1530 as p; p.patch_build_data()'
+      - name: Patch MIS bridge
+        run: python -c 'import scripts.patch_v1530 as p; p.patch_bridge()'
+      - name: Patch historical validation
+        run: python -c 'import scripts.patch_v1530 as p; p.patch_validation()'
+      - name: Patch daytrade source context
+        run: python -c 'import scripts.patch_v1530 as p; p.patch_daytrade()'
+      - name: Patch frontend decision UI
+        run: python -c 'import scripts.patch_v1530 as p; p.patch_ui()'
+      - name: Patch service worker and status
+        run: python -c 'import scripts.patch_v1530 as p; p.patch_sw_and_status()'
+      - name: Patch current cached data
+        run: python -c 'import scripts.patch_v1530 as p; p.patch_current_data()'
+      - name: Rebuild isolated daytrade data
+        run: python scripts/build_daytrade.py
 
       - name: Verify Python syntax
         run: |
@@ -59,37 +71,25 @@ jobs:
           intra=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
           daytrade=json.loads(Path('docs/data/daytrade.json').read_text(encoding='utf-8'))
 
-          # 1) chip intensity / cross-stock comparable strength
           for x in ['def _chip_intensity_fields','foreign_3d_intensity_pct','avg_volume20_shares','chip_intensity_label']:
               if x not in bd: raise SystemExit('chip intensity missing '+x)
-
-          # 2) pullback / attack pattern
           for x in ['def _execution_pattern_fields','量縮回踩','量增上攻','回踩承接','execution_pattern_strength']:
               if x not in bd: raise SystemExit('execution pattern missing '+x)
-
-          # 3) cumulative today changes
           for x in ['def _build_today_cumulative_change','today_score_delta','today_pace_delta','today_direction','new_setup','new_start','to_overheat']:
               if x not in bd: raise SystemExit('today change missing '+x)
-
-          # 4) inventory add + direction
           for x in ['🟢 可考慮加碼','今日變化方向','可加 ${actions.add','addable=']:
               if x not in ui: raise SystemExit('portfolio completion missing '+x)
-
-          # 5) Step 6 front-end must use per-stock dynamic thresholds, not hardcoded gate only
           for x in ['dayHot=+(dyn.day_hot_pct??8.5)','vwapHot=+(dyn.vwap_hot_pct??4.5)','paceHot=+(dyn.pace_hot_x??5)','ret15Hot=+(dyn.ret15_hot_pct??4)']:
               if x not in ui: raise SystemExit('dynamic entry gate missing '+x)
-
-          # 6) historical breakout-event volume baseline + Step7 research persistence
           for x in ['breakout_event_volumes','breakout_volume_profile','current_volume_vs_event_avg']:
               if x not in bd: raise SystemExit('breakout event baseline missing '+x)
           for x in ['execution_pattern','foreign_3d_intensity_pct','combination_5d','breakout_volume_profile']:
               if x not in bv: raise SystemExit('Step7 completion persistence missing '+x)
 
-          # Preserve score architecture.
           for x in ['"price_structure": 30','"flow_volume": 25','"relative_strength": 15','"sector": 20','"liquidity_risk": 10']:
               if x not in bd: raise SystemExit('intraday weight changed '+x)
-          for x in ['{"technical": 50.0, "chip": 25.0, "sector": 15.0, "liquidity": 10.0}']:
-              if x not in bv: raise SystemExit('swing baseline changed')
+          if '{"technical": 50.0, "chip": 25.0, "sector": 15.0, "liquidity": 10.0}' not in bv:
+              raise SystemExit('swing baseline changed')
 
           if st.get('version')!='1.5.30-free' or st.get('vision_completion_version')!='1.0': raise SystemExit('status mismatch')
           if st.get('dynamic_threshold_version')!='1.1' or st.get('portfolio_mode_version')!='1.2' or st.get('change_radar_version')!='1.1': raise SystemExit('sub-version mismatch')
@@ -104,11 +104,9 @@ jobs:
               pcov=sum(r.get('execution_pattern') is not None for r in irows)
               print('execution pattern coverage',pcov,'/',len(irows))
               if pcov < int(len(irows)*.95): raise SystemExit('execution pattern coverage low')
-
           if daytrade.get('version')!='1.0' or not daytrade.get('rows'):
               raise SystemExit('daytrade rebuild failed')
 
-          # Synthetic helper tests.
           spec=importlib.util.spec_from_file_location('bd','scripts/build_data.py')
           m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
           intensity=m._chip_intensity_fields({'avg_volume20_shares':1_000_000,'foreign_3d_net':180_000,'trust_net_latest':20_000})
@@ -124,7 +122,6 @@ jobs:
           if not today['ready'] or today['counts']['new_setup']!=1 or rows[0]['today_direction'] not in {'改善','小幅改善'}:
               raise SystemExit('today cumulative synthetic test failed')
 
-          # JS syntax contract.
           mm=re.search(r'<script>\s*(.*?)</script>\s*<script src="./hourly.js',ui,re.S)
           if not mm: raise SystemExit('inline JS missing')
           Path('/tmp/dogson-inline.js').write_text(mm.group(1),encoding='utf-8')
