@@ -464,14 +464,14 @@ document.addEventListener("click",e=>{
 if("serviceWorker" in navigator){
  window.addEventListener("load",async()=>{
   try{
-   const reg=await navigator.serviceWorker.register("./sw.js?v=1517",{updateViaCache:"none"});
+   const reg=await navigator.serviceWorker.register("./sw.js?v=1517b",{updateViaCache:"none"});
    await reg.update();
    let reloading=false;
    navigator.serviceWorker.addEventListener("controllerchange",()=>{
     if(reloading)return;
-    if(sessionStorage.getItem("dogsonSwReloaded1517")==="1")return;
+    if(sessionStorage.getItem("dogsonSwReloaded1517b")==="1")return;
     reloading=true;
-    sessionStorage.setItem("dogsonSwReloaded1517","1");
+    sessionStorage.setItem("dogsonSwReloaded1517b","1");
     location.reload();
    });
   }catch(e){}

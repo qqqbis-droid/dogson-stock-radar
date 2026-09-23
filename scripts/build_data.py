@@ -1873,16 +1873,18 @@ def _assign_stage_v2(r, preliminary_intraday, sector_score_10):
         (swing < 60, "波段延續分下降"),
     ]
     weak_hits = [txt for ok, txt in weak_flags if ok]
+    # Final calibration：庫存管理的「轉弱警戒」必須比一般回檔更嚴格。
+    # 核心價格/均線真的弱化 + 至少五項證據才亮警報，避免盤整股滿屏警告。
+    ma_short_broken = bool(ma5 > 0 and ma10 > 0 and ma5 < ma10)
     core_weak = bool(
-        below20
-        or (ma5 > 0 and ma10 > 0 and ma5 < ma10)
-        or swing < 52
-        or (macd_h < 0 and macd_acc < 0)
+        (below20 and ma_short_broken)
+        or swing < 48
+        or (macd_h < 0 and macd_acc < 0 and ret5 <= -2)
     )
-    if core_weak and len(weak_hits) >= 4:
+    if core_weak and len(weak_hits) >= 5:
         r["category"] = "轉弱警戒"
-        r["stage_reason"] = "價格／均線已有弱化，且動能、籌碼或族群等多項訊號同步轉差；尚未確認結構失效"
-        r["stage_risks"] = weak_hits[:4]
+        r["stage_reason"] = "價格／短均已有明確弱化，且至少五項技術、動能、籌碼或族群訊號同步轉差；尚未確認結構失效"
+        r["stage_risks"] = weak_hits[:5]
         return
 
     r["category"] = "觀察"
