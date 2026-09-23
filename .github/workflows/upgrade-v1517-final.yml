@@ -1,0 +1,117 @@
+name: Finalize Radar v1.5.17 Stage Engine 2.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1517-final.trigger"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1517-final
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+
+      - name: Require Stage Engine 2.0 base
+        run: |
+          grep -q 'Free Edition v1.5.17' docs/index.html
+          grep -q 'def _assign_stage_v2' scripts/build_data.py
+          grep -q 'core_weak and len(weak_hits) >= 4' scripts/build_data.py
+
+      - name: Apply final warning calibration
+        run: python scripts/patch_v1517_final_calibration.py
+
+      - name: Verify code and unchanged scoring architecture
+        run: |
+          python -m py_compile scripts/build_data.py scripts/patch_v1517_final_calibration.py
+          grep -q 'core_weak and len(weak_hits) >= 5' scripts/build_data.py
+          grep -q 'swing < 48' scripts/build_data.py
+          grep -q 'dogson-free-v1517b' docs/sw.js
+          grep -q 'sw.js?v=1517b' docs/index.html
+          grep -q '30 價格結構 + 25 量價/動能 + 15 相對強弱 + 20 族群 + 10 流動性/追價風險' scripts/build_data.py
+          grep -q '技術50＋籌碼25＋族群15＋流動性10＝100' scripts/build_data.py
+
+      - name: Preserve current live files
+        run: python scripts/sync_live_data.py || true
+
+      - name: Rebuild close data
+        run: python scripts/build_data.py --mode close
+
+      - name: Verify final distribution
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          o=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          rows=o.get('rows') or []
+          if not rows:
+              raise SystemExit('close radar empty')
+          counts=Counter(r.get('category') for r in rows)
+          print('FINAL Stage Engine 2.0 counts:', dict(counts))
+          n=len(rows)
+          weak=counts.get('轉弱警戒',0)
+          failed=counts.get('結構失效',0)
+          setup=counts.get('蓄勢待發',0)
+          trend=counts.get('趨勢持有',0)
+          print('FINAL setup:',setup,'trend:',trend,'weak:',weak,'failed:',failed,'total:',n)
+          if any(r.get('stage_version')!='2.0' for r in rows):
+              raise SystemExit('missing Stage Engine 2.0 rows')
+          if weak > int(n*0.24):
+              raise SystemExit(f'warning bucket still too noisy: {weak}/{n}')
+          if failed > int(n*0.18):
+              raise SystemExit(f'failure bucket too large: {failed}/{n}')
+          if weak + failed > int(n*0.38):
+              raise SystemExit(f'combined weak/failure too large: {weak+failed}/{n}')
+          if trend == 0:
+              raise SystemExit('trend-hold empty')
+          if setup == 0:
+              raise SystemExit('setup empty')
+          PY
+
+      - name: Commit final calibration safely
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p /tmp/v1517-final-live
+          cp -a docs/data /tmp/v1517-final-live/data
+          git add scripts/build_data.py docs/index.html docs/sw.js
+          git diff --cached --quiet || git commit -m "Calibrate v1.5.17 Stage Engine warnings"
+          git reset --hard HEAD
+          git clean -fd
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 4
+          done
+          test "$ok" = 1
+          rm -rf docs/data
+          cp -a /tmp/v1517-final-live/data docs/data
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
