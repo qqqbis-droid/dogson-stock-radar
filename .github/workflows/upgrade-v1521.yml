@@ -1,0 +1,157 @@
+name: Install Radar v1.5.21 Five-Minute Change Radar
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1521.trigger"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1521-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Require v1.5.20 first
+        run: |
+          grep -q 'Free Edition v1.5.20' docs/index.html
+          grep -q 'def _assign_stage_v2' scripts/build_data.py
+          grep -q 'stage_version' docs/data/status.json
+
+      - name: Apply v1.5.21 change radar patch
+        run: python scripts/patch_v1521.py
+
+      - name: Syntax and architecture verification
+        run: |
+          python -m py_compile scripts/build_data.py scripts/bridge_intraday.py scripts/patch_v1521.py
+          python - <<'PY'
+          from pathlib import Path
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          build=Path('scripts/build_data.py').read_text(encoding='utf-8')
+          bridge=Path('scripts/bridge_intraday.py').read_text(encoding='utf-8')
+          sw=Path('docs/sw.js').read_text(encoding='utf-8')
+          for m in [
+              'Free Edition v1.5.21','function changeRadarHTML()','🚨 5分鐘變化雷達',
+              '⬆️ 剛轉強','⬇️ 剛轉弱','🚀 剛突破','♻️ 剛站回VWAP','🔥 族群加速',
+              './sw.js?v=1521'
+          ]:
+              if m not in html: raise SystemExit('missing html marker: '+m)
+          for m in ['def build_change_radar(', 'intraday_previous.json', '"change_radar": change_radar']:
+              if m not in build: raise SystemExit('missing build marker: '+m)
+          for m in ['bd.build_change_radar(out_rows, rotation, previous_obj)', '"change_radar": change_radar']:
+              if m not in bridge: raise SystemExit('missing bridge marker: '+m)
+          if 'dogson-free-v1521' not in sw: raise SystemExit('service worker version missing')
+          # Existing score architecture must be untouched.
+          for m in ['價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10',
+                    '波段延續100＝日K技術50＋籌碼25＋族群15＋流動性10']:
+              if m not in html: raise SystemExit('score architecture marker missing: '+m)
+          print('static verification OK')
+          PY
+
+      - name: Synthetic change-radar behavior test
+        run: |
+          python - <<'PY'
+          import ast
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+
+          src=Path('scripts/build_data.py').read_text(encoding='utf-8')
+          tree=ast.parse(src)
+          fn=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='build_change_radar')
+          mod=ast.Module(body=[fn],type_ignores=[]);ast.fix_missing_locations(mod)
+          TW=timezone(timedelta(hours=8))
+          now=datetime.now(TW)
+          ns={'datetime':datetime,'TW':TW,'now_tw':lambda:now}
+          exec(compile(mod,'build_data.py','exec'),ns,ns)
+          f=ns['build_change_radar']
+          td=now.date().isoformat()
+          prev={
+            'updated_at':(now-timedelta(minutes=5)).isoformat(timespec='seconds'),
+            'rows':[
+              {'code':'1111','name':'強股','quote_date':td,'close':99,'vwap':100,'ret15':-0.2,'break3':False,'break12':False,'intraday_score':52,'category':'觀察','intraday_components':{'relative_strength_pct':-0.4}},
+              {'code':'2222','name':'弱股','quote_date':td,'close':101,'vwap':100,'ret15':0.4,'break3':False,'break12':True,'intraday_score':72,'category':'趨勢持有','intraday_components':{'relative_strength_pct':0.5}},
+            ],
+            'sector_rotation':[{'sector':'ABF載板','heat':1.5}],
+          }
+          cur=[
+            {'code':'1111','name':'強股','quote_date':td,'close':101,'vwap':100,'vwap_dist':1.0,'ret15':0.6,'break3':True,'break12':False,'intraday_score':66,'category':'剛啟動','intraday_components':{'relative_strength_pct':0.4}},
+            {'code':'2222','name':'弱股','quote_date':td,'close':99,'vwap':100,'vwap_dist':-1.0,'ret15':-0.7,'break3':False,'break12':True,'intraday_score':58,'category':'轉弱警戒','intraday_components':{'relative_strength_pct':-0.3}},
+          ]
+          out=f(cur,[{'sector':'ABF載板','heat':4.0}],prev)
+          print(out['counts'])
+          assert out['ready'] is True
+          assert out['counts']['turn_strong']>=1
+          assert out['counts']['turn_weak']>=1
+          assert out['counts']['breakout']>=1
+          assert out['counts']['vwap_reclaim']>=1
+          assert out['counts']['sector_accel']>=1
+          labels=[e['label'] for e in cur[0]['change_events']]
+          assert '⬆️ 剛轉強' in labels and '🚀 剛突破' in labels and '♻️ 剛站回VWAP' in labels
+          stale=dict(prev);stale['updated_at']=(now-timedelta(minutes=30)).isoformat(timespec='seconds')
+          cur2=[dict(cur[0])]
+          out2=f(cur2,[{'sector':'ABF載板','heat':4.0}],stale)
+          assert out2['ready'] is False and not out2['events']
+          print('synthetic behavior OK')
+          PY
+
+      - name: Seed waiting-state object for current static data
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('docs/data/intraday.json')
+          try:
+              o=json.loads(p.read_text(encoding='utf-8'))
+          except Exception:
+              o={}
+          o['change_radar']={
+              'version':'1.0','ready':False,
+              'reason':'等待下一個5分鐘快照建立比較基準',
+              'events':[],'sector_events':[],
+              'counts':{'turn_strong':0,'turn_weak':0,'breakout':0,'vwap_reclaim':0,'sector_accel':0}
+          }
+          p.write_text(json.dumps(o,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+          s=Path('docs/data/status.json')
+          z=json.loads(s.read_text(encoding='utf-8'))
+          z['version']='1.5.21-free';z['change_radar_version']='1.0'
+          s.write_text(json.dumps(z,ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8')
+          PY
+
+      - name: Commit v1.5.21
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html docs/sw.js docs/data/intraday.json docs/data/status.json scripts/build_data.py scripts/bridge_intraday.py
+          git diff --cached --quiet || git commit -m "Apply v1.5.21 five-minute change radar"
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 4
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
