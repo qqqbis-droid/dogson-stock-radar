@@ -1,9 +1,9 @@
-const CACHE='dogson-free-v140';
+const CACHE='dogson-free-v150';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(['./manifest.webmanifest','./realtime-config.js?v=140','./realtime.js?v=140']))
+    caches.open(CACHE).then(cache => cache.addAll(['./manifest.webmanifest','./realtime-config.js?v=150','./realtime.js?v=150']))
   );
 });
 

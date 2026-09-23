@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.4.0
+犬子老師飆股雷達 Free Edition v1.5.0
 =================================
-個股品質 = 技術50 + 籌碼25 + 族群10（85分換算100）；大盤15分獨立
+盤中＝執行雷達（即時動能100，籌碼只作背景）；盤後＝波段雷達（延續品質＋進場位置）；大盤15分獨立
 
 --mode close
     每日盤後跑一次：
@@ -1349,6 +1349,7 @@ def intraday_technical(x):
         "date": str(latest), "time": x.index[-1].strftime("%H:%M"),
         "close": cur, "pace": round(pace, 2), "vwap": round(vwap, 2),
         "vwap_dist": round(vwap_dist, 2), "day_change": round(day_change, 2),
+        "ret15": round(ret15, 2),
         "break3": b3, "break12": b12, "trend5": trend,
         "current_turnover": round(current_turnover, 0),
         "recent_turnover": round(recent_turnover, 0) if recent_turnover is not None else None,
@@ -1357,6 +1358,169 @@ def intraday_technical(x):
         "technical_score": max(0, min(50, round(score, 1))),
         "reasons": reasons, "overheat_reasons": over, **sr,
     }
+
+
+def _chip_background_label(score, coverage):
+    try:
+        sc = float(score)
+        cov = float(coverage or 0)
+    except Exception:
+        return "資料不足"
+    if cov < 40:
+        return "資料不足"
+    if sc >= 18:
+        return "偏多"
+    if sc <= 9:
+        return "偏空"
+    return "中性"
+
+
+def _intraday_score_parts(r, market, sector_score_10):
+    """盤中執行分 0~100；籌碼不計分，只作背景。
+
+    30 價格結構 + 25 量價/動能 + 15 相對強弱 + 20 族群 + 10 流動性/追價風險。
+    """
+    close = float(r.get("close") or 0)
+    vwap = float(r.get("vwap") or 0)
+    pace = float(r.get("pace") or 0)
+    day = float(r.get("day_change") or 0)
+    ret15 = float(r.get("ret15") or 0)
+
+    price = 0.0
+    if vwap > 0 and close > vwap:
+        price += 10
+    if r.get("break3"):
+        price += 8
+    if r.get("break12"):
+        price += 6
+    if r.get("trend5"):
+        price += 6
+    price = min(30.0, price)
+
+    flow = 0.0
+    if 1.5 <= pace < 3.5:
+        flow += 15
+    elif 1.2 <= pace < 1.5:
+        flow += 10
+    elif 3.5 <= pace <= 5:
+        flow += 10
+    elif pace >= 1.0:
+        flow += 5
+    if 0.2 <= ret15 <= 2.5:
+        flow += 6
+    elif ret15 > 0:
+        flow += 3
+    if 0.5 <= day <= 6.5:
+        flow += 4
+    elif 0 < day < 0.5:
+        flow += 2
+    flow = min(25.0, flow)
+
+    comps = (market or {}).get("components") or {}
+    side = "otc" if str(r.get("market")) == "上櫃" else "taiex"
+    bench = ((comps.get(side) or {}).get("change_pct"))
+    try:
+        bench = float(bench) if bench is not None else 0.0
+    except Exception:
+        bench = 0.0
+    rel_pct = day - bench
+    if rel_pct >= 2.0:
+        relative = 10.0
+    elif rel_pct >= 1.0:
+        relative = 8.0
+    elif rel_pct >= 0.3:
+        relative = 6.0
+    elif rel_pct >= 0:
+        relative = 4.0
+    elif rel_pct > -1.0:
+        relative = 2.0
+    else:
+        relative = 0.0
+    if close > 0 and vwap > 0 and close >= vwap and ret15 > 0:
+        relative += 5.0
+    relative = min(15.0, relative)
+
+    sector = max(0.0, min(20.0, float(sector_score_10 or 0) * 2.0))
+
+    level = str(r.get("liquidity_level") or "未知")
+    liquidity = 5.0 if level == "活躍" else 4.0 if level == "正常" else 2.0 if level == "偏低" else 3.0
+    hot_n = len(r.get("overheat_reasons") or [])
+    risk = 5.0 if hot_n == 0 else 2.0 if hot_n == 1 else 0.0
+    if float(r.get("vwap_dist") or 0) < -2.0:
+        risk = max(0.0, risk - 2.0)
+    liquidity_risk = min(10.0, liquidity + risk)
+
+    total = max(0.0, min(100.0, price + flow + relative + sector + liquidity_risk))
+    return round(total, 1), {
+        "price_structure": round(price, 1),
+        "flow_volume": round(flow, 1),
+        "relative_strength": round(relative, 1),
+        "relative_strength_pct": round(rel_pct, 2),
+        "sector": round(sector, 1),
+        "liquidity_risk": round(liquidity_risk, 1),
+    }
+
+
+def _close_entry_position_score(r):
+    """波段進場位置 0~100；和『這家公司/趨勢好不好』分開。"""
+    score = 40.0
+    if r.get("trend"):
+        score += 10
+    if r.get("break20"):
+        score += 5
+    elif r.get("break3"):
+        score += 3
+
+    try:
+        dist = float(r.get("dist20"))
+    except Exception:
+        dist = 999.0
+    if 0 <= dist <= 3:
+        score += 20
+    elif dist <= 7:
+        score += 15
+    elif dist <= 10:
+        score += 8
+    elif dist <= 15:
+        score += 2
+    elif dist < 0:
+        score -= 10
+    else:
+        score -= 10
+
+    try:
+        vx = float(r.get("vol_x"))
+    except Exception:
+        vx = 0.0
+    if 1.2 <= vx <= 2.5:
+        score += 10
+    elif 0.8 <= vx < 1.2:
+        score += 5
+    elif vx > 4:
+        score -= 5
+
+    try:
+        ret5 = float(r.get("ret5"))
+    except Exception:
+        ret5 = 999.0
+    if 0 <= ret5 <= 8:
+        score += 10
+    elif ret5 <= 15:
+        score += 5
+    elif ret5 > 20:
+        score -= 10
+
+    sup = r.get("support") or {}
+    try:
+        upper = float(sup.get("high"))
+        close = float(r.get("close"))
+        if upper > 0 and close >= upper and (close / upper - 1) <= 0.03:
+            score += 5
+    except Exception:
+        pass
+
+    score -= min(25.0, 10.0 * len(r.get("overheat_reasons") or []))
+    return round(max(0.0, min(100.0, score)), 1)
 
 def add_component_scores(rows, market, preliminary_intraday=False):
     """加入族群分、總分、階段與品質。
@@ -1475,27 +1639,53 @@ def add_component_scores(rows, market, preliminary_intraday=False):
         r["market_trade_date"] = market.get("trade_date")
 
         cs = float(r.get("chip_score", 12.5))
-        liq_adjust = float(r.get("liquidity_adjust", 0))
-        # v1.4: market is an independent operation-environment gauge.  It must not
-        # make every stock's quality rise/fall by the same amount.
-        stock_raw = float(r.get("technical_score", 0)) + cs + sec + liq_adjust
-        stock_raw = max(0.0, min(85.0, stock_raw))
-        r["stock_raw_score"] = round(stock_raw, 1)
-        r["score"] = round(stock_raw / 85.0 * 100.0, 1)
-        r["market_in_quality_score"] = False
-
         chip_cov = float(r.get("chip_coverage_pct") or 0)
-        r["score_reliable"] = bool(chip_cov >= 60)
-        if not r["score_reliable"]:
-            r["quality_label"] = "資料待補"
-        elif r["score"] >= 80:
-            r["quality_label"] = "高共振"
-        elif r["score"] >= 70:
-            r["quality_label"] = "強"
+        liq_adjust = float(r.get("liquidity_adjust", 0))
+        r["market_in_quality_score"] = False
+        r["chip_background"] = _chip_background_label(cs, chip_cov)
+        r["chip_background_score"] = round(cs, 1)
+
+        if preliminary_intraday:
+            # v1.5：盤中是執行雷達。籌碼僅作昨日/最近盤後背景，不灌入即時動能分。
+            intraday_score, intraday_parts = _intraday_score_parts(r, market, sec)
+            r["intraday_score"] = intraday_score
+            r["intraday_components"] = intraday_parts
+            r["stock_raw_score"] = intraday_score
+            r["score"] = intraday_score
+            r["score_type"] = "intraday_execution"
+            r["score_reliable"] = True
+            if intraday_score >= 82:
+                r["quality_label"] = "強動能"
+            elif intraday_score >= 70:
+                r["quality_label"] = "轉強"
+            elif intraday_score >= 55:
+                r["quality_label"] = "中性"
+            else:
+                r["quality_label"] = "轉弱"
+            r["quality_reference"] = 70
+            r["quality_pass_market"] = bool(intraday_score >= 70)
         else:
-            r["quality_label"] = "一般"
-        r["quality_reference"] = quality_reference
-        r["quality_pass_market"] = bool(r["score_reliable"] and r["score"] >= quality_reference)
+            # v1.5：盤後是波段雷達。延續品質與進場位置分開，避免『好股票＝現在可追』。
+            stock_raw = float(r.get("technical_score", 0)) + cs + sec + liq_adjust
+            stock_raw = max(0.0, min(85.0, stock_raw))
+            swing = round(stock_raw / 85.0 * 100.0, 1)
+            r["stock_raw_score"] = round(stock_raw, 1)
+            r["score"] = swing
+            r["swing_quality_score"] = swing
+            r["swing_continuation_score"] = swing
+            r["entry_position_score"] = _close_entry_position_score(r)
+            r["score_type"] = "swing_continuation"
+            r["score_reliable"] = bool(chip_cov >= 60)
+            if not r["score_reliable"]:
+                r["quality_label"] = "資料待補"
+            elif swing >= 80:
+                r["quality_label"] = "高延續"
+            elif swing >= 70:
+                r["quality_label"] = "強"
+            else:
+                r["quality_label"] = "一般"
+            r["quality_reference"] = quality_reference
+            r["quality_pass_market"] = bool(r["score_reliable"] and swing >= quality_reference)
 
         if r.get("overheat_reasons"):
             r["category"] = "過熱不追"
@@ -1550,7 +1740,7 @@ def add_component_scores(rows, market, preliminary_intraday=False):
                 r["stage_reason"] = "條件尚未集中到啟動階段"
 
     order = {"剛啟動": 0, "等回踩": 1, "觀察": 2, "過熱不追": 3}
-    quality_order = {"高共振": 0, "強": 1, "一般": 2}
+    quality_order = {"強動能": 0, "高延續": 0, "轉強": 1, "強": 1, "中性": 2, "一般": 2, "轉弱": 3, "資料待補": 4}
     rows.sort(key=lambda r: (
         order.get(r["category"], 9),
         quality_order.get(r.get("quality_label"), 9),
@@ -1654,7 +1844,7 @@ def build_close():
         "trade_date": market.get("trade_date"),
         "data_complete": bool(market.get("data_complete")),
         "market": market,
-        "score_formula": {"technical": 50, "chip": 25, "sector": 10, "stock_raw_max": 85, "normalized_to": 100, "market_separate": 15},
+        "score_formula": {"mode": "swing", "technical": 50, "chip": 25, "sector": 10, "stock_raw_max": 85, "normalized_to": 100, "entry_position": 100, "market_separate": 15},
         "rows": rows,
     })
     dump("market.json", market)
@@ -1664,7 +1854,7 @@ def build_close():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "close_updated_at": now_tw().isoformat(timespec="seconds"),
         "daily_count": len(rows),
-        "version": "1.4.0-free",
+        "version": "1.5.0-free",
     })
     dump("status.json", status)
 
@@ -2118,7 +2308,7 @@ def build_intraday():
                 "updated_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_attempted_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_count": len(previous.get("rows", [])),
-                "version": "1.4.0-free",
+                "version": "1.5.0-free",
             })
             dump("status.json", status)
             print("intraday source empty; kept previous", len(previous.get("rows", [])))
@@ -2165,7 +2355,7 @@ def build_intraday():
             "latest_time": quote_latest, "structure_latest_time": structure_latest,
             "note": "現價/當日漲跌採官方MIS；VWAP/突破/量速/支撐壓力仍採5分K結構",
         },
-        "score_formula": {"technical": 50, "chip": 25, "sector": 10, "stock_raw_max": 85, "normalized_to": 100, "market_separate": 15},
+        "score_formula": {"mode": "intraday_execution", "price_structure": 30, "flow_volume": 25, "relative_strength": 15, "sector": 20, "liquidity_risk": 10, "chip": "background_only", "market_separate": 15},
         "rows": rows,
     })
 
@@ -2174,7 +2364,7 @@ def build_intraday():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_count": len(rows),
-        "version": "1.4.0-free",
+        "version": "1.5.0-free",
     })
     dump("status.json", status)
     print("intraday done", len(rows))

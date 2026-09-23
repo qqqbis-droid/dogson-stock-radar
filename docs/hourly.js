@@ -11,6 +11,7 @@
   let data={rows:[]};
   let byCode=new Map();
   let selected='ALL';
+  let hourlyExpanded=false;
 
   function n(v,d=1){const x=Number(v);return Number.isFinite(x)?x.toFixed(d):'—'}
   function signed(v,d=1){const x=Number(v);return Number.isFinite(x)?`${x>=0?'+':''}${x.toFixed(d)}%`:'—'}
@@ -29,6 +30,7 @@
     s.textContent=`
       .hourlybox{background:linear-gradient(180deg,#151c27,#111720);border:1px solid #2a3140;border-radius:18px;padding:13px;margin:12px 0}
       .hourlytop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.hourlytitle{font-size:18px;font-weight:900}.hourlysub{font-size:11px;color:#9ba5b6;margin-top:4px;line-height:1.5}.hourlystamp{font-size:10px;color:#9ba5b6;text-align:right;white-space:nowrap}
+      .hourlytoggle{border:1px solid #36506f;background:#17304a;color:#cde6ff;border-radius:10px;padding:7px 10px;font-size:11px;font-weight:850;white-space:nowrap}.hourlysummary{font-size:11px;color:#9ba5b6;margin-top:7px}
       .hourlyfilters{display:flex;gap:7px;overflow:auto;padding:10px 0 4px}.hourlyfilter{white-space:nowrap;border:1px solid #2a3140;background:#242b38;color:#c7cfdb;padding:7px 10px;border-radius:999px;font-size:11px;font-weight:800}.hourlyfilter.on{border-color:#4d8ac7;color:#b9ddff;background:#17304a}
       .hourlylist{display:grid;gap:7px;margin-top:8px}.hourlyrow{width:100%;text-align:left;border:1px solid #29313e;background:#0e131a;color:#f4f6fb;border-radius:12px;padding:10px;display:flex;justify-content:space-between;gap:10px}.hourlyrow:active{transform:scale(.995)}.hourlyname{font-size:13px;font-weight:900}.hourlymeta{font-size:10px;color:#9ba5b6;margin-top:4px;line-height:1.5}.hourlyright{text-align:right;min-width:108px}.hourlyscore{font-size:13px;font-weight:900}.hourlylight{font-size:11px;font-weight:850;margin-top:4px}
       .hourlymore{font-size:10px;color:#9ba5b6;margin-top:8px;line-height:1.5}.hourlyempty{color:#9ba5b6;padding:14px 2px;font-size:12px}
@@ -77,13 +79,17 @@
     const rows=filteredRows();
     const counts=data.entry_light_counts||{};
     const updated=data.updated_at?new Date(data.updated_at).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
-    box.innerHTML=`
-      <div class="hourlytop"><div><div class="hourlytitle">⏱️ 60分K 趨勢雷達</div><div class="hourlysub">四種生命週期是篩選器；60K分數是結構品質；進場燈號只看位置/延伸，不代表買進訊號。</div></div><div class="hourlystamp">${data.trade_date||''}<br>${updated}</div></div>
+    const body=hourlyExpanded?`
       <div class="hourlyfilters">
         ${buttonHTML('ALL','全部60K')}${buttonHTML('PRE_CROSS','🟡 金叉前夕')}${buttonHTML('EARLY','🟢 初升')}${buttonHTML('STABLE_CONT','🔵 穩定續航')}${buttonHTML('ACCEL_CONT','🚀 加速續航')}${buttonHTML('GREEN',`🟢 位置舒服 ${counts.GREEN??''}`)}
       </div>
       <div class="hourlylist">${rows.length?rows.slice(0,18).map(rowHTML).join(''):'<div class="hourlyempty">目前沒有符合這個60K條件的股票。</div>'}</div>
-      <div class="hourlymore">目前共 ${data.rows?.length||0} 檔符合60K生命週期條件；🟢 ${counts.GREEN||0}｜🟡 ${counts.YELLOW||0}｜🟠 ${counts.ORANGE||0}｜🔴 ${counts.RED||0}。點股票會帶到下方完整卡片。</div>`;
+      <div class="hourlymore">目前共 ${data.rows?.length||0} 檔符合60K生命週期條件；🟢 ${counts.GREEN||0}｜🟡 ${counts.YELLOW||0}｜🟠 ${counts.ORANGE||0}｜🔴 ${counts.RED||0}。點股票會帶到下方完整卡片。</div>`:
+      `<div class="hourlysummary">符合 ${data.rows?.length||0} 檔｜🟢位置舒服 ${counts.GREEN||0}｜收合時不占版面，點「展開」再挑60K股票。</div>`;
+    box.innerHTML=`
+      <div class="hourlytop"><div><div class="hourlytitle">⏱️ 60分K 趨勢雷達</div><div class="hourlysub">四種生命週期＋進場燈號；預設收合，避免手機版被名單擋住。</div></div><div style="display:flex;gap:8px;align-items:flex-start"><div class="hourlystamp">${data.trade_date||''}<br>${updated}</div><button id="hourlyToggle" class="hourlytoggle">${hourlyExpanded?'收合 ▲':'展開 ▼'}</button></div></div>
+      ${body}`;
+    box.querySelector('#hourlyToggle')?.addEventListener('click',()=>{hourlyExpanded=!hourlyExpanded;renderPanel()});
     box.querySelectorAll('[data-h60]').forEach(b=>b.onclick=()=>{selected=b.dataset.h60;renderPanel()});
     box.querySelectorAll('[data-hourly-code]').forEach(b=>b.onclick=()=>focusStock(b.dataset.hourlyCode));
   }

@@ -34,11 +34,14 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 .empty{text-align:center;color:var(--muted);padding:35px 10px}.note{font-size:11px;color:var(--muted);line-height:1.5;margin:12px 2px}
 .rotationbox{background:linear-gradient(180deg,#151c27,#111720);border:1px solid var(--line);border-radius:18px;padding:13px;margin:12px 0}.rotationtop{display:flex;justify-content:space-between;align-items:flex-start}.rotationtitle{font-size:18px;font-weight:900}.rotationcols{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.rotationhead{font-size:13px;font-weight:900;margin-bottom:6px}.rotationrow{display:flex;justify-content:space-between;gap:8px;background:#0e131a;border:1px solid #252d39;border-radius:11px;padding:9px;margin:6px 0;font-size:11px}.rotationleaders{color:var(--muted);margin-top:4px}.rotationnums{text-align:right;color:#cbd3df;line-height:1.45;min-width:138px}@media(max-width:620px){.rotationcols{grid-template-columns:1fr}.rotationrow{font-size:10px}}
 .footer{position:fixed;left:0;right:0;bottom:0;background:rgba(11,13,18,.94);backdrop-filter:blur(16px);border-top:1px solid var(--line);padding:8px 14px calc(8px + env(safe-area-inset-bottom));font-size:11px;color:var(--muted);text-align:center}
+
+.parts.intradayparts,.parts.closeparts{grid-template-columns:repeat(2,1fr)}
+.peerpeekback{position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:40;display:flex;align-items:flex-end;justify-content:center;padding:14px}.peerpeek{width:min(720px,100%);background:#161c26;border:1px solid #344052;border-radius:18px;padding:14px;box-shadow:0 18px 50px rgba(0,0,0,.45)}.peerpeektop{display:flex;justify-content:space-between;gap:10px}.peerpeekname{font-size:19px;font-weight:900}.peerpeekgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:10px}.peerpeekitem{background:#0e131a;border:1px solid #29313e;border-radius:10px;padding:9px}.peerpeekv{font-weight:900}.peerpeekl{font-size:10px;color:var(--muted);margin-top:3px}.peerpeekactions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.peerpeekbtn{border:1px solid #36506f;background:#17304a;color:#cde6ff;border-radius:11px;padding:10px;font-weight:850}.peerpeekbtn.secondary{background:#242b38;border-color:#343d4d;color:#d4dae4}
 </style>
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.4.0｜官方即時價＋獨立大盤＋多因子族群</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.0｜盤中執行雷達＋盤後波段雷達＋可展開族群</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -55,10 +58,11 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
    <summary>❓ 每個數值怎麼看？點我教學</summary>
    <div class="helptext">
     <b>階段和品質現在分開看。</b>「剛啟動」主要看突破、量能、VWAP/均線與位階；總分不再是剛啟動的硬門檻。總分 82 代表品質高，不是 82% 會漲。<br><br>
-    <b>技術 50：</b>突破、均線、量能、RSI、MACD、VWAP 等。<br>
-    <b>籌碼 25：</b>外資連3買、借券賣出連3減、投信、融資。覆蓋率低於60%時品質總分會標示「資料待補」，不再用假精準分數誤導。盤後會在14:25、20:30、23:40及次日08:15自動重抓，補齊較晚公布的融資與借券資料。<br>
+    <b>盤中動能 100：</b>價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10。籌碼只顯示為「偏多/中性/偏空背景」，不灌入盤中分數。<br>
+    <b>盤後波段：</b>波段延續＝技術50＋籌碼25＋族群10換算100；另外獨立計算「進場位置100」，避免好股票在過熱位置仍被誤認為好買點。<br>
+    <b>籌碼：</b>外資連3買、借券賣出連3減、投信、融資。盤中只作背景；盤後才正式進入波段延續評分。盤後會在14:25、20:30、23:40及次日08:15補抓。<br>
     <b>族群 10：</b>改用多因子共振：廣度3＋強度2＋量能2＋領頭股2＋延續性1。強勢股成交金額占比也納入強度，避免冷門小股一起紅就拿高分；點開族群即可點選共振個股。<br>
-    <b>個股品質：</b>技術50＋籌碼25＋族群10＝85分，再換算為100分；大盤不再灌進每一檔個股分數。<br><b>大盤 15（獨立）：</b>只判斷今天的操作環境。盤中＝加權3＋櫃買3＋今日上漲家數3＋盤中資金動能4＋族群擴散2，昨日外資只顯示背景、不計分。盤後＝加權5（多頭排列5／僅站20MA 2.5／跌破20MA 0）＋櫃買4（4／2／0）＋上漲家數3（≥60%=3、55%=2.5、50%=1.5、45%=0.5）＋官方外資3（當日方向最多2＋近5日方向最多1）。<br><b>資金輪動：</b>看族群成交金額占比的近30分鐘變化，再合併漲跌、站VWAP比例、上漲家數與量速；這是吸金熱度，不是法人淨流入。<br><br><b>品質標籤：</b>80分以上＝高共振、70～79＝強、70以下＝一般。先看「階段」，再看「品質」。<br><br>
+    <b>兩套個股分數：</b>盤中看「盤中動能」，用來做當沖/庫存進出/族群輪動；盤後看「波段延續＋進場位置」，用來規劃隔日與波段。大盤15分始終獨立，不灌入個股。<br><b>大盤 15（獨立）：</b>只判斷今天的操作環境。盤中＝加權3＋櫃買3＋今日上漲家數3＋盤中資金動能4＋族群擴散2，昨日外資只顯示背景、不計分。盤後＝加權5（多頭排列5／僅站20MA 2.5／跌破20MA 0）＋櫃買4（4／2／0）＋上漲家數3（≥60%=3、55%=2.5、50%=1.5、45%=0.5）＋官方外資3（當日方向最多2＋近5日方向最多1）。<br><b>資金輪動：</b>看族群成交金額占比的近30分鐘變化，再合併漲跌、站VWAP比例、上漲家數與量速；這是吸金熱度，不是法人淨流入。<br><br><b>分數標籤：</b>盤中＝強動能/轉強/中性/轉弱；盤後＝高延續/強/一般。先看用途，再看階段與分數。<br><br>
     <b>同時間量速 2.4x：</b>今天此刻的累積量約為過去同時間的 2.4 倍。1.5～3 倍通常最舒服，>5 倍要防過熱。<br>
     <b>近即時價：</b>搜尋標的、我的關注與目前畫面股票會依優先順序放進最多5檔即時池，每10秒嘗試刷新；不是券商逐筆成交串流。<br><b>5分K結構：</b>VWAP、量速、突破、支撐壓力與階段仍以5分K計算，避免逐筆雜訊讓訊號一直跳。<br><b>VWAP：</b>今天市場的成交量加權平均成本；站上通常偏強，但離太遠反而容易追高。<br>
     <b>日量比：</b>今天完整成交量 ÷ 20日平均量。<br><b>流動性：</b>20日平均成交金額低於3,000萬直接排除；3,000萬～8,000萬標示偏低並降低品質分；8,000萬～2億正常；2億以上活躍。<br>
@@ -147,10 +151,22 @@ function groupHTML(r){
 }
 
 function partsHTML(r){
- return `<div class="parts">
- <div class="part"><div class="partv">${num(r.technical_score,0)}/50</div><div class="partl">技術</div></div>
- <div class="part"><div class="partv">${(+r.chip_coverage_pct||0)<60?"待補":num(r.chip_score,0)+"/25"}</div><div class="partl">籌碼${(+r.chip_coverage_pct||0)<60?" · 資料不足":""}</div></div>
- <div class="part"><div class="partv">${num(r.sector_score,1)}/10</div><div class="partl">族群</div></div>
+ if(mode==="intraday"){
+  const c=r.intraday_components||{};
+  return `<div class="parts intradayparts">
+   <div class="part"><div class="partv">${num(c.price_structure,0)}/30</div><div class="partl">價格結構</div></div>
+   <div class="part"><div class="partv">${num(c.flow_volume,0)}/25</div><div class="partl">量價/動能</div></div>
+   <div class="part"><div class="partv">${num(c.relative_strength,0)}/15</div><div class="partl">相對強弱 ${signed(c.relative_strength_pct,1)}</div></div>
+   <div class="part"><div class="partv">${num(c.sector,0)}/20</div><div class="partl">族群共振</div></div>
+   <div class="part"><div class="partv">${num(c.liquidity_risk,0)}/10</div><div class="partl">流動性/追價風險</div></div>
+   <div class="part"><div class="partv">${r.chip_background||"資料不足"}</div><div class="partl">籌碼背景 · 不計分</div></div>
+  </div>`;
+ }
+ return `<div class="parts closeparts">
+  <div class="part"><div class="partv">${num(r.technical_score,0)}/50</div><div class="partl">日K技術</div></div>
+  <div class="part"><div class="partv">${(+r.chip_coverage_pct||0)<60?"待補":num(r.chip_score,0)+"/25"}</div><div class="partl">籌碼${(+r.chip_coverage_pct||0)<60?" · 資料不足":""}</div></div>
+  <div class="part"><div class="partv">${num(r.sector_score,1)}/10</div><div class="partl">族群延續</div></div>
+  <div class="part"><div class="partv">${num(r.entry_position_score,0)}/100</div><div class="partl">進場位置</div></div>
  </div>`;
 }
 
@@ -172,6 +188,26 @@ function metrics(r){
  return [["收盤",num(r.close,2)],["日量比",num(r.vol_x,1)+"x"],["流動性",(r.liquidity_level||"—")+" · "+moneyTw(r.avg_turnover20)],["距20MA",signed(r.dist20,1)],["5日漲幅",signed(r.ret5,1)],["20日漲幅",signed(r.ret20,1)],["RSI",num(r.rsi,0)],["5MA",num(r.ma5,2)],["10MA",num(r.ma10,2)],["20MA",num(r.ma20,2)],["20日突破",r.break20?"是":"否"],["均線多頭",r.trend?"是":"否"],["族群共振",(r.sector_score_label?((r.sector_hot_count||0)+"檔 · "+r.sector_score_label+(r.sector_score_source==="官方產業代理"?"（產業代理）":"")):"待分類")]];
 }
 
+function showPeerPeek(code){
+ const r=rows.find(x=>String(x.code)===String(code));if(!r)return;
+ document.getElementById("peerPeekBack")?.remove();
+ const back=document.createElement("div");back.id="peerPeekBack";back.className="peerpeekback";
+ const intr=mode==="intraday";
+ const items=intr?[
+  ["現價",num(r.close,2)],["盤中動能",num(r.intraday_score??r.score,0)+"/100"],["同時間量速",num(r.pace,1)+"x"],["距VWAP",signed(r.vwap_dist,1)],["族群共振",num(r.sector_score,1)+"/10"],["籌碼背景",r.chip_background||"資料不足"]
+ ]:[
+  ["收盤",num(r.close,2)],["波段延續",(r.score_reliable===false?"待補":num(r.swing_quality_score??r.score,0)+"/100")],["進場位置",num(r.entry_position_score,0)+"/100"],["籌碼",(+r.chip_coverage_pct||0)<60?"待補":num(r.chip_score,0)+"/25"],["族群共振",num(r.sector_score,1)+"/10"],["階段",r.category||"觀察"]
+ ];
+ back.innerHTML=`<div class="peerpeek"><div class="peerpeektop"><div><div class="peerpeekname">${r.name} <span class="code">${r.code}</span></div><div class="sub">${r.sector_group||r.industry_name||r.industry||"未分類"}｜${signed(r.day_change,1)}</div></div><span class="cat ${cls(r.category)}">${r.category||"觀察"}</span></div><div class="peerpeekgrid">${items.map(x=>`<div class="peerpeekitem"><div class="peerpeekv">${x[1]}</div><div class="peerpeekl">${x[0]}</div></div>`).join("")}</div><div class="peerpeekactions"><button class="peerpeekbtn" data-peer-open="${r.code}">查看完整個股</button><button class="peerpeekbtn secondary" data-peer-close="1">關閉</button></div></div>`;
+ document.body.appendChild(back);
+}
+function focusPeer(code){
+ $("q").value=code;filter="all";watchOnly=false;
+ document.querySelectorAll(".filter").forEach(x=>x.classList.toggle("on",x.dataset.f==="all"));
+ document.getElementById("peerPeekBack")?.remove();render();
+ setTimeout(()=>document.querySelector(".card")?.scrollIntoView({behavior:"smooth",block:"start"}),30);
+}
+
 function render(){
  rows=mode==="intraday"?intraRows:closeRows;
  let rr=rows.filter(r=>(filter==="all"||r.category===filter)&&(!watchOnly||watched(r.code)));
@@ -179,7 +215,7 @@ function render(){
  if(q){let hits=rr.filter(r=>String(r.code)===q||String(r.name).toLowerCase().includes(q));if(hits.length)rr=hits}
  if(!rr.length){$("cards").innerHTML='<div class="empty">目前沒有符合條件的資料。盤中會掃描所有通過流動性門檻的股票；若個別免費行情源暫缺，切到盤後仍可查完整日K資料。</div>';return}
  $("cards").innerHTML=rr.slice(0,70).map(r=>`<div class="card" data-code="${r.code}">
-  <div class="top"><div class="stockleft"><button class="star ${watched(r.code)?"on":""}" onclick="toggleWatch('${r.code}')">${watched(r.code)?"★":"☆"}</button><div><div class="name">${r.name}<span class="code">${r.code}</span></div><div class="sub">${r.industry_name||r.industry||"未分類"}${r.sector_group?" · "+r.sector_group:""} · ${mode==="intraday"?(r.time||""):(r.date||"")}</div><span class="cat ${cls(r.category)}">${r.category}</span><span class="quality ${qualityCls(r.quality_label)}">品質：${r.quality_label||"一般"}</span></div></div><div><div class="score">${r.score_reliable===false?"—":num(r.score,0)}</div><div class="label">${r.score_reliable===false?"籌碼覆蓋不足":"品質總分 /100"}</div></div></div>
+  <div class="top"><div class="stockleft"><button class="star ${watched(r.code)?"on":""}" onclick="toggleWatch('${r.code}')">${watched(r.code)?"★":"☆"}</button><div><div class="name">${r.name}<span class="code">${r.code}</span></div><div class="sub">${r.industry_name||r.industry||"未分類"}${r.sector_group?" · "+r.sector_group:""} · ${mode==="intraday"?(r.time||""):(r.date||"")}</div><span class="cat ${cls(r.category)}">${r.category}</span><span class="quality ${qualityCls(r.quality_label)}">${mode==="intraday"?"動能":"波段"}：${r.quality_label||"一般"}</span></div></div><div><div class="score">${mode==="intraday"?num(r.intraday_score??r.score,0):(r.score_reliable===false?"—":num(r.swing_quality_score??r.score,0))}</div><div class="label">${mode==="intraday"?"盤中動能 /100":(r.score_reliable===false?"籌碼覆蓋不足":"波段延續 /100")}</div></div></div>
   ${partsHTML(r)}
   <div class="metrics">${metrics(r).map(m=>`<div class="metric"><div class="mval">${m[1]}</div><div class="mlab">${m[0]}</div></div>`).join("")}</div>
   ${srHTML(r)}
@@ -208,24 +244,22 @@ async function load(){
  }
 }
 
-document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;market=mode==="intraday"?intraMarket:closeMarket;$("modeText").textContent=mode==="intraday"?"盤中：純即時大盤 / 5分K / 資金輪動":"盤後：正式收盤日K / 籌碼 / 同交易日大盤 / 支撐壓力";$("marketbox").innerHTML=marketHTML();$("rotationbox").innerHTML=rotationHTML();render()});
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;market=mode==="intraday"?intraMarket:closeMarket;$("modeText").textContent=mode==="intraday"?"盤中：執行雷達 / 動能 / 當沖與庫存進出 / 族群輪動":"盤後：波段雷達 / 延續性 / 進場位置 / 60分K";$("marketbox").innerHTML=marketHTML();$("rotationbox").innerHTML=rotationHTML();render()});
 document.querySelectorAll(".filter[data-f]").forEach(b=>b.onclick=()=>{document.querySelectorAll(".filter[data-f]").forEach(x=>x.classList.remove("on"));b.classList.add("on");filter=b.dataset.f;render()});
 $("watchOnly").onclick=()=>{watchOnly=!watchOnly;$("watchOnly").classList.toggle("on",watchOnly);render()};
 $("scan").onclick=render;
 $("q").addEventListener("input",()=>{const q=$("q").value.trim().toLowerCase(),box=$("suggestions");if(!q){box.classList.remove("show");return}let h=universe.filter(x=>String(x.code).startsWith(q)||String(x.name).toLowerCase().includes(q)).slice(0,10);box.innerHTML=h.map(x=>`<button class="suggestion" data-code="${x.code}">${x.name}<small>${x.code} · ${x.industry_name||x.industry}</small></button>`).join("");box.classList.toggle("show",h.length>0);box.querySelectorAll(".suggestion").forEach(b=>b.onclick=()=>{$("q").value=b.dataset.code;box.classList.remove("show");render()})});
 
-$("cards").addEventListener("click",e=>{
- const b=e.target.closest(".peerlink");if(!b)return;
- const code=b.dataset.code;if(!code)return;
- $("q").value=code;filter="all";watchOnly=false;
- document.querySelectorAll(".filter").forEach(x=>x.classList.toggle("on",x.dataset.f==="all"));
- render();
- setTimeout(()=>document.querySelector(".card")?.scrollIntoView({behavior:"smooth",block:"start"}),30);
+document.addEventListener("click",e=>{
+ const peer=e.target.closest(".peerlink");
+ if(peer){const code=peer.dataset.code;if(code)showPeerPeek(code);return}
+ const open=e.target.closest("[data-peer-open]");if(open){focusPeer(open.dataset.peerOpen);return}
+ if(e.target.closest("[data-peer-close]")||e.target.id==="peerPeekBack")document.getElementById("peerPeekBack")?.remove();
 });
 if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
 load();
 </script>
-<script src="./realtime-config.js?v=140"></script>
-<script src="./realtime.js?v=140"></script>
+<script src="./realtime-config.js?v=150"></script>
+<script src="./realtime.js?v=150"></script>
 </body>
 </html>
