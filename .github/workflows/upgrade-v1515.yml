@@ -1,0 +1,93 @@
+name: Install Radar v1.5.15 Safari Cache Repair
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1515.trigger"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1515-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Require v1.5.14 first
+        run: |
+          grep -q 'Free Edition v1.5.14' docs/index.html
+          grep -q 'todayStrength=x=>x.today_amount_100m' docs/index.html
+
+      - name: Apply v1.5.15 Safari cache repair
+        run: python scripts/patch_v1515.py
+
+      - name: Verify force-update mechanism
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          sw=Path('docs/sw.js').read_text(encoding='utf-8')
+          refresh=Path('docs/refresh.html').read_text(encoding='utf-8')
+          required=[
+            'Free Edition v1.5.15',
+            'register("./sw.js?v=1515",{updateViaCache:"none"})',
+            'await reg.update()',
+            'controllerchange',
+            'dogsonSwReloaded1515',
+            'todayStrength=x=>x.today_amount_100m??0;',
+            '今日估算流入 TOP 3',
+            '盤中族群成交資金輪動',
+          ]
+          for m in required:
+              if m not in html:
+                  raise SystemExit('missing index marker: '+m)
+          if 'dogson-free-v1515' not in sw:
+              raise SystemExit('service worker cache not bumped')
+          for m in ['getRegistrations()', 'unregister()', 'caches.keys()', 'force','1515']:
+              if m not in refresh:
+                  raise SystemExit('missing refresh marker: '+m)
+          # Scoring architecture must remain unchanged.
+          for m in ['價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10',
+                    '波段延續＝日K技術50＋籌碼25＋族群15＋流動性10']:
+              if m not in html:
+                  raise SystemExit('score architecture marker missing: '+m)
+          print('v1.5.15 force-update verification OK')
+          PY
+
+      - name: Commit v1.5.15
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html docs/sw.js docs/refresh.html
+          git diff --cached --quiet || git commit -m "Apply v1.5.15 Safari force-update repair"
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 3
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
