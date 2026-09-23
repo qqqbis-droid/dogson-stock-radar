@@ -28,7 +28,7 @@ h1{font-size:22px;margin:0}.sub{font-size:12px;color:var(--muted);margin-top:4px
 .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}.metric{background:#0e131a;border:1px solid #252d39;border-radius:12px;padding:9px}.mval{font-weight:850;font-size:14px}.mlab{font-size:10px;color:var(--muted);margin-top:3px}
 .srbox{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.sr{background:#0e131a;border-radius:12px;padding:10px}.support{border:1px solid #244936}.resistance{border:1px solid #56313a}.srtitle{font-size:11px;color:var(--muted)}.srprice{font-size:16px;font-weight:900;margin-top:4px}.support .srprice{color:var(--green)}.resistance .srprice{color:var(--red)}.srbasis{font-size:10px;color:#8994a6;margin-top:4px}
 .chips{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}.chip{background:#10151d;padding:9px;border-radius:10px;font-size:12px}.yes{color:var(--green)}.bad{color:var(--red)}
-.reasons{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.reason{background:#202734;border-radius:8px;padding:5px 7px;font-size:11px;color:#d7deea}.warn{color:#ff9baa}
+.reasons{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.reason{background:#202734;border-radius:8px;padding:5px 7px;font-size:11px;color:#d7deea}.warn{color:#ff9baa}.stagebox{margin-top:10px;background:#0e141c;border:1px solid #2b3544;border-radius:13px;padding:10px 11px}.stagetop{display:flex;align-items:center;justify-content:space-between;gap:8px}.stagetitle{font-size:11px;color:#9ba5b6;font-weight:850}.stagereason{font-size:12px;line-height:1.55;color:#edf2fa;margin-top:7px}.stagechips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.stagechip{font-size:10px;line-height:1.35;padding:5px 7px;border-radius:8px;background:#17231d;border:1px solid #274532;color:#a9e8bf}.stagechip.risk{background:#25191c;border-color:#4a2930;color:#ffb2be}.stagehint{font-size:10px;color:#7f8b9d;margin-top:7px}.peerpeek .stagebox{margin-top:10px}.peerpeek .stagereason{font-size:11px}.peerpeek .stagechip{font-size:9px;padding:4px 6px}
 details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summary{font-size:12px;color:#cbd3df;cursor:pointer}.group{display:grid;gap:6px;margin-top:8px}.g{display:flex;justify-content:space-between;background:#10151d;padding:8px;border-radius:9px;font-size:12px}.peerlink{width:100%;border:0;color:inherit;text-align:left;cursor:pointer}.peerlink:active{transform:scale(.995)}
 .help{background:#121821;border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:10px}.help summary{font-weight:850;border:0;padding:0}.helptext{color:#cbd3df;font-size:12px;line-height:1.65;margin-top:10px}.helptext b{color:white}.guide-intro{background:#0e131a;border:1px solid #29313e;border-radius:11px;padding:10px 11px}.guide-title{font-size:14px;font-weight:900;color:#b9ddff;margin:16px 0 7px}.guide-card{background:#10151d;border:1px solid #252d39;border-radius:11px;padding:10px 11px;margin:7px 0}.guide-line{margin:5px 0}.guide-key{color:#fff;font-weight:850}.guide-formula{margin-top:7px;color:#98a5b7;font-size:11px;line-height:1.55}.guide-tip{margin-top:8px;padding:7px 9px;border-left:3px solid #4d8ac7;background:#111923;color:#d9e8f8}.guide-warn{color:#ffd477}.guide-mini{color:#9ba5b6;font-size:11px}
 .empty{text-align:center;color:var(--muted);padding:35px 10px}.note{font-size:11px;color:var(--muted);line-height:1.5;margin:12px 2px}
@@ -41,7 +41,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.17｜Stage Engine 2.0＋新手教學＋法人金額力度</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.18｜生命週期可解釋化＋Stage Engine 2.0</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -393,6 +393,17 @@ function metrics(r){
  return [["收盤",num(r.close,2)],["日量比",num(r.vol_x,1)+"x"],["流動性",(r.liquidity_level||"—")+" · "+moneyTw(r.avg_turnover20)],["距20MA",signed(r.dist20,1)],["5日漲幅",signed(r.ret5,1)],["20日漲幅",signed(r.ret20,1)],["RSI",num(r.rsi,0)],["5MA",num(r.ma5,2)],["10MA",num(r.ma10,2)],["20MA",num(r.ma20,2)],["20日突破",r.break20?"是":"否"],["均線多頭",r.trend?"是":"否"],["族群共振",(r.sector_score_label?((r.sector_hot_count||0)+"檔 · "+r.sector_score_label+(r.sector_score_source==="官方產業代理"?"（產業代理）":"")):"待分類")]];
 }
 
+function stageExplainHTML(r,compact=false){
+ const category=r.category||"觀察";
+ const reason=(r.stage_reason||"目前沒有足夠資料形成明確生命週期判讀").trim();
+ const signals=[...(r.stage_signals||[])].filter(Boolean).slice(0,5);
+ const risks=[...(r.stage_risks||[])].filter(Boolean).slice(0,5);
+ const signalHTML=signals.map(x=>`<span class="stagechip">✓ ${x}</span>`).join("");
+ const riskHTML=risks.map(x=>`<span class="stagechip risk">⚠ ${x}</span>`).join("");
+ const evidence=(signalHTML||riskHTML)?`<div class="stagechips">${signalHTML}${riskHTML}</div>`:`<div class="stagehint">目前沒有額外的關鍵證據需要提示。</div>`;
+ return `<div class="stagebox"><div class="stagetop"><span class="stagetitle">${compact?"生命週期":"🧭 生命週期判讀"}</span><span class="cat ${cls(category)}">${category}</span></div><div class="stagereason">${reason}</div>${evidence}</div>`;
+}
+
 function showPeerPeek(code){
  const r=rows.find(x=>String(x.code)===String(code));if(!r)return;
  document.getElementById("peerPeekBack")?.remove();
@@ -403,7 +414,7 @@ function showPeerPeek(code){
  ]:[
   ["收盤",num(r.close,2)],["波段延續",(r.score_reliable===false?"待補":num(r.swing_quality_score??r.score,0)+"/100")],["進場位置",num(r.entry_position_score,0)+"/100"],["籌碼",(+r.chip_coverage_pct||0)<60?"待補":num(r.chip_score,0)+"/25"],["族群共振",num(r.sector_score,1)+"/10"],["階段",r.category||"觀察"]
  ];
- back.innerHTML=`<div class="peerpeek"><div class="peerpeektop"><div><div class="peerpeekname">${r.name} <span class="code">${r.code}</span></div><div class="sub">${r.sector_group||r.industry_name||r.industry||"未分類"}｜${signed(r.day_change,1)}</div></div><span class="cat ${cls(r.category)}">${r.category||"觀察"}</span></div><div class="peerpeekgrid">${items.map(x=>`<div class="peerpeekitem"><div class="peerpeekv">${x[1]}</div><div class="peerpeekl">${x[0]}</div></div>`).join("")}</div><div class="peerpeekactions"><button class="peerpeekbtn" data-peer-open="${r.code}">查看完整個股</button><button class="peerpeekbtn secondary" data-peer-close="1">關閉</button></div></div>`;
+ back.innerHTML=`<div class="peerpeek"><div class="peerpeektop"><div><div class="peerpeekname">${r.name} <span class="code">${r.code}</span></div><div class="sub">${r.sector_group||r.industry_name||r.industry||"未分類"}｜${signed(r.day_change,1)}</div></div><span class="cat ${cls(r.category)}">${r.category||"觀察"}</span></div><div class="peerpeekgrid">${items.map(x=>`<div class="peerpeekitem"><div class="peerpeekv">${x[1]}</div><div class="peerpeekl">${x[0]}</div></div>`).join("")}</div>${stageExplainHTML(r,true)}<div class="peerpeekactions"><button class="peerpeekbtn" data-peer-open="${r.code}">查看完整個股</button><button class="peerpeekbtn secondary" data-peer-close="1">關閉</button></div></div>`;
  document.body.appendChild(back);
 }
 function focusPeer(code){
@@ -421,11 +432,12 @@ function render(){
  if(!rr.length){$("cards").innerHTML='<div class="empty">目前沒有符合條件的資料。盤中會掃描所有通過流動性門檻的股票；若個別免費行情源暫缺，切到盤後仍可查完整日K資料。</div>';return}
  $("cards").innerHTML=rr.slice(0,70).map(r=>`<div class="card" data-code="${r.code}">
   <div class="top"><div class="stockleft"><button class="star ${watched(r.code)?"on":""}" onclick="toggleWatch('${r.code}')">${watched(r.code)?"★":"☆"}</button><div><div class="name">${r.name}<span class="code">${r.code}</span></div><div class="sub">${r.industry_name||r.industry||"未分類"}${r.sector_group?" · "+r.sector_group:""} · ${mode==="intraday"?(r.time||""):(r.date||"")}</div><span class="cat ${cls(r.category)}">${r.category}</span><span class="quality ${qualityCls(r.quality_label)}">${mode==="intraday"?"動能":"波段"}：${r.quality_label||"一般"}</span></div></div><div><div class="score">${mode==="intraday"?num(r.intraday_score??r.score,0):(r.score_reliable===false?"—":num(r.swing_quality_score??r.score,0))}</div><div class="label">${mode==="intraday"?"盤中動能 /100":(r.score_reliable===false?"籌碼覆蓋不足":"波段延續 /100")}</div></div></div>
+  ${stageExplainHTML(r)}
   ${partsHTML(r)}
   <div class="metrics">${metrics(r).map(m=>`<div class="metric"><div class="mval">${m[1]}</div><div class="mlab">${m[0]}</div></div>`).join("")}</div>
   ${srHTML(r)}
   ${chipHTML(r)}
-  <div class="reasons">${r.stage_reason?`<span class="reason">階段：${r.stage_reason}</span>`:""}${(r.reasons||[]).map(x=>`<span class="reason">${x}</span>`).join("")}${(r.overheat_reasons||[]).map(x=>`<span class="reason warn">⚠ ${x}</span>`).join("")}</div>
+  <div class="reasons">${(r.reasons||[]).map(x=>`<span class="reason">${x}</span>`).join("")}${(r.overheat_reasons||[]).filter(x=>!(r.stage_risks||[]).includes(x)).map(x=>`<span class="reason warn">⚠ ${x}</span>`).join("")}</div>
   ${groupHTML(r)}
  </div>`).join("");
 }
@@ -464,12 +476,12 @@ document.addEventListener("click",e=>{
 if("serviceWorker" in navigator){
  window.addEventListener("load",async()=>{
   try{
-   const reg=await navigator.serviceWorker.register("./sw.js?v=1517b",{updateViaCache:"none"});
+   const reg=await navigator.serviceWorker.register("./sw.js?v=1518",{updateViaCache:"none"});
    await reg.update();
    let reloading=false;
    navigator.serviceWorker.addEventListener("controllerchange",()=>{
     if(reloading)return;
-    if(sessionStorage.getItem("dogsonSwReloaded1517b")==="1")return;
+    if(sessionStorage.getItem("dogsonSwReloaded1518")==="1")return;
     reloading=true;
     sessionStorage.setItem("dogsonSwReloaded1517b","1");
     location.reload();
