@@ -41,7 +41,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.10｜族群共振全可展開＋相對強弱透明化＋盤後族群資金流</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.11｜盤中族群輪動可收合＋族群共振全可展開＋盤後族群資金流</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -62,7 +62,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
     <b>盤後波段 100：</b>波段延續＝日K技術50＋籌碼25＋族群15＋流動性10，直接加總100，不再用85分換算；另外獨立計算「進場位置100」，避免好股票在過熱位置仍被誤認為好買點。<br><b>盤後族群法人資金流：</b>把同族群成分股的外資＋投信官方淨買賣股數加總，顯示當日、近5日、近20日、連續流入/流出與是否加速，再搭配族群近5日漲跌。單位用張，不用目前股價回推歷史億元；此欄不新增個股分數。預設先收合成流入／流出前三名摘要，按「展開完整族群」才顯示完整明細，收合狀態會記住。<br>
     <b>籌碼：</b>外資連3買、借券賣出連3減、投信、融資。盤中只作背景；盤後才正式進入波段延續評分。盤後會在14:25、20:30、23:40及次日08:15補抓。<br>
     <b>族群共振原始10：</b>廣度3＋強度2＋量能2＋領頭股2＋延續性1；盤中換算為20分、盤後換算為15分。強勢股成交金額占比也納入強度；點開族群即可點選共振個股。若個股沒有自訂窄族群，會自動改用官方產業代理展開同產業股票；這只補成分股清單，不改原本代理分數。<br>
-    <b>兩套個股分數：</b>盤中看「盤中動能」，用來做當沖/庫存進出/族群輪動；盤後看「波段延續＋進場位置」，用來規劃隔日與波段。大盤15分始終獨立，不灌入個股。<br><b>大盤 15（獨立）：</b>只判斷今天的操作環境。盤中＝加權3＋櫃買3＋今日上漲家數3＋盤中資金動能4＋族群擴散2，昨日外資只顯示背景、不計分。盤後＝加權5（多頭排列5／僅站20MA 2.5／跌破20MA 0）＋櫃買4（4／2／0）＋上漲家數3（≥60%=3、55%=2.5、50%=1.5、45%=0.5）＋官方外資3（當日方向最多2＋近5日方向最多1）。<br><b>資金輪動：</b>看族群成交金額占比的近30分鐘變化，再合併漲跌、站VWAP比例、上漲家數與量速；這是吸金熱度，不是法人淨流入。盤中可直接點族群展開目前掃描到的同族群股票，再點股票查看小卡。<br><br><b>分數標籤：</b>盤中＝強動能/轉強/中性/轉弱；盤後＝高延續/強/一般。先看用途，再看階段與分數。<br><br>
+    <b>兩套個股分數：</b>盤中看「盤中動能」，用來做當沖/庫存進出/族群輪動；盤後看「波段延續＋進場位置」，用來規劃隔日與波段。大盤15分始終獨立，不灌入個股。<br><b>大盤 15（獨立）：</b>只判斷今天的操作環境。盤中＝加權3＋櫃買3＋今日上漲家數3＋盤中資金動能4＋族群擴散2，昨日外資只顯示背景、不計分。盤後＝加權5（多頭排列5／僅站20MA 2.5／跌破20MA 0）＋櫃買4（4／2／0）＋上漲家數3（≥60%=3、55%=2.5、50%=1.5、45%=0.5）＋官方外資3（當日方向最多2＋近5日方向最多1）。<br><b>資金輪動：</b>看族群成交金額占比的近30分鐘變化，再合併漲跌、站VWAP比例、上漲家數與量速；這是吸金熱度，不是法人淨流入。整個盤中族群輪動區可展開／收合，狀態會記住；展開後仍可再點單一族群看同族群股票，再點股票查看小卡。<br><br><b>分數標籤：</b>盤中＝強動能/轉強/中性/轉弱；盤後＝高延續/強/一般。先看用途，再看階段與分數。<br><br>
     <b>同時間量速 2.4x：</b>今天此刻的累積量約為過去同時間的 2.4 倍。1.5～3 倍通常最舒服，>5 倍要防過熱。<br><b>振幅效率：</b>今日振幅＝(今日高−今日低)÷昨收；區間位置＝(現價−今日低)÷(今日高−今日低)；振幅效率＝當日漲幅÷今日振幅。「有效擴張」代表振幅放大且價格仍靠近高點；「高震盪／沖高回落」會降低原本量價品質與追價安全度。這不是新增分數，盤中仍維持30＋25＋15＋20＋10＝100。<br><b>同時段振幅倍數：</b>今日此刻振幅 ÷ 歷史同時間平均振幅。程式欄位支援最多20個交易日；現行5日5分K來源先以可取得樣本暖機，畫面會顯示樣本數，至少3日才讓倍數參與評分。<br>
     <b>近即時價：</b>搜尋標的、我的關注與目前畫面股票會依優先順序放進最多5檔即時池，每10秒嘗試刷新；不是券商逐筆成交串流。<br><b>5分K結構：</b>VWAP、量速、突破、支撐壓力與階段仍以5分K計算，避免逐筆雜訊讓訊號一直跳。<br><b>VWAP：</b>今天市場的成交量加權平均成本；站上通常偏強，但離太遠反而容易追高。<br>
     <b>日量比：</b>今天完整成交量 ÷ 20日平均量。<br><b>流動性：</b>20日平均成交金額低於3,000萬直接排除；3,000萬～8,000萬標示偏低並降低品質分；8,000萬～2億正常；2億以上活躍。<br>
@@ -83,6 +83,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 <script>
 let mode="intraday",filter="all",watchOnly=false,universe=[],closeRows=[],intraRows=[],rows=[],market={},marketLive={},closeMarket={},intraMarket={},sectorRotation=[],sectorFunds=[];
 let sectorFundsOpen=localStorage.getItem("dogsonSectorFundsOpen")==="1";
+let sectorRotationOpen=localStorage.getItem("dogsonSectorRotationOpen")==="1";
 const $=id=>document.getElementById(id);
 function watchlist(){try{return JSON.parse(localStorage.getItem("dogson-watch")||"[]")}catch{return[]}}
 function saveWatch(x){localStorage.setItem("dogson-watch",JSON.stringify(x))}
@@ -138,6 +139,13 @@ function toggleCloseSectorFunds(){
  if(box)box.innerHTML=rotationHTML();
 }
 
+function toggleIntradaySectorRotation(){
+ sectorRotationOpen=!sectorRotationOpen;
+ localStorage.setItem("dogsonSectorRotationOpen",sectorRotationOpen?"1":"0");
+ const box=document.getElementById("rotationbox");
+ if(box)box.innerHTML=rotationHTML();
+}
+
 function closeSectorFundsHTML(){
  const arr=sectorFunds||[];
  const title="🏦 盤後族群法人資金流";
@@ -171,7 +179,12 @@ function rotationHTML(){
   const memberHTML=members.length?members.slice(0,30).map(r=>`<button class="rotationmember peerlink" data-code="${r.code}"><span><b>${r.code} ${r.name}</b><small>${signed(r.day_change,1)} · ${r.category||"觀察"}</small></span><span class="rmscore">${num(r.intraday_score??r.score,0)}/100</span></button>`).join(""):`<div class="sub">目前沒有可展開的盤中個股資料</div>`;
   return `<details class="rotationgroup"><summary class="rotationrow"><div><b>${x.state}｜${x.sector}</b><div class="rotationleaders">${(x.leaders||[]).map(s=>`${s.name} ${signed(s.change_pct,1)}`).join(" · ")}</div><span class="rotationopen">查看族群 ${members.length} 檔 ▾</span></div><div class="rotationnums">熱度 ${signed(x.heat,1,"")}<br>族群 ${signed(x.change_pct,1)}｜資金占比 ${num(x.turnover_share_pct,1)}%<br>${x.share_change_pp===null||x.share_change_pp===undefined?"占比變化待累積":`近${x.window_min||30}分占比 ${signed(x.share_change_pp,2,"pp")}`}｜VWAP上 ${num(x.above_vwap_pct,0)}%</div></summary><div class="rotationmembers">${memberHTML}</div></details>`;
  };
- return `<div class="rotationbox"><div class="rotationtop"><div><div class="rotationtitle">💰 族群資金輪動</div><div class="sub">成交金額占比變化＋價格＋VWAP＋廣度；不是法人淨流入</div></div></div><div class="rotationcols"><div><div class="rotationhead">🔥 吸金中</div>${hot.length?hot.map(one).join(""):`<div class="sub">暫無明顯流入族群</div>`}</div><div><div class="rotationhead">🧊 流失／降溫</div>${cold.length?cold.map(one).join(""):`<div class="sub">暫無明顯流失族群</div>`}</div></div></div>`;
+ const mini=x=>`<div class="closeflowpreviewitem"><span>${x.sector}</span><b>${signed(x.heat,1,"")}</b></div>`;
+ const preview=`<div class="closeflowpreview"><div class="closeflowpreviewcol"><div class="closeflowpreviewhead">🔥 吸金前 3</div>${hot.length?hot.slice(0,3).map(mini).join(""):`<div class="sub">暫無明顯吸金族群</div>`}</div><div class="closeflowpreviewcol"><div class="closeflowpreviewhead">🧊 降溫前 3</div>${cold.length?cold.slice(0,3).map(mini).join(""):`<div class="sub">暫無明顯流失族群</div>`}</div></div>`;
+ const detail=sectorRotationOpen?`<div class="rotationcols"><div><div class="rotationhead">🔥 吸金中</div>${hot.length?hot.map(one).join(""):`<div class="sub">暫無明顯流入族群</div>`}</div><div><div class="rotationhead">🧊 流失／降溫</div>${cold.length?cold.map(one).join(""):`<div class="sub">暫無明顯流失族群</div>`}</div></div>`:"";
+ const label=sectorRotationOpen?"收合族群輪動":"展開完整輪動";
+ const arrow=sectorRotationOpen?"▲":"▼";
+ return `<div class="rotationbox"><div class="rotationtop"><div><div class="rotationtitle">💰 族群資金輪動</div><div class="sub">成交金額占比變化＋價格＋VWAP＋廣度；不是法人淨流入</div></div><button class="rotationtoggle" type="button" aria-expanded="${sectorRotationOpen}" onclick="toggleIntradaySectorRotation()">${arrow} ${label}</button></div>${preview}${detail}</div>`;
 }
 
 function srHTML(r){
