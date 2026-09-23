@@ -48,8 +48,14 @@ jobs:
           print('TPEx latest=', latest, 'close=', float(x['Close'].iloc[-1]))
           PY
 
+      - name: Preserve last live 60K data before rebuild
+        run: python scripts/sync_live_data.py || true
+
       - name: Rebuild close radar
         run: python scripts/build_data.py --mode close
+
+      - name: Rebuild 60K lifecycle and entry lights
+        run: python scripts/build_hourly.py
 
       - name: Verify official OTC index consistency
         run: |
@@ -70,6 +76,8 @@ jobs:
           assert otc.get('date') == trade, f"OTC date mismatch: {otc.get('date')} != {trade}"
           assert 'TPEx official' in str(otc.get('source')), f"unexpected OTC source: {otc.get('source')}"
           assert otc.get('close') is not None, 'OTC close missing'
+          h = json.loads(Path('docs/data/hourly.json').read_text(encoding='utf-8'))
+          assert len(h.get('rows') or []) > 0, '60K radar unexpectedly empty'
           PY
 
       - name: Commit source UI and rebuilt data
