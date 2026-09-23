@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.5.1
+犬子老師飆股雷達 Free Edition v1.5.5
 =================================
 盤中＝執行雷達（即時動能100，籌碼只作背景）；盤後＝波段雷達（延續品質直接100分＋進場位置）；大盤15分獨立
 
@@ -1301,6 +1301,59 @@ def intraday_technical(x):
     ret15 = (c.iloc[-1] / c.iloc[-4] - 1) * 100 if len(c) >= 4 else 0
     vwap_dist = (cur / vwap - 1) * 100 if vwap else 0
 
+    # v1.5.5 振幅效率：只升級既有量價/追價風險，不新增總分權重。
+    day_high = float(today["High"].max())
+    day_low = float(today["Low"].min())
+    day_range = max(0.0, day_high - day_low)
+    amplitude_pct = (day_range / prev_close * 100) if prev_close else 0.0
+    range_position_pct = ((cur - day_low) / day_range * 100) if day_range > 0 else 50.0
+    range_position_pct = max(0.0, min(100.0, range_position_pct))
+    amplitude_efficiency = (day_change / amplitude_pct) if amplitude_pct > 1e-9 else 0.0
+
+    # 同時段振幅基準：欄位支援最多20個歷史交易日；現行5日5分K來源
+    # 會先用可取得的歷史樣本暖機。只有樣本>=3才讓倍數參與評分。
+    all_dates = sorted(set(x.index.date))
+    cutoff_time = today.index[-1].time()
+    amp_samples = []
+    for d0 in [d for d in all_dates if d < latest][-20:]:
+        hist = x[x.index.date == d0]
+        hist = hist[[ts.time() <= cutoff_time for ts in hist.index]]
+        if hist.empty:
+            continue
+        earlier = [d for d in all_dates if d < d0]
+        if not earlier:
+            continue
+        pd0 = earlier[-1]
+        pday = x[x.index.date == pd0]
+        if pday.empty:
+            continue
+        hist_prev_close = float(pday["Close"].iloc[-1])
+        if hist_prev_close <= 0:
+            continue
+        hist_range = float(hist["High"].max() - hist["Low"].min())
+        hist_amp = hist_range / hist_prev_close * 100
+        if np.isfinite(hist_amp) and hist_amp >= 0:
+            amp_samples.append(float(hist_amp))
+
+    amp_sample_days = len(amp_samples)
+    same_time_amp_avg_pct = float(np.mean(amp_samples)) if amp_samples else None
+    amplitude_multiple = (amplitude_pct / same_time_amp_avg_pct) if same_time_amp_avg_pct and same_time_amp_avg_pct > 1e-9 else None
+    amp_baseline_ready = bool(amp_sample_days >= 3 and amplitude_multiple is not None)
+
+    # 狀態只用來修正既有量價25與追價風險10，不形成新的分數桶。
+    expanded = bool((amp_baseline_ready and amplitude_multiple >= 1.25) or (not amp_baseline_ready and amplitude_pct >= 4.5))
+    compressed = bool(amp_baseline_ready and amplitude_multiple <= 0.90)
+    if expanded and range_position_pct >= 80 and amplitude_efficiency >= 0.55 and cur >= vwap:
+        amplitude_regime = "有效擴張"
+    elif expanded and range_position_pct <= 40 and cur < vwap and amplitude_efficiency <= 0.25:
+        amplitude_regime = "沖高回落"
+    elif expanded and abs(amplitude_efficiency) < 0.30:
+        amplitude_regime = "高震盪"
+    elif compressed and cur >= vwap and 45 <= range_position_pct <= 85 and amplitude_efficiency >= 0:
+        amplitude_regime = "健康整理"
+    else:
+        amplitude_regime = "中性"
+
     # 資金輪動用：目前累積成交金額，以及最近一段 vs 前一段成交金額。
     current_turnover = float(turnover_s.sum())
     pair_n = min(6, len(today) // 2)  # 最多比較最近30分鐘 vs 前30分鐘
@@ -1343,6 +1396,10 @@ def intraday_technical(x):
         score -= 5; over.append("量速極端")
     if ret15 > 4:
         score -= 5; over.append("15分鐘急拉")
+    if amplitude_regime == "高震盪":
+        over.append("高振幅低效率")
+    elif amplitude_regime == "沖高回落":
+        over.append("振幅擴大後沖高回落")
 
     sr = intraday_sr(x, vwap)
     return {
@@ -1350,6 +1407,14 @@ def intraday_technical(x):
         "close": cur, "pace": round(pace, 2), "vwap": round(vwap, 2),
         "vwap_dist": round(vwap_dist, 2), "day_change": round(day_change, 2),
         "ret15": round(ret15, 2),
+        "amplitude_pct": round(amplitude_pct, 2),
+        "range_position_pct": round(range_position_pct, 1),
+        "amplitude_efficiency": round(amplitude_efficiency, 3),
+        "same_time_amp_avg_pct": round(same_time_amp_avg_pct, 2) if same_time_amp_avg_pct is not None else None,
+        "amplitude_multiple": round(amplitude_multiple, 3) if amplitude_multiple is not None else None,
+        "amp_sample_days": amp_sample_days,
+        "amp_baseline_ready": amp_baseline_ready,
+        "amplitude_regime": amplitude_regime,
         "break3": b3, "break12": b12, "trend5": trend,
         "current_turnover": round(current_turnover, 0),
         "recent_turnover": round(recent_turnover, 0) if recent_turnover is not None else None,
@@ -1385,6 +1450,10 @@ def _intraday_score_parts(r, market, sector_score_10):
     pace = float(r.get("pace") or 0)
     day = float(r.get("day_change") or 0)
     ret15 = float(r.get("ret15") or 0)
+    amp_regime = str(r.get("amplitude_regime") or "中性")
+    amp_multiple = r.get("amplitude_multiple")
+    amp_ready = bool(r.get("amp_baseline_ready"))
+    range_pos = float(r.get("range_position_pct") or 50)
 
     price = 0.0
     if vwap > 0 and close > vwap:
@@ -1398,14 +1467,26 @@ def _intraday_score_parts(r, market, sector_score_10):
     price = min(30.0, price)
 
     flow = 0.0
+    # 原本的量速權重仍在量價/動能25分內；振幅效率只修正量速品質。
     if 1.5 <= pace < 3.5:
-        flow += 15
+        pace_points = 15.0
     elif 1.2 <= pace < 1.5:
-        flow += 10
+        pace_points = 10.0
     elif 3.5 <= pace <= 5:
-        flow += 10
+        pace_points = 10.0
     elif pace >= 1.0:
-        flow += 5
+        pace_points = 5.0
+    else:
+        pace_points = 0.0
+
+    if amp_regime == "有效擴張":
+        pace_points = min(15.0, pace_points + 2.0)
+    elif amp_regime == "高震盪":
+        pace_points = max(0.0, pace_points - 4.0)
+    elif amp_regime == "沖高回落":
+        pace_points = max(0.0, pace_points - 6.0)
+    flow += pace_points
+
     if 0.2 <= ret15 <= 2.5:
         flow += 6
     elif ret15 > 0:
@@ -1448,6 +1529,14 @@ def _intraday_score_parts(r, market, sector_score_10):
     risk = 5.0 if hot_n == 0 else 2.0 if hot_n == 1 else 0.0
     if float(r.get("vwap_dist") or 0) < -2.0:
         risk = max(0.0, risk - 2.0)
+    # 振幅效率只調整原本的「追價風險」5分，不增加10分上限。
+    if amp_regime == "高震盪":
+        risk = max(0.0, risk - 2.0)
+    elif amp_regime == "沖高回落":
+        risk = max(0.0, risk - 3.0)
+    elif amp_regime == "有效擴張" and amp_ready and amp_multiple is not None and float(amp_multiple) >= 1.6 and range_pos >= 95:
+        # 強勢是真的，但若已貼近極端高檔且振幅明顯擴張，仍降低追價安全度。
+        risk = max(0.0, risk - 1.0)
     liquidity_risk = min(10.0, liquidity + risk)
 
     total = max(0.0, min(100.0, price + flow + relative + sector + liquidity_risk))
@@ -2378,7 +2467,7 @@ def build_intraday():
             "latest_time": quote_latest, "structure_latest_time": structure_latest,
             "note": "現價/當日漲跌採官方MIS；VWAP/突破/量速/支撐壓力仍採5分K結構",
         },
-        "score_formula": {"mode": "intraday_execution", "price_structure": 30, "flow_volume": 25, "relative_strength": 15, "sector": 20, "liquidity_risk": 10, "chip": "background_only", "market_separate": 15},
+        "score_formula": {"mode": "intraday_execution", "price_structure": 30, "flow_volume": 25, "relative_strength": 15, "sector": 20, "liquidity_risk": 10, "amplitude_efficiency": "inside_flow_and_liquidity_risk_no_new_weight", "chip": "background_only", "market_separate": 15},
         "rows": rows,
     })
 
