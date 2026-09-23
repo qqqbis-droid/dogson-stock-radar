@@ -1,0 +1,91 @@
+name: Install Radar v1.5.1 Direct 100 Scoring
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "scripts/patch_v151.py"
+      - ".github/workflows/upgrade-v151.yml"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v151-upgrade
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - name: Sync latest deployed data
+        run: python scripts/sync_live_data.py || true
+      - name: Apply v1.5.1 patch
+        run: python scripts/patch_v151.py
+      - name: Syntax check
+        run: python -m py_compile scripts/build_data.py scripts/bridge_intraday.py scripts/build_hourly.py
+      - name: Rebuild close radar
+        run: python scripts/build_data.py --mode close
+      - name: Rebuild 60K radar
+        run: python scripts/build_hourly.py
+      - name: Rebuild intraday radar
+        run: |
+          python scripts/build_data.py --mode intraday
+          python scripts/bridge_intraday.py
+      - name: Verify direct 100 formulas and footer
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          h=Path('docs/index.html').read_text(encoding='utf-8')
+          c=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          i=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
+          cr=c.get('rows') or []
+          ir=i.get('rows') or []
+          assert 'Free Edition v1.5.1' in h
+          assert '盤中動能100＝價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10' in h
+          assert '波段延續100＝日K技術50＋籌碼25＋族群15＋流動性10' in h
+          assert cr and ir
+          f=c.get('score_formula') or {}
+          assert f.get('total') == 100 and f.get('normalized') is False, f
+          assert f.get('technical') == 50 and f.get('chip') == 25 and f.get('sector') == 15 and f.get('liquidity') == 10, f
+          for r in cr[:100]:
+              sw=r.get('swing_components') or {}
+              assert set(['technical','chip','sector','liquidity']).issubset(sw), (r.get('code'),sw)
+              calc=round(sum(float(sw[k]) for k in ['technical','chip','sector','liquidity']),1)
+              assert abs(calc-float(r.get('swing_quality_score'))) < 0.2, (r.get('code'),calc,r.get('swing_quality_score'))
+          fi=i.get('score_formula') or {}
+          assert fi.get('mode') == 'intraday_execution' and fi.get('chip') == 'background_only', fi
+          print('close formula=',f)
+          print('intraday formula=',fi)
+          print('sample close=',{k:cr[0].get(k) for k in ['code','swing_quality_score','swing_components','entry_position_score']})
+          print('sample intraday=',{k:ir[0].get(k) for k in ['code','intraday_score','intraday_components','chip_background']})
+          PY
+      - name: Commit v1.5.1 source and rebuilt data
+        run: |
+          git config user.name "qqqbis-droid"
+          git config user.email "qqqbis@gmail.com"
+          git add scripts/build_data.py docs/index.html docs/sw.js docs/data
+          git diff --cached --quiet || git commit -m "Apply Radar v1.5.1 direct 100 scoring and mode footer"
+          git push
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
