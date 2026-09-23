@@ -59,7 +59,7 @@ jobs:
             './sw.js?v=1519',
             'dogsonSwReloaded1519',
             '價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10',
-            '波段延續＝日K技術50＋籌碼25＋族群15＋流動性10',
+            '波段延續100＝日K技術50＋籌碼25＋族群15＋流動性10',
           ]
           for m in must:
               if m not in html:
@@ -71,7 +71,6 @@ jobs:
           if 'dogson-free-v1519' not in sw:
               raise SystemExit('SW cache not bumped to v1519')
 
-          # Synthetic mapping checks mirror the JS canonicalization intent.
           def stage_key(v):
               s=str(v or '').strip()
               for e in '🌱🔥🟡🚂🔵⚠️❌🚫': s=s.replace(e,'')
