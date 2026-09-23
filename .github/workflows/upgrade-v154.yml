@@ -1,0 +1,108 @@
+name: Install Radar v1.5.4 MA20-60 Entry Lights
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/upgrade-v154.yml"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v154-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+
+      - name: Sync latest deployed data
+        run: python scripts/sync_live_data.py || true
+
+      - name: Ensure v1.5.3 sector-flow base
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess, sys
+          s=Path('scripts/build_data.py').read_text(encoding='utf-8')
+          if 'def build_sector_institution_flow(rows):' not in s:
+              subprocess.run([sys.executable,'scripts/patch_v153.py'],check=True)
+          else:
+              print('v1.5.3 base already present')
+          PY
+
+      - name: Apply v1.5.4 patch
+        run: python scripts/patch_v154.py
+
+      - name: Syntax check
+        run: python -m py_compile scripts/chip_data.py scripts/build_data.py scripts/build_hourly.py scripts/patch_v154.py
+
+      - name: Rebuild close radar
+        run: python scripts/build_data.py --mode close
+
+      - name: Rebuild intraday radar
+        run: python scripts/build_data.py --mode intraday
+
+      - name: Verify v1.5.4 fields
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          close=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          rows=close.get('rows') or []
+          if not rows:
+              raise SystemExit('close rows empty')
+          sample=next((r for r in rows if r.get('ma60') is not None),None)
+          if not sample:
+              raise SystemExit('no row with ma60')
+          for k in ['ma20_60_state','entry_light','market_gate','market_env_score','quality_score']:
+              if k not in sample:
+                  raise SystemExit('missing v1.5.4 field: '+k)
+          if sample.get('market_in_quality_score') is not False:
+              raise SystemExit('market must remain outside stock quality score')
+          funds=close.get('sector_funds') or []
+          if not funds:
+              raise SystemExit('v1.5.3 sector_funds missing')
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          for marker in ['v1.5.4','20/60狀態','大盤環境 · 不計入個股分','20/60 黃金交叉']:
+              if marker not in html:
+                  raise SystemExit('UI marker missing: '+marker)
+          print('sample', {k:sample.get(k) for k in ['code','name','ma20','ma60','ma20_60_state','entry_light','quality_score','market_gate']})
+          print('sector funds',len(funds))
+          print('v1.5.4 verification OK')
+          PY
+
+      - name: Commit v1.5.4 source and refreshed data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/chip_data.py scripts/build_data.py docs/index.html docs/sw.js .github/workflows/close.yml \
+            docs/data/close.json docs/data/intraday.json docs/data/chip_history.json docs/data/chip_status.json \
+            docs/data/universe.json docs/data/market.json docs/data/status.json || true
+          git diff --cached --quiet || git commit -m "Apply v1.5.4 MA20-60 continuation and entry lights"
+          git reset --hard HEAD
+          git clean -fd .cache || true
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
