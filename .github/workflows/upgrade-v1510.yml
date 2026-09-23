@@ -1,0 +1,126 @@
+name: Install Radar v1.5.10 Sector Resonance Drilldown Fix
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/upgrade-v1510.yml"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1510-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+
+      - name: Sync latest deployed data
+        run: python scripts/sync_live_data.py || true
+
+      - name: Apply v1.5.10 sector drilldown patch
+        run: python scripts/patch_v1510.py
+
+      - name: Syntax check
+        run: python -m py_compile scripts/build_data.py scripts/patch_v1510.py
+
+      - name: Synthetic official-industry peer test
+        run: |
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path('scripts').resolve()))
+          import build_data as b
+
+          base={
+            'sector_group':'', 'industry_name':'電子零組件業', 'technical_score':32,
+            'overheat_reasons':[], 'day_change':1.2, 'vol_x':1.4, 'trend':True,
+            'break3':False, 'break20':False, 'chip_score':12.5, 'chip_coverage_pct':80,
+            'liquidity_level':'正常', 'liquidity_adjust':0, 'close':100, 'dist20':2,
+            'ret5':3, 'support':None, 'current_turnover':100000000,
+          }
+          rows=[]
+          for i in range(3):
+              r=dict(base)
+              r.update({'code':f'99{i}1','name':f'測試{i+1}','technical_score':32+i,'day_change':1+i*.2})
+              rows.append(r)
+          market={'market_score':8,'market_mode':'中性','data_complete':True,'trade_date':'2026-09-23'}
+          out=b.add_component_scores(rows,market,preliminary_intraday=False)
+          for r in out:
+              if r.get('sector_score_source')!='官方產業代理':
+                  raise SystemExit('official proxy source missing')
+              if len(r.get('sector_peers') or []) < 3:
+                  raise SystemExit('official industry peers not populated')
+          print('official-industry peer test OK', out[0]['sector_score'], len(out[0]['sector_peers']))
+          PY
+
+      - name: Rebuild intraday radar
+        run: python scripts/build_data.py --mode intraday
+
+      - name: Verify v1.5.10 output and unchanged score weights
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          intra=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
+          rows=intra.get('rows') or []
+          if not rows:
+              raise SystemExit('intraday rows empty')
+          proxy=[r for r in rows if r.get('sector_score_source')=='官方產業代理']
+          if proxy and not any(r.get('sector_peers') for r in proxy):
+              raise SystemExit('official industry rows still have no peers')
+          formula=intra.get('score_formula') or {}
+          expected={'price_structure':30,'flow_volume':25,'relative_strength':15,'sector':20,'liquidity_risk':10}
+          for k,v in expected.items():
+              if formula.get(k)!=v:
+                  raise SystemExit(f'weight changed: {k}={formula.get(k)} expected {v}')
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          for marker in ['v1.5.10','官方產業代理','官方產業','點我展開']:
+              if marker not in html:
+                  raise SystemExit('UI marker missing: '+marker)
+          sw=Path('docs/sw.js').read_text(encoding='utf-8')
+          if 'dogson-free-v1510' not in sw:
+              raise SystemExit('service worker cache not bumped')
+          print('proxy rows',len(proxy),'with peers',sum(bool(r.get('sector_peers')) for r in proxy))
+          print('v1.5.10 verification OK')
+          PY
+
+      - name: Commit v1.5.10 source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py docs/index.html docs/sw.js
+          git diff --cached --quiet || git commit -m "Apply v1.5.10 sector resonance drilldown fix"
+          git reset --hard HEAD
+          git clean -fd .cache || true
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 5
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
