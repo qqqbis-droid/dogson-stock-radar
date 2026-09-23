@@ -41,7 +41,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.8｜盤中族群可展開＋盤後法人族群流向可收合＋振幅效率</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.9｜盤中相對強弱透明化＋盤後族群資金流可收合＋振幅效率</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -58,7 +58,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
    <summary>❓ 每個數值怎麼看？點我教學</summary>
    <div class="helptext">
     <b>階段和分數分開看。</b>盤中顯示「盤中動能」，盤後顯示「波段延續」；82分代表條件共振程度，不是82%會漲。「剛啟動」仍主要看突破、量能、VWAP/均線與位階。<br><br>
-    <b>盤中動能 100：</b>價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10。籌碼只顯示為「偏多/中性/偏空背景」，不灌入盤中分數。<br>
+    <b>盤中動能 100：</b>價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10。籌碼只顯示為「偏多/中性/偏空背景」，不灌入盤中分數。<br><b>盤中相對強弱 15：</b>這不是 RSI。上市股拿個股當日漲跌去減「加權指數」當日漲跌；上櫃股則減「櫃買指數」當日漲跌。相對市場 ≥+2.0%＝10分、+1.0～&lt;+2.0%＝8分、+0.3～&lt;+1.0%＝6分、0～&lt;+0.3%＝4分、-1.0～&lt;0%＝2分、≤-1.0%＝0分；若同時現價≥VWAP 且近15分鐘漲幅&gt;0，再加5分，最高15分。也就是「比市場強」最多10分，「盤中仍站強勢結構」再加5分。<br>
     <b>盤後波段 100：</b>波段延續＝日K技術50＋籌碼25＋族群15＋流動性10，直接加總100，不再用85分換算；另外獨立計算「進場位置100」，避免好股票在過熱位置仍被誤認為好買點。<br><b>盤後族群法人資金流：</b>把同族群成分股的外資＋投信官方淨買賣股數加總，顯示當日、近5日、近20日、連續流入/流出與是否加速，再搭配族群近5日漲跌。單位用張，不用目前股價回推歷史億元；此欄不新增個股分數。預設先收合成流入／流出前三名摘要，按「展開完整族群」才顯示完整明細，收合狀態會記住。<br>
     <b>籌碼：</b>外資連3買、借券賣出連3減、投信、融資。盤中只作背景；盤後才正式進入波段延續評分。盤後會在14:25、20:30、23:40及次日08:15補抓。<br>
     <b>族群共振原始10：</b>廣度3＋強度2＋量能2＋領頭股2＋延續性1；盤中換算為20分、盤後換算為15分。強勢股成交金額占比也納入強度；點開族群即可點選共振個股。<br>
@@ -196,7 +196,7 @@ function partsHTML(r){
   return `<div class="parts intradayparts">
    <div class="part"><div class="partv">${num(c.price_structure,0)}/30</div><div class="partl">價格結構</div></div>
    <div class="part"><div class="partv">${num(c.flow_volume,0)}/25</div><div class="partl">量價/動能</div></div>
-   <div class="part"><div class="partv">${num(c.relative_strength,0)}/15</div><div class="partl">相對強弱 ${signed(c.relative_strength_pct,1)}</div></div>
+   <div class="part"><div class="partv">${num(c.relative_strength,0)}/15</div><div class="partl">相對${String(r.market)==="上櫃"?"櫃買":"加權"} ${signed(c.relative_strength_pct,1)}</div></div>
    <div class="part"><div class="partv">${num(c.sector,0)}/20</div><div class="partl">族群共振</div></div>
    <div class="part"><div class="partv">${num(c.liquidity_risk,0)}/10</div><div class="partl">流動性/追價風險</div></div>
    <div class="part"><div class="partv">${r.chip_background||"資料不足"}</div><div class="partl">籌碼背景 · 不計分</div></div>
