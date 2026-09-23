@@ -1,0 +1,106 @@
+name: Install Radar v1.5.7 Close Sector Institutional Flow
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/upgrade-v157.yml"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v157-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Apply v1.5.7 close sector-flow patch
+        run: python scripts/patch_v157.py
+
+      - name: Syntax check
+        run: python -m py_compile scripts/chip_data.py scripts/build_data.py
+
+      - name: Rebuild close radar and backfill institutional history
+        run: python scripts/build_data.py --mode close
+
+      - name: Verify close sector institutional flow
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          close=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          funds=close.get('sector_funds') or []
+          if not funds:
+              raise SystemExit('sector_funds empty')
+          if not any(x.get('today_lots') is not None for x in funds):
+              raise SystemExit('no today sector fund data')
+          max_days=max(int(x.get('history_days') or 0) for x in funds)
+          if max_days < 5:
+              raise SystemExit(f'institution history too short: {max_days}')
+          if not close.get('sector_funds_note'):
+              raise SystemExit('sector_funds_note missing')
+
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          for marker in [
+              'v1.5.7',
+              'function closeSectorFundsHTML()',
+              '盤後族群法人資金流',
+              '當日法人淨買超',
+              '近 5 日法人淨買超',
+              '近 20 日法人淨買超',
+              'sectorFunds=cj.sector_funds||[]',
+          ]:
+              if marker not in html:
+                  raise SystemExit('missing UI marker: '+marker)
+
+          sw=Path('docs/sw.js').read_text(encoding='utf-8')
+          if 'dogson-free-v157' not in sw:
+              raise SystemExit('service worker cache not bumped')
+
+          print('sector groups', len(funds), 'max history days', max_days)
+          print('v1.5.7 close sector institutional flow verification OK')
+          PY
+
+      - name: Commit v1.5.7 source and rebuilt data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/chip_data.py scripts/build_data.py docs/index.html docs/sw.js \
+            docs/data/close.json docs/data/market.json docs/data/status.json \
+            docs/data/chip_history.json docs/data/chip_status.json docs/data/universe.json
+          git diff --cached --quiet || git commit -m "Apply v1.5.7 close sector institutional flow"
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 4
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
