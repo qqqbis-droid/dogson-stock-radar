@@ -1,0 +1,136 @@
+name: Install Radar v1.5.24 Step 5 Multi-Timeframe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1524.trigger"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1524-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Require Step 4 first
+        run: |
+          grep -q 'Free Edition v1.5.23' docs/index.html
+          grep -q 'function entryDecision(r,mkt=market)' docs/index.html
+          grep -q 'entry_radar_version":"1.0"' docs/data/status.json
+          grep -q 'def build_intraday' scripts/build_data.py
+          grep -q 'ma20_60' scripts/build_hourly.py
+
+      - name: Apply Step 5 patch
+        run: python scripts/patch_v1524.py
+
+      - name: Static verification
+        run: |
+          python -m py_compile scripts/patch_v1524.py scripts/build_data.py scripts/bridge_intraday.py scripts/build_hourly.py
+          python - <<'PY'
+          from pathlib import Path
+          import json,re
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          bd=Path('scripts/build_data.py').read_text(encoding='utf-8')
+          br=Path('scripts/bridge_intraday.py').read_text(encoding='utf-8')
+          sw=Path('docs/sw.js').read_text(encoding='utf-8')
+          intra=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
+          status=json.loads(Path('docs/data/status.json').read_text(encoding='utf-8'))
+          required_html=[
+            'Free Edition v1.5.24','function mtfHTML(r)','Step 5｜5分＋60分＋日K',
+            '5分＋60分＋日K三框共振','mtfGreenOk','20T/60T 權重＝0',
+            '<script src="./hourly.js?v=1524"></script>','./sw.js?v=1524'
+          ]
+          for x in required_html:
+              if x not in html: raise SystemExit('missing html marker: '+x)
+          required_backend=[
+            'def _attach_multitimeframe_context(rows, close_map, hourly_obj):',
+            'rows = _attach_multitimeframe_context(rows, close_map, hourly_obj)',
+            'multi_timeframe_version": "1.0"',
+            'decision_context_no_new_weight',
+            'mtf_60_bearish','mtf_setup_ok'
+          ]
+          for x in required_backend:
+              if x not in bd: raise SystemExit('missing build_data marker: '+x)
+          if 'bd._attach_multitimeframe_context' not in br: raise SystemExit('bridge does not refresh MTF')
+          if 'dogson-free-v1524' not in sw or './hourly.js?v=1524' not in sw: raise SystemExit('service worker not upgraded')
+          if status.get('version')!='1.5.24-free' or status.get('multi_timeframe_version')!='1.0': raise SystemExit('status mismatch')
+          rows=intra.get('rows') or []
+          mtf=[r for r in rows if isinstance(r,dict) and isinstance(r.get('multi_timeframe'),dict)]
+          hcov=[r for r in mtf if (r.get('multi_timeframe',{}).get('60m') or {}).get('available')]
+          print('current intraday MTF coverage',len(mtf),'/',len(rows),'60K',len(hcov))
+          if rows and len(mtf)<max(1,int(len(rows)*0.95)): raise SystemExit('MTF row coverage too low')
+          if rows and len(hcov)<max(1,int(len(rows)*0.80)): raise SystemExit('60K coverage too low')
+          sf=intra.get('score_formula') or {}
+          if sf.get('price_structure')!=30 or sf.get('flow_volume')!=25 or sf.get('relative_strength')!=15 or sf.get('sector')!=20 or sf.get('liquidity_risk')!=10:
+              raise SystemExit('intraday 100-point formula changed')
+          if sf.get('multi_timeframe')!='decision_context_no_new_weight': raise SystemExit('MTF must be decision context only')
+          m=re.search(r'<script>\s*(.*?)</script>\s*<script src="./hourly.js',html,re.S)
+          if not m: raise SystemExit('main inline script not found')
+          Path('/tmp/dogson-inline.js').write_text(m.group(1),encoding='utf-8')
+          print('static verification OK')
+          PY
+          node --check /tmp/dogson-inline.js
+          node --check docs/hourly.js
+
+      - name: Verify roadmap contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          bd=Path('scripts/build_data.py').read_text(encoding='utf-8')
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          checks={
+            '60K 20T/60T is formally attached':'gap20_60_pct',
+            'already-crossed continuation remains':'STABLE_CONT',
+            'accelerating continuation remains':'ACCEL_CONT',
+            'pre-cross setup remains':'PRE_CROSS',
+            'Stage reads MTF':'mtf_60_supportive',
+            'entry light reads MTF':'mtfGreenOk',
+            'no new score weight':'score_weight": 0',
+          }
+          for label,mark in checks.items():
+              src=bd if mark!='mtfGreenOk' else html
+              if mark not in src: raise SystemExit('roadmap contract missing: '+label)
+          # Explicitly preserve the existing 100-point architecture.
+          for mark in ['price_structure": 30','flow_volume": 25','relative_strength": 15','sector": 20','liquidity_risk": 10']:
+              if mark not in bd: raise SystemExit('existing intraday formula changed: '+mark)
+          print('Step 5 roadmap contract OK')
+          PY
+
+      - name: Commit Step 5
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py scripts/bridge_intraday.py docs/index.html docs/sw.js docs/data/intraday.json docs/data/status.json
+          git diff --cached --quiet || git commit -m "Apply v1.5.24 Step 5 multi-timeframe"
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 4
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
