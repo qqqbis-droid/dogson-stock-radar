@@ -1,0 +1,170 @@
+name: Install Radar v1.5.30 Original Vision Completion
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1530.trigger"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1530-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Require v1.5.29
+        run: |
+          grep -q 'Free Edition v1.5.29' docs/index.html
+          grep -q '"daytrade_version":"1.0"' docs/data/status.json
+          grep -q 'def _dynamic_threshold_values' scripts/build_data.py
+          grep -q 'def calibrated_weights' scripts/build_validation.py
+
+      - name: Apply v1.5.30 completion patch
+        run: |
+          python scripts/patch_v1530.py
+          python scripts/build_daytrade.py
+
+      - name: Verify Python syntax
+        run: |
+          python -m py_compile scripts/patch_v1530.py scripts/build_data.py scripts/bridge_intraday.py scripts/build_validation.py scripts/build_daytrade.py
+
+      - name: Verify six completion contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import importlib.util, json, re
+
+          bd=Path('scripts/build_data.py').read_text(encoding='utf-8')
+          bv=Path('scripts/build_validation.py').read_text(encoding='utf-8')
+          ui=Path('docs/index.html').read_text(encoding='utf-8')
+          st=json.loads(Path('docs/data/status.json').read_text(encoding='utf-8'))
+          close=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          intra=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
+          daytrade=json.loads(Path('docs/data/daytrade.json').read_text(encoding='utf-8'))
+
+          # 1) chip intensity / cross-stock comparable strength
+          for x in ['def _chip_intensity_fields','foreign_3d_intensity_pct','avg_volume20_shares','chip_intensity_label']:
+              if x not in bd: raise SystemExit('chip intensity missing '+x)
+
+          # 2) pullback / attack pattern
+          for x in ['def _execution_pattern_fields','量縮回踩','量增上攻','回踩承接','execution_pattern_strength']:
+              if x not in bd: raise SystemExit('execution pattern missing '+x)
+
+          # 3) cumulative today changes
+          for x in ['def _build_today_cumulative_change','today_score_delta','today_pace_delta','today_direction','new_setup','new_start','to_overheat']:
+              if x not in bd: raise SystemExit('today change missing '+x)
+
+          # 4) inventory add + direction
+          for x in ['🟢 可考慮加碼','今日變化方向','可加 ${actions.add','addable=']:
+              if x not in ui: raise SystemExit('portfolio completion missing '+x)
+
+          # 5) Step 6 front-end must use per-stock dynamic thresholds, not hardcoded gate only
+          for x in ['dayHot=+(dyn.day_hot_pct??8.5)','vwapHot=+(dyn.vwap_hot_pct??4.5)','paceHot=+(dyn.pace_hot_x??5)','ret15Hot=+(dyn.ret15_hot_pct??4)']:
+              if x not in ui: raise SystemExit('dynamic entry gate missing '+x)
+
+          # 6) historical breakout-event volume baseline + Step7 research persistence
+          for x in ['breakout_event_volumes','breakout_volume_profile','current_volume_vs_event_avg']:
+              if x not in bd: raise SystemExit('breakout event baseline missing '+x)
+          for x in ['execution_pattern','foreign_3d_intensity_pct','combination_5d','breakout_volume_profile']:
+              if x not in bv: raise SystemExit('Step7 completion persistence missing '+x)
+
+          # Preserve score architecture.
+          for x in ['"price_structure": 30','"flow_volume": 25','"relative_strength": 15','"sector": 20','"liquidity_risk": 10']:
+              if x not in bd: raise SystemExit('intraday weight changed '+x)
+          for x in ['{"technical": 50.0, "chip": 25.0, "sector": 15.0, "liquidity": 10.0}']:
+              if x not in bv: raise SystemExit('swing baseline changed')
+
+          if st.get('version')!='1.5.30-free' or st.get('vision_completion_version')!='1.0': raise SystemExit('status mismatch')
+          if st.get('dynamic_threshold_version')!='1.1' or st.get('portfolio_mode_version')!='1.2' or st.get('change_radar_version')!='1.1': raise SystemExit('sub-version mismatch')
+
+          crows=close.get('rows') or []
+          irows=intra.get('rows') or []
+          if crows:
+              cov=sum(r.get('chip_intensity_label') is not None for r in crows)
+              print('chip intensity coverage',cov,'/',len(crows))
+              if cov < int(len(crows)*.95): raise SystemExit('chip intensity coverage low')
+          if irows:
+              pcov=sum(r.get('execution_pattern') is not None for r in irows)
+              print('execution pattern coverage',pcov,'/',len(irows))
+              if pcov < int(len(irows)*.95): raise SystemExit('execution pattern coverage low')
+
+          if daytrade.get('version')!='1.0' or not daytrade.get('rows'):
+              raise SystemExit('daytrade rebuild failed')
+
+          # Synthetic helper tests.
+          spec=importlib.util.spec_from_file_location('bd','scripts/build_data.py')
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          intensity=m._chip_intensity_fields({'avg_volume20_shares':1_000_000,'foreign_3d_net':180_000,'trust_net_latest':20_000})
+          if abs(float(intensity['foreign_3d_intensity_pct'])-18.0)>1e-6 or intensity['chip_intensity_label']!='明顯累積':
+              raise SystemExit('chip intensity synthetic test failed')
+          patt=m._execution_pattern_fields({'close':105,'vwap':103,'vwap_dist':1.0,'ret15':0.8,'pace':1.6,'recent_turnover':140,'previous_turnover':100,'trend5':True,'break3':True})
+          if patt['execution_pattern']!='量增上攻': raise SystemExit('attack pattern synthetic test failed')
+          pull=m._execution_pattern_fields({'close':103,'vwap':103,'vwap_dist':0.1,'ret15':-0.2,'pace':0.9,'recent_turnover':70,'previous_turnover':100,'trend5':True,'break3':False})
+          if pull['execution_pattern']!='量縮回踩': raise SystemExit('pullback pattern synthetic test failed')
+          hist={'intraday':[{'key':'2026-09-24T09:10','date':'2026-09-24','rows':[{'code':'0001','name':'T','score':55,'category':'觀察','pace':1.0}]}]}
+          rows=[{'code':'0001','name':'T','date':'2026-09-24','intraday_score':70,'category':'蓄勢待發','pace':1.8}]
+          today=m._build_today_cumulative_change(rows,hist)
+          if not today['ready'] or today['counts']['new_setup']!=1 or rows[0]['today_direction'] not in {'改善','小幅改善'}:
+              raise SystemExit('today cumulative synthetic test failed')
+
+          # JS syntax contract.
+          mm=re.search(r'<script>\s*(.*?)</script>\s*<script src="./hourly.js',ui,re.S)
+          if not mm: raise SystemExit('inline JS missing')
+          Path('/tmp/dogson-inline.js').write_text(mm.group(1),encoding='utf-8')
+          print('v1.5.30 six completion contracts OK')
+          PY
+          node --check /tmp/dogson-inline.js
+          node --check docs/hourly.js
+
+      - name: Commit v1.5.30
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py scripts/bridge_intraday.py scripts/build_validation.py scripts/build_daytrade.py docs/index.html docs/sw.js docs/data/status.json docs/data/close.json docs/data/intraday.json docs/data/daytrade.json
+          git diff --cached --quiet || git commit -m "Apply v1.5.30 original vision completion"
+          ok=0
+          for n in $(seq 1 12); do
+            git fetch origin main
+            if git rebase origin/main; then
+              if git push origin HEAD:main; then ok=1; break; fi
+            else
+              conflicted=$(git diff --name-only --diff-filter=U || true)
+              if [ -n "$conflicted" ]; then
+                while IFS= read -r f; do
+                  [ -z "$f" ] && continue
+                  git checkout --theirs -- "$f"
+                  git add "$f"
+                done <<< "$conflicted"
+                GIT_EDITOR=true git rebase --continue || { git rebase --abort || true; sleep 3; continue; }
+                if git push origin HEAD:main; then ok=1; break; fi
+              else
+                git rebase --abort || true
+              fi
+            fi
+            sleep 3
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
