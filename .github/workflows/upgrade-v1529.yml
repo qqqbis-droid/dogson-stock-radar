@@ -1,0 +1,132 @@
+name: Install Radar v1.5.29 Step 8 Daytrade
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1529.trigger"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1529-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Require v1.5.28
+        run: |
+          grep -q 'Free Edition v1.5.28' docs/index.html
+          grep -q '"validation_version":"1.0"' docs/data/status.json
+          grep -q 'build_daytrade.py' .github/workflows/intraday.yml
+      - name: Apply Step 8 patch
+        run: |
+          python scripts/patch_v1529.py
+          python scripts/build_daytrade.py
+      - name: Verify Step 8 isolation and UI contract
+        run: |
+          python -m py_compile scripts/build_data.py scripts/bridge_intraday.py scripts/sync_live_data.py scripts/build_validation.py scripts/build_daytrade.py scripts/patch_v1529.py
+          python - <<'PY'
+          from pathlib import Path
+          import copy, importlib.util, json, re
+
+          src=Path('scripts/build_daytrade.py').read_text(encoding='utf-8')
+          ui=Path('docs/index.html').read_text(encoding='utf-8')
+          wf=Path('.github/workflows/intraday.yml').read_text(encoding='utf-8')
+          status=json.loads(Path('docs/data/status.json').read_text(encoding='utf-8'))
+          dt=json.loads(Path('docs/data/daytrade.json').read_text(encoding='utf-8'))
+
+          if 'dump(INTRADAY' in src or 'dump(DATA / "intraday.json"' in src:
+              raise SystemExit('daytrade engine writes source intraday data')
+          for x in ['source_intraday_score','source_category','daytrade_score','daytrade_state','daytrade_components','DAYTRADE_WEIGHTS']:
+              if x not in src: raise SystemExit('daytrade isolation marker missing '+x)
+          if 'python scripts/build_daytrade.py' not in wf:
+              raise SystemExit('production intraday workflow not wired to Step 8')
+          if wf.index('python scripts/build_daytrade.py') < wf.index('python scripts/bridge_intraday.py'):
+              raise SystemExit('daytrade must run after MIS bridge')
+          if wf.index('python scripts/build_validation.py --mode intraday') < wf.index('python scripts/build_daytrade.py'):
+              raise SystemExit('Step 7 source snapshot ordering changed unexpectedly')
+
+          spec=importlib.util.spec_from_file_location('bdt','scripts/build_daytrade.py')
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          sample={
+              'code':'0001','name':'TEST','close':105,'vwap':103,'vwap_dist':1.94,'pace':1.8,
+              'ret15':0.8,'day_change':3.2,'range_position_pct':78,'amplitude_regime':'有效擴張',
+              'trend5':True,'break3':True,'recent_turnover':180,'previous_turnover':120,
+              'liquidity_level':'活躍','category':'剛啟動','intraday_score':82,'overheat_reasons':[],
+              'intraday_components':{'relative_strength':11,'sector':15},
+              'dynamic_thresholds':{'day_hot_pct':8,'vwap_hot_pct':4,'ret15_hot_pct':3.5,'pace_hot_x':5,'day_good_high_pct':5.8,'ret15_good_high_pct':2.2,'mode':'personalized'},
+              'market_mode':'偏多'
+          }
+          before=copy.deepcopy(sample)
+          out=m.score_daytrade_row(sample)
+          if sample != before: raise SystemExit('source row mutated by daytrade scorer')
+          if not 0 <= float(out['daytrade_score']) <= 100: raise SystemExit('daytrade score out of bounds')
+          if out['source_category'] != '剛啟動' or out['source_intraday_score'] != 82: raise SystemExit('source trace lost')
+          if out['daytrade_state'] not in {'可執行','等回踩','觀察','過熱不追','失效'}: raise SystemExit('invalid daytrade state')
+          if sum(out['daytrade_component_weights'].values()) != 100: raise SystemExit('daytrade weights do not sum 100')
+
+          for x in ['data-mode="daytrade"','fetch("./data/daytrade.json?"+bust)','獨立當沖 /100','Step 8｜獨立當沖模式','來源盤中 Stage 2.0']:
+              if x not in ui: raise SystemExit('Step 8 UI missing '+x)
+          if status.get('version')!='1.5.29-free' or status.get('daytrade_version')!='1.0': raise SystemExit('status mismatch')
+          if dt.get('version')!='1.0' or not dt.get('rows'): raise SystemExit('daytrade data not built')
+          iso=dt.get('isolation') or {}
+          if any(bool(iso.get(k)) for k in ['writes_intraday','changes_stage2','changes_swing_score','changes_intraday_score']):
+              raise SystemExit('daytrade isolation flags violated')
+          weights=dt.get('weights') or {}
+          if sum(float(v) for v in weights.values()) != 100: raise SystemExit('daytrade file weights mismatch')
+
+          mm=re.search(r'<script>\s*(.*?)</script>\s*<script src="./hourly.js',ui,re.S)
+          if not mm: raise SystemExit('inline JS missing')
+          Path('/tmp/dogson-inline.js').write_text(mm.group(1),encoding='utf-8')
+          print('Step 8 contract OK', dt.get('state_counts'))
+          PY
+          node --check /tmp/dogson-inline.js
+      - name: Commit Step 8 non-workflow files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py scripts/bridge_intraday.py scripts/sync_live_data.py docs/index.html docs/sw.js docs/data/status.json docs/data/daytrade.json
+          git diff --cached --quiet || git commit -m "Apply v1.5.29 Step 8 independent daytrade mode"
+          ok=0
+          for n in $(seq 1 12); do
+            git fetch origin main
+            if git rebase origin/main; then
+              if git push origin HEAD:main; then ok=1; break; fi
+            else
+              conflicted=$(git diff --name-only --diff-filter=U || true)
+              if [ -n "$conflicted" ]; then
+                while IFS= read -r f; do
+                  [ -z "$f" ] && continue
+                  git checkout --theirs -- "$f"
+                  git add "$f"
+                done <<< "$conflicted"
+                GIT_EDITOR=true git rebase --continue || { git rebase --abort || true; sleep 3; continue; }
+                if git push origin HEAD:main; then ok=1; break; fi
+              else
+                git rebase --abort || true
+              fi
+            fi
+            sleep 3
+          done
+          test "$ok" = 1
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
