@@ -1,4 +1,4 @@
-const CACHE='dogson-free-v1512';
+const CACHE='dogson-free-v1513';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
