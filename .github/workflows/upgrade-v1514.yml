@@ -1,0 +1,105 @@
+name: Install Radar v1.5.14 Today Money Ranking
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1514.trigger"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1514-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Require v1.5.13 first
+        run: |
+          grep -q 'Free Edition v1.5.13' docs/index.html
+          grep -q 'today_amount_100m' scripts/build_data.py
+          grep -q 'function closeSectorMembers(sector)' docs/index.html
+
+      - name: Apply v1.5.14 ranking and naming patch
+        run: python scripts/patch_v1514.py
+
+      - name: Verify today-money ranking and transparent intraday naming
+        run: |
+          python -m py_compile scripts/build_data.py scripts/patch_v1514.py
+          python - <<'PY'
+          from pathlib import Path
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          build=Path('scripts/build_data.py').read_text(encoding='utf-8')
+          sw=Path('docs/sw.js').read_text(encoding='utf-8')
+          required_html=[
+            'Free Edition v1.5.14',
+            'const todayStrength=x=>x.today_amount_100m??0;',
+            '今日估算流入 TOP 3',
+            '今日估算流出 TOP 3',
+            '依今日估算法人淨額排序',
+            '盤中族群成交資金輪動',
+            '吸金熱度＝成交金額占比變化＋價格＋VWAP＋廣度＋量速',
+            '不是法人淨流入',
+          ]
+          for m in required_html:
+              if m not in html:
+                  raise SystemExit('missing HTML marker: '+m)
+          if 'net5_amount_100m??x.today_amount_100m' in html:
+              raise SystemExit('old 5-day-first frontend ranking still present')
+          required_build=[
+            '今日估算法人淨額',
+            'abs(float(x.get("today_amount_100m") or 0))',
+            'abs(float(x.get("today_lots") or 0))',
+            '"version": "1.5.14-free"',
+          ]
+          for m in required_build:
+              if m not in build:
+                  raise SystemExit('missing build marker: '+m)
+          if 'abs(float(x.get("net5_amount_100m") or x.get("today_amount_100m") or 0))' in build:
+              raise SystemExit('old 5-day-first backend ranking still present')
+          if 'dogson-free-v1514' not in sw:
+              raise SystemExit('service worker cache not bumped')
+          # Score architecture and formulas must remain intact.
+          for m in ['價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10',
+                    '波段延續＝日K技術50＋籌碼25＋族群15＋流動性10']:
+              if m not in html:
+                  raise SystemExit('score architecture marker missing: '+m)
+          print('v1.5.14 verification OK')
+          PY
+
+      - name: Commit v1.5.14
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html docs/sw.js scripts/build_data.py
+          git diff --cached --quiet || git commit -m "Apply v1.5.14 today money ranking and intraday naming"
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 4
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
