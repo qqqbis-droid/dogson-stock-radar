@@ -41,7 +41,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.11｜盤中族群輪動可收合＋族群共振全可展開＋盤後族群資金流</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.12｜盤後法人金額力度＋盤中族群輪動可收合＋族群共振全可展開</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -59,7 +59,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
    <div class="helptext">
     <b>階段和分數分開看。</b>盤中顯示「盤中動能」，盤後顯示「波段延續」；82分代表條件共振程度，不是82%會漲。「剛啟動」仍主要看突破、量能、VWAP/均線與位階。<br><br>
     <b>盤中動能 100：</b>價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10。籌碼只顯示為「偏多/中性/偏空背景」，不灌入盤中分數。<br><b>盤中相對強弱 15：</b>這不是 RSI。上市股拿個股當日漲跌去減「加權指數」當日漲跌；上櫃股則減「櫃買指數」當日漲跌。相對市場 ≥+2.0%＝10分、+1.0～&lt;+2.0%＝8分、+0.3～&lt;+1.0%＝6分、0～&lt;+0.3%＝4分、-1.0～&lt;0%＝2分、≤-1.0%＝0分；若同時現價≥VWAP 且近15分鐘漲幅&gt;0，再加5分，最高15分。也就是「比市場強」最多10分，「盤中仍站強勢結構」再加5分。<br>
-    <b>盤後波段 100：</b>波段延續＝日K技術50＋籌碼25＋族群15＋流動性10，直接加總100，不再用85分換算；另外獨立計算「進場位置100」，避免好股票在過熱位置仍被誤認為好買點。<br><b>盤後族群法人資金流：</b>把同族群成分股的外資＋投信官方淨買賣股數加總，顯示當日、近5日、近20日、連續流入/流出與是否加速，再搭配族群近5日漲跌。單位用張，不用目前股價回推歷史億元；此欄不新增個股分數。預設先收合成流入／流出前三名摘要，按「展開完整族群」才顯示完整明細，收合狀態會記住。<br>
+    <b>盤後波段 100：</b>波段延續＝日K技術50＋籌碼25＋族群15＋流動性10，直接加總100，不再用85分換算；另外獨立計算「進場位置100」，避免好股票在過熱位置仍被誤認為好買點。<br><b>盤後族群法人資金流：</b>外資＋投信官方逐股淨買賣股數，逐日乘上「該交易日收盤價」後加總成族群估算金額；5日／20日都使用各自當日價格，不拿今天股價回推。金額用來比較資金力度、張數仍保留看持股方向；這不是官方逐股實際成交金額，因此畫面明確標示「估算」。此欄不新增個股分數。<br>
     <b>籌碼：</b>外資連3買、借券賣出連3減、投信、融資。盤中只作背景；盤後才正式進入波段延續評分。盤後會在14:25、20:30、23:40及次日08:15補抓。<br>
     <b>族群共振原始10：</b>廣度3＋強度2＋量能2＋領頭股2＋延續性1；盤中換算為20分、盤後換算為15分。強勢股成交金額占比也納入強度；點開族群即可點選共振個股。若個股沒有自訂窄族群，會自動改用官方產業代理展開同產業股票；這只補成分股清單，不改原本代理分數。<br>
     <b>兩套個股分數：</b>盤中看「盤中動能」，用來做當沖/庫存進出/族群輪動；盤後看「波段延續＋進場位置」，用來規劃隔日與波段。大盤15分始終獨立，不灌入個股。<br><b>大盤 15（獨立）：</b>只判斷今天的操作環境。盤中＝加權3＋櫃買3＋今日上漲家數3＋盤中資金動能4＋族群擴散2，昨日外資只顯示背景、不計分。盤後＝加權5（多頭排列5／僅站20MA 2.5／跌破20MA 0）＋櫃買4（4／2／0）＋上漲家數3（≥60%=3、55%=2.5、50%=1.5、45%=0.5）＋官方外資3（當日方向最多2＋近5日方向最多1）。<br><b>資金輪動：</b>看族群成交金額占比的近30分鐘變化，再合併漲跌、站VWAP比例、上漲家數與量速；這是吸金熱度，不是法人淨流入。整個盤中族群輪動區可展開／收合，狀態會記住；展開後仍可再點單一族群看同族群股票，再點股票查看小卡。<br><br><b>分數標籤：</b>盤中＝強動能/轉強/中性/轉弱；盤後＝高延續/強/一般。先看用途，再看階段與分數。<br><br>
@@ -94,6 +94,7 @@ function lots(v){return v===null||v===undefined?"—":num((+v)/1000,0)+"張"}
 function marketLots(v){if(v===null||v===undefined||Number.isNaN(+v))return "—";v=+v;return Math.abs(v)>=10000?signed(v/10000,1,"萬張"):signed(v,0,"張")}
 function signed(v,d=1,suffix="%"){if(v===null||v===undefined||Number.isNaN(+v))return "—";return ((+v)>=0?"+":"")+num(v,d)+suffix}
 function moneyTw(v){if(v===null||v===undefined||Number.isNaN(+v))return "—";v=+v;if(v>=1e8)return num(v/1e8,1)+"億";if(v>=1e7)return num(v/1e7,1)+"千萬";return num(v/1e6,1)+"百萬"}
+function flowMoney(v){if(v===null||v===undefined||Number.isNaN(+v))return "—";v=+v;if(v===0)return "0";const a=Math.abs(v);if(a>=1)return signed(v,2,"億");if(a>=.1)return signed(v*10,1,"千萬");return signed(v*100,1,"百萬")}
 function cls(c){return c==="剛啟動"?"start":c==="等回踩"?"pull":c==="過熱不追"?"hot":"watch"}
 function qualityCls(q){return (q==="高共振"||q==="高延續"||q==="強動能")?"high":(q==="強"||q==="轉強")?"strong":""}
 function updateFooter(){
@@ -149,17 +150,19 @@ function toggleIntradaySectorRotation(){
 function closeSectorFundsHTML(){
  const arr=sectorFunds||[];
  const title="🏦 盤後族群法人資金流";
- const sub="外資＋投信官方淨買賣股數彙總（張），未含自營商；這是盤後觀察欄位，不額外增加個股100分";
+ const sub="外資＋投信官方淨買賣股數 × 各交易日收盤價估算；金額看力度、張數看方向，未含自營商；不額外增加個股100分";
  if(!arr.length)return `<div class="rotationbox"><div class="rotationtop"><div><div class="rotationtitle">${title}</div><div class="sub">${sub}</div></div></div><div class="rotationleaders">目前法人歷史資料不足，完成盤後籌碼更新後會顯示。</div></div>`;
 
- const allBuys=arr.filter(x=>(x.today_lots||0)>0).sort((a,b)=>(b.net5_lots??b.today_lots??0)-(a.net5_lots??a.today_lots??0));
- const allSells=arr.filter(x=>(x.today_lots||0)<0).sort((a,b)=>(a.net5_lots??a.today_lots??0)-(b.net5_lots??b.today_lots??0));
+ const strength=x=>x.net5_amount_100m??x.today_amount_100m??0;
+ const allBuys=arr.filter(x=>(x.today_amount_100m??0)>0).sort((a,b)=>strength(b)-strength(a));
+ const allSells=arr.filter(x=>(x.today_amount_100m??0)<0).sort((a,b)=>strength(a)-strength(b));
  const buys=allBuys.slice(0,8),sells=allSells.slice(0,8);
- const period=(v,need,n)=>v===null||v===undefined?`累積中 ${Math.min(n||0,need)}/${need}日`:signed(v,0,"張");
- const mini=x=>`<div class="closeflowpreviewitem"><span>${x.sector}</span><b>${signed(x.today_lots,0,"張")}</b></div>`;
- const one=x=>{const buy=(x.today_lots||0)>0,sell=(x.today_lots||0)<0;const tag=buy?"buy":sell?"sell":"flat";return `<div class="closeflowcard"><div class="closeflowname">${x.sector}</div><div class="closeflowgrid"><div class="closeflowitem"><span>當日法人淨買超</span><b>${signed(x.today_lots,0,"張")}</b></div><div class="closeflowitem"><span>近 5 日法人淨買超</span><b>${period(x.net5_lots,5,x.history_days)}</b></div><div class="closeflowitem"><span>近 20 日法人淨買超</span><b>${period(x.net20_lots,20,x.history_days)}</b></div><div class="closeflowitem"><span>近 5 日漲跌</span><b>${signed(x.ret5_pct,2)}</b></div></div><div class="flowtext">資金流向｜${x.flow_text||"—"}</div><span class="flowtag ${tag}">${x.action||"觀察"}</span></div>`};
+ const periodMoney=(v,need,n)=>v===null||v===undefined?`累積中 ${Math.min(n||0,need)}/${need}日`:flowMoney(v);
+ const lotsSub=v=>v===null||v===undefined?"張數待補":signed(v,0,"張");
+ const mini=x=>`<div class="closeflowpreviewitem"><span>${x.sector}</span><b>${flowMoney(x.today_amount_100m)}</b></div>`;
+ const one=x=>{const buy=(x.today_amount_100m??x.today_lots??0)>0,sell=(x.today_amount_100m??x.today_lots??0)<0;const tag=buy?"buy":sell?"sell":"flat";return `<div class="closeflowcard"><div class="closeflowname">${x.sector}</div><div class="closeflowgrid"><div class="closeflowitem"><span>當日估算淨額</span><b>${flowMoney(x.today_amount_100m)} <small>｜${lotsSub(x.today_lots)}</small></b></div><div class="closeflowitem"><span>近 5 日估算淨額</span><b>${periodMoney(x.net5_amount_100m,5,x.amount_history_days)} <small>｜${x.net5_lots===null||x.net5_lots===undefined?"張數累積中":signed(x.net5_lots,0,"張")}</small></b></div><div class="closeflowitem"><span>近 20 日估算淨額</span><b>${periodMoney(x.net20_amount_100m,20,x.amount_history_days)} <small>｜${x.net20_lots===null||x.net20_lots===undefined?"張數累積中":signed(x.net20_lots,0,"張")}</small></b></div><div class="closeflowitem"><span>近 5 日漲跌</span><b>${signed(x.ret5_pct,2)}</b></div></div><div class="flowtext">資金流向｜${x.flow_text||"—"}</div><div class="closeflowsummary">估算金額覆蓋 ${num(x.amount_coverage_pct,0)}%｜${x.amount_method||"淨買賣股數×當日收盤價"}</div><span class="flowtag ${tag}">${x.action||"觀察"}</span></div>`};
 
- const preview=`<div class="closeflowpreview"><div class="closeflowpreviewcol"><div class="closeflowpreviewhead">🔴 流入前 3</div>${allBuys.length?allBuys.slice(0,3).map(mini).join(""):`<div class="sub">目前無明顯流入</div>`}</div><div class="closeflowpreviewcol"><div class="closeflowpreviewhead">🟢 流出前 3</div>${allSells.length?allSells.slice(0,3).map(mini).join(""):`<div class="sub">目前無明顯流出</div>`}</div></div><div class="closeflowsummary">今日流入 ${allBuys.length} 個族群｜流出 ${allSells.length} 個族群｜完整明細各顯示前 8 名</div>`;
+ const preview=`<div class="closeflowpreview"><div class="closeflowpreviewcol"><div class="closeflowpreviewhead">🔴 流入前 3</div>${allBuys.length?allBuys.slice(0,3).map(mini).join(""):`<div class="sub">目前無明顯流入</div>`}</div><div class="closeflowpreviewcol"><div class="closeflowpreviewhead">🟢 流出前 3</div>${allSells.length?allSells.slice(0,3).map(mini).join(""):`<div class="sub">目前無明顯流出</div>`}</div></div><div class="closeflowsummary">依估算金額力度排序｜今日流入 ${allBuys.length} 個族群｜流出 ${allSells.length} 個族群｜完整明細各顯示前 8 名</div>`;
  const detail=sectorFundsOpen?`<div class="rotationcols"><div><div class="rotationhead">🔴 法人流入／加碼</div>${buys.length?buys.map(one).join(""):`<div class="sub">目前沒有明顯法人流入族群</div>`}</div><div><div class="rotationhead">🟢 法人流出／減碼</div>${sells.length?sells.map(one).join(""):`<div class="sub">目前沒有明顯法人流出族群</div>`}</div></div>`:"";
  const label=sectorFundsOpen?"收合族群明細":"展開完整族群";
  const arrow=sectorFundsOpen?"▲":"▼";

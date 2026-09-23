@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.5.10
+犬子老師飆股雷達 Free Edition v1.5.12
 =================================
 盤中＝執行雷達（即時動能100，籌碼只作背景）；盤後＝波段雷達（延續品質直接100分＋進場位置）；大盤15分獨立
 
@@ -1879,6 +1879,9 @@ def build_close():
     official_trade_date = max((v.get("date") for v in official_today.values() if v.get("date")), default=None)
 
     rows = []
+    # v1.5.12：沿用這一輪本來就下載的6個月日K，保存各股近期每日收盤價，
+    # 供法人「淨股數 × 當日收盤價」估算歷史金額；不額外再打一輪行情來源。
+    price_history = {}
     breadth_changes = []
     syms = uni["symbol"].tolist()
 
@@ -1895,6 +1898,15 @@ def build_close():
                 m = meta.get(sym, {})
                 code = str(m.get("code", sym.split(".")[0]))
                 x = overlay_official_today_bar(x, official_today.get(code))
+                try:
+                    ph = {}
+                    for idx, px in x["Close"].dropna().tail(45).items():
+                        v = float(px)
+                        if np.isfinite(v) and v > 0:
+                            ph[str(pd.Timestamp(idx).date())] = v
+                    price_history[code] = ph
+                except Exception:
+                    price_history[code] = {}
                 t = close_technical(x)
                 if not t:
                     continue
@@ -1957,7 +1969,7 @@ def build_close():
         r["chip_coverage_pct"] = coverage
 
     rows = add_component_scores(rows, market, preliminary_intraday=False)
-    sector_funds = build_sector_institution_flow(rows)
+    sector_funds = build_sector_institution_flow(rows, price_history)
 
     dump("close.json", {
         "updated_at": now_tw().isoformat(timespec="seconds"),
@@ -1965,7 +1977,7 @@ def build_close():
         "data_complete": bool(market.get("data_complete")),
         "market": market,
         "sector_funds": sector_funds,
-        "sector_funds_note": "外資＋投信官方淨買賣股數彙總，單位張；未含自營商；不額外計入個股100分",
+        "sector_funds_note": "外資＋投信官方淨買賣股數 × 各交易日收盤價估算金額；張數保留；未含自營商；估算金額僅供力度比較，不額外計入個股100分",
         "score_formula": {"mode": "swing_direct_100", "technical": 50, "chip": 25, "sector": 15, "liquidity": 10, "total": 100, "normalized": False, "entry_position": 100, "market_separate": 15},
         "rows": rows,
     })
@@ -1976,7 +1988,7 @@ def build_close():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "close_updated_at": now_tw().isoformat(timespec="seconds"),
         "daily_count": len(rows),
-        "version": "1.5.10-free",
+        "version": "1.5.12-free",
     })
     dump("status.json", status)
 
@@ -2338,14 +2350,16 @@ def build_intraday_market(rows, market_live, rotation, close_market):
     }
 
 
-def build_sector_institution_flow(rows):
-    """盤後族群法人資金流：外資＋投信官方逐股淨買賣股數彙總。
+def build_sector_institution_flow(rows, price_history=None):
+    """盤後族群法人資金流：官方淨買賣股數 + 同日收盤價估算金額。
 
-    單位使用「張」，而不是用現在股價回推歷史億元，避免把估算金額
-    誤當成官方歷史資金流。族群優先採自訂 sector_group，未分類者退回
-    官方 industry_name。此資料只做盤後觀察，不額外灌入個股 100 分。
+    金額 = (外資淨買賣股數 + 投信淨買賣股數) × 該交易日收盤價。
+    這是逐日、逐股估算後再彙總，不是官方逐股實際成交金額；張數仍保留。
+    族群優先採自訂 sector_group，未分類者退回官方 industry_name。
+    此資料只做盤後觀察，不額外灌入個股100分。
     """
     history = load_json("chip_history.json", {})
+    price_history = price_history or {}
     if not isinstance(history, dict) or not rows:
         return []
 
@@ -2362,6 +2376,7 @@ def build_sector_institution_flow(rows):
         daily = {}
         for r in members:
             code = str(r.get("code") or "")
+            prices = price_history.get(code) or {}
             for h in history.get(code) or []:
                 ds = str(h.get("date") or "")
                 if not ds:
@@ -2374,27 +2389,57 @@ def build_sector_institution_flow(rows):
                     net = float(fv or 0) + float(tv or 0)
                 except Exception:
                     continue
-                daily[ds] = daily.get(ds, 0.0) + net
+                z = daily.setdefault(ds, {"shares": 0.0, "amount": 0.0, "records": 0, "priced": 0})
+                z["shares"] += net
+                z["records"] += 1
+                try:
+                    px = float(prices.get(ds))
+                except Exception:
+                    px = None
+                if px is not None and np.isfinite(px) and px > 0:
+                    z["amount"] += net * px
+                    z["priced"] += 1
 
         ordered = sorted(daily.items(), key=lambda x: x[0], reverse=True)
-        vals = [v / 1000.0 for _, v in ordered]  # 股 -> 張
+        vals = [z["shares"] / 1000.0 for _, z in ordered]  # 股 -> 張
+        amount_vals = []
+        for _, z in ordered:
+            cov = (z["priced"] / z["records"]) if z["records"] else 0.0
+            # 避免少數缺價個股讓族群金額看起來過度精確；單日覆蓋至少80%才採用。
+            amount_vals.append((z["amount"] / 100_000_000.0) if cov >= 0.80 else None)
+
         latest = vals[0] if vals else None
         prev = vals[1] if len(vals) >= 2 else None
         net5 = sum(vals[:5]) if len(vals) >= 5 else None
         net20 = sum(vals[:20]) if len(vals) >= 20 else None
 
+        latest_amount = amount_vals[0] if amount_vals else None
+        prev_amount = amount_vals[1] if len(amount_vals) >= 2 else None
+        net5_amount = sum(amount_vals[:5]) if len(amount_vals) >= 5 and all(v is not None for v in amount_vals[:5]) else None
+        net20_amount = sum(amount_vals[:20]) if len(amount_vals) >= 20 and all(v is not None for v in amount_vals[:20]) else None
+
+        recent_rows = [z for _, z in ordered[:20]]
+        rec_n = sum(int(z.get("records") or 0) for z in recent_rows)
+        priced_n = sum(int(z.get("priced") or 0) for z in recent_rows)
+        amount_coverage = (priced_n / rec_n * 100.0) if rec_n else 0.0
+        amount_days = sum(v is not None for v in amount_vals)
+
+        # 金額資料完整時，用金額判定流入/流出與加速；否則退回原本張數方向。
+        flow_vals = amount_vals if latest_amount is not None else vals
+        flow_latest = flow_vals[0] if flow_vals else None
+        flow_prev = flow_vals[1] if len(flow_vals) >= 2 else None
         streak = 0
         streak_dir = None
-        if vals and vals[0] != 0:
-            streak_dir = 1 if vals[0] > 0 else -1
-            for v in vals:
-                if v == 0 or (1 if v > 0 else -1) != streak_dir:
+        if flow_latest is not None and flow_latest != 0:
+            streak_dir = 1 if flow_latest > 0 else -1
+            for v in flow_vals:
+                if v is None or v == 0 or (1 if v > 0 else -1) != streak_dir:
                     break
                 streak += 1
 
         accelerating = bool(
-            latest is not None and prev is not None and latest * prev > 0
-            and abs(latest) >= abs(prev) * 1.15
+            flow_latest is not None and flow_prev is not None and flow_latest * flow_prev > 0
+            and abs(flow_latest) >= abs(flow_prev) * 1.15
         )
         if streak_dir == 1:
             flow_text = f"連續流入 {streak} 天" + (" ↑ 流入加速" if accelerating else "")
@@ -2403,15 +2448,17 @@ def build_sector_institution_flow(rows):
         else:
             flow_text = "資金方向中性"
 
-        if latest is None:
+        action_latest = latest_amount if latest_amount is not None else latest
+        action_5 = net5_amount if net5_amount is not None else net5
+        if action_latest is None:
             action = "資料累積中"
-        elif latest > 0 and (net5 is None or net5 > 0):
+        elif action_latest > 0 and (action_5 is None or action_5 > 0):
             action = "持續加碼"
-        elif latest > 0:
+        elif action_latest > 0:
             action = "轉為加碼"
-        elif latest < 0 and (net5 is None or net5 < 0):
+        elif action_latest < 0 and (action_5 is None or action_5 < 0):
             action = "持續減碼"
-        elif latest < 0:
+        elif action_latest < 0:
             action = "轉為減碼"
         else:
             action = "中性"
@@ -2425,6 +2472,12 @@ def build_sector_institution_flow(rows):
 
         out.append({
             "sector": key,
+            "today_amount_100m": None if latest_amount is None else round(latest_amount, 4),
+            "net5_amount_100m": None if net5_amount is None else round(net5_amount, 4),
+            "net20_amount_100m": None if net20_amount is None else round(net20_amount, 4),
+            "amount_history_days": amount_days,
+            "amount_coverage_pct": round(amount_coverage, 1),
+            "amount_method": "外資＋投信淨買賣股數×各交易日收盤價（估算）",
             "today_lots": None if latest is None else round(latest, 1),
             "net5_lots": None if net5 is None else round(net5, 1),
             "net20_lots": None if net20 is None else round(net20, 1),
@@ -2441,13 +2494,12 @@ def build_sector_institution_flow(rows):
 
     out.sort(
         key=lambda x: (
+            abs(float(x.get("net5_amount_100m") or x.get("today_amount_100m") or 0)),
             abs(float(x.get("net5_lots") or x.get("today_lots") or 0)),
-            abs(float(x.get("today_lots") or 0)),
         ),
         reverse=True,
     )
     return out
-
 def build_intraday():
     close_obj = load_json("close.json", {"rows": []})
     close_rows = close_obj.get("rows", [])
