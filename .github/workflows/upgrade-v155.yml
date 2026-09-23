@@ -1,0 +1,138 @@
+name: Install Radar v1.5.5 Intraday Amplitude Efficiency
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/upgrade-v155.yml"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v155-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+
+      - name: Sync latest deployed data
+        run: python scripts/sync_live_data.py || true
+
+      - name: Apply v1.5.5 amplitude-efficiency patch
+        run: python scripts/patch_v155.py
+
+      - name: Syntax check
+        run: python -m py_compile scripts/build_data.py scripts/patch_v155.py
+
+      - name: Synthetic amplitude smoke test
+        run: |
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path('scripts').resolve()))
+          import pandas as pd
+          import build_data as b
+
+          days=['2026-09-17','2026-09-18','2026-09-21','2026-09-22','2026-09-23']
+          rows=[]; idx=[]
+          base=100.0
+          for di,d in enumerate(days):
+              for i in range(18):
+                  t=pd.Timestamp(f'{d} 09:00')+pd.Timedelta(minutes=5*i)
+                  op=base+di*0.6+i*0.05
+                  cl=op+0.10+(0.02*i if di==4 else 0.0)
+                  hi=max(op,cl)+0.18+(0.02*i if di==4 else 0.0)
+                  lo=min(op,cl)-0.12
+                  rows.append([op,hi,lo,cl,100000+i*3000])
+                  idx.append(t)
+          df=pd.DataFrame(rows,index=idx,columns=['Open','High','Low','Close','Volume'])
+          r=b.intraday_technical(df)
+          if not r:
+              raise SystemExit('intraday_technical returned none')
+          required=['amplitude_pct','range_position_pct','amplitude_efficiency','same_time_amp_avg_pct','amplitude_multiple','amp_sample_days','amp_baseline_ready','amplitude_regime']
+          for k in required:
+              if k not in r:
+                  raise SystemExit('missing amplitude field: '+k)
+          market={'components':{'taiex':{'change_pct':0.5},'otc':{'change_pct':0.5}}}
+          score,parts=b._intraday_score_parts(r,market,5)
+          if not (0 <= score <= 100):
+              raise SystemExit('score outside 0..100')
+          if float(parts.get('flow_volume',0)) > 25 or float(parts.get('liquidity_risk',0)) > 10:
+              raise SystemExit('existing score bucket cap changed')
+          print({k:r.get(k) for k in required})
+          print('score',score,'flow',parts.get('flow_volume'),'risk',parts.get('liquidity_risk'))
+          PY
+
+      - name: Rebuild intraday radar
+        run: python scripts/build_data.py --mode intraday
+
+      - name: Verify v1.5.5 output and unchanged weights
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          intra=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
+          rows=intra.get('rows') or []
+          if not rows:
+              raise SystemExit('intraday rows empty')
+          sample=next((r for r in rows if 'amplitude_efficiency' in r),None)
+          if not sample:
+              raise SystemExit('no row has amplitude-efficiency fields')
+          for k in ['amplitude_pct','range_position_pct','amplitude_efficiency','amplitude_regime','amp_sample_days']:
+              if k not in sample:
+                  raise SystemExit('missing output field: '+k)
+          formula=intra.get('score_formula') or {}
+          expected={'price_structure':30,'flow_volume':25,'relative_strength':15,'sector':20,'liquidity_risk':10}
+          for k,v in expected.items():
+              if formula.get(k) != v:
+                  raise SystemExit(f'weight changed: {k}={formula.get(k)} expected {v}')
+          if formula.get('amplitude_efficiency') != 'inside_flow_and_liquidity_risk_no_new_weight':
+              raise SystemExit('amplitude no-new-weight marker missing')
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          for marker in ['v1.5.5','振幅效率','同時段振幅倍數','振幅狀態']:
+              if marker not in html:
+                  raise SystemExit('UI marker missing: '+marker)
+          print('sample', {k:sample.get(k) for k in ['code','name','amplitude_pct','range_position_pct','amplitude_multiple','amp_sample_days','amplitude_efficiency','amplitude_regime']})
+          print('score formula',formula)
+          print('v1.5.5 verification OK')
+          PY
+
+      - name: Commit v1.5.5 source only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py docs/index.html docs/sw.js
+          git diff --cached --quiet || git commit -m "Apply v1.5.5 intraday amplitude efficiency"
+          git reset --hard HEAD
+          git clean -fd .cache || true
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 5
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
