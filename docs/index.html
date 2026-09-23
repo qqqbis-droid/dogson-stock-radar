@@ -58,11 +58,15 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 /* v1.5.24 Step 5 multi-timeframe */
 .mtfbox{margin-top:10px;border:1px solid #344760;background:linear-gradient(180deg,#111a26,#0e151f);border-radius:13px;padding:10px}.mtftop{display:flex;justify-content:space-between;gap:8px;align-items:center}.mtftitle{font-size:11px;color:#9ba5b6;font-weight:850}.mtflabel{font-size:12px;font-weight:900;color:#b9ddff}.mtfgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.mtfcell{background:#0d141d;border:1px solid #29384b;border-radius:10px;padding:8px}.mtfcellv{font-size:11px;font-weight:900}.mtfcelll{font-size:9px;color:#9ba5b6;margin-top:3px;line-height:1.45}.mtfnote{font-size:9px;color:#7f8b9d;margin-top:7px;line-height:1.45}@media(max-width:520px){.mtfgrid{grid-template-columns:1fr}.mtfcell{padding:7px 8px}}
 
+
+/* v1.5.26 portfolio decision */
+.portfolio-decision{margin-top:9px;border:1px solid #34455a;background:#0f1721;border-radius:11px;padding:9px}.portfolio-decision-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.portfolio-decision-title{font-size:10px;color:#9ba5b6;font-weight:850}.portfolio-decision-badge{border-radius:999px;padding:5px 8px;font-size:11px;font-weight:900;white-space:nowrap}.portfolio-decision-badge.hold{background:#173527;color:#a5efbf}.portfolio-decision-badge.cool{background:#173049;color:#b7ddff}.portfolio-decision-badge.pause{background:#40300f;color:#ffd477}.portfolio-decision-badge.reduce{background:#43251c;color:#ffc29f}.portfolio-decision-badge.exit{background:#471820;color:#ff9cac}.portfolio-decision-head{font-size:12px;font-weight:900;margin-top:6px}.portfolio-decision-reasons{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}.portfolio-decision-reasons span{font-size:9px;background:#151f2a;border:1px solid #2a394a;border-radius:8px;padding:5px 7px;color:#c2ccda}.portfolio-decision-note{font-size:9px;color:var(--muted);line-height:1.45;margin-top:7px}
+
 </style>
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.25｜Step 5 多時間框架完整化</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.26｜庫存決策層＋多時間框架</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -305,13 +309,66 @@ function portfolioSummaryHTML(){
  const pc=pnl>0?"pnl up":pnl<0?"pnl down":"pnl";
  return `<div class="portfolio-summary"><div class="portfolio-summary-title">💼 我的庫存｜${entries.length} 檔</div><div class="portfolio-summary-sub">本機資料，不上傳 GitHub｜目前可取得行情 ${quoted}/${entries.length} 檔</div><div class="portfolio-summary-grid"><div class="portfolio-summary-item"><div class="portfolio-summary-v">${portfolioMoney(totalCost)}</div><div class="portfolio-summary-l">成本總額</div></div><div class="portfolio-summary-item"><div class="portfolio-summary-v">${portfolioMoney(coveredValue)}</div><div class="portfolio-summary-l">可計目前市值</div></div><div class="portfolio-summary-item"><div class="portfolio-summary-v ${pc}">${portfolioMoney(pnl)}</div><div class="portfolio-summary-l">可計未實現損益</div></div><div class="portfolio-summary-item"><div class="portfolio-summary-v ${pc}">${pct===null?"—":signed(pct,2)}</div><div class="portfolio-summary-l">可計報酬率</div></div></div></div>`;
 }
+function portfolioDecision(r,h){
+ const st=stageKey(r?.category),score=+(r?.intraday_score??r?.score??0),amp=String(r?.amplitude_regime||"");
+ const mtf=r?.multi_timeframe||{},mstate=String(mtf.state||""),h60=mtf["60m"]||{},daily=mtf.daily||{};
+ const rs=r?.relative_multiframe||{},rsState=String(rs.status||"");
+ const manual=String(h?.reason_status||"valid");
+ const reasons=[];
+ const structuralFail=manual==="invalid"||st==="結構失效"||String(h60.state||"")==="DEATH_CROSS"&&String(daily.state||"")==="WEAK";
+ if(structuralFail){
+  if(manual==="invalid")reasons.push("你已標記原始持有理由消失");
+  if(st==="結構失效")reasons.push("Stage 2.0 已進入結構失效");
+  if(String(h60.state||"")==="DEATH_CROSS")reasons.push("60K 20T跌破60T");
+  if(String(daily.state||"")==="WEAK")reasons.push("日K背景同步偏弱");
+  return {key:"exit",label:"❌ 結構失效",head:"原本持有邏輯已出現明顯失效訊號",reasons};
+ }
+ const multiWeak=mstate==="WEAK"||mstate==="CONFLICT"||h60.bearish===true;
+ const relWeak=rsState==="LAGGING";
+ if(st==="轉弱警戒"&&(multiWeak||relWeak||score<50)){
+  reasons.push("Stage 已轉弱警戒");
+  if(multiWeak)reasons.push("60K／日K框架未支持");
+  if(relWeak)reasons.push("多時框相對強弱落後市場");
+  if(score<50)reasons.push(`盤中動能 ${num(score,0)}/100`);
+  return {key:"reduce",label:"🟠 考慮減碼",head:"不是單一雜訊：已有兩層以上轉弱證據",reasons};
+ }
+ if(st==="轉弱警戒"||multiWeak||relWeak||manual==="weak"){
+  if(st==="轉弱警戒")reasons.push("Stage 轉弱，先不要加碼");
+  if(multiWeak)reasons.push("60K／日K尚未重新共振");
+  if(relWeak)reasons.push("相對市場偏弱");
+  if(manual==="weak")reasons.push("你手動標記持有理由轉弱");
+  return {key:"pause",label:"⚠️ 暫停加碼",head:"結構尚未正式失效，但先提高警覺",reasons};
+ }
+ const cooling=st==="回踩承接"||amp==="健康整理"||(mode==="intraday"&&score>0&&score<68&&h60.supportive===true&&String(daily.state||"")!=="WEAK");
+ if(cooling){
+  if(st==="回踩承接")reasons.push("目前屬發動後回踩承接");
+  if(h60.supportive===true)reasons.push(h60.label||"60K結構仍支持");
+  if(String(daily.state||"")!=="WEAK")reasons.push("日K主要結構未轉弱");
+  if(amp==="健康整理")reasons.push("振幅屬健康整理");
+  return {key:"cool",label:"🔵 只是降溫",head:"目前較像整理／回踩，不等於持有理由消失",reasons};
+ }
+ if(st==="過熱不追"){
+  reasons.push("新買點過熱，但持有與追價是兩件事");
+  if(h60.supportive===true)reasons.push(h60.label||"60K結構仍在");
+  return {key:"hold",label:"✅ 續抱觀察",head:"不適合追高，不代表既有庫存要賣",reasons};
+ }
+ if(h60.supportive===true)reasons.push(h60.label||"60K 20T/60T支持");
+ if(String(daily.state||"")==="BULLISH")reasons.push("日K背景偏多");
+ if(rsState==="LEADING"||rsState==="IMPROVING")reasons.push(rs.label||"相對強弱支持");
+ if(st)reasons.push(`Stage：${st}`);
+ return {key:"hold",label:"✅ 續抱",head:"核心結構仍成立，暫無必要因盤中雜訊退出",reasons:reasons.slice(0,4)};
+}
+function portfolioDecisionHTML(r,h){
+ const d=portfolioDecision(r,h);
+ return `<div class="portfolio-decision"><div class="portfolio-decision-top"><div class="portfolio-decision-title">🧭 系統持有判讀</div><span class="portfolio-decision-badge ${d.key}">${d.label}</span></div><div class="portfolio-decision-head">${d.head}</div><div class="portfolio-decision-reasons">${(d.reasons||[]).map(x=>`<span>${escHTML(x)}</span>`).join("")}</div><div class="portfolio-decision-note">這是持有管理層，不把「現在不適合新買」直接解讀成「手上股票要賣」。真正退出仍以你的原始進場理由與結構失效條件為核心。</div></div>`;
+}
 function portfolioHTML(r){
  const h=holding(r.code);if(!h)return "";
  const sh=+(h.shares||0),co=h.cost===null||h.cost===undefined?null:+h.cost,px=+(r.close||0),p=portfolioPnL(h,px);
  const pc=p.pnl>0?"pnl up":p.pnl<0?"pnl down":"pnl";
  const st=stageKey(r.category),sys=st==="結構失效"?`<span class="portfolio-system bad">系統目前：❌ 結構失效，請對照你的失效條件</span>`:st==="轉弱警戒"?`<span class="portfolio-system warn">系統目前：⚠️ 轉弱警戒，請檢查持有理由</span>`:`<span class="portfolio-system">系統目前：${st||"觀察"}</span>`;
  const reason=x=>escHTML(x||"尚未填寫").replace(/\n/g,"<br>");
- return `<div class="portfoliobox"><div class="portfolio-top"><div><div class="portfolio-title">💼 我的庫存</div><div class="portfolio-statusline"><span class="portfolio-status ${reasonStatusClass(h.reason_status)}">${reasonStatusText(h.reason_status)}</span>${sys}</div></div><button class="portfolio-editbtn" type="button" data-portfolio-edit="${r.code}">編輯庫存</button></div><div class="portfolio-grid"><div class="portfolio-metric"><div class="portfolio-metric-v">${sh>0?num(sh,0)+"股":"—"}</div><div class="portfolio-metric-l">持有股數</div></div><div class="portfolio-metric"><div class="portfolio-metric-v">${co&&co>0?num(co,2):"—"}</div><div class="portfolio-metric-l">平均成本</div></div><div class="portfolio-metric"><div class="portfolio-metric-v ${pc}">${portfolioMoney(p.pnl)}</div><div class="portfolio-metric-l">未實現損益</div></div><div class="portfolio-metric"><div class="portfolio-metric-v ${pc}">${p.pct===null?"—":signed(p.pct,2)}</div><div class="portfolio-metric-l">報酬率</div></div></div><div class="portfolio-reasons"><div class="portfolio-reason"><b>🎯 進場理由</b>${reason(h.entry_reason)}</div><div class="portfolio-reason"><b>🧩 持有理由</b>${reason(h.hold_reason)}</div><div class="portfolio-reason"><b>🛑 結構失效條件</b>${reason(h.invalidation)}</div></div>${r._portfolio_fallback?`<div class="portfolio-fallback">⚠️ ${escHTML(r._portfolio_fallback)}</div>`:""}</div>`;
+ return `<div class="portfoliobox"><div class="portfolio-top"><div><div class="portfolio-title">💼 我的庫存</div><div class="portfolio-statusline"><span class="portfolio-status ${reasonStatusClass(h.reason_status)}">${reasonStatusText(h.reason_status)}</span>${sys}</div></div><button class="portfolio-editbtn" type="button" data-portfolio-edit="${r.code}">編輯庫存</button></div><div class="portfolio-grid"><div class="portfolio-metric"><div class="portfolio-metric-v">${sh>0?num(sh,0)+"股":"—"}</div><div class="portfolio-metric-l">持有股數</div></div><div class="portfolio-metric"><div class="portfolio-metric-v">${co&&co>0?num(co,2):"—"}</div><div class="portfolio-metric-l">平均成本</div></div><div class="portfolio-metric"><div class="portfolio-metric-v ${pc}">${portfolioMoney(p.pnl)}</div><div class="portfolio-metric-l">未實現損益</div></div><div class="portfolio-metric"><div class="portfolio-metric-v ${pc}">${p.pct===null?"—":signed(p.pct,2)}</div><div class="portfolio-metric-l">報酬率</div></div></div>${portfolioDecisionHTML(r,h)}<div class="portfolio-reasons"><div class="portfolio-reason"><b>🎯 進場理由</b>${reason(h.entry_reason)}</div><div class="portfolio-reason"><b>🧩 持有理由</b>${reason(h.hold_reason)}</div><div class="portfolio-reason"><b>🛑 結構失效條件</b>${reason(h.invalidation)}</div></div>${r._portfolio_fallback?`<div class="portfolio-fallback">⚠️ ${escHTML(r._portfolio_fallback)}</div>`:""}</div>`;
 }
 function showPortfolioEditor(code){
  code=String(code);const r=currentHoldingRow(code)||universe.find(x=>String(x.code)===code)||{code,name:code};const h=holding(code)||{};
@@ -733,14 +790,14 @@ document.addEventListener("click",e=>{
 if("serviceWorker" in navigator){
  window.addEventListener("load",async()=>{
   try{
-   const reg=await navigator.serviceWorker.register("./sw.js?v=1525",{updateViaCache:"none"});
+   const reg=await navigator.serviceWorker.register("./sw.js?v=1526",{updateViaCache:"none"});
    await reg.update();
    let reloading=false;
    navigator.serviceWorker.addEventListener("controllerchange",()=>{
     if(reloading)return;
-    if(sessionStorage.getItem("dogsonSwReloaded1525")==="1")return;
+    if(sessionStorage.getItem("dogsonSwReloaded1526")==="1")return;
     reloading=true;
-    sessionStorage.setItem("dogsonSwReloaded1525","1");
+    sessionStorage.setItem("dogsonSwReloaded1526","1");
     location.reload();
    });
   }catch(e){}
@@ -748,7 +805,7 @@ if("serviceWorker" in navigator){
 }
 load();
 </script>
-<script src="./hourly.js?v=1525"></script>
+<script src="./hourly.js?v=1526"></script>
 <script src="./realtime-config.js?v=151"></script>
 <script src="./realtime.js?v=151"></script>
 </body>
