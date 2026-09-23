@@ -37,12 +37,22 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 .footer{position:fixed;left:0;right:0;bottom:0;background:rgba(11,13,18,.94);backdrop-filter:blur(16px);border-top:1px solid var(--line);padding:8px 14px calc(8px + env(safe-area-inset-bottom));font-size:11px;color:var(--muted);text-align:center}
 
 .parts.intradayparts,.parts.closeparts{grid-template-columns:repeat(2,1fr)}
-.peerpeekback{position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:40;display:flex;align-items:flex-end;justify-content:center;padding:14px}.peerpeek{width:min(720px,100%);background:#161c26;border:1px solid #344052;border-radius:18px;padding:14px;box-shadow:0 18px 50px rgba(0,0,0,.45)}.peerpeektop{display:flex;justify-content:space-between;gap:10px}.peerpeekname{font-size:19px;font-weight:900}.peerpeekgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:10px}.peerpeekitem{background:#0e131a;border:1px solid #29313e;border-radius:10px;padding:9px}.peerpeekv{font-weight:900}.peerpeekl{font-size:10px;color:var(--muted);margin-top:3px}.peerpeekactions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.peerpeekbtn{border:1px solid #36506f;background:#17304a;color:#cde6ff;border-radius:11px;padding:10px;font-weight:850}.peerpeekbtn.secondary{background:#242b38;border-color:#343d4d;color:#d4dae4}
+.peerpeekback{position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:40;display:flex;align-items:flex-end;justify-content:center;padding:14px}.peerpeek{width:min(720px,100%);background:#161c26;border:1px solid #344052;border-radius:18px;padding:14px;box-shadow:0 18px 50px rgba(0,0,0,.45)}.peerpeektop{display:flex;justify-content:space-between;gap:10px}.peerpeekname{font-size:19px;font-weight:900}.peerpeekgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:10px}.peerpeekitem{background:#0e131a;border:1px solid #29313e;border-radius:10px;padding:9px}.peerpeekv{font-weight:900}.peerpeekl{font-size:10px;color:var(--muted);margin-top:3px}.peerpeekactions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.peerpeekbtn{border:1px solid #36506f;background:#17304a;color:#cde6ff;border-radius:11px;padding:10px;font-weight:850}.peerpeekbtn.secondary{background:#242b38;border-color:#343d4d;color:#d4dae4}
+
+/* v1.5.22 portfolio mode */
+.portfolio-mini{border:1px solid #334256;background:#192231;color:#b9c9dd;border-radius:999px;padding:5px 8px;font-size:10px;font-weight:850;margin:7px 0 0 5px;cursor:pointer}.portfolio-mini.held{background:#2b2011;border-color:#5a4320;color:#ffd477}
+.portfolio-summary{background:linear-gradient(180deg,#1b202b,#121821);border:1px solid #394559;border-radius:16px;padding:12px;margin:10px 0}.portfolio-summary-title{font-size:16px;font-weight:900}.portfolio-summary-sub{font-size:10px;color:var(--muted);margin-top:3px;line-height:1.45}.portfolio-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:10px}.portfolio-summary-item{background:#0e131a;border:1px solid #29313e;border-radius:10px;padding:8px;min-width:0}.portfolio-summary-v{font-size:13px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.portfolio-summary-l{font-size:9px;color:var(--muted);margin-top:3px}
+.portfoliobox{margin-top:10px;background:linear-gradient(180deg,#181d26,#10151c);border:1px solid #3b4658;border-radius:13px;padding:11px}.portfolio-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.portfolio-title{font-size:12px;font-weight:900}.portfolio-editbtn{border:1px solid #40526a;background:#172538;color:#cde6ff;border-radius:9px;padding:6px 8px;font-size:10px;font-weight:850;cursor:pointer}.portfolio-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:9px}.portfolio-metric{background:#0e131a;border:1px solid #29313e;border-radius:9px;padding:7px;min-width:0}.portfolio-metric-v{font-size:12px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.portfolio-metric-l{font-size:9px;color:var(--muted);margin-top:3px}.pnl.up{color:var(--red)}.pnl.down{color:var(--green)}
+.portfolio-statusline{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:9px}.portfolio-status{display:inline-flex;border-radius:999px;padding:5px 8px;font-size:10px;font-weight:900}.portfolio-status.valid{background:#173527;color:#9ef0bd}.portfolio-status.weak{background:#40300f;color:#ffd477}.portfolio-status.invalid{background:#471820;color:#ff9cac}.portfolio-system{font-size:10px;color:var(--muted)}.portfolio-system.warn{color:#ffd477}.portfolio-system.bad{color:#ff9cac}
+.portfolio-reasons{display:grid;gap:6px;margin-top:9px}.portfolio-reason{background:#101722;border:1px solid #263140;border-radius:9px;padding:8px;font-size:11px;line-height:1.5}.portfolio-reason b{display:block;font-size:9px;color:#9ba5b6;margin-bottom:3px}.portfolio-fallback{font-size:10px;color:#ffd477;margin-top:8px}
+.portfolio-back{position:fixed;inset:0;background:rgba(0,0,0,.64);z-index:55;display:flex;align-items:flex-end;justify-content:center;padding:14px}.portfolio-modal{width:min(720px,100%);max-height:88vh;overflow:auto;background:#161c26;border:1px solid #3a4659;border-radius:18px;padding:14px;box-shadow:0 18px 50px rgba(0,0,0,.5)}.portfolio-modal-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.portfolio-modal-title{font-size:19px;font-weight:900}.portfolio-close{border:0;background:#242b38;color:#d4dae4;border-radius:10px;padding:8px 10px;font-weight:900}.portfolio-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}.portfolio-field{display:grid;gap:5px}.portfolio-field.full{grid-column:1/-1}.portfolio-field label{font-size:10px;color:#a8b2c1;font-weight:800}.portfolio-input,.portfolio-textarea,.portfolio-select{width:100%;background:#0e131a;color:#fff;border:1px solid #303b4a;border-radius:10px;padding:10px;font-size:13px}.portfolio-textarea{min-height:72px;resize:vertical;line-height:1.45}.portfolio-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}.portfolio-save,.portfolio-remove,.portfolio-cancel{border-radius:11px;padding:10px;font-weight:900}.portfolio-save{border:1px solid #2e6647;background:#173527;color:#9ef0bd}.portfolio-remove{border:1px solid #62303a;background:#30181e;color:#ffb3bf}.portfolio-cancel{border:1px solid #3a4352;background:#242b38;color:#d4dae4}.portfolio-privacy{font-size:10px;color:var(--muted);line-height:1.55;margin-top:10px}
+@media(max-width:620px){.portfolio-summary-grid,.portfolio-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.portfolio-form-grid{grid-template-columns:1fr}.portfolio-field.full{grid-column:auto}.portfolio-actions{grid-template-columns:1fr 1fr}.portfolio-cancel{grid-column:1/-1}}
+
 </style>
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.21｜生命週期可解釋化＋Stage Engine 2.0</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.22｜5分鐘變化雷達＋庫存模式</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -53,7 +63,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
  <div class="row"><input id="q" class="search" placeholder="輸入股票代號或名稱，例如 2308、台達電" autocomplete="off"><button id="scan" class="scan">掃描</button></div>
  <div id="suggestions" class="suggestions"></div>
  <div class="filters">
-  <button class="filter on" data-f="all">全部</button><button class="filter" data-f="蓄勢待發">🌱 蓄勢待發</button><button class="filter" data-f="剛啟動">🔥 剛啟動</button><button class="filter" data-f="回踩承接">🟡 回踩承接</button><button class="filter" data-f="趨勢持有">🚂 趨勢持有</button><button class="filter" data-f="觀察">🔵 觀察</button><button class="filter" data-f="轉弱警戒">⚠️ 轉弱警戒</button><button class="filter" data-f="結構失效">❌ 結構失效</button><button class="filter" data-f="過熱不追">🚫 過熱不追</button><button class="filter" id="watchOnly">⭐ 我的關注</button>
+  <button class="filter on" data-f="all">全部</button><button class="filter" data-f="蓄勢待發">🌱 蓄勢待發</button><button class="filter" data-f="剛啟動">🔥 剛啟動</button><button class="filter" data-f="回踩承接">🟡 回踩承接</button><button class="filter" data-f="趨勢持有">🚂 趨勢持有</button><button class="filter" data-f="觀察">🔵 觀察</button><button class="filter" data-f="轉弱警戒">⚠️ 轉弱警戒</button><button class="filter" data-f="結構失效">❌ 結構失效</button><button class="filter" data-f="過熱不追">🚫 過熱不追</button><button class="filter" id="watchOnly">⭐ 我的關注</button><button class="filter" id="portfolioOnly">💼 我的庫存</button>
  </div>
  <details class="help">
    <summary>❓ 每個數值怎麼看？第一次使用請點我</summary>
@@ -191,7 +201,17 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
       <div class="guide-tip">這一區回答的是「剛剛變了什麼」，不是另一套分數，也不會改動原本100分。</div>
     </div>
 
-    <div class="guide-title">⑭ 第一次使用，照這個順序最快</div>
+    <div class="guide-title">⑭ 💼 庫存模式：把「為什麼買」一起保存</div>
+    <div class="guide-card">
+      <div class="guide-line"><span class="guide-key">我的庫存</span>：只顯示你手動登記的實際持股，與「我的關注」分開。</div>
+      <div class="guide-line"><span class="guide-key">股數／平均成本</span>：用來即時計算目前市值、未實現損益與報酬率；正報酬依台股習慣顯示紅色、負報酬顯示綠色。</div>
+      <div class="guide-line"><span class="guide-key">進場理由</span>：記錄當初為什麼買；<span class="guide-key">持有理由</span>：記錄現在為什麼還留著。</div>
+      <div class="guide-line"><span class="guide-key">理由狀態</span>：由你手動標記 ✅仍成立／⚠️轉弱／❌消失。系統生命週期只提供證據，不會自動把你的核心理由改掉。</div>
+      <div class="guide-line"><span class="guide-key">結構失效條件</span>：先寫好什麼情況代表原本交易邏輯不成立，避免盤中被單根急殺或情緒帶走。</div>
+      <div class="guide-tip">庫存資料只存在目前瀏覽器的 localStorage，不會寫進公開 GitHub；換裝置／清除網站資料後不會自動同步。</div>
+    </div>
+
+    <div class="guide-title">⑮ 第一次使用，照這個順序最快</div>
     <div class="guide-card">
       <div class="guide-line"><b>盤中：</b>① 看大盤 15 分 → ② 看族群成交資金輪動 → ③ 找同族群高動能個股 → ④ 看 VWAP、量速、相對強弱與階段 → ⑤ 最後才決定要不要追、等回踩或只觀察。</div>
       <div class="guide-line"><b>盤後：</b>① 看大盤環境 → ② 看法人族群資金流 → ③ 看個股波段延續 → ④ 再看進場位置 → ⑤ 用籌碼、支撐壓力確認隔日計畫。</div>
@@ -204,13 +224,14 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 <div id="changebox"></div>
 <div id="liveStatus" class="live-status warn">🟡 近即時報價準備中｜技術結構仍採5分K</div>
 <div class="meta"><span id="modeText">盤中：5分K / VWAP / 量速</span><span id="updated">—</span></div>
+<div id="portfolioSummary"></div>
 <div id="cards"><div class="empty">正在讀取最新資料…</div></div>
 <div class="note">盤中大盤分只使用今天即時量價、VWAP、市場廣度與族群資金輪動；昨日外資只保留背景提示，不計入盤中15分。個股籌碼仍使用最近已完成交易日資料。族群資金「流入／流失」代表成交資金集中度與價格結構的變化，不等於法人淨買賣。</div>
 </div>
 <div class="footer" id="footerText">盤中動能100＝價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10｜籌碼只作背景｜大盤15分獨立</div>
 
 <script>
-let mode="intraday",filter="all",watchOnly=false,universe=[],closeRows=[],intraRows=[],rows=[],market={},marketLive={},closeMarket={},intraMarket={},sectorRotation=[],sectorFunds=[],changeRadar={};
+let mode="intraday",filter="all",watchOnly=false,portfolioOnly=false,portfolioData={},universe=[],closeRows=[],intraRows=[],rows=[],market={},marketLive={},closeMarket={},intraMarket={},sectorRotation=[],sectorFunds=[],changeRadar={};
 let sectorFundsOpen=localStorage.getItem("dogsonSectorFundsOpen")==="1";
 let sectorRotationOpen=localStorage.getItem("dogsonSectorRotationOpen")==="1";
 const $=id=>document.getElementById(id);
@@ -218,6 +239,72 @@ function watchlist(){try{return JSON.parse(localStorage.getItem("dogson-watch")|
 function saveWatch(x){localStorage.setItem("dogson-watch",JSON.stringify(x))}
 function watched(c){return watchlist().includes(String(c))}
 function toggleWatch(c){let w=watchlist();c=String(c);w=w.includes(c)?w.filter(x=>x!==c):[...w,c];saveWatch(w);render()}
+const PORTFOLIO_KEY="dogson-portfolio-v1";
+function loadPortfolio(){try{const x=JSON.parse(localStorage.getItem(PORTFOLIO_KEY)||"{}");return x&&typeof x==="object"&&!Array.isArray(x)?x:{}}catch{return {}}}
+function savePortfolioData(){localStorage.setItem(PORTFOLIO_KEY,JSON.stringify(portfolioData))}
+function holding(c){return portfolioData[String(c)]||null}
+function held(c){return !!holding(c)}
+function escHTML(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+function reasonStatusText(v){return v==="weak"?"⚠️ 轉弱":v==="invalid"?"❌ 消失":"✅ 仍成立"}
+function reasonStatusClass(v){return v==="weak"?"weak":v==="invalid"?"invalid":"valid"}
+function portfolioMoney(v){if(v===null||v===undefined||Number.isNaN(+v))return "—";const n=+v,a=Math.abs(n),sign=n>0?"+":n<0?"-":"";if(a>=1e8)return sign+"$"+num(a/1e8,2)+"億";if(a>=1e4)return sign+"$"+num(a/1e4,1)+"萬";return sign+"$"+num(a,0)}
+function currentHoldingRow(code){
+ code=String(code);
+ const primary=mode==="intraday"?intraRows:closeRows;
+ const secondary=mode==="intraday"?closeRows:intraRows;
+ const a=primary.find(x=>String(x.code)===code);if(a)return a;
+ const b=secondary.find(x=>String(x.code)===code);if(b)return {...b,_portfolio_fallback:mode==="intraday"?"盤中行情暫缺，使用最近盤後資料":"盤後資料暫缺，使用最近盤中資料"};
+ const u=universe.find(x=>String(x.code)===code);
+ return u?{...u,code,name:u.name||code,category:"觀察",score_reliable:false,reasons:[],_portfolio_fallback:"目前沒有可用行情，先保留庫存紀錄"}:null;
+}
+function portfolioPnL(h,px){
+ const shares=+(h?.shares||0),cost=+(h?.cost||0),price=+px;
+ if(!(shares>0)||!(cost>0)||!(price>0))return {costValue:null,marketValue:null,pnl:null,pct:null};
+ const costValue=shares*cost,marketValue=shares*price,pnl=marketValue-costValue;
+ return {costValue,marketValue,pnl,pct:costValue>0?pnl/costValue*100:null};
+}
+function portfolioSummaryHTML(){
+ if(!portfolioOnly)return "";
+ const entries=Object.entries(portfolioData);
+ if(!entries.length)return `<div class="portfolio-summary"><div class="portfolio-summary-title">💼 我的庫存</div><div class="portfolio-summary-sub">目前還沒有庫存紀錄。從任一個股卡點「💼 加入庫存」即可建立。</div></div>`;
+ let totalCost=0,coveredCost=0,coveredValue=0,quoted=0;
+ entries.forEach(([code,h])=>{
+  const sh=+(h.shares||0),co=+(h.cost||0);if(sh>0&&co>0)totalCost+=sh*co;
+  const r=currentHoldingRow(code),px=+(r?.close||0);if(sh>0&&co>0&&px>0){coveredCost+=sh*co;coveredValue+=sh*px;quoted++}
+ });
+ const pnl=coveredCost>0?coveredValue-coveredCost:null,pct=coveredCost>0?pnl/coveredCost*100:null;
+ const pc=pnl>0?"pnl up":pnl<0?"pnl down":"pnl";
+ return `<div class="portfolio-summary"><div class="portfolio-summary-title">💼 我的庫存｜${entries.length} 檔</div><div class="portfolio-summary-sub">本機資料，不上傳 GitHub｜目前可取得行情 ${quoted}/${entries.length} 檔</div><div class="portfolio-summary-grid"><div class="portfolio-summary-item"><div class="portfolio-summary-v">${portfolioMoney(totalCost)}</div><div class="portfolio-summary-l">成本總額</div></div><div class="portfolio-summary-item"><div class="portfolio-summary-v">${portfolioMoney(coveredValue)}</div><div class="portfolio-summary-l">可計目前市值</div></div><div class="portfolio-summary-item"><div class="portfolio-summary-v ${pc}">${portfolioMoney(pnl)}</div><div class="portfolio-summary-l">可計未實現損益</div></div><div class="portfolio-summary-item"><div class="portfolio-summary-v ${pc}">${pct===null?"—":signed(pct,2)}</div><div class="portfolio-summary-l">可計報酬率</div></div></div></div>`;
+}
+function portfolioHTML(r){
+ const h=holding(r.code);if(!h)return "";
+ const sh=+(h.shares||0),co=h.cost===null||h.cost===undefined?null:+h.cost,px=+(r.close||0),p=portfolioPnL(h,px);
+ const pc=p.pnl>0?"pnl up":p.pnl<0?"pnl down":"pnl";
+ const st=stageKey(r.category),sys=st==="結構失效"?`<span class="portfolio-system bad">系統目前：❌ 結構失效，請對照你的失效條件</span>`:st==="轉弱警戒"?`<span class="portfolio-system warn">系統目前：⚠️ 轉弱警戒，請檢查持有理由</span>`:`<span class="portfolio-system">系統目前：${st||"觀察"}</span>`;
+ const reason=x=>escHTML(x||"尚未填寫").replace(/\n/g,"<br>");
+ return `<div class="portfoliobox"><div class="portfolio-top"><div><div class="portfolio-title">💼 我的庫存</div><div class="portfolio-statusline"><span class="portfolio-status ${reasonStatusClass(h.reason_status)}">${reasonStatusText(h.reason_status)}</span>${sys}</div></div><button class="portfolio-editbtn" type="button" data-portfolio-edit="${r.code}">編輯庫存</button></div><div class="portfolio-grid"><div class="portfolio-metric"><div class="portfolio-metric-v">${sh>0?num(sh,0)+"股":"—"}</div><div class="portfolio-metric-l">持有股數</div></div><div class="portfolio-metric"><div class="portfolio-metric-v">${co&&co>0?num(co,2):"—"}</div><div class="portfolio-metric-l">平均成本</div></div><div class="portfolio-metric"><div class="portfolio-metric-v ${pc}">${portfolioMoney(p.pnl)}</div><div class="portfolio-metric-l">未實現損益</div></div><div class="portfolio-metric"><div class="portfolio-metric-v ${pc}">${p.pct===null?"—":signed(p.pct,2)}</div><div class="portfolio-metric-l">報酬率</div></div></div><div class="portfolio-reasons"><div class="portfolio-reason"><b>🎯 進場理由</b>${reason(h.entry_reason)}</div><div class="portfolio-reason"><b>🧩 持有理由</b>${reason(h.hold_reason)}</div><div class="portfolio-reason"><b>🛑 結構失效條件</b>${reason(h.invalidation)}</div></div>${r._portfolio_fallback?`<div class="portfolio-fallback">⚠️ ${escHTML(r._portfolio_fallback)}</div>`:""}</div>`;
+}
+function showPortfolioEditor(code){
+ code=String(code);const r=currentHoldingRow(code)||universe.find(x=>String(x.code)===code)||{code,name:code};const h=holding(code)||{};
+ document.getElementById("portfolioEditBack")?.remove();
+ const back=document.createElement("div");back.id="portfolioEditBack";back.className="portfolio-back";
+ const status=h.reason_status||"valid";
+ back.innerHTML=`<div class="portfolio-modal"><div class="portfolio-modal-top"><div><div class="portfolio-modal-title">💼 ${escHTML(r.name||code)} <span class="code">${escHTML(code)}</span></div><div class="sub">庫存資料只存在這個瀏覽器</div></div><button class="portfolio-close" type="button" data-portfolio-cancel="1">關閉</button></div><div class="portfolio-form-grid"><div class="portfolio-field"><label>持有股數</label><input id="pfShares" class="portfolio-input" type="number" min="0" step="1" inputmode="numeric" value="${escHTML(h.shares??"")}" placeholder="例如 40"></div><div class="portfolio-field"><label>平均成本</label><input id="pfCost" class="portfolio-input" type="number" min="0" step="0.01" inputmode="decimal" value="${escHTML(h.cost??"")}" placeholder="例如 139.5"></div><div class="portfolio-field full"><label>進場理由｜當初為什麼買？</label><textarea id="pfEntry" class="portfolio-textarea" placeholder="例如：外資連買、股價尚未發動，小量試單">${escHTML(h.entry_reason||"")}</textarea></div><div class="portfolio-field full"><label>持有理由｜現在為什麼繼續留？</label><textarea id="pfHold" class="portfolio-textarea" placeholder="例如：60分K仍向上、族群共振、支撐未失守">${escHTML(h.hold_reason||"")}</textarea></div><div class="portfolio-field"><label>理由狀態｜由你手動維護</label><select id="pfStatus" class="portfolio-select"><option value="valid" ${status==="valid"?"selected":""}>✅ 仍成立</option><option value="weak" ${status==="weak"?"selected":""}>⚠️ 轉弱</option><option value="invalid" ${status==="invalid"?"selected":""}>❌ 消失</option></select></div><div class="portfolio-field"><label>目前行情</label><div class="portfolio-input">${r.close?num(r.close,2):"—"}｜${stageKey(r.category)||"觀察"}</div></div><div class="portfolio-field full"><label>結構失效條件｜什麼情況代表交易邏輯不成立？</label><textarea id="pfInvalid" class="portfolio-textarea" placeholder="例如：跌破20MA＋前低且反抽站不回，並伴隨量增">${escHTML(h.invalidation||"")}</textarea></div></div><div class="portfolio-actions"><button class="portfolio-save" type="button" data-portfolio-save="${escHTML(code)}">儲存庫存</button><button class="portfolio-remove" type="button" data-portfolio-remove="${escHTML(code)}">移除庫存</button><button class="portfolio-cancel" type="button" data-portfolio-cancel="1">取消</button></div><div class="portfolio-privacy">🔒 這些資料只寫入目前裝置的 localStorage，不會送到公開 GitHub repository。清除網站資料、無痕模式或更換裝置時不會自動同步。</div></div>`;
+ document.body.appendChild(back);
+}
+function savePortfolioEditor(code){
+ code=String(code);const shares=Number(document.getElementById("pfShares")?.value||0),rawCost=(document.getElementById("pfCost")?.value||"").trim(),cost=rawCost===""?null:Number(rawCost);
+ if(!(shares>0)){alert("請輸入大於 0 的持有股數");return}
+ if(cost!==null&&(!(cost>0)||!Number.isFinite(cost))){alert("平均成本請輸入大於 0 的數字，或先留空");return}
+ portfolioData[code]={shares,cost,entry_reason:document.getElementById("pfEntry")?.value.trim()||"",hold_reason:document.getElementById("pfHold")?.value.trim()||"",reason_status:document.getElementById("pfStatus")?.value||"valid",invalidation:document.getElementById("pfInvalid")?.value.trim()||"",updated_at:new Date().toISOString()};
+ savePortfolioData();document.getElementById("portfolioEditBack")?.remove();render();
+}
+function removePortfolio(code){
+ code=String(code);if(!holding(code)){document.getElementById("portfolioEditBack")?.remove();return}
+ if(!confirm(`確定要把 ${code} 從「我的庫存」移除嗎？`))return;
+ delete portfolioData[code];savePortfolioData();document.getElementById("portfolioEditBack")?.remove();render();
+}
+portfolioData=loadPortfolio();
 function num(v,d=1){return v===null||v===undefined||Number.isNaN(+v)?"—":(+v).toFixed(d)}
 function lots(v){return v===null||v===undefined?"—":num((+v)/1000,0)+"張"}
 function marketLots(v){if(v===null||v===undefined||Number.isNaN(+v))return "—";v=+v;return Math.abs(v)>=10000?signed(v/10000,1,"萬張"):signed(v,0,"張")}
@@ -443,7 +530,7 @@ function showPeerPeek(code){
  ]:[
   ["收盤",num(r.close,2)],["波段延續",(r.score_reliable===false?"待補":num(r.swing_quality_score??r.score,0)+"/100")],["進場位置",num(r.entry_position_score,0)+"/100"],["籌碼",(+r.chip_coverage_pct||0)<60?"待補":num(r.chip_score,0)+"/25"],["族群共振",num(r.sector_score,1)+"/10"],["階段",r.category||"觀察"]
  ];
- back.innerHTML=`<div class="peerpeek"><div class="peerpeektop"><div><div class="peerpeekname">${r.name} <span class="code">${r.code}</span></div><div class="sub">${r.sector_group||r.industry_name||r.industry||"未分類"}｜${signed(r.day_change,1)}</div></div><span class="cat ${cls(r.category)}">${stageKey(r.category)||"觀察"}</span></div><div class="peerpeekgrid">${items.map(x=>`<div class="peerpeekitem"><div class="peerpeekv">${x[1]}</div><div class="peerpeekl">${x[0]}</div></div>`).join("")}</div>${stageExplainHTML(r,true)}<div class="peerpeekactions"><button class="peerpeekbtn" data-peer-open="${r.code}">查看完整個股</button><button class="peerpeekbtn secondary" data-peer-close="1">關閉</button></div></div>`;
+ back.innerHTML=`<div class="peerpeek"><div class="peerpeektop"><div><div class="peerpeekname">${r.name} <span class="code">${r.code}</span></div><div class="sub">${r.sector_group||r.industry_name||r.industry||"未分類"}｜${signed(r.day_change,1)}</div></div><span class="cat ${cls(r.category)}">${stageKey(r.category)||"觀察"}</span></div><div class="peerpeekgrid">${items.map(x=>`<div class="peerpeekitem"><div class="peerpeekv">${x[1]}</div><div class="peerpeekl">${x[0]}</div></div>`).join("")}</div>${stageExplainHTML(r,true)}<div class="peerpeekactions"><button class="peerpeekbtn" data-peer-open="${r.code}">查看完整個股</button><button class="peerpeekbtn" data-portfolio-edit="${r.code}">💼 庫存</button><button class="peerpeekbtn secondary" data-peer-close="1">關閉</button></div></div>`;
  document.body.appendChild(back);
 }
 function focusPeer(code){
@@ -470,13 +557,17 @@ function stageKey(v){
 
 function render(){
  rows=mode==="intraday"?intraRows:closeRows;
- let rr=rows.filter(r=>(filter==="all"||stageKey(r.category)===stageKey(filter))&&(!watchOnly||watched(r.code)));
+ let source=rows;
+ if(portfolioOnly)source=Object.keys(portfolioData).map(code=>currentHoldingRow(code)).filter(Boolean);
+ let rr=source.filter(r=>(filter==="all"||stageKey(r.category)===stageKey(filter))&&(!watchOnly||watched(r.code)));
+ $("portfolioSummary").innerHTML=portfolioSummaryHTML();
  const q=$("q").value.trim().toLowerCase();
  if(q){let hits=rr.filter(r=>String(r.code)===q||String(r.name).toLowerCase().includes(q));if(hits.length)rr=hits}
  if(!rr.length){$("cards").innerHTML='<div class="empty">目前沒有符合條件的資料。盤中會掃描所有通過流動性門檻的股票；若個別免費行情源暫缺，切到盤後仍可查完整日K資料。</div>';return}
  $("cards").innerHTML=rr.slice(0,70).map(r=>`<div class="card" data-code="${r.code}">
-  <div class="top"><div class="stockleft"><button class="star ${watched(r.code)?"on":""}" onclick="toggleWatch('${r.code}')">${watched(r.code)?"★":"☆"}</button><div><div class="name">${r.name}<span class="code">${r.code}</span></div><div class="sub">${r.industry_name||r.industry||"未分類"}${r.sector_group?" · "+r.sector_group:""} · ${mode==="intraday"?(r.time||""):(r.date||"")}</div><span class="cat ${cls(r.category)}">${stageKey(r.category)}</span><span class="quality ${qualityCls(r.quality_label)}">${mode==="intraday"?"動能":"波段"}：${r.quality_label||"一般"}</span></div></div><div><div class="score">${mode==="intraday"?num(r.intraday_score??r.score,0):(r.score_reliable===false?"—":num(r.swing_quality_score??r.score,0))}</div><div class="label">${mode==="intraday"?"盤中動能 /100":(r.score_reliable===false?"籌碼覆蓋不足":"波段延續 /100")}</div></div></div>
+  <div class="top"><div class="stockleft"><button class="star ${watched(r.code)?"on":""}" onclick="toggleWatch('${r.code}')">${watched(r.code)?"★":"☆"}</button><div><div class="name">${r.name}<span class="code">${r.code}</span></div><div class="sub">${r.industry_name||r.industry||"未分類"}${r.sector_group?" · "+r.sector_group:""} · ${mode==="intraday"?(r.time||""):(r.date||"")}</div><span class="cat ${cls(r.category)}">${stageKey(r.category)}</span><span class="quality ${qualityCls(r.quality_label)}">${mode==="intraday"?"動能":"波段"}：${r.quality_label||"一般"}</span><button class="portfolio-mini ${held(r.code)?"held":""}" type="button" data-portfolio-edit="${r.code}">${held(r.code)?"💼 已持有":"💼 加入庫存"}</button></div></div><div><div class="score">${mode==="intraday"?num(r.intraday_score??r.score,0):(r.score_reliable===false?"—":num(r.swing_quality_score??r.score,0))}</div><div class="label">${mode==="intraday"?"盤中動能 /100":(r.score_reliable===false?"籌碼覆蓋不足":"波段延續 /100")}</div></div></div>
   ${stageExplainHTML(r)}
+  ${portfolioHTML(r)}
   ${changeBadgeHTML(r)}
   ${partsHTML(r)}
   <div class="metrics">${metrics(r).map(m=>`<div class="metric"><div class="mval">${m[1]}</div><div class="mlab">${m[0]}</div></div>`).join("")}</div>
@@ -509,10 +600,15 @@ async function load(){
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;market=mode==="intraday"?intraMarket:closeMarket;$("modeText").textContent=mode==="intraday"?"盤中：執行雷達 / 動能 / 當沖與庫存進出 / 族群輪動":"盤後：波段雷達 / 延續性 / 進場位置 / 60分K";$("marketbox").innerHTML=marketHTML();$("rotationbox").innerHTML=rotationHTML();$("changebox").innerHTML=changeRadarHTML();updateFooter();render()});
 document.querySelectorAll(".filter[data-f]").forEach(b=>b.onclick=()=>{document.querySelectorAll(".filter[data-f]").forEach(x=>x.classList.remove("on"));b.classList.add("on");filter=b.dataset.f;render()});
 $("watchOnly").onclick=()=>{watchOnly=!watchOnly;$("watchOnly").classList.toggle("on",watchOnly);render()};
+$("portfolioOnly").onclick=()=>{portfolioOnly=!portfolioOnly;$("portfolioOnly").classList.toggle("on",portfolioOnly);render()};
 $("scan").onclick=render;
 $("q").addEventListener("input",()=>{const q=$("q").value.trim().toLowerCase(),box=$("suggestions");if(!q){box.classList.remove("show");return}let h=universe.filter(x=>String(x.code).startsWith(q)||String(x.name).toLowerCase().includes(q)).slice(0,10);box.innerHTML=h.map(x=>`<button class="suggestion" data-code="${x.code}">${x.name}<small>${x.code} · ${x.industry_name||x.industry}</small></button>`).join("");box.classList.toggle("show",h.length>0);box.querySelectorAll(".suggestion").forEach(b=>b.onclick=()=>{$("q").value=b.dataset.code;box.classList.remove("show");render()})});
 
 document.addEventListener("click",e=>{
+ const pe=e.target.closest("[data-portfolio-edit]");if(pe){showPortfolioEditor(pe.dataset.portfolioEdit);return}
+ const ps=e.target.closest("[data-portfolio-save]");if(ps){savePortfolioEditor(ps.dataset.portfolioSave);return}
+ const pr=e.target.closest("[data-portfolio-remove]");if(pr){removePortfolio(pr.dataset.portfolioRemove);return}
+ if(e.target.closest("[data-portfolio-cancel]")||e.target.id==="portfolioEditBack"){document.getElementById("portfolioEditBack")?.remove();return}
  const peer=e.target.closest(".peerlink");
  if(peer){const code=peer.dataset.code;if(code)showPeerPeek(code);return}
  const open=e.target.closest("[data-peer-open]");if(open){focusPeer(open.dataset.peerOpen);return}
@@ -521,14 +617,14 @@ document.addEventListener("click",e=>{
 if("serviceWorker" in navigator){
  window.addEventListener("load",async()=>{
   try{
-   const reg=await navigator.serviceWorker.register("./sw.js?v=1521",{updateViaCache:"none"});
+   const reg=await navigator.serviceWorker.register("./sw.js?v=1522",{updateViaCache:"none"});
    await reg.update();
    let reloading=false;
    navigator.serviceWorker.addEventListener("controllerchange",()=>{
     if(reloading)return;
-    if(sessionStorage.getItem("dogsonSwReloaded1521")==="1")return;
+    if(sessionStorage.getItem("dogsonSwReloaded1522")==="1")return;
     reloading=true;
-    sessionStorage.setItem("dogsonSwReloaded1521","1");
+    sessionStorage.setItem("dogsonSwReloaded1522","1");
     location.reload();
    });
   }catch(e){}
