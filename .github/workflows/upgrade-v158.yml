@@ -1,0 +1,98 @@
+name: Install Radar v1.5.8 Collapsible Close Sector Flow
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/upgrade-v158.yml"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v158-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Apply v1.5.8 collapse patch
+        run: python scripts/patch_v158.py
+
+      - name: Verify collapsible close sector flow
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          close=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          if not (close.get('sector_funds') or []):
+              raise SystemExit('sector_funds missing from close data')
+
+          for marker in [
+              'v1.5.8',
+              'function toggleCloseSectorFunds()',
+              'dogsonSectorFundsOpen',
+              '展開完整族群',
+              '收合族群明細',
+              '流入前 3',
+              '流出前 3',
+              'aria-expanded',
+              '預設先收合成流入／流出前三名摘要',
+          ]:
+              if marker not in html:
+                  raise SystemExit('missing UI marker: '+marker)
+
+          # 第3點只改UI，不得改既有分數說明。
+          for score_marker in [
+              '盤中動能 100：</b>價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10',
+              '盤後波段 100：</b>波段延續＝日K技術50＋籌碼25＋族群15＋流動性10',
+              '此欄不新增個股分數',
+          ]:
+              if score_marker not in html:
+                  raise SystemExit('score architecture changed unexpectedly: '+score_marker)
+
+          sw=Path('docs/sw.js').read_text(encoding='utf-8')
+          if 'dogson-free-v158' not in sw:
+              raise SystemExit('service worker cache not bumped')
+
+          print('sector groups', len(close.get('sector_funds') or []))
+          print('v1.5.8 collapse verification OK')
+          PY
+
+      - name: Commit v1.5.8 UI
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html docs/sw.js
+          git diff --cached --quiet || git commit -m "Apply v1.5.8 collapsible close sector flow"
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 4
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
