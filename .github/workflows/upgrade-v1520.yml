@@ -1,0 +1,111 @@
+name: Install Radar v1.5.20 Lifecycle Data Repair
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1520.trigger"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1520-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Require v1.5.19 UI and Stage Engine 2.0 source
+        run: |
+          grep -q 'Free Edition v1.5.19' docs/index.html
+          grep -q 'function stageKey(v)' docs/index.html
+          grep -q 'def _assign_stage_v2' scripts/build_data.py
+          test -s docs/data/close.json
+          test -s docs/data/intraday.json
+
+      - name: Reclassify existing close and intraday data
+        run: python scripts/repair_stage_data_v1520.py
+
+      - name: Verify canonical lifecycle data and filters
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+
+          stages=['蓄勢待發','剛啟動','回踩承接','趨勢持有','觀察','轉弱警戒','結構失效','過熱不追']
+          close=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          intra=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
+          status=json.loads(Path('docs/data/status.json').read_text(encoding='utf-8'))
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          sw=Path('docs/sw.js').read_text(encoding='utf-8')
+
+          cd=Counter(str(r.get('category') or '觀察') for r in close.get('rows',[]))
+          idd=Counter(str(r.get('category') or '觀察') for r in intra.get('rows',[]))
+          print('CLOSE DIST', dict(cd))
+          print('INTRA DIST ', dict(idd))
+
+          for s in stages:
+              if cd.get(s,0)<=0:
+                  raise SystemExit(f'close stage empty: {s}')
+              if f'data-f="{s}"' not in html:
+                  raise SystemExit(f'filter missing: {s}')
+          for r in close.get('rows',[]):
+              if r.get('category') not in stages:
+                  raise SystemExit(f'noncanonical close category: {r.get("category")}')
+              if r.get('stage_version')!='2.0':
+                  raise SystemExit('close row missing Stage 2.0 marker')
+          for r in intra.get('rows',[]):
+              if r.get('category') not in stages:
+                  raise SystemExit(f'noncanonical intraday category: {r.get("category")}')
+              if r.get('stage_version')!='2.0':
+                  raise SystemExit('intraday row missing Stage 2.0 marker')
+          if status.get('version')!='1.5.20-free' or status.get('stage_version')!='2.0':
+              raise SystemExit('status version mismatch')
+          if 'Free Edition v1.5.20' not in html or './sw.js?v=1520' not in html:
+              raise SystemExit('v1.5.20 UI version markers missing')
+          if 'dogson-free-v1520' not in sw:
+              raise SystemExit('v1.5.20 SW cache missing')
+          # Score architecture must stay untouched.
+          for m in ['價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10',
+                    '波段延續100＝日K技術50＋籌碼25＋族群15＋流動性10']:
+              if m not in html:
+                  raise SystemExit('score architecture marker missing: '+m)
+          print('v1.5.20 verification OK')
+          PY
+
+      - name: Commit repaired lifecycle data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html docs/sw.js docs/data/close.json docs/data/intraday.json docs/data/status.json
+          git diff --cached --quiet || git commit -m "Apply v1.5.20 Stage 2.0 data reclassification"
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 4
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
