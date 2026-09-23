@@ -1,0 +1,94 @@
+name: Install Radar v1.5.16 Beginner Help Rewrite
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1516.trigger"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1516-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Require v1.5.15 first
+        run: |
+          grep -q 'Free Edition v1.5.15' docs/index.html
+          grep -q './sw.js?v=1515' docs/index.html
+
+      - name: Apply v1.5.16 beginner help rewrite
+        run: python scripts/patch_v1516.py
+
+      - name: Verify beginner help and unchanged score logic
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          sw=Path('docs/sw.js').read_text(encoding='utf-8')
+          required=[
+            'Free Edition v1.5.16',
+            '第一次使用請點我',
+            '大盤 → 族群 → 個股 → 位置',
+            '盤中動能 /100',
+            '波段延續 /100',
+            '進場位置高',
+            '今日估算流入 TOP 3／流出 TOP 3',
+            '盤中族群成交資金輪動',
+            '分數是「條件有沒有一起出現」，不是上漲機率',
+            './sw.js?v=1516',
+            'dogsonSwReloaded1516',
+          ]
+          for m in required:
+              if m not in html:
+                  raise SystemExit('missing help marker: '+m)
+          # Existing architecture must remain unchanged.
+          for m in [
+            '盤中動能100＝價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10',
+            '波段延續100＝日K技術50＋籌碼25＋族群15＋流動性10',
+          ]:
+              if m not in html:
+                  raise SystemExit('score architecture marker missing: '+m)
+          if 'dogson-free-v1516' not in sw:
+              raise SystemExit('service worker cache not bumped')
+          print('v1.5.16 verification OK')
+          PY
+
+      - name: Commit v1.5.16
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html docs/sw.js
+          git diff --cached --quiet || git commit -m "Apply v1.5.16 beginner help rewrite"
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 4
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
