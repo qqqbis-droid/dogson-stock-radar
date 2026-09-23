@@ -1,0 +1,84 @@
+name: Install Radar v1.4.1 MIS Snapshot Structure
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/upgrade-v141.yml'
+      - 'scripts/patch_v141.py'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-pages
+  cancel-in-progress: true
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Apply v1.4.1 patch
+        run: python scripts/patch_v141.py
+
+      - name: Commit production source upgrade
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py scripts/sync_live_data.py docs/index.html docs/realtime.js docs/sw.js
+          git diff --cached --check
+          git commit -m "Apply Radar v1.4.1 MIS snapshot structure" || true
+          git push
+
+      - name: Install runtime requirements
+        run: pip install -r requirements.txt
+
+      - name: Sync last live data
+        run: python scripts/sync_live_data.py || true
+
+      - name: Rebuild intraday radar
+        run: python scripts/build_data.py --mode intraday
+
+      - name: Verify v1.4.1 structure
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          j=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
+          rows=j.get('rows') or []
+          q=j.get('quote_layer') or {}
+          print('rows',len(rows),'quote_layer',q)
+          if not rows:
+              raise SystemExit('intraday rows empty')
+          if 'MIS快照' not in str(q.get('structure_source') or ''):
+              raise SystemExit('v1.4.1 structure metadata missing')
+          sample=next((r for r in rows if str(r.get('code'))=='8021'),None)
+          if sample:
+              print('8021', {k:sample.get(k) for k in ['close','quote_time','structure_time','structure_source','structure_live_bars','structure_gap_min','pace','vwap','technical_score']})
+          mis=[r for r in rows if str(r.get('structure_source') or '').startswith('MIS')]
+          print('MIS structure rows',len(mis),'bridges',sum(bool(r.get('structure_approx')) for r in mis))
+          if int(q.get('coverage') or 0) > 0 and not mis:
+              raise SystemExit('MIS quote exists but no MIS structure row was produced')
+          PY
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
