@@ -1,0 +1,120 @@
+name: Install Radar v1.5.22 Portfolio Mode
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1522.trigger"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1522-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Require v1.5.21 first
+        run: |
+          grep -q 'Free Edition v1.5.21' docs/index.html
+          grep -q 'function changeRadarHTML()' docs/index.html
+          grep -q 'dogson-free-v1521' docs/sw.js
+          grep -q '"change_radar_version":"1.0"' docs/data/status.json
+
+      - name: Apply v1.5.22 portfolio mode patch
+        run: python scripts/patch_v1522.py
+
+      - name: Static verification
+        run: |
+          python -m py_compile scripts/patch_v1522.py
+          python - <<'PY'
+          from pathlib import Path
+          import json,re
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          sw=Path('docs/sw.js').read_text(encoding='utf-8')
+          status=json.loads(Path('docs/data/status.json').read_text(encoding='utf-8'))
+          required=[
+            'Free Edition v1.5.22','id="portfolioOnly"','💼 我的庫存',
+            'dogson-portfolio-v1','function portfolioSummaryHTML()','function portfolioHTML(r)',
+            'function showPortfolioEditor(code)','function savePortfolioEditor(code)',
+            '進場理由','持有理由','結構失效條件','✅ 仍成立','⚠️ 轉弱','❌ 消失',
+            'data-portfolio-edit','data-portfolio-save','data-portfolio-remove',
+            './sw.js?v=1522'
+          ]
+          for m in required:
+              if m not in html: raise SystemExit('missing html marker: '+m)
+          for m in [
+            '價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10',
+            '波段延續100＝日K技術50＋籌碼25＋族群15＋流動性10',
+            '🚨 5分鐘變化雷達'
+          ]:
+              if m not in html: raise SystemExit('existing architecture marker missing: '+m)
+          if 'dogson-free-v1522' not in sw: raise SystemExit('service worker cache version missing')
+          if status.get('version')!='1.5.22-free' or status.get('portfolio_mode_version')!='1.0':
+              raise SystemExit('status version mismatch')
+          # Portfolio data must remain local-only: no dedicated public data file or network endpoint is introduced.
+          if Path('docs/data/portfolio.json').exists(): raise SystemExit('portfolio data must not be public')
+          if 'fetch("./data/portfolio' in html or "fetch('./data/portfolio" in html:
+              raise SystemExit('portfolio must not fetch public server data')
+          # Inline app script must remain extractable for JS syntax check.
+          m=re.search(r'<script>\s*(.*?)</script>\s*<script src="./realtime-config',html,re.S)
+          if not m: raise SystemExit('main inline script not found')
+          Path('/tmp/dogson-inline.js').write_text(m.group(1),encoding='utf-8')
+          print('static verification OK')
+          PY
+          node --check /tmp/dogson-inline.js
+
+      - name: Verify portfolio behavior contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          checks={
+            'portfolio filter uses actual saved holdings':'Object.keys(portfolioData).map(code=>currentHoldingRow(code)).filter(Boolean)',
+            'fallback keeps holding visible if primary mode quote missing':'const b=secondary.find',
+            'manual reason status is not auto-overwritten':'reason_status:document.getElementById("pfStatus")',
+            'pnl uses shares x cost vs current price':'const costValue=shares*cost,marketValue=shares*price,pnl=marketValue-costValue',
+            'taiwan pnl color convention':'.pnl.up{color:var(--red)}.pnl.down{color:var(--green)}',
+            'privacy note':'不會送到公開 GitHub repository',
+          }
+          for label,marker in checks.items():
+              if marker not in html: raise SystemExit(f'behavior contract missing: {label}')
+          print('portfolio behavior contract OK')
+          PY
+
+      - name: Commit v1.5.22
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html docs/sw.js docs/data/status.json
+          git diff --cached --quiet || git commit -m "Apply v1.5.22 portfolio mode"
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 4
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
