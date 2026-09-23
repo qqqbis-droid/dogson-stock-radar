@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.5.24
+犬子老師飆股雷達 Free Edition v1.5.25
 =================================
 盤中＝執行雷達（即時動能100，籌碼只作背景）；盤後＝波段雷達（延續品質直接100分＋進場位置）；大盤15分獨立
 
@@ -985,9 +985,10 @@ def index_state(symbol, label, snap=None):
             change = float(snap["change_pct"])
         else:
             change = float((c.iloc[-1]/c.iloc[-2]-1)*100)
+        ret5 = float((c.iloc[-1]/c.iloc[-6]-1)*100) if len(c) >= 6 else None
         return {
             "label": label, "symbol": symbol, "close": round(close, 2),
-            "change_pct": round(change, 2),
+            "change_pct": round(change, 2), "ret5": round(ret5, 2) if ret5 is not None else None,
             "ma5": round(ma5, 2), "ma10": round(ma10, 2), "ma20": round(ma20, 2),
             "trend": bool(close > ma5 > ma10 > ma20),
             "above20": bool(close > ma20),
@@ -1299,6 +1300,7 @@ def intraday_technical(x):
         prev_close = float(c.iloc[0])
     day_change = (cur / prev_close - 1) * 100 if prev_close else 0
     ret15 = (c.iloc[-1] / c.iloc[-4] - 1) * 100 if len(c) >= 4 else 0
+    ret60 = (c.iloc[-1] / c.iloc[-13] - 1) * 100 if len(c) >= 13 else None
     vwap_dist = (cur / vwap - 1) * 100 if vwap else 0
 
     # v1.5.5 振幅效率：只升級既有量價/追價風險，不新增總分權重。
@@ -1407,6 +1409,7 @@ def intraday_technical(x):
         "close": cur, "pace": round(pace, 2), "vwap": round(vwap, 2),
         "vwap_dist": round(vwap_dist, 2), "day_change": round(day_change, 2),
         "ret15": round(ret15, 2),
+        "ret60": round(ret60, 2) if ret60 is not None else None,
         "amplitude_pct": round(amplitude_pct, 2),
         "range_position_pct": round(range_position_pct, 1),
         "amplitude_efficiency": round(amplitude_efficiency, 3),
@@ -1676,6 +1679,10 @@ def _assign_stage_v2(r, preliminary_intraday, sector_score_10):
         mtf_60_bearish = bool(mtf60.get("bearish"))
         mtf_daily_weak = str(mtfd.get("state") or "") == "WEAK"
         mtf_daily_supportive = str(mtfd.get("state") or "") == "BULLISH"
+        rel_mtf = r.get("relative_multiframe") or {}
+        rel_mtf_status = str(rel_mtf.get("status") or "")
+        rel_mtf_lagging = rel_mtf_status == "LAGGING"
+        rel_mtf_supportive = rel_mtf_status in {"LEADING", "IMPROVING"}
 
         invalid_flags = [
             (vwap > 0 and close < vwap * 0.985, "明顯跌破VWAP"),
@@ -1695,6 +1702,7 @@ def _assign_stage_v2(r, preliminary_intraday, sector_score_10):
             break3 and above_vwap and pace >= 1.1 and rel >= 0
             and (trend5 or break12 or tech >= 22)
             and not (mtf_60_available and mtf_60_bearish)
+            and not rel_mtf_lagging
         )
         if launch:
             r["category"] = "剛啟動"
@@ -1704,6 +1712,8 @@ def _assign_stage_v2(r, preliminary_intraday, sector_score_10):
                 launch_signals.append(f"60K {mtf60.get('label') or '20T/60T支持'}")
             if mtf_daily_supportive:
                 launch_signals.append("日K背景偏多")
+            if rel_mtf_supportive:
+                launch_signals.append(rel_mtf.get("label") or "多時框相對強弱改善")
             r["stage_signals"] = launch_signals[:5]
             return
 
@@ -1724,6 +1734,7 @@ def _assign_stage_v2(r, preliminary_intraday, sector_score_10):
             score >= 70 and above_vwap and rel >= 0
             and (trend5 or break12)
             and not (mtf_60_available and mtf_60_bearish)
+            and not rel_mtf_lagging
         )
         if trend_hold:
             r["category"] = "趨勢持有"
@@ -1740,6 +1751,7 @@ def _assign_stage_v2(r, preliminary_intraday, sector_score_10):
             (-0.5 <= ret15 <= 1.5, "15分鐘未急拉急殺"),
             (mtf_60_supportive, f"60K {mtf60.get('label') or '20T/60T結構支持'}"),
             (mtf_daily_supportive, "日K背景仍支持"),
+            (rel_mtf_supportive, rel_mtf.get("label") or "多時框相對強弱改善"),
         ]
         setup_hits = [txt for ok, txt in setup_flags if ok]
         mtf_setup_ok = (not mtf_60_available) or mtf_60_supportive or mtf_60_state == "PRE_CROSS"
@@ -1758,6 +1770,7 @@ def _assign_stage_v2(r, preliminary_intraday, sector_score_10):
             (not trend5, "5分短均未維持多頭"),
             (mtf_60_available and mtf_60_bearish, "60K 20T/60T結構偏弱"),
             (mtf_daily_weak, "日K背景偏弱"),
+            (rel_mtf_lagging, "15分／60分／當日／5日相對強弱多數落後"),
         ]
         weak_hits = [txt for ok, txt in weak_flags if ok]
         core_weak = bool(
@@ -2914,6 +2927,102 @@ def build_change_radar(rows, rotation, previous_obj):
     return base
 
 
+
+def _attach_relative_multitimeframe(rows, close_map, close_market, market_live=None):
+    """Add 15m/60m/day/5d relative strength as decision context, never as a new score bucket.
+
+    15m/60m use the median return of the same TWSE/TPEx stock pool as a robust free-data proxy.
+    Day uses the official live index change when available. 5d uses completed index history when
+    available, otherwise falls back to the same-market median 5d stock return.
+    """
+    if not rows:
+        return rows
+    market_live = market_live or {}
+    close_market = close_market or {}
+
+    def val(x):
+        try:
+            if x is None: return None
+            z = float(x)
+            return z if np.isfinite(z) else None
+        except Exception:
+            return None
+
+    def median_for(market_name, key, source_rows):
+        xs=[]
+        for x in source_rows:
+            if str(x.get("market") or "") != market_name: continue
+            z=val(x.get(key))
+            if z is not None: xs.append(z)
+        return float(np.median(xs)) if xs else None
+
+    # Previous completed daily rows are used only for the 5d fallback.
+    close_rows_for_proxy=[]
+    for code,d in (close_map or {}).items():
+        if not isinstance(d,dict): continue
+        close_rows_for_proxy.append({"code":code,"market":d.get("market"),"ret5":d.get("ret5")})
+
+    baselines={}
+    for market_name, side, sym in (("上市","taiex","^TWII"),("上櫃","otc","^TWOII")):
+        live = market_live.get(sym) or {}
+        day_bench = val(live.get("change_pct"))
+        day_source = "官方即時指數"
+        if day_bench is None:
+            day_bench = val((close_market.get(side) or {}).get("change_pct"))
+            day_source = "最近完成交易日指數"
+        if day_bench is None:
+            day_bench = median_for(market_name,"day_change",rows)
+            day_source = "同市場中位數 proxy"
+
+        ret5_bench = val((close_market.get(side) or {}).get("ret5"))
+        ret5_source = "官方指數5日"
+        if ret5_bench is None:
+            vals=[]
+            for code,d in (close_map or {}).items():
+                if not isinstance(d,dict) or str(d.get("market") or "") != market_name: continue
+                z=val(d.get("ret5"))
+                if z is not None: vals.append(z)
+            ret5_bench=float(np.median(vals)) if vals else None
+            ret5_source="同市場5日中位數 proxy"
+
+        baselines[market_name]={
+            "ret15":median_for(market_name,"ret15",rows),
+            "ret60":median_for(market_name,"ret60",rows),
+            "day":day_bench,
+            "ret5":ret5_bench,
+            "sources":{"15m":"同市場15分報酬中位數 proxy","60m":"同市場60分報酬中位數 proxy","day":day_source,"5d":ret5_source},
+        }
+
+    for r in rows:
+        market_name=str(r.get("market") or "")
+        b=baselines.get(market_name) or {}
+        d=(close_map or {}).get(str(r.get("code") or "")) or {}
+        raw={"15m":val(r.get("ret15")),"60m":val(r.get("ret60")),"day":val(r.get("day_change")),"5d":val(d.get("ret5"))}
+        bench={"15m":val(b.get("ret15")),"60m":val(b.get("ret60")),"day":val(b.get("day")),"5d":val(b.get("ret5"))}
+        rel={k:(raw[k]-bench[k] if raw[k] is not None and bench[k] is not None else None) for k in raw}
+        available=[v for v in rel.values() if v is not None]
+        pos=sum(1 for v in available if v>0)
+        neg=sum(1 for v in available if v<0)
+        day_rel=rel.get("day")
+        r15,r60=rel.get("15m"),rel.get("60m")
+        if len(available)>=3 and pos>=3 and (day_rel is None or day_rel>=0):
+            status="LEADING"; label="多時框領先市場"
+        elif r15 is not None and r60 is not None and r15>r60 and r15>0 and (day_rel is None or day_rel>=0):
+            status="IMPROVING"; label="短線相對強弱改善"
+        elif len(available)>=3 and neg>=3 and (day_rel is None or day_rel<=0):
+            status="LAGGING"; label="多時框落後市場"
+        else:
+            status="MIXED"; label="相對強弱分歧"
+        r["relative_multiframe"]={
+            "version":"1.0","status":status,"label":label,"available_count":len(available),
+            "relative_pct":{k:(round(v,2) if v is not None else None) for k,v in rel.items()},
+            "stock_return_pct":{k:(round(v,2) if v is not None else None) for k,v in raw.items()},
+            "benchmark_return_pct":{k:(round(v,2) if v is not None else None) for k,v in bench.items()},
+            "sources":b.get("sources") or {},"score_weight":0,
+            "note":"多時間框架相對強弱只作波段決策確認；不改既有相對強弱15分公式",
+        }
+    return rows
+
 def _attach_multitimeframe_context(rows, close_map, hourly_obj):
     """Attach 5m + prior completed 60m + daily context without changing any score weight."""
     if not rows:
@@ -2947,8 +3056,11 @@ def _attach_multitimeframe_context(rows, close_map, hourly_obj):
         h_ma20 = fv(h, "ma20_60")
         h_ma60 = fv(h, "ma60_60")
         h_price = fv(h, "price")
+        gap20_60 = fv(h, "gap20_60_pct", 999)
         if not h_available:
             h_state = "UNAVAILABLE"
+        elif gap20_60 < 0 and dir20 == "DOWN":
+            h_state = "DEATH_CROSS"
         elif hcat in {"PRE_CROSS", "EARLY", "STABLE_CONT", "ACCEL_CONT"}:
             h_state = hcat
         elif dir20 == "DOWN" and dir60 == "DOWN" and (not h_ma20 or h_price < h_ma20):
@@ -2960,7 +3072,7 @@ def _attach_multitimeframe_context(rows, close_map, hourly_obj):
         else:
             h_state = "NEUTRAL"
         h_supportive = h_state in {"PRE_CROSS", "EARLY", "STABLE_CONT", "ACCEL_CONT", "BULLISH", "IMPROVING"}
-        h_bearish = h_state == "BEARISH"
+        h_bearish = h_state in {"BEARISH", "DEATH_CROSS"}
 
         dclose = fv(d, "close")
         dma20 = fv(d, "ma20")
@@ -3008,6 +3120,7 @@ def _attach_multitimeframe_context(rows, close_map, hourly_obj):
             "BULLISH": "20T/60T多頭",
             "IMPROVING": "20T轉上／60T改善",
             "BEARISH": "20T/60T偏弱",
+            "DEATH_CROSS": "20T跌破60T／死亡交叉風險",
             "NEUTRAL": "20T/60T中性",
             "UNAVAILABLE": "60K資料待補",
         }
@@ -3161,7 +3274,7 @@ def build_intraday():
                 "updated_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_attempted_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_count": len(previous.get("rows", [])),
-                "version": "1.5.24-free",
+                "version": "1.5.25-free",
             })
             dump("status.json", status)
             print("intraday source empty; kept previous", len(previous.get("rows", [])))
@@ -3197,6 +3310,7 @@ def build_intraday():
     rows = _attach_multitimeframe_context(rows, close_map, hourly_obj)
 
     market_live = intraday_index_snapshot()
+    rows = _attach_relative_multitimeframe(rows, close_map, market, market_live)
     sector_rotation = build_sector_rotation(rows)
     intraday_market = build_intraday_market(rows, market_live, sector_rotation, market)
     rows = add_component_scores(rows, intraday_market, preliminary_intraday=True)
@@ -3213,8 +3327,9 @@ def build_intraday():
             "latest_time": quote_latest, "structure_latest_time": structure_latest,
             "note": "現價/當日漲跌採官方MIS；VWAP/突破/量速/支撐壓力仍採5分K結構",
         },
-        "multi_timeframe_version": "1.0",
-        "score_formula": {"mode": "intraday_execution", "price_structure": 30, "flow_volume": 25, "relative_strength": 15, "sector": 20, "liquidity_risk": 10, "amplitude_efficiency": "inside_flow_and_liquidity_risk_no_new_weight", "multi_timeframe": "decision_context_no_new_weight", "chip": "background_only", "market_separate": 15},
+        "multi_timeframe_version": "1.1",
+        "relative_multiframe_version": "1.0",
+        "score_formula": {"mode": "intraday_execution", "price_structure": 30, "flow_volume": 25, "relative_strength": 15, "sector": 20, "liquidity_risk": 10, "amplitude_efficiency": "inside_flow_and_liquidity_risk_no_new_weight", "multi_timeframe": "decision_context_no_new_weight", "relative_multiframe": "decision_context_no_new_weight", "chip": "background_only", "market_separate": 15},
         "rows": rows,
     })
 
@@ -3223,8 +3338,9 @@ def build_intraday():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_count": len(rows),
-        "version": "1.5.24-free",
-        "multi_timeframe_version": "1.0",
+        "version": "1.5.25-free",
+        "multi_timeframe_version": "1.1",
+        "relative_multiframe_version": "1.0",
     })
     dump("status.json", status)
     print("intraday done", len(rows))

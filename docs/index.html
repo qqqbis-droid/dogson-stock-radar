@@ -56,13 +56,13 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 
 
 /* v1.5.24 Step 5 multi-timeframe */
-.mtfbox{margin-top:10px;border:1px solid #344760;background:linear-gradient(180deg,#111a26,#0e151f);border-radius:13px;padding:10px}.mtftop{display:flex;justify-content:space-between;gap:8px;align-items:center}.mtftitle{font-size:11px;color:#9ba5b6;font-weight:850}.mtflabel{font-size:12px;font-weight:900;color:#b9ddff}.mtfgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}.mtfcell{background:#0d141d;border:1px solid #29384b;border-radius:10px;padding:8px}.mtfcellv{font-size:11px;font-weight:900}.mtfcelll{font-size:9px;color:#9ba5b6;margin-top:3px;line-height:1.45}.mtfnote{font-size:9px;color:#7f8b9d;margin-top:7px;line-height:1.45}@media(max-width:520px){.mtfgrid{grid-template-columns:1fr}.mtfcell{padding:7px 8px}}
+.mtfbox{margin-top:10px;border:1px solid #344760;background:linear-gradient(180deg,#111a26,#0e151f);border-radius:13px;padding:10px}.mtftop{display:flex;justify-content:space-between;gap:8px;align-items:center}.mtftitle{font-size:11px;color:#9ba5b6;font-weight:850}.mtflabel{font-size:12px;font-weight:900;color:#b9ddff}.mtfgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.mtfcell{background:#0d141d;border:1px solid #29384b;border-radius:10px;padding:8px}.mtfcellv{font-size:11px;font-weight:900}.mtfcelll{font-size:9px;color:#9ba5b6;margin-top:3px;line-height:1.45}.mtfnote{font-size:9px;color:#7f8b9d;margin-top:7px;line-height:1.45}@media(max-width:520px){.mtfgrid{grid-template-columns:1fr}.mtfcell{padding:7px 8px}}
 
 </style>
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.24｜Step 5 多時間框架</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.25｜Step 5 多時間框架完整化</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -235,7 +235,8 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
       <div class="guide-line"><span class="guide-key">60分K 20T／60T</span>：負責波段骨架。正式辨識金叉前夕、初升金叉、已金叉穩定續航、加速續航，以及20T／60T轉弱。</div>
       <div class="guide-line"><span class="guide-key">日K</span>：負責大方向，確認均線與波段背景是否仍支持。</div>
       <div class="guide-line"><span class="guide-key">三框共振</span>：5分觸發＋60K結構支持＋日K沒有轉弱，才是最完整的波段進場背景。</div>
-      <div class="guide-tip">60K 20T／60T不新增總分權重，而是正式接進 Stage 與盤中三燈。已黃金交叉一段、只要20T／60T斜率仍向上，也會保留為「穩定／加速續航」，不會因為不是剛金叉就被排除。</div>
+      <div class="guide-line"><span class="guide-key">相對強弱 15分／60分／當日／5日</span>：短週期看相對同市場中位數，當日優先對官方加權／櫃買，5日優先對官方指數日K；用來找「大盤回檔它撐住、大盤止跌它先走」的股票。</div>
+      <div class="guide-tip">60K 20T／60T與多時框相對強弱都不新增總分權重，而是正式接進 Stage 與盤中三燈。已黃金交叉一段、只要20T／60T斜率仍向上，也會保留為「穩定／加速續航」，不會因為不是剛金叉就被排除。</div>
     </div>
 
     <div class="guide-title">⑰ 第一次使用，照這個順序最快</div>
@@ -480,6 +481,7 @@ function entryDecision(r,mkt=market){
  const vwap=+(r?.vwap_dist??0),day=+(r?.day_change??0),pos=+(r?.range_position_pct??50),pace=+(r?.pace??0);
  const marketMode=String(mkt?.market_mode||"—"),marketScore=+(mkt?.market_score??0);
  const mtf=r?.multi_timeframe||{},mtfState=String(mtf.state||""),mtf60=mtf["60m"]||{};
+ const rsm=r?.relative_multiframe||{},rsStatus=String(rsm.status||"");
  const good=[],wait=[],block=[];
 
  // Hard gates：沿用既有過熱/失效概念，不重算100分。
@@ -511,10 +513,14 @@ function entryDecision(r,mkt=market){
  else if(mtfState==="WEAK")wait.unshift("60K＋日K偏弱，先不急進");
  else if(mtf60.available)wait.push("多時間框架尚未完全共振");
  else wait.push("60K資料待補，不因缺資料自動判空");
+ if(rsStatus==="LEADING"||rsStatus==="IMPROVING")good.push(rsm.label||"多時框相對強弱改善");
+ else if(rsStatus==="LAGGING")wait.unshift("15分／60分／當日／5日相對強弱多數落後");
+ else if(rsStatus==="MIXED")wait.push("多時框相對強弱仍分歧");
 
+ const rsGreenOk=rsStatus!=="LAGGING";
  const mtfGreenOk=!mtf60.available||mtfState==="ALIGNED"||(mtfState==="SETUP"&&(r.break3||stage==="剛啟動"));
  const marketWeak=marketMode==="防守"||(Number.isFinite(marketScore)&&marketScore>0&&marketScore<6);
- const coreGreen=score>=70&&ps>=20&&flow>=14&&rel>=8&&sec>=8&&liq>=6&&vwap>=-.5&&vwap<=2.5&&pos>=45&&pos<=90&&stage!=="轉弱警戒"&&mtfGreenOk;
+ const coreGreen=score>=70&&ps>=20&&flow>=14&&rel>=8&&sec>=8&&liq>=6&&vwap>=-.5&&vwap<=2.5&&pos>=45&&pos<=90&&stage!=="轉弱警戒"&&mtfGreenOk&&rsGreenOk;
  if(coreGreen&&!marketWeak){
   return {key:"green",icon:"🟢",label:"可試單（波段）",headline:"條件同步，可用小部位試單",good,wait:wait.slice(0,2),block,marketMode,marketScore,score};
  }
@@ -527,7 +533,7 @@ function entryDecisionHTML(r){
  const positives=(d.good||[]).slice(0,4).map(x=>`<span>${x}</span>`).join("");
  const waits=(d.wait||[]).slice(0,4).map(x=>`<span class="wait">${x}</span>`).join("");
  const blocks=(d.block||[]).slice(0,4).map(x=>`<span class="block">${x}</span>`).join("");
- return `<div class="entrybox"><div class="entrytop"><div><div class="entrytitle">🚦 Step 4｜盤中進場雷達</div><div class="entryheadline">${d.headline}</div></div><span class="entrylight ${d.key}">${d.icon} ${d.label}</span></div><div class="entrymeta"><span>個股動能 ${num(d.score,0)}/100</span><span>大盤 ${d.marketMode}${d.marketScore?` ${num(d.marketScore,1)}/15`:""} · 獨立</span><span>60K ${r?.multi_timeframe?.["60m"]?.label||"待補"}</span><span>20T/60T 權重＝0</span></div><div class="entrywhy">${positives}${waits}${blocks}</div><div class="entrynote">三燈只做進場時機判斷，不改原本100分；🟢 代表可小量試單，不等於自動買進。</div></div>`;
+ return `<div class="entrybox"><div class="entrytop"><div><div class="entrytitle">🚦 Step 4｜盤中進場雷達</div><div class="entryheadline">${d.headline}</div></div><span class="entrylight ${d.key}">${d.icon} ${d.label}</span></div><div class="entrymeta"><span>個股動能 ${num(d.score,0)}/100</span><span>大盤 ${d.marketMode}${d.marketScore?` ${num(d.marketScore,1)}/15`:""} · 獨立</span><span>60K ${r?.multi_timeframe?.["60m"]?.label||"待補"}</span><span>相對強弱 ${r?.relative_multiframe?.label||"待補"}</span><span>MTF權重＝0</span></div><div class="entrywhy">${positives}${waits}${blocks}</div><div class="entrynote">三燈只做進場時機判斷，不改原本100分；🟢 代表可小量試單，不等於自動買進。</div></div>`;
 }
 function entrySummaryHTML(){
  if(mode!=="intraday")return "";
@@ -542,11 +548,12 @@ function mtfHTML(r){
  if(mode!=="intraday")return "";
  const m=r?.multi_timeframe||{};
  if(!m.version)return `<div class="mtfbox"><div class="mtftop"><div class="mtftitle">🧭 Step 5｜多時間框架</div><div class="mtflabel">等待新一輪盤中資料</div></div><div class="mtfnote">5分＋60分＋日K連動會在盤中資料更新後顯示。</div></div>`;
- const f=m["5m"]||{},h=m["60m"]||{},d=m.daily||{};
+ const f=m["5m"]||{},h=m["60m"]||{},d=m.daily||{},rs=r?.relative_multiframe||{},rp=rs.relative_pct||{};
  const hma=(h.available&&h.ma20!==null&&h.ma20!==undefined)?`20T ${num(h.ma20,2)} ${mtfArrow(h.dir20)}｜60T ${num(h.ma60,2)} ${mtfArrow(h.dir60)}`:"60K資料待補";
  const cross=h.available?(h.state==="PRE_CROSS"?"金叉前夕":Number.isFinite(+h.cross_age)?`金叉約 ${num(h.cross_age,0)} 根`:(h.supportive?"已金叉／結構向上":"尚未形成多頭")):"";
  const dailyMA=(d.ma20!==null&&d.ma20!==undefined)?`20MA ${num(d.ma20,2)}｜距20MA ${signed(d.dist20,1)}`:"日K資料待補";
- return `<div class="mtfbox"><div class="mtftop"><div class="mtftitle">🧭 Step 5｜5分＋60分＋日K</div><div class="mtflabel">${m.label||"框架確認"}</div></div><div class="mtfgrid"><div class="mtfcell"><div class="mtfcellv">${f.label||"5分等待"}</div><div class="mtfcelll">VWAP ${f.above_vwap?"上":"下"}｜3K ${f.break3?"突破":"未突破"}｜短均 ${f.trend5?"多頭":"未確認"}</div></div><div class="mtfcell"><div class="mtfcellv">${h.label||"60K待補"}</div><div class="mtfcelll">${hma}${cross?`<br>${cross}｜20/60差 ${h.gap20_60_pct===null||h.gap20_60_pct===undefined?"—":signed(h.gap20_60_pct,2)}`:""}</div></div><div class="mtfcell"><div class="mtfcellv">${d.label||"日K中性"}</div><div class="mtfcelll">${dailyMA}<br>${d.stage?`前收生命週期：${d.stage}`:"以前一完成交易日日K為背景"}</div></div></div><div class="mtfnote">多時間框架是決策確認層，權重＝0；不改盤中100分，也不改盤後波段100分。</div></div>`;
+ const rsline=`15分 ${rp["15m"]===null||rp["15m"]===undefined?"—":signed(rp["15m"],2)}｜60分 ${rp["60m"]===null||rp["60m"]===undefined?"—":signed(rp["60m"],2)}<br>當日 ${rp.day===null||rp.day===undefined?"—":signed(rp.day,2)}｜5日 ${rp["5d"]===null||rp["5d"]===undefined?"—":signed(rp["5d"],2)}`;
+ return `<div class="mtfbox"><div class="mtftop"><div class="mtftitle">🧭 Step 5｜5分＋60分＋日K</div><div class="mtflabel">${m.label||"框架確認"}</div></div><div class="mtfgrid"><div class="mtfcell"><div class="mtfcellv">${f.label||"5分等待"}</div><div class="mtfcelll">VWAP ${f.above_vwap?"上":"下"}｜3K ${f.break3?"突破":"未突破"}｜短均 ${f.trend5?"多頭":"未確認"}</div></div><div class="mtfcell"><div class="mtfcellv">${h.label||"60K待補"}</div><div class="mtfcelll">${hma}${cross?`<br>${cross}｜20/60差 ${h.gap20_60_pct===null||h.gap20_60_pct===undefined?"—":signed(h.gap20_60_pct,2)}`:""}</div></div><div class="mtfcell"><div class="mtfcellv">${d.label||"日K中性"}</div><div class="mtfcelll">${dailyMA}<br>${d.stage?`前收生命週期：${d.stage}`:"以前一完成交易日日K為背景"}</div></div><div class="mtfcell"><div class="mtfcellv">${rs.label||"相對強弱待補"}</div><div class="mtfcelll">${rsline}</div></div></div><div class="mtfnote">多時間框架是決策確認層，權重＝0；不改盤中100分，也不改盤後波段100分。</div></div>`;
 }
 
 function srHTML(r){
@@ -726,14 +733,14 @@ document.addEventListener("click",e=>{
 if("serviceWorker" in navigator){
  window.addEventListener("load",async()=>{
   try{
-   const reg=await navigator.serviceWorker.register("./sw.js?v=1524",{updateViaCache:"none"});
+   const reg=await navigator.serviceWorker.register("./sw.js?v=1525",{updateViaCache:"none"});
    await reg.update();
    let reloading=false;
    navigator.serviceWorker.addEventListener("controllerchange",()=>{
     if(reloading)return;
-    if(sessionStorage.getItem("dogsonSwReloaded1524")==="1")return;
+    if(sessionStorage.getItem("dogsonSwReloaded1525")==="1")return;
     reloading=true;
-    sessionStorage.setItem("dogsonSwReloaded1524","1");
+    sessionStorage.setItem("dogsonSwReloaded1525","1");
     location.reload();
    });
   }catch(e){}
@@ -741,7 +748,7 @@ if("serviceWorker" in navigator){
 }
 load();
 </script>
-<script src="./hourly.js?v=1524"></script>
+<script src="./hourly.js?v=1525"></script>
 <script src="./realtime-config.js?v=151"></script>
 <script src="./realtime.js?v=151"></script>
 </body>

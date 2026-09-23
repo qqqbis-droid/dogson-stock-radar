@@ -1,9 +1,9 @@
-const CACHE='dogson-free-v1524';
+const CACHE='dogson-free-v1525';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(['./manifest.webmanifest','./hourly.js?v=1524','./realtime-config.js?v=151','./realtime.js?v=151']))
+    caches.open(CACHE).then(cache => cache.addAll(['./manifest.webmanifest','./hourly.js?v=1525','./realtime-config.js?v=151','./realtime.js?v=151']))
   );
 });
 
