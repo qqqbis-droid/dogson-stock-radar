@@ -2,6 +2,11 @@ name: Radar - Intraday Update
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - "scripts/bridge_intraday.py"
+      - "scripts/sync_live_data.py"
+      - ".github/workflows/intraday.yml"
   schedule:
     # 台灣時間約 09:00~13:59；GitHub cron 可能延遲數分鐘。
     - cron: "*/5 1-5 * * 1-5"
@@ -29,10 +34,25 @@ jobs:
           python-version: "3.12"
           cache: "pip"
       - run: pip install -r requirements.txt
-      - name: Download last close/chip data from live Pages
+      - name: Download last close/chip/bridge data from live Pages
         run: python scripts/sync_live_data.py || true
-      - name: Build 5-minute radar only
+      - name: Build 5-minute radar base
         run: python scripts/build_data.py --mode intraday
+      - name: Bridge delayed 5-minute tail with TWSE MIS snapshots
+        run: python scripts/bridge_intraday.py
+      - name: Verify intraday freshness
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('docs/data/intraday.json')
+          o = json.loads(p.read_text(encoding='utf-8'))
+          b = o.get('bridge') or {}
+          print('bridge=', b)
+          if not b.get('bridged_rows'):
+              raise SystemExit('MIS bridge produced no bridged rows')
+          print('quote_time=', b.get('latest_quote_time'), 'structure_time=', b.get('latest_structure_time'))
+          PY
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
