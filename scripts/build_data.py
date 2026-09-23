@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.5.5
+犬子老師飆股雷達 Free Edition v1.5.7
 =================================
 盤中＝執行雷達（即時動能100，籌碼只作背景）；盤後＝波段雷達（延續品質直接100分＋進場位置）；大盤15分獨立
 
@@ -1950,12 +1950,15 @@ def build_close():
         r["chip_coverage_pct"] = coverage
 
     rows = add_component_scores(rows, market, preliminary_intraday=False)
+    sector_funds = build_sector_institution_flow(rows)
 
     dump("close.json", {
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "trade_date": market.get("trade_date"),
         "data_complete": bool(market.get("data_complete")),
         "market": market,
+        "sector_funds": sector_funds,
+        "sector_funds_note": "外資＋投信官方淨買賣股數彙總，單位張；未含自營商；不額外計入個股100分",
         "score_formula": {"mode": "swing_direct_100", "technical": 50, "chip": 25, "sector": 15, "liquidity": 10, "total": 100, "normalized": False, "entry_position": 100, "market_separate": 15},
         "rows": rows,
     })
@@ -1966,7 +1969,7 @@ def build_close():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "close_updated_at": now_tw().isoformat(timespec="seconds"),
         "daily_count": len(rows),
-        "version": "1.5.1-free",
+        "version": "1.5.7-free",
     })
     dump("status.json", status)
 
@@ -2326,6 +2329,117 @@ def build_intraday_market(rows, market_live, rotation, close_market):
             "foreign": "昨日/最近盤後外資只顯示背景，不計入盤中15分",
         },
     }
+
+
+def build_sector_institution_flow(rows):
+    """盤後族群法人資金流：外資＋投信官方逐股淨買賣股數彙總。
+
+    單位使用「張」，而不是用現在股價回推歷史億元，避免把估算金額
+    誤當成官方歷史資金流。族群優先採自訂 sector_group，未分類者退回
+    官方 industry_name。此資料只做盤後觀察，不額外灌入個股 100 分。
+    """
+    history = load_json("chip_history.json", {})
+    if not isinstance(history, dict) or not rows:
+        return []
+
+    groups = {}
+    for r in rows:
+        sector = str(r.get("sector_group") or "").strip()
+        industry = str(r.get("industry_name") or "").strip()
+        key = sector if sector else (industry if industry and industry != "未分類" else "")
+        if key:
+            groups.setdefault(key, []).append(r)
+
+    out = []
+    for key, members in groups.items():
+        daily = {}
+        for r in members:
+            code = str(r.get("code") or "")
+            for h in history.get(code) or []:
+                ds = str(h.get("date") or "")
+                if not ds:
+                    continue
+                fv = h.get("foreign_net")
+                tv = h.get("trust_net")
+                if fv is None and tv is None:
+                    continue
+                try:
+                    net = float(fv or 0) + float(tv or 0)
+                except Exception:
+                    continue
+                daily[ds] = daily.get(ds, 0.0) + net
+
+        ordered = sorted(daily.items(), key=lambda x: x[0], reverse=True)
+        vals = [v / 1000.0 for _, v in ordered]  # 股 -> 張
+        latest = vals[0] if vals else None
+        prev = vals[1] if len(vals) >= 2 else None
+        net5 = sum(vals[:5]) if len(vals) >= 5 else None
+        net20 = sum(vals[:20]) if len(vals) >= 20 else None
+
+        streak = 0
+        streak_dir = None
+        if vals and vals[0] != 0:
+            streak_dir = 1 if vals[0] > 0 else -1
+            for v in vals:
+                if v == 0 or (1 if v > 0 else -1) != streak_dir:
+                    break
+                streak += 1
+
+        accelerating = bool(
+            latest is not None and prev is not None and latest * prev > 0
+            and abs(latest) >= abs(prev) * 1.15
+        )
+        if streak_dir == 1:
+            flow_text = f"連續流入 {streak} 天" + (" ↑ 流入加速" if accelerating else "")
+        elif streak_dir == -1:
+            flow_text = f"連續流出 {streak} 天" + (" ↓ 流出加速" if accelerating else "")
+        else:
+            flow_text = "資金方向中性"
+
+        if latest is None:
+            action = "資料累積中"
+        elif latest > 0 and (net5 is None or net5 > 0):
+            action = "持續加碼"
+        elif latest > 0:
+            action = "轉為加碼"
+        elif latest < 0 and (net5 is None or net5 < 0):
+            action = "持續減碼"
+        elif latest < 0:
+            action = "轉為減碼"
+        else:
+            action = "中性"
+
+        weighted = [
+            (float(r.get("ret5") or 0), max(float(r.get("avg_turnover20") or 0), 1.0))
+            for r in members
+        ]
+        sw = sum(w for _, w in weighted)
+        ret5 = sum(v * w for v, w in weighted) / sw if sw else None
+
+        out.append({
+            "sector": key,
+            "today_lots": None if latest is None else round(latest, 1),
+            "net5_lots": None if net5 is None else round(net5, 1),
+            "net20_lots": None if net20 is None else round(net20, 1),
+            "history_days": len(vals),
+            "latest_date": ordered[0][0] if ordered else None,
+            "flow_streak": streak,
+            "flow_direction": "in" if streak_dir == 1 else "out" if streak_dir == -1 else "flat",
+            "accelerating": accelerating,
+            "flow_text": flow_text,
+            "action": action,
+            "ret5_pct": None if ret5 is None else round(ret5, 2),
+            "member_count": len(members),
+        })
+
+    out.sort(
+        key=lambda x: (
+            abs(float(x.get("net5_lots") or x.get("today_lots") or 0)),
+            abs(float(x.get("today_lots") or 0)),
+        ),
+        reverse=True,
+    )
+    return out
 
 def build_intraday():
     close_obj = load_json("close.json", {"rows": []})

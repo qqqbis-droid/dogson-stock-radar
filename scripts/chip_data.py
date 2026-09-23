@@ -554,6 +554,66 @@ def _save_history(history: Dict[str, List[dict]]):
         _diag(f"save chip_history failed: {e}")
 
 
+
+def backfill_institution_history(codes: set, market_map: dict, target_days: int = 20, calendar_days: int = 45):
+    """只回補外資＋投信歷史，供盤後族群 1/5/20 日法人流向使用。
+
+    不重抓歷史融資/借券，避免盤後流程過慢。資料仍寫回既有
+    chip_history.json，之後每日只需補最新交易日。
+    """
+    history = _load_persisted_history(codes)
+
+    def inst_dates():
+        return {
+            str(r.get("date"))
+            for rows in history.values()
+            for r in rows
+            if r.get("date") and (r.get("foreign_net") is not None or r.get("trust_net") is not None)
+        }
+
+    dates = inst_dates()
+    if len(dates) >= target_days:
+        return history
+
+    listed = {c for c in codes if str(market_map.get(c) or "") == "上市"}
+    otc = set(codes) - listed
+
+    for d in _recent_calendar_days(calendar_days):
+        ds = d.isoformat()
+        if ds in dates:
+            continue
+        merged = {c: {} for c in codes}
+
+        if listed:
+            try:
+                part = _extract_inst(_twse_institution(d), listed)
+                for c, vals in part.items():
+                    merged[c].update(vals)
+            except Exception as e:
+                _diag(f"TWSE inst backfill {d} failed: {e}")
+
+        if otc:
+            try:
+                part = _extract_inst(_tpex_institution(d), otc)
+                for c, vals in part.items():
+                    merged[c].update(vals)
+            except Exception as e:
+                _diag(f"TPEx inst backfill {d} failed: {e}")
+
+        any_day = False
+        for c, vals in merged.items():
+            if vals and any(v is not None for v in vals.values()):
+                history[c] = _merge_history(history.get(c, []), [{"date": ds, **vals}])
+                any_day = True
+        if any_day:
+            dates.add(ds)
+        if len(dates) >= target_days:
+            break
+
+    _save_history(history)
+    _diag(f"institution history dates={len(dates)} target={target_days}")
+    return history
+
 def _save_status(out: Dict[str, dict]):
     try:
         vals = list(out.values())
@@ -614,6 +674,9 @@ def build_chip_signals(codes: Iterable[str], market_map: dict, cache_dir: Path) 
         history[c] = _merge_history(persisted.get(c, []), fetched.get(c, []))
     _save_history(history)
 
+    # v1.5.7: 盤後族群資金流需要 5/20 日官方法人歷史。
+    history = backfill_institution_history(codes, market_map, target_days=20, calendar_days=45)
+
     out = {}
     for c in codes:
         hs = history.get(c, [])
@@ -660,7 +723,8 @@ def build_chip_signals(codes: Iterable[str], market_map: dict, cache_dir: Path) 
             "margin_3d_pct": margin_3d_pct,
             "margin_status": margin_status,
             "chip_combo": (foreign_3buy and sbl_3down) if (len(foreign_vals) >= 3 and len(sbl_vals) >= 4) else None,
-            "chip_history_days": min(len(hs), 4),
+            "chip_history_days": min(len(hs), 40),
+            "institution_history_days": len({x.get("date") for x in hs if x.get("date") and (x.get("foreign_net") is not None or x.get("trust_net") is not None)}),
         }
 
     try:
