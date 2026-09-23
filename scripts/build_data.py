@@ -1988,7 +1988,7 @@ def build_close():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "close_updated_at": now_tw().isoformat(timespec="seconds"),
         "daily_count": len(rows),
-        "version": "1.5.12-free",
+        "version": "1.5.14-free",
     })
     dump("status.json", status)
 
@@ -2492,10 +2492,12 @@ def build_sector_institution_flow(rows, price_history=None):
             "member_count": len(members),
         })
 
+    # v1.5.14：資料層也統一以「今日估算法人淨額」力度排序。
+    # 5日/20日只作趨勢欄位，不影響今日榜名次。
     out.sort(
         key=lambda x: (
-            abs(float(x.get("net5_amount_100m") or x.get("today_amount_100m") or 0)),
-            abs(float(x.get("net5_lots") or x.get("today_lots") or 0)),
+            abs(float(x.get("today_amount_100m") or 0)),
+            abs(float(x.get("today_lots") or 0)),
         ),
         reverse=True,
     )

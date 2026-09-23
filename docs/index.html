@@ -41,7 +41,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.13｜盤後法人金額力度＋族群成分股小卡＋盤中輪動可收合</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.14｜盤後今日法人金額排名＋盤中成交資金輪動透明化</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -164,9 +164,11 @@ function closeSectorFundsHTML(){
  const sub="外資＋投信官方淨買賣股數 × 各交易日收盤價估算；金額看力度、張數看方向，未含自營商；不額外增加個股100分";
  if(!arr.length)return `<div class="rotationbox"><div class="rotationtop"><div><div class="rotationtitle">${title}</div><div class="sub">${sub}</div></div></div><div class="rotationleaders">目前法人歷史資料不足，完成盤後籌碼更新後會顯示。</div></div>`;
 
- const strength=x=>x.net5_amount_100m??x.today_amount_100m??0;
- const allBuys=arr.filter(x=>(x.today_amount_100m??0)>0).sort((a,b)=>strength(b)-strength(a));
- const allSells=arr.filter(x=>(x.today_amount_100m??0)<0).sort((a,b)=>strength(a)-strength(b));
+ const todayStrength=x=>x.today_amount_100m??0;
+ // v1.5.14：既然畫面寫「今日 TOP」，名次就只看今日估算法人淨額。
+ // 5日/20日留在卡片裡看趨勢，不再干擾今日排名。
+ const allBuys=arr.filter(x=>(x.today_amount_100m??0)>0).sort((a,b)=>todayStrength(b)-todayStrength(a));
+ const allSells=arr.filter(x=>(x.today_amount_100m??0)<0).sort((a,b)=>todayStrength(a)-todayStrength(b));
  const buys=allBuys.slice(0,8),sells=allSells.slice(0,8);
  const periodMoney=(v,need,n)=>v===null||v===undefined?`累積 ${Math.min(n||0,need)}/${need}日`:flowMoney(v);
  const lotsText=(v,need,n)=>v===null||v===undefined?`累積${Math.min(n||0,need)}/${need}日`:signed(v,0,"張");
@@ -180,7 +182,7 @@ function closeSectorFundsHTML(){
    return `<div class="closeflowcard"><div class="closeflowname">${x.sector}</div><div class="closeflowgrid compact">${metric("當日估算",flowMoney(x.today_amount_100m))}${metric("5日估算",periodMoney(x.net5_amount_100m,5,x.amount_history_days))}${metric("20日估算",periodMoney(x.net20_amount_100m,20,x.amount_history_days))}${metric("5日漲跌",signed(x.ret5_pct,2))}</div><div class="closeflowlots"><span>張數｜今日 ${lotsText(x.today_lots,1,x.history_days)}</span><span>5日 ${lotsText(x.net5_lots,5,x.history_days)}</span><span>20日 ${lotsText(x.net20_lots,20,x.history_days)}</span></div><div class="flowtext">${x.flow_text||"資金方向中性"}</div><div class="closeflowsummary">金額覆蓋 ${num(x.amount_coverage_pct,0)}%｜估算值</div><span class="flowtag ${tag}">${x.action||"觀察"}</span><details class="closeflowmembers"><summary>👥 查看成分股 ${members.length} 檔</summary><div class="closeflowmembergrid">${memberHTML}</div></details></div>`;
  };
 
- const preview=`<div class="closeflowpreview"><div class="closeflowpreviewcol"><div class="closeflowpreviewhead">🔴 流入前 3</div>${allBuys.length?allBuys.slice(0,3).map(mini).join(""):`<div class="sub">目前無明顯流入</div>`}</div><div class="closeflowpreviewcol"><div class="closeflowpreviewhead">🟢 流出前 3</div>${allSells.length?allSells.slice(0,3).map(mini).join(""):`<div class="sub">目前無明顯流出</div>`}</div></div><div class="closeflowsummary">依估算金額力度排序｜今日流入 ${allBuys.length} 個族群｜流出 ${allSells.length} 個族群</div>`;
+ const preview=`<div class="closeflowpreview"><div class="closeflowpreviewcol"><div class="closeflowpreviewhead">🔴 今日估算流入 TOP 3</div>${allBuys.length?allBuys.slice(0,3).map(mini).join(""):`<div class="sub">目前無明顯流入</div>`}</div><div class="closeflowpreviewcol"><div class="closeflowpreviewhead">🟢 今日估算流出 TOP 3</div>${allSells.length?allSells.slice(0,3).map(mini).join(""):`<div class="sub">目前無明顯流出</div>`}</div></div><div class="closeflowsummary">依今日估算法人淨額排序｜今日流入 ${allBuys.length} 個族群｜流出 ${allSells.length} 個族群</div>`;
  const detail=sectorFundsOpen?`<div class="rotationcols"><div><div class="rotationhead">🔴 法人流入／加碼</div>${buys.length?buys.map(one).join(""):`<div class="sub">目前沒有明顯法人流入族群</div>`}</div><div><div class="rotationhead">🟢 法人流出／減碼</div>${sells.length?sells.map(one).join(""):`<div class="sub">目前沒有明顯法人流出族群</div>`}</div></div>`:"";
  const label=sectorFundsOpen?"收合族群明細":"展開完整族群";
  const arrow=sectorFundsOpen?"▲":"▼";
@@ -190,7 +192,7 @@ function closeSectorFundsHTML(){
 function rotationHTML(){
  if(mode==="close")return closeSectorFundsHTML();
  const arr=sectorRotation||[];
- if(!arr.length)return `<div class="rotationbox"><div class="rotationtitle">💰 族群資金輪動</div><div class="sub">目前資料不足，累積更多5分K後會開始顯示。</div></div>`;
+ if(!arr.length)return `<div class="rotationbox"><div class="rotationtitle">💰 盤中族群成交資金輪動</div><div class="sub">目前資料不足，累積更多5分K後會開始顯示。</div></div>`;
  const hot=arr.filter(x=>(x.heat||0)>=2.5).slice(0,4);
  const cold=[...arr].sort((a,b)=>(a.heat||0)-(b.heat||0)).filter(x=>(x.heat||0)<=-2.5).slice(0,4);
  const one=x=>{
@@ -205,7 +207,7 @@ function rotationHTML(){
  const detail=sectorRotationOpen?`<div class="rotationcols"><div><div class="rotationhead">🔥 吸金中</div>${hot.length?hot.map(one).join(""):`<div class="sub">暫無明顯流入族群</div>`}</div><div><div class="rotationhead">🧊 流失／降溫</div>${cold.length?cold.map(one).join(""):`<div class="sub">暫無明顯流失族群</div>`}</div></div>`:"";
  const label=sectorRotationOpen?"收合族群輪動":"展開完整輪動";
  const arrow=sectorRotationOpen?"▲":"▼";
- return `<div class="rotationbox"><div class="rotationtop"><div><div class="rotationtitle">💰 族群資金輪動</div><div class="sub">成交金額占比變化＋價格＋VWAP＋廣度；不是法人淨流入</div></div><button class="rotationtoggle" type="button" aria-expanded="${sectorRotationOpen}" onclick="toggleIntradaySectorRotation()">${arrow} ${label}</button></div>${preview}${detail}</div>`;
+ return `<div class="rotationbox"><div class="rotationtop"><div><div class="rotationtitle">💰 盤中族群成交資金輪動</div><div class="sub">吸金熱度＝成交金額占比變化＋價格＋VWAP＋廣度＋量速；反映市場成交資金輪動，不是法人淨流入</div></div><button class="rotationtoggle" type="button" aria-expanded="${sectorRotationOpen}" onclick="toggleIntradaySectorRotation()">${arrow} ${label}</button></div>${preview}${detail}</div>`;
 }
 
 function srHTML(r){
