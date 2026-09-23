@@ -24,12 +24,12 @@ h1{font-size:22px;margin:0}.sub{font-size:12px;color:var(--muted);margin-top:4px
 .card{background:linear-gradient(180deg,#171c25,#131820);border:1px solid var(--line);border-radius:18px;padding:14px;margin:10px 0}
 .top{display:flex;justify-content:space-between;gap:10px}.stockleft{display:flex;gap:8px}.star{border:0;background:transparent;font-size:24px;color:#8f9aac;padding:0}.star.on{color:#ffd76b}.name{font-size:19px;font-weight:900}.code{font-size:13px;color:var(--muted);margin-left:6px}.score{font-size:27px;font-weight:900}.label{font-size:11px;color:var(--muted);text-align:right}
 .cat{display:inline-block;font-size:12px;font-weight:850;padding:6px 9px;border-radius:999px;margin-top:7px}.start{background:#0f3928;color:#69efa8}.pull{background:#40300f;color:#ffd477}.watch{background:#1b2b42;color:#9cc9ff}.hot{background:#441923;color:#ff9aab}.quality{display:inline-block;font-size:11px;font-weight:800;padding:5px 8px;border-radius:999px;margin:7px 0 0 5px;background:#222938;color:#cbd6e6}.quality.high{background:#392b0f;color:#ffd477}.quality.strong{background:#192f45;color:#a9d5ff}
-.parts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:11px}.part{background:#0f141c;border:1px solid #29313e;border-radius:10px;padding:8px 5px;text-align:center}.partv{font-size:14px;font-weight:900}.partl{font-size:9px;color:var(--muted);margin-top:3px}
+.parts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:11px}.part{background:#0f141c;border:1px solid #29313e;border-radius:10px;padding:8px 5px;text-align:center}.partv{font-size:14px;font-weight:900}.partl{font-size:9px;color:var(--muted);margin-top:3px}
 .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}.metric{background:#0e131a;border:1px solid #252d39;border-radius:12px;padding:9px}.mval{font-weight:850;font-size:14px}.mlab{font-size:10px;color:var(--muted);margin-top:3px}
 .srbox{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.sr{background:#0e131a;border-radius:12px;padding:10px}.support{border:1px solid #244936}.resistance{border:1px solid #56313a}.srtitle{font-size:11px;color:var(--muted)}.srprice{font-size:16px;font-weight:900;margin-top:4px}.support .srprice{color:var(--green)}.resistance .srprice{color:var(--red)}.srbasis{font-size:10px;color:#8994a6;margin-top:4px}
 .chips{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}.chip{background:#10151d;padding:9px;border-radius:10px;font-size:12px}.yes{color:var(--green)}.bad{color:var(--red)}
 .reasons{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.reason{background:#202734;border-radius:8px;padding:5px 7px;font-size:11px;color:#d7deea}.warn{color:#ff9baa}
-details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summary{font-size:12px;color:#cbd3df;cursor:pointer}.group{display:grid;gap:6px;margin-top:8px}.g{display:flex;justify-content:space-between;background:#10151d;padding:8px;border-radius:9px;font-size:12px}
+details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summary{font-size:12px;color:#cbd3df;cursor:pointer}.group{display:grid;gap:6px;margin-top:8px}.g{display:flex;justify-content:space-between;background:#10151d;padding:8px;border-radius:9px;font-size:12px}.peerlink{width:100%;border:0;color:inherit;text-align:left;cursor:pointer}.peerlink:active{transform:scale(.995)}
 .help{background:#121821;border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:10px}.help summary{font-weight:850;border:0;padding:0}.helptext{color:#cbd3df;font-size:12px;line-height:1.65;margin-top:10px}.helptext b{color:white}
 .empty{text-align:center;color:var(--muted);padding:35px 10px}.note{font-size:11px;color:var(--muted);line-height:1.5;margin:12px 2px}
 .rotationbox{background:linear-gradient(180deg,#151c27,#111720);border:1px solid var(--line);border-radius:18px;padding:13px;margin:12px 0}.rotationtop{display:flex;justify-content:space-between;align-items:flex-start}.rotationtitle{font-size:18px;font-weight:900}.rotationcols{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.rotationhead{font-size:13px;font-weight:900;margin-bottom:6px}.rotationrow{display:flex;justify-content:space-between;gap:8px;background:#0e131a;border:1px solid #252d39;border-radius:11px;padding:9px;margin:6px 0;font-size:11px}.rotationleaders{color:var(--muted);margin-top:4px}.rotationnums{text-align:right;color:#cbd3df;line-height:1.45;min-width:138px}@media(max-width:620px){.rotationcols{grid-template-columns:1fr}.rotationrow{font-size:10px}}
@@ -38,7 +38,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.3.7｜交易日一致性＋櫃買官方指數</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.4.0｜官方即時價＋獨立大盤＋多因子族群</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -57,8 +57,8 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
     <b>階段和品質現在分開看。</b>「剛啟動」主要看突破、量能、VWAP/均線與位階；總分不再是剛啟動的硬門檻。總分 82 代表品質高，不是 82% 會漲。<br><br>
     <b>技術 50：</b>突破、均線、量能、RSI、MACD、VWAP 等。<br>
     <b>籌碼 25：</b>外資連3買、借券賣出連3減、投信、融資。覆蓋率低於60%時品質總分會標示「資料待補」，不再用假精準分數誤導。盤後會在14:25、20:30、23:40及次日08:15自動重抓，補齊較晚公布的融資與借券資料。<br>
-    <b>族群 10：</b>優先看較窄的次產業/題材共振：4檔以上=10、3檔=8、2檔=5、1檔=2。沒有窄群組時改用官方產業廣度作代理，最高6分，並明確標示「產業代理」，不再因為資料尚未分類就直接判0分。<br>
-    <b>大盤 15：</b>盤中＝加權3＋櫃買3＋今日上漲家數3＋盤中資金動能4＋族群擴散2，昨日外資只顯示背景、不計分。盤後＝加權5（多頭排列5／僅站20MA 2.5／跌破20MA 0）＋櫃買4（4／2／0）＋上漲家數3（≥60%=3、55%=2.5、50%=1.5、45%=0.5）＋官方外資3（當日方向最多2＋近5日方向最多1）。<br><b>資金輪動：</b>看族群成交金額占比的近30分鐘變化，再合併漲跌、站VWAP比例、上漲家數與量速；這是吸金熱度，不是法人淨流入。<br><br><b>品質標籤：</b>80分以上＝高共振、70～79＝強、70以下＝一般。先看「階段」，再看「品質」。<br><br>
+    <b>族群 10：</b>改用多因子共振：廣度3＋強度2＋量能2＋領頭股2＋延續性1。強勢股成交金額占比也納入強度，避免冷門小股一起紅就拿高分；點開族群即可點選共振個股。<br>
+    <b>個股品質：</b>技術50＋籌碼25＋族群10＝85分，再換算為100分；大盤不再灌進每一檔個股分數。<br><b>大盤 15（獨立）：</b>只判斷今天的操作環境。盤中＝加權3＋櫃買3＋今日上漲家數3＋盤中資金動能4＋族群擴散2，昨日外資只顯示背景、不計分。盤後＝加權5（多頭排列5／僅站20MA 2.5／跌破20MA 0）＋櫃買4（4／2／0）＋上漲家數3（≥60%=3、55%=2.5、50%=1.5、45%=0.5）＋官方外資3（當日方向最多2＋近5日方向最多1）。<br><b>資金輪動：</b>看族群成交金額占比的近30分鐘變化，再合併漲跌、站VWAP比例、上漲家數與量速；這是吸金熱度，不是法人淨流入。<br><br><b>品質標籤：</b>80分以上＝高共振、70～79＝強、70以下＝一般。先看「階段」，再看「品質」。<br><br>
     <b>同時間量速 2.4x：</b>今天此刻的累積量約為過去同時間的 2.4 倍。1.5～3 倍通常最舒服，>5 倍要防過熱。<br>
     <b>近即時價：</b>搜尋標的、我的關注與目前畫面股票會依優先順序放進最多5檔即時池，每10秒嘗試刷新；不是券商逐筆成交串流。<br><b>5分K結構：</b>VWAP、量速、突破、支撐壓力與階段仍以5分K計算，避免逐筆雜訊讓訊號一直跳。<br><b>VWAP：</b>今天市場的成交量加權平均成本；站上通常偏強，但離太遠反而容易追高。<br>
     <b>日量比：</b>今天完整成交量 ÷ 20日平均量。<br><b>流動性：</b>20日平均成交金額低於3,000萬直接排除；3,000萬～8,000萬標示偏低並降低品質分；8,000萬～2億正常；2億以上活躍。<br>
@@ -74,7 +74,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 <div id="cards"><div class="empty">正在讀取最新資料…</div></div>
 <div class="note">盤中大盤分只使用今天即時量價、VWAP、市場廣度與族群資金輪動；昨日外資只保留背景提示，不計入盤中15分。個股籌碼仍使用最近已完成交易日資料。族群資金「流入／流失」代表成交資金集中度與價格結構的變化，不等於法人淨買賣。</div>
 </div>
-<div class="footer">階段看價格行為｜品質分 = 技術50 + 籌碼25 + 族群10 + 大盤15 ± 流動性修正</div>
+<div class="footer">階段看價格行為｜個股品質 = 技術50＋籌碼25＋族群10（85換算100）｜大盤15分獨立判斷操作環境</div>
 
 <script>
 let mode="intraday",filter="all",watchOnly=false,universe=[],closeRows=[],intraRows=[],rows=[],market={},marketLive={},closeMarket={},intraMarket={},sectorRotation=[];
@@ -139,17 +139,18 @@ function srHTML(r){
 function groupHTML(r){
  const key=(r.sector_group||"").trim();
  if(!key)return "";
- let same=rows.filter(x=>x.sector_group===key&&x.technical_score>=30&&!(x.overheat_reasons||[]).length).slice(0,8);
- if(same.length<2)return "";
- return `<details><summary>👥 ${key} 共振 ${r.sector_hot_count||same.length} 檔｜點我展開</summary><div class="group">${same.map(x=>`<div class="g"><span>${x.code} ${x.name}</span><span>${x.score_reliable===false?"—":num(x.score,0)}｜${x.category}</span></div>`).join("")}</div></details>`;
+ const d=r.sector_detail||{};
+ const peers=(r.sector_peers&&r.sector_peers.length?r.sector_peers:rows.filter(x=>x.sector_group===key).slice(0,10));
+ const comp=d.components||{};
+ const detail=`廣度 ${num(comp.breadth,1)}/3 · 強度 ${num(comp.strength,1)}/2 · 量能 ${num(comp.volume,1)}/2 · 領頭 ${num(comp.leaders,1)}/2 · 延續 ${num(comp.continuity,1)}/1`;
+ return `<details><summary>👥 ${key} 共振 ${num(r.sector_score,1)}/10｜${d.strong_count||0}/${d.count||peers.length} 檔轉強｜點我展開</summary><div class="helptext" style="margin:7px 2px">${detail}</div><div class="group">${peers.map(x=>`<button class="g peerlink" data-code="${x.code}"><span>${x.code} ${x.name}<small> ${signed(x.day_change,1)}</small></span><span>${x.score===null||x.score===undefined?"—":num(x.score,0)}｜${x.category||"觀察"}</span></button>`).join("")}</div></details>`;
 }
 
 function partsHTML(r){
  return `<div class="parts">
  <div class="part"><div class="partv">${num(r.technical_score,0)}/50</div><div class="partl">技術</div></div>
  <div class="part"><div class="partv">${(+r.chip_coverage_pct||0)<60?"待補":num(r.chip_score,0)+"/25"}</div><div class="partl">籌碼${(+r.chip_coverage_pct||0)<60?" · 資料不足":""}</div></div>
- <div class="part"><div class="partv">${num(r.sector_score,0)}/10</div><div class="partl">族群</div></div>
- <div class="part"><div class="partv">${r.market_data_complete===false?"待補":num(r.market_score,0)+"/15"}</div><div class="partl">大盤${r.market_data_complete===false?" · 日期未齊":""}</div></div>
+ <div class="part"><div class="partv">${num(r.sector_score,1)}/10</div><div class="partl">族群</div></div>
  </div>`;
 }
 
@@ -167,7 +168,7 @@ function chipHTML(r){
 }
 
 function metrics(r){
- if(mode==="intraday")return [["現價",num(r.close,2)],["同時間量速",num(r.pace,1)+"x"],["距VWAP",signed(r.vwap_dist,1)],["當日",signed(r.day_change,1)],["VWAP",num(r.vwap,2)],["流動性",(r.liquidity_level||"—")+" · "+moneyTw(r.avg_turnover20)],["族群共振",(r.sector_score_label?((r.sector_hot_count||0)+"檔 · "+r.sector_score_label+(r.sector_score_source==="官方產業代理"?"（產業代理）":"")):"待分類")]];
+ if(mode==="intraday")return [["現價",num(r.close,2)],["行情時間",r.quote_time||r.time||"—"],["5分K結構",r.structure_time||r.time||"—"],["同時間量速",num(r.pace,1)+"x"],["距VWAP",signed(r.vwap_dist,1)],["當日",signed(r.day_change,1)],["VWAP",num(r.vwap,2)],["流動性",(r.liquidity_level||"—")+" · "+moneyTw(r.avg_turnover20)],["族群共振",(r.sector_score_label?(num(r.sector_score,1)+"/10 · "+r.sector_score_label+(r.sector_score_source==="官方產業代理"?"（產業代理）":"")):"待分類")]];
  return [["收盤",num(r.close,2)],["日量比",num(r.vol_x,1)+"x"],["流動性",(r.liquidity_level||"—")+" · "+moneyTw(r.avg_turnover20)],["距20MA",signed(r.dist20,1)],["5日漲幅",signed(r.ret5,1)],["20日漲幅",signed(r.ret20,1)],["RSI",num(r.rsi,0)],["5MA",num(r.ma5,2)],["10MA",num(r.ma10,2)],["20MA",num(r.ma20,2)],["20日突破",r.break20?"是":"否"],["均線多頭",r.trend?"是":"否"],["族群共振",(r.sector_score_label?((r.sector_hot_count||0)+"檔 · "+r.sector_score_label+(r.sector_score_source==="官方產業代理"?"（產業代理）":"")):"待分類")]];
 }
 
@@ -177,7 +178,7 @@ function render(){
  const q=$("q").value.trim().toLowerCase();
  if(q){let hits=rr.filter(r=>String(r.code)===q||String(r.name).toLowerCase().includes(q));if(hits.length)rr=hits}
  if(!rr.length){$("cards").innerHTML='<div class="empty">目前沒有符合條件的資料。盤中會掃描所有通過流動性門檻的股票；若個別免費行情源暫缺，切到盤後仍可查完整日K資料。</div>';return}
- $("cards").innerHTML=rr.slice(0,70).map(r=>`<div class="card">
+ $("cards").innerHTML=rr.slice(0,70).map(r=>`<div class="card" data-code="${r.code}">
   <div class="top"><div class="stockleft"><button class="star ${watched(r.code)?"on":""}" onclick="toggleWatch('${r.code}')">${watched(r.code)?"★":"☆"}</button><div><div class="name">${r.name}<span class="code">${r.code}</span></div><div class="sub">${r.industry_name||r.industry||"未分類"}${r.sector_group?" · "+r.sector_group:""} · ${mode==="intraday"?(r.time||""):(r.date||"")}</div><span class="cat ${cls(r.category)}">${r.category}</span><span class="quality ${qualityCls(r.quality_label)}">品質：${r.quality_label||"一般"}</span></div></div><div><div class="score">${r.score_reliable===false?"—":num(r.score,0)}</div><div class="label">${r.score_reliable===false?"籌碼覆蓋不足":"品質總分 /100"}</div></div></div>
   ${partsHTML(r)}
   <div class="metrics">${metrics(r).map(m=>`<div class="metric"><div class="mval">${m[1]}</div><div class="mlab">${m[0]}</div></div>`).join("")}</div>
@@ -212,10 +213,19 @@ document.querySelectorAll(".filter[data-f]").forEach(b=>b.onclick=()=>{document.
 $("watchOnly").onclick=()=>{watchOnly=!watchOnly;$("watchOnly").classList.toggle("on",watchOnly);render()};
 $("scan").onclick=render;
 $("q").addEventListener("input",()=>{const q=$("q").value.trim().toLowerCase(),box=$("suggestions");if(!q){box.classList.remove("show");return}let h=universe.filter(x=>String(x.code).startsWith(q)||String(x.name).toLowerCase().includes(q)).slice(0,10);box.innerHTML=h.map(x=>`<button class="suggestion" data-code="${x.code}">${x.name}<small>${x.code} · ${x.industry_name||x.industry}</small></button>`).join("");box.classList.toggle("show",h.length>0);box.querySelectorAll(".suggestion").forEach(b=>b.onclick=()=>{$("q").value=b.dataset.code;box.classList.remove("show");render()})});
+
+$("cards").addEventListener("click",e=>{
+ const b=e.target.closest(".peerlink");if(!b)return;
+ const code=b.dataset.code;if(!code)return;
+ $("q").value=code;filter="all";watchOnly=false;
+ document.querySelectorAll(".filter").forEach(x=>x.classList.toggle("on",x.dataset.f==="all"));
+ render();
+ setTimeout(()=>document.querySelector(".card")?.scrollIntoView({behavior:"smooth",block:"start"}),30);
+});
 if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
 load();
 </script>
-<script src="./realtime-config.js?v=136"></script>
-<script src="./realtime.js?v=136"></script>
+<script src="./realtime-config.js?v=140"></script>
+<script src="./realtime.js?v=140"></script>
 </body>
 </html>

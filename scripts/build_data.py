@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.3.7
+犬子老師飆股雷達 Free Edition v1.4.0
 =================================
-總分 = 技術 50 + 籌碼 25 + 族群 10 + 大盤 15
+個股品質 = 技術50 + 籌碼25 + 族群10（85分換算100）；大盤15分獨立
 
 --mode close
     每日盤後跑一次：
@@ -1384,18 +1384,67 @@ def add_component_scores(rows, market, preliminary_intraday=False):
             if industry and industry != "未分類":
                 industry_hot[industry] = industry_hot.get(industry, 0) + 1
 
-    quality_reference = market.get("radar_threshold", 76)
+    def _resonance_stats(group_rows):
+        total = len(group_rows)
+        if not total:
+            return {"score": 0.0, "count": 0, "strong_count": 0}
+        strong = [x for x in group_rows if float(x.get("technical_score") or 0) >= 30 and not x.get("overheat_reasons")]
+        up_pct = sum(1 for x in group_rows if float(x.get("day_change") or 0) > 0) / total * 100
+        strong_pct = len(strong) / total * 100
+        avg_tech = sum(float(x.get("technical_score") or 0) for x in group_rows) / total
+        acts = []
+        for x in group_rows:
+            v = x.get("pace") if x.get("pace") is not None else x.get("vol_x")
+            if v is not None:
+                try: acts.append(float(v))
+                except Exception: pass
+        avg_activity = sum(acts) / len(acts) if acts else 1.0
+        leaders = [x for x in group_rows if float(x.get("technical_score") or 0) >= 35 and float(x.get("day_change") or 0) >= 1]
+        trend_hits = sum(1 for x in group_rows if x.get("trend5") or x.get("trend") or x.get("break12") or x.get("break20"))
+        continuity_pct = trend_hits / total * 100
+
+        # Strong-stock turnover share is especially useful intraday: two large leaders
+        # matter more than many tiny red/green prints.
+        total_turn = sum(float(x.get("current_turnover") or 0) for x in group_rows)
+        strong_turn = sum(float(x.get("current_turnover") or 0) for x in strong)
+        strong_turn_pct = (strong_turn / total_turn * 100) if total_turn > 0 else strong_pct
+
+        breadth_score = 3.0 if up_pct >= 70 else 2.5 if up_pct >= 60 else 1.5 if up_pct >= 50 else 0.5 if up_pct >= 40 else 0.0
+        strength_basis = max(strong_pct, strong_turn_pct)
+        strength_score = 2.0 if strength_basis >= 60 else 1.5 if strength_basis >= 45 else 1.0 if strength_basis >= 30 else 0.5 if avg_tech >= 25 else 0.0
+        volume_score = 2.0 if avg_activity >= 2.0 else 1.5 if avg_activity >= 1.5 else 1.0 if avg_activity >= 1.2 else 0.5 if avg_activity >= 1.0 else 0.0
+        leader_score = 2.0 if len(leaders) >= 2 else 1.2 if len(leaders) == 1 else 0.0
+        continuity_score = 1.0 if continuity_pct >= 60 else 0.5 if continuity_pct >= 40 else 0.0
+        score = round(min(10.0, breadth_score + strength_score + volume_score + leader_score + continuity_score), 1)
+        return {
+            "score": score, "count": total, "strong_count": len(strong),
+            "up_pct": round(up_pct, 1), "strong_pct": round(strong_pct, 1),
+            "strong_turnover_pct": round(strong_turn_pct, 1),
+            "avg_technical": round(avg_tech, 1), "activity": round(avg_activity, 2),
+            "leader_count": len(leaders), "continuity_pct": round(continuity_pct, 1),
+            "components": {
+                "breadth": breadth_score, "strength": strength_score,
+                "volume": volume_score, "leaders": leader_score,
+                "continuity": continuity_score,
+            },
+        }
+
+    quality_reference = 76
     market_score = float(market.get("market_score", 7.5))
 
     for r in rows:
         key = str(r.get("sector_group") or "").strip()
         industry = str(r.get("industry_name") or "").strip()
+        stat = None
+        group_rows = []
         if key:
-            n = int(hot.get(key, 0))
-            sec = sector_score(n)
-            source = "次產業"
+            group_rows = [x for x in rows if str(x.get("sector_group") or "").strip() == key]
+            stat = _resonance_stats(group_rows)
+            n = int(stat.get("strong_count") or 0)
+            sec = float(stat.get("score") or 0)
+            source = "次產業多因子"
             label = key
-            ratio = None
+            ratio = (n / len(group_rows)) if group_rows else None
         else:
             n = int(industry_hot.get(industry, 0)) if industry and industry != "未分類" else 0
             total_n = int(industry_total.get(industry, 0)) if industry and industry != "未分類" else 0
@@ -1409,6 +1458,17 @@ def add_component_scores(rows, market, preliminary_intraday=False):
         r["sector_score_source"] = source
         r["sector_score_label"] = label
         r["sector_hot_ratio"] = round(ratio * 100, 1) if ratio is not None else None
+        r["sector_detail"] = stat
+        if group_rows:
+            peers = sorted(group_rows, key=lambda x: (float(x.get("technical_score") or 0), float(x.get("day_change") or 0), float(x.get("current_turnover") or 0)), reverse=True)[:10]
+            r["sector_peers"] = [{
+                "code": x.get("code"), "name": x.get("name"),
+                "technical_score": x.get("technical_score"),
+                "score": x.get("score"), "day_change": x.get("day_change"),
+                "category": x.get("category"),
+            } for x in peers]
+        else:
+            r["sector_peers"] = []
         r["market_score"] = market_score
         r["market_mode"] = market.get("market_mode", "中性")
         r["market_data_complete"] = bool(market.get("data_complete", True))
@@ -1416,12 +1476,16 @@ def add_component_scores(rows, market, preliminary_intraday=False):
 
         cs = float(r.get("chip_score", 12.5))
         liq_adjust = float(r.get("liquidity_adjust", 0))
-        total = float(r.get("technical_score", 0)) + cs + sec + market_score + liq_adjust
-        r["score"] = round(max(0, min(100, total)), 1)
+        # v1.4: market is an independent operation-environment gauge.  It must not
+        # make every stock's quality rise/fall by the same amount.
+        stock_raw = float(r.get("technical_score", 0)) + cs + sec + liq_adjust
+        stock_raw = max(0.0, min(85.0, stock_raw))
+        r["stock_raw_score"] = round(stock_raw, 1)
+        r["score"] = round(stock_raw / 85.0 * 100.0, 1)
+        r["market_in_quality_score"] = False
 
         chip_cov = float(r.get("chip_coverage_pct") or 0)
-        same_day = (not r.get("market_trade_date")) or str(r.get("date")) == str(r.get("market_trade_date"))
-        r["score_reliable"] = bool(chip_cov >= 60 and r.get("market_data_complete", True) and same_day)
+        r["score_reliable"] = bool(chip_cov >= 60)
         if not r["score_reliable"]:
             r["quality_label"] = "資料待補"
         elif r["score"] >= 80:
@@ -1590,7 +1654,7 @@ def build_close():
         "trade_date": market.get("trade_date"),
         "data_complete": bool(market.get("data_complete")),
         "market": market,
-        "score_formula": {"technical": 50, "chip": 25, "sector": 10, "market": 15},
+        "score_formula": {"technical": 50, "chip": 25, "sector": 10, "stock_raw_max": 85, "normalized_to": 100, "market_separate": 15},
         "rows": rows,
     })
     dump("market.json", market)
@@ -1600,7 +1664,7 @@ def build_close():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "close_updated_at": now_tw().isoformat(timespec="seconds"),
         "daily_count": len(rows),
-        "version": "1.3.6-free",
+        "version": "1.4.0-free",
     })
     dump("status.json", status)
 
@@ -1684,6 +1748,77 @@ def intraday_index_snapshot():
             print("intraday index fallback", e)
     return out
 
+
+
+def intraday_stock_snapshot(universe_df, codes=None):
+    """Official TWSE MIS near-real-time quotes for listed + OTC stocks.
+
+    This is intentionally a quote layer, not a replacement for the 5-minute
+    structure engine.  MIS supplies last price / previous close / official time;
+    Yahoo 5m continues to supply VWAP, breakout, pace and support/resistance.
+    """
+    if universe_df is None or universe_df.empty:
+        return {}
+    wanted = set(str(c) for c in (codes or []))
+    cols = ["code", "market"]
+    recs = universe_df[cols].astype(str).to_dict("records")
+    if wanted:
+        recs = [r for r in recs if r["code"] in wanted]
+    now = now_tw()
+    today = now.date()
+    out = {}
+
+    def fnum(v):
+        try:
+            z = str(v or "").replace(",", "").strip()
+            return float(z) if z not in {"", "-", "--"} else None
+        except Exception:
+            return None
+
+    for i in range(0, len(recs), 80):
+        part = recs[i:i+80]
+        ex_ch = "|".join(
+            f"{'otc' if r['market'] == '上櫃' else 'tse'}_{r['code']}.tw"
+            for r in part
+        )
+        try:
+            rr = requests.get(
+                "https://mis.twse.com.tw/stock/api/getStockInfo.jsp",
+                params={"ex_ch": ex_ch, "json": "1", "delay": "0", "_": int(now.timestamp()*1000)},
+                headers={
+                    "User-Agent": "Mozilla/5.0 DogsonRadar/1.4.0",
+                    "Referer": "https://mis.twse.com.tw/stock/index.jsp",
+                    "Accept": "application/json,text/plain,*/*",
+                },
+                timeout=20,
+            )
+            rr.raise_for_status()
+            for x in rr.json().get("msgArray") or []:
+                code = str(x.get("c") or "").strip()
+                td = _parse_mis_trade_date(x.get("d"))
+                if not code or td != today:
+                    continue
+                last = fnum(x.get("z"))
+                prev = fnum(x.get("y"))
+                if last is None or last <= 0:
+                    continue
+                tm = str(x.get("t") or "").strip()
+                # Some MIS responses include HH:MM:SS, some HH:MM.
+                if len(tm) >= 5:
+                    tm = tm[:8]
+                out[code] = {
+                    "date": td.isoformat(),
+                    "time": tm,
+                    "close": last,
+                    "prev_close": prev,
+                    "change_pct": ((last / prev - 1) * 100) if prev and prev > 0 else None,
+                    "volume_lots": fnum(x.get("v")),
+                    "source": "TWSE MIS",
+                }
+        except Exception as e:
+            print("MIS intraday stock batch", i, e)
+    print("MIS intraday stock quotes", len(out), "/", len(recs))
+    return out
 
 def _weighted_pct(rows, predicate, weight_key="current_turnover"):
     valid = [r for r in rows if (r.get(weight_key) or 0) > 0]
@@ -1983,11 +2118,37 @@ def build_intraday():
                 "updated_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_attempted_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_count": len(previous.get("rows", [])),
-                "version": "1.3.6-free",
+                "version": "1.4.0-free",
             })
             dump("status.json", status)
             print("intraday source empty; kept previous", len(previous.get("rows", [])))
             return
+
+    # Official quote overlay: all rows get the freshest MIS last price available.
+    # Structure fields (technical_score/breakouts/VWAP/support) still come from the
+    # 5-minute engine; quote time is stored separately so freshness is transparent.
+    quote_map = intraday_stock_snapshot(u, [r.get("code") for r in rows])
+    structure_times = [str(r.get("time") or "")[:5] for r in rows if r.get("time")]
+    for r in rows:
+        r["structure_time"] = r.get("time")
+        r["structure_close"] = r.get("close")
+        q = quote_map.get(str(r.get("code")))
+        if not q:
+            continue
+        r["quote_date"] = q.get("date")
+        r["quote_time"] = q.get("time")
+        r["quote_source"] = q.get("source")
+        r["quote_close"] = q.get("close")
+        r["close"] = q.get("close")
+        if q.get("change_pct") is not None:
+            r["day_change"] = round(float(q.get("change_pct")), 2)
+        if r.get("vwap"):
+            try: r["vwap_dist"] = round((float(r["close"]) / float(r["vwap"]) - 1) * 100, 2)
+            except Exception: pass
+
+    quote_times = [str(q.get("time") or "")[:5] for q in quote_map.values() if q.get("time")]
+    quote_latest = max(quote_times) if quote_times else None
+    structure_latest = max(structure_times) if structure_times else None
 
     market_live = intraday_index_snapshot()
     sector_rotation = build_sector_rotation(rows)
@@ -1999,7 +2160,12 @@ def build_intraday():
         "market": intraday_market,
         "market_intraday": market_live,
         "sector_rotation": sector_rotation,
-        "score_formula": {"technical": 50, "chip": 25, "sector": 10, "market": 15},
+        "quote_layer": {
+            "source": "TWSE MIS", "coverage": len(quote_map), "row_count": len(rows),
+            "latest_time": quote_latest, "structure_latest_time": structure_latest,
+            "note": "現價/當日漲跌採官方MIS；VWAP/突破/量速/支撐壓力仍採5分K結構",
+        },
+        "score_formula": {"technical": 50, "chip": 25, "sector": 10, "stock_raw_max": 85, "normalized_to": 100, "market_separate": 15},
         "rows": rows,
     })
 
@@ -2008,7 +2174,7 @@ def build_intraday():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_count": len(rows),
-        "version": "1.3.6-free",
+        "version": "1.4.0-free",
     })
     dump("status.json", status)
     print("intraday done", len(rows))
