@@ -1,0 +1,120 @@
+name: Install Radar v1.5.23 Intraday Entry Radar
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1523.trigger"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1523-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Require v1.5.22 first
+        run: |
+          grep -q 'Free Edition v1.5.22' docs/index.html
+          grep -q 'function portfolioSummaryHTML()' docs/index.html
+          grep -q 'dogson-free-v1522' docs/sw.js
+          grep -q '"portfolio_mode_version":"1.0"' docs/data/status.json
+
+      - name: Apply v1.5.23 Step 4 patch
+        run: python scripts/patch_v1523.py
+
+      - name: Static verification
+        run: |
+          python -m py_compile scripts/patch_v1523.py
+          python - <<'PY'
+          from pathlib import Path
+          import json,re
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          sw=Path('docs/sw.js').read_text(encoding='utf-8')
+          status=json.loads(Path('docs/data/status.json').read_text(encoding='utf-8'))
+          required=[
+            'Free Edition v1.5.23','id="entrySummary"',
+            'function entryDecision(r,mkt=market)','function entryDecisionHTML(r)','function entrySummaryHTML()',
+            '🟢 可試單（波段）','🟡 等確認','🔴 先不進',
+            'Step 4｜盤中進場雷達','20T/60T 不另加權','大盤15分獨立',
+            './sw.js?v=1523'
+          ]
+          for m in required:
+              if m not in html: raise SystemExit('missing html marker: '+m)
+          for m in [
+            '價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10',
+            '波段延續100＝日K技術50＋籌碼25＋族群15＋流動性10',
+            'function portfolioSummaryHTML()','🚨 5分鐘變化雷達'
+          ]:
+              if m not in html: raise SystemExit('existing architecture marker missing: '+m)
+          if 'dogson-free-v1523' not in sw: raise SystemExit('service worker cache version missing')
+          if status.get('version')!='1.5.23-free' or status.get('entry_radar_version')!='1.0':
+              raise SystemExit('status version mismatch')
+          m=re.search(r'<script>\s*(.*?)</script>\s*<script src="./realtime-config',html,re.S)
+          if not m: raise SystemExit('main inline script not found')
+          Path('/tmp/dogson-inline.js').write_text(m.group(1),encoding='utf-8')
+          print('static verification OK')
+          PY
+          node --check /tmp/dogson-inline.js
+
+      - name: Verify Step 4 behavior contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          checks={
+            'does not create a replacement score':'const score=+(r?.intraday_score??r?.score??0)',
+            'market stays independent':'大盤15分獨立',
+            '20T 60T stays outside weighting':'20T/60T 不另加權',
+            'hard structure stop':'stage==="結構失效"',
+            'overheat stop':'stage==="過熱不追"',
+            'vwap chase gate':'vwap>4.5',
+            'day chase gate':'day>=8.5',
+            'green requires multiple confirmations':'const coreGreen=score>=70&&ps>=20&&flow>=14&&rel>=8&&sec>=8&&liq>=6',
+            'defensive market downgrades entry':'if(coreGreen&&!marketWeak)',
+            'green explicitly small position':'可用小部位試單',
+          }
+          for label,marker in checks.items():
+              if marker not in html: raise SystemExit(f'behavior contract missing: {label}')
+          if 'r.intraday_score=' in html or 'r.score=' in html:
+              raise SystemExit('Step 4 must not overwrite existing score fields')
+          print('Step 4 behavior contract OK')
+          PY
+
+      - name: Commit v1.5.23
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html docs/sw.js docs/data/status.json
+          git diff --cached --quiet || git commit -m "Apply v1.5.23 intraday entry radar"
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 4
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
