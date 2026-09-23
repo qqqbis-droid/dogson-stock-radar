@@ -260,6 +260,16 @@ def main():
     intraday_market = bd.build_intraday_market(out_rows, market_live, rotation, close_market)
     out_rows = bd.add_component_scores(out_rows, intraday_market, preliminary_intraday=True)
 
+    # v1.5.21：最後以「完成MIS橋接後」的最新狀態和上一輪正式頁面比較。
+    previous_obj = {}
+    try:
+        prev_path = bd.CACHE / "intraday_previous.json"
+        if prev_path.exists():
+            previous_obj = json.loads(prev_path.read_text(encoding="utf-8"))
+    except Exception:
+        previous_obj = {}
+    change_radar = bd.build_change_radar(out_rows, rotation, previous_obj)
+
     quote_times = [str(q.get("time") or "")[:5] for q in quotes.values() if q.get("time")]
     quote_latest = max(quote_times) if quote_times else None
     structure_latest = max(fresh_times) if fresh_times else obj.get("quote_layer", {}).get("structure_latest_time")
@@ -269,6 +279,7 @@ def main():
         "market": intraday_market,
         "market_intraday": market_live,
         "sector_rotation": rotation,
+        "change_radar": change_radar,
         "rows": out_rows,
         "bridge": {
             "version": "1.4.2",

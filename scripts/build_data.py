@@ -2721,7 +2721,187 @@ def build_sector_institution_flow(rows, price_history=None):
         reverse=True,
     )
     return out
+
+
+def build_change_radar(rows, rotation, previous_obj):
+    """Compare this intraday snapshot with the prior deployed snapshot.
+
+    This is an event/change layer only. It never changes the 100-point score or
+    Stage Engine result.  A comparison is accepted only for the same trade date
+    and a reasonably recent prior run, so overnight/stale gaps are not mislabeled
+    as "just turned" events.
+    """
+    def num(v, default=0.0):
+        try:
+            return float(v) if v is not None else float(default)
+        except Exception:
+            return float(default)
+
+    def trade_date_of(rs):
+        vals = []
+        for z in rs or []:
+            d = str(z.get("quote_date") or z.get("date") or "")[:10]
+            if len(d) == 10:
+                vals.append(d)
+        return max(vals) if vals else None
+
+    now = now_tw()
+    previous_obj = previous_obj if isinstance(previous_obj, dict) else {}
+    prev_rows = previous_obj.get("rows") or []
+    prev_time_raw = previous_obj.get("updated_at")
+    comparison_min = None
+    try:
+        pt = datetime.fromisoformat(str(prev_time_raw))
+        if pt.tzinfo is None:
+            pt = pt.replace(tzinfo=TW)
+        comparison_min = (now - pt.astimezone(TW)).total_seconds() / 60.0
+    except Exception:
+        comparison_min = None
+
+    cur_date = trade_date_of(rows)
+    prev_date = trade_date_of(prev_rows)
+    same_day = bool(cur_date and prev_date and cur_date == prev_date)
+    fresh_gap = bool(comparison_min is not None and 0.5 <= comparison_min <= 16.0)
+
+    for r in rows:
+        r["change_events"] = []
+        r["change_score_delta"] = None
+        r["previous_intraday_score"] = None
+        r["previous_stage"] = None
+
+    base = {
+        "version": "1.0",
+        "ready": False,
+        "trade_date": cur_date,
+        "previous_trade_date": prev_date,
+        "previous_updated_at": prev_time_raw,
+        "comparison_minutes": round(comparison_min, 1) if comparison_min is not None else None,
+        "events": [],
+        "sector_events": [],
+        "counts": {"turn_strong": 0, "turn_weak": 0, "breakout": 0, "vwap_reclaim": 0, "sector_accel": 0},
+    }
+    if not prev_rows:
+        base["reason"] = "等待下一個5分鐘快照建立比較基準"
+        return base
+    if not same_day:
+        base["reason"] = "新交易日第一輪，先建立今日比較基準"
+        return base
+    if not fresh_gap:
+        base["reason"] = "上一輪間隔過久，為避免誤判『剛發生』事件，本輪只建立新基準"
+        return base
+
+    prev_map = {str(x.get("code")): x for x in prev_rows if x.get("code")}
+    strong_stages = {"蓄勢待發", "剛啟動", "回踩承接", "趨勢持有"}
+    weak_stages = {"轉弱警戒", "結構失效"}
+    events = []
+
+    def add_event(r, typ, label, reason, priority):
+        e = {
+            "type": typ, "label": label, "reason": reason,
+            "priority": int(priority), "code": str(r.get("code") or ""),
+            "name": str(r.get("name") or ""),
+            "score": round(num(r.get("intraday_score", r.get("score"))), 1),
+            "score_delta": r.get("change_score_delta"),
+            "stage": str(r.get("category") or "觀察"),
+            "previous_stage": r.get("previous_stage"),
+        }
+        r.setdefault("change_events", []).append(e)
+        events.append(e)
+        base["counts"][typ] += 1
+
+    for r in rows:
+        code = str(r.get("code") or "")
+        p = prev_map.get(code)
+        if not p:
+            continue
+        cur_score = num(r.get("intraday_score", r.get("score")))
+        prev_score = num(p.get("intraday_score", p.get("score")))
+        delta = cur_score - prev_score
+        cur_stage = str(r.get("category") or "觀察")
+        prev_stage = str(p.get("category") or "觀察")
+        r["change_score_delta"] = round(delta, 1)
+        r["previous_intraday_score"] = round(prev_score, 1)
+        r["previous_stage"] = prev_stage
+
+        cur_close, cur_vwap = num(r.get("close")), num(r.get("vwap"))
+        prev_close, prev_vwap = num(p.get("close")), num(p.get("vwap"))
+        cur_above = bool(cur_vwap > 0 and cur_close >= cur_vwap)
+        prev_above = bool(prev_vwap > 0 and prev_close >= prev_vwap)
+        cur_rel = num((r.get("intraday_components") or {}).get("relative_strength_pct"))
+        prev_rel = num((p.get("intraday_components") or {}).get("relative_strength_pct"))
+        rel_delta = cur_rel - prev_rel
+        cur_break3, prev_break3 = bool(r.get("break3")), bool(p.get("break3"))
+        cur_break12, prev_break12 = bool(r.get("break12")), bool(p.get("break12"))
+
+        # 新突破：必須是本輪才由 false -> true，且站在VWAP上方、動能至少60。
+        if ((cur_break3 and not prev_break3) or (cur_break12 and not prev_break12)) and cur_above and cur_score >= 60:
+            which = "3K突破" if cur_break3 and not prev_break3 else "60分區間突破"
+            add_event(r, "breakout", "🚀 剛突破", f"{which}剛成立｜動能 {prev_score:.0f}→{cur_score:.0f}", 100)
+
+        # 站回VWAP：要求上一輪在下方、本輪站回，且15分動能不為負，降低來回穿越雜訊。
+        if prev_vwap > 0 and cur_vwap > 0 and (not prev_above) and cur_above and num(r.get("ret15")) >= 0:
+            add_event(r, "vwap_reclaim", "♻️ 剛站回VWAP", f"由VWAP下方重新站回｜距VWAP {num(r.get('vwap_dist')):+.1f}%", 88)
+
+        stage_turn_strong = prev_stage in ({"觀察", "轉弱警戒"} | weak_stages) and cur_stage in strong_stages
+        score_turn_strong = delta >= 8 and cur_score >= 60 and ((not prev_above and cur_above) or rel_delta >= 0.5 or (cur_break3 and not prev_break3))
+        if stage_turn_strong or score_turn_strong:
+            bits = [f"動能 {prev_score:.0f}→{cur_score:.0f}"]
+            if prev_stage != cur_stage:
+                bits.append(f"{prev_stage}→{cur_stage}")
+            if rel_delta >= 0.5:
+                bits.append(f"相對市場改善 {rel_delta:+.1f}pp")
+            add_event(r, "turn_strong", "⬆️ 剛轉強", "｜".join(bits), 92)
+
+        stage_turn_weak = prev_stage not in weak_stages and cur_stage in weak_stages
+        score_turn_weak = delta <= -8 and cur_score <= 60 and ((prev_above and not cur_above) or rel_delta <= -0.5)
+        if stage_turn_weak or score_turn_weak:
+            bits = [f"動能 {prev_score:.0f}→{cur_score:.0f}"]
+            if prev_stage != cur_stage:
+                bits.append(f"{prev_stage}→{cur_stage}")
+            if rel_delta <= -0.5:
+                bits.append(f"相對市場惡化 {rel_delta:+.1f}pp")
+            add_event(r, "turn_weak", "⬇️ 剛轉弱", "｜".join(bits), 95)
+
+    # 族群加速：熱度跨過+2.5，或已在正熱區且單輪再增加至少1.5。
+    prev_rot = {str(x.get("sector") or ""): x for x in (previous_obj.get("sector_rotation") or [])}
+    sector_events = []
+    for x in rotation or []:
+        sector = str(x.get("sector") or "")
+        p = prev_rot.get(sector)
+        if not sector or not p:
+            continue
+        h = num(x.get("heat")); ph = num(p.get("heat")); dh = h - ph
+        crossed = ph < 2.5 <= h
+        accelerated = h >= 2.5 and dh >= 1.5
+        if crossed or accelerated:
+            sector_events.append({
+                "type": "sector_accel", "label": "🔥 族群加速", "sector": sector,
+                "heat": round(h, 1), "heat_delta": round(dh, 1),
+                "reason": f"熱度 {ph:+.1f}→{h:+.1f}（{dh:+.1f}）",
+                "priority": 85,
+            })
+    sector_events.sort(key=lambda z: (z.get("heat_delta", 0), z.get("heat", 0)), reverse=True)
+    base["counts"]["sector_accel"] = len(sector_events)
+
+    events.sort(key=lambda z: (z.get("priority", 0), abs(z.get("score_delta") or 0)), reverse=True)
+    base.update({
+        "ready": True,
+        "reason": "只顯示相較上一輪新發生的變化",
+        "events": events[:80],
+        "sector_events": sector_events[:20],
+    })
+    return base
+
 def build_intraday():
+    # v1.5.21：sync_live_data 已先抓回上一輪正式 intraday.json。
+    # 先留一份到 .cache，讓 build_data 與後續 MIS bridge 都能和同一個基準比較。
+    previous_intraday = load_json("intraday.json", {})
+    try:
+        (CACHE / "intraday_previous.json").write_text(
+            json.dumps(previous_intraday, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
+        )
+    except Exception:
+        pass
     close_obj = load_json("close.json", {"rows": []})
     close_rows = close_obj.get("rows", [])
     market = load_json("market.json", close_obj.get("market", {}))
@@ -2850,9 +3030,11 @@ def build_intraday():
     sector_rotation = build_sector_rotation(rows)
     intraday_market = build_intraday_market(rows, market_live, sector_rotation, market)
     rows = add_component_scores(rows, intraday_market, preliminary_intraday=True)
+    change_radar = build_change_radar(rows, sector_rotation, previous_intraday)
 
     dump("intraday.json", {
         "updated_at": now_tw().isoformat(timespec="seconds"),
+        "change_radar": change_radar,
         "market": intraday_market,
         "market_intraday": market_live,
         "sector_rotation": sector_rotation,
