@@ -206,7 +206,8 @@ def build():
         }
 
     syms = list(meta)
-    rows = []
+    rows = []  # strict 60K lifecycle candidates
+    all_rows = []  # every close-radar stock: calculated 60K or explicit unavailable status
     failed = []
     batch_size = 50
 
@@ -255,8 +256,7 @@ def build():
             day_turn = (c * v).groupby(dates).sum()
             avg_vol_lots = float(day_vol.tail(10).mean()) / 1000 if len(day_vol) else 0
             avg_turn_mn = float(day_turn.tail(10).mean()) / 1e6 if len(day_turn) else 0
-            if not (avg_turn_mn >= 50 and avg_vol_lots >= 300):
-                continue
+            liquidity_ok = bool(avg_turn_mn >= 50 and avg_vol_lots >= 300)
             lastv = float(day_vol.iloc[-1]) if len(day_vol) else 0
             prev9 = float(day_vol.iloc[-10:-1].mean()) if len(day_vol) >= 10 else 0
             volratio = lastv / prev9 if prev9 > 0 else None
@@ -270,9 +270,8 @@ def build():
                     cross_age = age
                     break
 
-            # Nearby falling 240T overhead is a hard structural warning.
-            if (not above240) and overhead <= 3 and d240 != "UP":
-                continue
+            # Keep this as a candidate exclusion, but still publish the stock's 60K basics.
+            near_240_risk = bool((not above240) and overhead <= 3 and d240 != "UP")
 
             category = None
             if m20 <= m60 and -0.8 <= gap <= 0 and d20 == "UP" and d60 in ("UP", "FLAT"):
@@ -281,27 +280,45 @@ def build():
                 category = "EARLY"
             elif m20 > m60 and d20 == "UP" and d60 == "UP":
                 category = "ACCEL_CONT" if (s20 >= s60 and slope_diff > 0.60) else "STABLE_CONT"
-            else:
-                continue
 
-            score = 0
-            score += 12 if d20 == "UP" else 0
-            score += 10 if d60 == "UP" else (5 if d60 == "FLAT" else 0)
-            score += 3 if m20 > m60 else 1
-            score += 8 if category == "PRE_CROSS" else (12 if category == "EARLY" else 15)
-            score += 10 if above240 else (4 if overhead > 5 else 2)
-            score += 8 if d240 == "UP" else (5 if d240 == "FLAT" else 2)
-            score += 2 if orderly else 0
-            score += 10 if slope_diff <= 0.30 else (8 if slope_diff <= 0.60 else (6 if slope_diff <= 1.20 else (3 if slope_diff <= 2 else 1)))
-            ap = abs(p20)
-            score += 15 if ap <= 3 else (12 if ap <= 5 else (7 if ap <= 8 else (3 if ap <= 12 else 1)))
-            if category == "PRE_CROSS":
-                ag = abs(gap)
-                score += 10 if ag <= 0.30 else (8 if ag <= 0.80 else 3)
-            else:
-                score += 10 if 0 <= gap <= 3 else (6 if 3 < gap <= 6 else 2)
-            score += 2 if volratio is None else (5 if 0.8 <= volratio <= 2.5 else (3 if 0.5 <= volratio < 0.8 or 2.5 < volratio <= 4 else 1))
-            score = min(100, int(score))
+            candidate = bool(category is not None and liquidity_ok and not near_240_risk)
+            exclusion_reason = ""
+            if not liquidity_ok:
+                exclusion_reason = f"流動性不足：10日均額{avg_turn_mn:.0f}百萬／均量{avg_vol_lots:.0f}張"
+            elif near_240_risk:
+                exclusion_reason = "240T近壓且斜率未向上"
+            elif category is None:
+                if m20 <= m60 and d20 != "UP":
+                    exclusion_reason = "60K 20T仍在60T下方，且20T尚未轉上"
+                elif m20 <= m60:
+                    exclusion_reason = "60K 20T仍在60T下方，未達金叉前夕門檻"
+                elif d20 != "UP" or d60 not in ("UP", "FLAT"):
+                    exclusion_reason = "20T／60T斜率未形成同步向上"
+                else:
+                    exclusion_reason = "未符合金叉前夕／初升／續航生命週期條件"
+
+            # Only lifecycle matches receive the legacy candidate score.
+            # Non-candidates still publish MA/slope/cross/extension data for every close card.
+            score = None
+            if category is not None:
+                score = 0
+                score += 12 if d20 == "UP" else 0
+                score += 10 if d60 == "UP" else (5 if d60 == "FLAT" else 0)
+                score += 3 if m20 > m60 else 1
+                score += 8 if category == "PRE_CROSS" else (12 if category == "EARLY" else 15)
+                score += 10 if above240 else (4 if overhead > 5 else 2)
+                score += 8 if d240 == "UP" else (5 if d240 == "FLAT" else 2)
+                score += 2 if orderly else 0
+                score += 10 if slope_diff <= 0.30 else (8 if slope_diff <= 0.60 else (6 if slope_diff <= 1.20 else (3 if slope_diff <= 2 else 1)))
+                ap = abs(p20)
+                score += 15 if ap <= 3 else (12 if ap <= 5 else (7 if ap <= 8 else (3 if ap <= 12 else 1)))
+                if category == "PRE_CROSS":
+                    ag = abs(gap)
+                    score += 10 if ag <= 0.30 else (8 if ag <= 0.80 else 3)
+                else:
+                    score += 10 if 0 <= gap <= 3 else (6 if 3 < gap <= 6 else 2)
+                score += 2 if volratio is None else (5 if 0.8 <= volratio <= 2.5 else (3 if 0.5 <= volratio < 0.8 or 2.5 < volratio <= 4 else 1))
+                score = min(100, int(score))
 
             m = meta[sym]
             cr = close_rows[m["code"]]
@@ -314,11 +331,14 @@ def build():
             dpos = daily_position_score(cr)
             chip = float(cr.get("chip_score") or 0)
             sector = float(cr.get("sector_score") or 0)
-            combined = round(score * 0.50 + dpos + chip * 0.80 + sector, 1)
+            combined = round(score * 0.50 + dpos + chip * 0.80 + sector, 1) if score is not None else None
 
-            rows.append({
+            row = {
                 **m,
                 "category60": category,
+                "is_candidate": candidate,
+                "data_status": "OK",
+                "exclusion_reason": exclusion_reason,
                 "score60": score,
                 "combined_score": combined,
                 "entry_light": light_key,
@@ -357,8 +377,31 @@ def build():
                 "sector_score": cr.get("sector_score"),
                 "industry_hot_count": cr.get("industry_hot_count"),
                 "existing_radar_score": cr.get("score"),
-            })
+            }
+            all_rows.append(row)
+            if candidate:
+                rows.append(row)
         time.sleep(0.25)
+
+    # Ensure every close-radar stock has an explicit 60K card state, even when Yahoo
+    # cannot supply 246 completed 60-minute bars.
+    covered_codes = {str(r.get("code")) for r in all_rows}
+    for sym, m in meta.items():
+        code = str(m.get("code"))
+        if code in covered_codes:
+            continue
+        all_rows.append({
+            **m,
+            "category60": None,
+            "is_candidate": False,
+            "data_status": "UNAVAILABLE",
+            "exclusion_reason": "60K資料不足或來源未回傳（需要至少246根完成K棒）",
+            "score60": None,
+            "combined_score": None,
+            "entry_light": None,
+            "entry_light_emoji": "⚪",
+            "entry_light_label": "資料待補",
+        })
 
     light_order = {"GREEN": 0, "YELLOW": 1, "ORANGE": 2, "RED": 3}
     lifecycle_order = {"PRE_CROSS": 0, "EARLY": 1, "STABLE_CONT": 2, "ACCEL_CONT": 3}
@@ -376,15 +419,19 @@ def build():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "source_close_updated_at": close_obj.get("updated_at"),
         "trade_date": max(trade_dates) if trade_dates else None,
-        "method": "60K lifecycle + independent entry-position light; review score = 60K 50% + daily position 20% + chips 20% + sector 10%",
+        "method": "all close stocks publish 60K basics; lifecycle candidates remain strict; candidate review score = 60K 50% + daily position 20% + chips 20% + sector 10%",
         "entry_light_rule": "GREEN -1.5%~+2% vs 60K20T; YELLOW +2~5% or -1.5~-3%; ORANGE +5~8%; RED >8% or <-3%; daily overextension can downgrade",
         "counts": counts,
         "entry_light_counts": lights,
         "failed_60m": len(set(failed)),
+        "candidate_count": len(rows),
+        "all_row_count": len(all_rows),
+        "calculated_60k_count": sum(1 for r in all_rows if r.get("data_status") == "OK"),
         "rows": rows,
+        "all_rows": all_rows,
     }
     dump(result)
-    print("hourly done", len(rows), counts, lights, "failed", len(set(failed)))
+    print("hourly done candidates", len(rows), "all", len(all_rows), counts, lights, "failed", len(set(failed)))
 
 
 if __name__ == "__main__":

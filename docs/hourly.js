@@ -42,7 +42,7 @@
 
   function ensureHeaderNote(){
     const sub=document.querySelector('header .sub');
-    if(sub&&!sub.dataset.hourly){sub.textContent+='｜60K趨勢＋進場燈號';sub.dataset.hourly='1'}
+    if(sub&&!sub.dataset.hourly){sub.textContent+='｜60K全股票資訊＋候選燈號';sub.dataset.hourly='1'}
   }
 
   function ensureBox(){
@@ -84,10 +84,10 @@
         ${buttonHTML('ALL','全部60K')}${buttonHTML('PRE_CROSS','🟡 金叉前夕')}${buttonHTML('EARLY','🟢 初升')}${buttonHTML('STABLE_CONT','🔵 穩定續航')}${buttonHTML('ACCEL_CONT','🚀 加速續航')}${buttonHTML('GREEN',`🟢 位置舒服 ${counts.GREEN??''}`)}
       </div>
       <div class="hourlylist">${rows.length?rows.slice(0,18).map(rowHTML).join(''):'<div class="hourlyempty">目前沒有符合這個60K條件的股票。</div>'}</div>
-      <div class="hourlymore">目前共 ${data.rows?.length||0} 檔符合60K生命週期條件；🟢 ${counts.GREEN||0}｜🟡 ${counts.YELLOW||0}｜🟠 ${counts.ORANGE||0}｜🔴 ${counts.RED||0}。點股票會帶到下方完整卡片。</div>`:
-      `<div class="hourlysummary">符合 ${data.rows?.length||0} 檔｜🟢位置舒服 ${counts.GREEN||0}｜收合時不占版面，點「展開」再挑60K股票。</div>`;
+      <div class="hourlymore">候選 ${data.rows?.length||0} 檔；全盤後卡60K覆蓋 ${data.calculated_60k_count||0}/${data.all_row_count||0} 檔。🟢 ${counts.GREEN||0}｜🟡 ${counts.YELLOW||0}｜🟠 ${counts.ORANGE||0}｜🔴 ${counts.RED||0}。未進候選的股票仍會在個股卡顯示20T/60T/240T與原因。</div>`:
+      `<div class="hourlysummary">候選 ${data.rows?.length||0} 檔｜60K可計算 ${data.calculated_60k_count||0}/${data.all_row_count||0} 檔｜🟢位置舒服 ${counts.GREEN||0}｜每張盤後卡都會顯示60K狀態。</div>`;
     box.innerHTML=`
-      <div class="hourlytop"><div><div class="hourlytitle">⏱️ 60分K 趨勢雷達</div><div class="hourlysub">四種生命週期＋進場燈號；預設收合，避免手機版被名單擋住。</div></div><div style="display:flex;gap:8px;align-items:flex-start"><div class="hourlystamp">${data.trade_date||''}<br>${updated}</div><button id="hourlyToggle" class="hourlytoggle">${hourlyExpanded?'收合 ▲':'展開 ▼'}</button></div></div>
+      <div class="hourlytop"><div><div class="hourlytitle">⏱️ 60分K 趨勢雷達</div><div class="hourlysub">每檔盤後股票都有60K狀態；只有符合四種生命週期才進候選名單。預設收合。</div></div><div style="display:flex;gap:8px;align-items:flex-start"><div class="hourlystamp">${data.trade_date||''}<br>${updated}</div><button id="hourlyToggle" class="hourlytoggle">${hourlyExpanded?'收合 ▲':'展開 ▼'}</button></div></div>
       ${body}`;
     box.querySelector('#hourlyToggle')?.addEventListener('click',()=>{hourlyExpanded=!hourlyExpanded;renderPanel()});
     box.querySelectorAll('[data-h60]').forEach(b=>b.onclick=()=>{selected=b.dataset.h60;renderPanel()});
@@ -118,11 +118,20 @@
     document.querySelectorAll('.hourlystrip').forEach(x=>x.remove());
     if(!isClose)return;
     document.querySelectorAll('.card').forEach(card=>{
-      const r=byCode.get(codeFromCard(card));if(!r)return;
-      const l=life(r);
+      const code=codeFromCard(card);
+      const r=byCode.get(code);
       const strip=document.createElement('div');strip.className='hourlystrip';
-      strip.title=r.entry_light_reason||'';
-      strip.innerHTML=`<div class="hourlystriptop"><div class="hourlylifelabel">${l.emoji} ${l.label}｜60K ${n(r.score60,0)}</div><div class="hourlyentry">${r.entry_light_emoji||''} ${r.entry_light_label||''}</div></div><div class="hourlystripmeta">20T${DIR[r.dir20]||'—'} ${n(r.ma20_60,2)}｜60T${DIR[r.dir60]||'—'} ${n(r.ma60_60,2)}｜240T${DIR[r.dir240]||'—'} ${n(r.ma240_60,2)}<br>${crossText(r)}｜斜率差 ${n(r.slope_diff,3)}pp｜距60K20T ${signed(r.price_vs20_60_pct,2)}${r.entry_light_reason?'｜'+r.entry_light_reason:''}</div>`;
+      if(!r||r.data_status==='UNAVAILABLE'){
+        const reason=r?.exclusion_reason||'60K資料尚未建立';
+        strip.innerHTML=`<div class="hourlystriptop"><div class="hourlylifelabel">⚪ 60K資料待補</div><div class="hourlyentry">未進候選</div></div><div class="hourlystripmeta">${reason}</div>`;
+      }else{
+        const l=life(r);
+        const status=r.is_candidate?`${l.emoji} ${l.label}｜60K ${n(r.score60,0)}`:'⚪ 未進60K候選';
+        const right=r.is_candidate?`${r.entry_light_emoji||''} ${r.entry_light_label||''}`:'結構資訊照常顯示';
+        const reason=!r.is_candidate&&r.exclusion_reason?`<br>未進候選：${r.exclusion_reason}`:'';
+        strip.title=r.entry_light_reason||r.exclusion_reason||'';
+        strip.innerHTML=`<div class="hourlystriptop"><div class="hourlylifelabel">${status}</div><div class="hourlyentry">${right}</div></div><div class="hourlystripmeta">20T${DIR[r.dir20]||'—'} ${n(r.ma20_60,2)}｜60T${DIR[r.dir60]||'—'} ${n(r.ma60_60,2)}｜240T${DIR[r.dir240]||'—'} ${n(r.ma240_60,2)}<br>${crossText(r)}｜斜率差 ${n(r.slope_diff,3)}pp｜距60K20T ${signed(r.price_vs20_60_pct,2)}${r.entry_light_reason?'｜'+r.entry_light_reason:''}${reason}</div>`;
+      }
       const top=card.querySelector('.top');if(top)top.insertAdjacentElement('afterend',strip);else card.prepend(strip);
     });
   }
@@ -132,7 +141,7 @@
       const r=await fetch(`${DATA_URL}?${Date.now()}`,{cache:'no-store'});
       if(!r.ok)throw new Error(`HTTP ${r.status}`);
       data=await r.json();
-      byCode=new Map((data.rows||[]).map(x=>[String(x.code),x]));
+      byCode=new Map(((data.all_rows&&data.all_rows.length)?data.all_rows:(data.rows||[])).map(x=>[String(x.code),x]));
     }catch(e){
       data={rows:[],entry_light_counts:{}};byCode=new Map();
     }
