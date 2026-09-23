@@ -1,0 +1,122 @@
+name: Install Radar v1.5.19 Lifecycle Filter Repair
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1519.trigger"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1519-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Require v1.5.18 explainable lifecycle UI
+        run: |
+          grep -q 'Free Edition v1.5.18' docs/index.html
+          grep -q 'stageExplainHTML' docs/index.html
+          grep -q 'data-f="蓄勢待發"' docs/index.html
+
+      - name: Apply v1.5.19 lifecycle filter repair
+        run: python scripts/patch_v1519.py
+
+      - name: Verify all lifecycle filters and unchanged scoring
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          sw=Path('docs/sw.js').read_text(encoding='utf-8')
+          must=[
+            'Free Edition v1.5.19',
+            'function stageKey(v){',
+            'stageKey(r.category)===stageKey(filter)',
+            'data-f="蓄勢待發">🌱 蓄勢待發',
+            'data-f="剛啟動">🔥 剛啟動',
+            'data-f="回踩承接">🟡 回踩承接',
+            'data-f="趨勢持有">🚂 趨勢持有',
+            'data-f="觀察">🔵 觀察',
+            'data-f="轉弱警戒">⚠️ 轉弱警戒',
+            'data-f="結構失效">❌ 結構失效',
+            'data-f="過熱不追">🚫 過熱不追',
+            './sw.js?v=1519',
+            'dogsonSwReloaded1519',
+            '價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10',
+            '波段延續＝日K技術50＋籌碼25＋族群15＋流動性10',
+          ]
+          for m in must:
+              if m not in html:
+                  raise SystemExit('missing HTML marker: '+m)
+          if 'r.category===filter' in html:
+              raise SystemExit('fragile exact lifecycle filter still present')
+          if 'dogsonSwReloaded1517b' in html or 'dogsonSwReloaded1518' in html:
+              raise SystemExit('old mismatched SW reload key still present')
+          if 'dogson-free-v1519' not in sw:
+              raise SystemExit('SW cache not bumped to v1519')
+
+          # Synthetic mapping checks mirror the JS canonicalization intent.
+          def stage_key(v):
+              s=str(v or '').strip()
+              for e in '🌱🔥🟡🚂🔵⚠️❌🚫': s=s.replace(e,'')
+              s=''.join(s.split())
+              if '蓄勢' in s: return '蓄勢待發'
+              if '剛啟動' in s or '啟動' in s: return '剛啟動'
+              if '回踩' in s: return '回踩承接'
+              if '趨勢' in s: return '趨勢持有'
+              if '轉弱' in s: return '轉弱警戒'
+              if '失效' in s: return '結構失效'
+              if '過熱' in s: return '過熱不追'
+              if '觀察' in s: return '觀察'
+              return s
+          cases={
+            '🌱 蓄勢':'蓄勢待發','蓄勢待發':'蓄勢待發',
+            '🔥 剛啟動':'剛啟動','🟡 回踩':'回踩承接','回踩承接':'回踩承接',
+            '🚂 趨勢':'趨勢持有','趨勢持有':'趨勢持有','🔵 觀察':'觀察',
+            '⚠️ 轉弱':'轉弱警戒','轉弱警戒':'轉弱警戒',
+            '❌ 失效':'結構失效','結構失效':'結構失效',
+            '🚫 過熱':'過熱不追','過熱不追':'過熱不追',
+          }
+          for src,want in cases.items():
+              got=stage_key(src)
+              if got!=want: raise SystemExit(f'mapping failed: {src} => {got}, want {want}')
+          print('v1.5.19 lifecycle filter verification OK')
+          PY
+
+      - name: Commit v1.5.19 UI repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html docs/sw.js
+          git diff --cached --quiet || git commit -m "Apply v1.5.19 lifecycle filter repair"
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 4
+          done
+          test "$ok" = 1
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
