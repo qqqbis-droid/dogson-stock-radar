@@ -1,0 +1,75 @@
+name: Install Radar v1.5.26 Portfolio Decision
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1526.trigger"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1526-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Require v1.5.25
+        run: |
+          grep -q 'Free Edition v1.5.25' docs/index.html
+          grep -q 'relative_multiframe_version":"1.0"' docs/data/status.json
+      - name: Apply portfolio decision patch
+        run: python scripts/patch_v1526.py
+      - name: Verify
+        run: |
+          python -m py_compile scripts/patch_v1526.py
+          python - <<'PY'
+          from pathlib import Path
+          import json,re
+          h=Path('docs/index.html').read_text(encoding='utf-8')
+          s=json.loads(Path('docs/data/status.json').read_text(encoding='utf-8'))
+          for m in ['Free Edition v1.5.26','function portfolioDecision(r,h)','只是降溫','暫停加碼','考慮減碼','結構失效','不適合追高，不代表既有庫存要賣']:
+              if m not in h: raise SystemExit('missing '+m)
+          if s.get('version')!='1.5.26-free' or s.get('portfolio_mode_version')!='1.1': raise SystemExit('status mismatch')
+          # It must consume existing layers rather than invent a new score.
+          for m in ['multi_timeframe','relative_multiframe','stageKey(r?.category)','amplitude_regime']:
+              if m not in h: raise SystemExit('decision input missing '+m)
+          m=re.search(r'<script>\s*(.*?)</script>\s*<script src="./hourly.js',h,re.S)
+          if not m: raise SystemExit('inline JS missing')
+          Path('/tmp/dogson-inline.js').write_text(m.group(1),encoding='utf-8')
+          print('portfolio decision contract OK')
+          PY
+          node --check /tmp/dogson-inline.js
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html docs/sw.js docs/data/status.json
+          git diff --cached --quiet || git commit -m "Apply v1.5.26 portfolio decision layer"
+          ok=0
+          for n in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true; sleep 4
+          done
+          test "$ok" = 1
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
