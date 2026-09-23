@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.5.0
+犬子老師飆股雷達 Free Edition v1.5.1
 =================================
-盤中＝執行雷達（即時動能100，籌碼只作背景）；盤後＝波段雷達（延續品質＋進場位置）；大盤15分獨立
+盤中＝執行雷達（即時動能100，籌碼只作背景）；盤後＝波段雷達（延續品質直接100分＋進場位置）；大盤15分獨立
 
 --mode close
     每日盤後跑一次：
@@ -1461,6 +1461,20 @@ def _intraday_score_parts(r, market, sector_score_10):
     }
 
 
+
+def _swing_liquidity_score(r):
+    """盤後波段延續的流動性 0~10；不和進場位置混在一起。"""
+    level = str(r.get("liquidity_level") or "未知")
+    if level == "活躍":
+        return 10.0
+    if level == "正常":
+        return 8.0
+    if level == "偏低":
+        return 5.0
+    if level == "不足":
+        return 0.0
+    return 6.0
+
 def _close_entry_position_score(r):
     """波段進場位置 0~100；和『這家公司/趨勢好不好』分開。"""
     score = 40.0
@@ -1665,16 +1679,25 @@ def add_component_scores(rows, market, preliminary_intraday=False):
             r["quality_reference"] = 70
             r["quality_pass_market"] = bool(intraday_score >= 70)
         else:
-            # v1.5：盤後是波段雷達。延續品質與進場位置分開，避免『好股票＝現在可追』。
-            stock_raw = float(r.get("technical_score", 0)) + cs + sec + liq_adjust
-            stock_raw = max(0.0, min(85.0, stock_raw))
-            swing = round(stock_raw / 85.0 * 100.0, 1)
-            r["stock_raw_score"] = round(stock_raw, 1)
+            # v1.5.1：盤後波段延續直接加總100分，不再先算85再換算。
+            # 技術50＋籌碼25＋族群15＋流動性10＝100；進場位置另外獨立100。
+            tech_component = max(0.0, min(50.0, float(r.get("technical_score") or 0)))
+            chip_component = max(0.0, min(25.0, cs))
+            sector_component = max(0.0, min(15.0, float(sec or 0) * 1.5))
+            liquidity_component = _swing_liquidity_score(r)
+            swing = round(min(100.0, tech_component + chip_component + sector_component + liquidity_component), 1)
+            r["swing_components"] = {
+                "technical": round(tech_component, 1),
+                "chip": round(chip_component, 1),
+                "sector": round(sector_component, 1),
+                "liquidity": round(liquidity_component, 1),
+            }
+            r["stock_raw_score"] = swing
             r["score"] = swing
             r["swing_quality_score"] = swing
             r["swing_continuation_score"] = swing
             r["entry_position_score"] = _close_entry_position_score(r)
-            r["score_type"] = "swing_continuation"
+            r["score_type"] = "swing_continuation_direct_100"
             r["score_reliable"] = bool(chip_cov >= 60)
             if not r["score_reliable"]:
                 r["quality_label"] = "資料待補"
@@ -1844,7 +1867,7 @@ def build_close():
         "trade_date": market.get("trade_date"),
         "data_complete": bool(market.get("data_complete")),
         "market": market,
-        "score_formula": {"mode": "swing", "technical": 50, "chip": 25, "sector": 10, "stock_raw_max": 85, "normalized_to": 100, "entry_position": 100, "market_separate": 15},
+        "score_formula": {"mode": "swing_direct_100", "technical": 50, "chip": 25, "sector": 15, "liquidity": 10, "total": 100, "normalized": False, "entry_position": 100, "market_separate": 15},
         "rows": rows,
     })
     dump("market.json", market)
@@ -1854,7 +1877,7 @@ def build_close():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "close_updated_at": now_tw().isoformat(timespec="seconds"),
         "daily_count": len(rows),
-        "version": "1.5.0-free",
+        "version": "1.5.1-free",
     })
     dump("status.json", status)
 
@@ -2308,7 +2331,7 @@ def build_intraday():
                 "updated_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_attempted_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_count": len(previous.get("rows", [])),
-                "version": "1.5.0-free",
+                "version": "1.5.1-free",
             })
             dump("status.json", status)
             print("intraday source empty; kept previous", len(previous.get("rows", [])))
@@ -2364,7 +2387,7 @@ def build_intraday():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_count": len(rows),
-        "version": "1.5.0-free",
+        "version": "1.5.1-free",
     })
     dump("status.json", status)
     print("intraday done", len(rows))
