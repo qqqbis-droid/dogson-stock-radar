@@ -38,11 +38,13 @@ jobs:
           grep -q 'data-f="等回踩"' docs/index.html
 
       - name: Apply Stage Engine 2.0
-        run: python scripts/patch_v1517.py
+        run: |
+          python scripts/patch_v1517.py
+          python scripts/patch_v1517_calibrate.py
 
       - name: Verify Stage Engine code and synthetic cases
         run: |
-          python -m py_compile scripts/build_data.py scripts/patch_v1517.py
+          python -m py_compile scripts/build_data.py scripts/patch_v1517.py scripts/patch_v1517_calibrate.py
           python - <<'PY'
           import sys
           sys.path.insert(0, 'scripts')
@@ -67,6 +69,11 @@ jobs:
               chip_score=7,chip_coverage_pct=100,trend=False,break3=False,break20=False,overheat_reasons=[])
           assert stage(close_bad, False) == '結構失效', close_bad
 
+          close_weak = dict(close=98,ma5=98,ma10=99,ma20=100,dist20=-2,ret5=-3,day_change=-1,
+              vol_x=.8,rsi=43,macd_h=-.2,macd_acc=-.1,technical_score=20,swing_quality_score=55,score=55,
+              chip_score=8,chip_coverage_pct=100,trend=False,break3=False,break20=False,overheat_reasons=[])
+          assert stage(close_weak, False) == '轉弱警戒', close_weak
+
           intra_launch = dict(close=102,vwap=100,pace=1.6,ret15=1.0,technical_score=30,intraday_score=80,score=80,
               intraday_components={'relative_strength_pct':1.0},trend5=True,break3=True,break12=False,overheat_reasons=[])
           assert stage(intra_launch, True) == '剛啟動', intra_launch
@@ -74,7 +81,7 @@ jobs:
           intra_setup = dict(close=100.5,vwap=100,pace=1.2,ret15=.2,technical_score=22,intraday_score=60,score=60,
               intraday_components={'relative_strength_pct':.2},trend5=True,break3=False,break12=False,overheat_reasons=[])
           assert stage(intra_setup, True) == '蓄勢待發', intra_setup
-          print('synthetic Stage Engine 2.0 cases OK')
+          print('synthetic Stage Engine 2.0 calibrated cases OK')
           PY
           grep -q 'data-f="蓄勢待發"' docs/index.html
           grep -q 'data-f="結構失效"' docs/index.html
@@ -108,15 +115,35 @@ jobs:
           unknown=set(counts)-allowed
           if unknown:
               raise SystemExit(f'unknown stages: {unknown}')
-          print('setup candidates:', counts.get('蓄勢待發',0), 'warning:', counts.get('轉弱警戒',0), 'failed:', counts.get('結構失效',0))
+          n=len(rows)
+          setup=counts.get('蓄勢待發',0)
+          warning=counts.get('轉弱警戒',0)
+          failed=counts.get('結構失效',0)
+          trend=counts.get('趨勢持有',0)
+          print('setup candidates:', setup, 'trend hold:', trend, 'warning:', warning, 'failed:', failed, 'total:', n)
+          # Guard only against clearly pathological calibration; market regimes may vary.
+          if failed > max(100, int(n*0.18)):
+              raise SystemExit(f'too many structural failures: {failed}/{n}')
+          if warning + failed > int(n*0.50):
+              raise SystemExit(f'too many weak/failure labels: {warning+failed}/{n}')
+          if setup > int(n*0.35):
+              raise SystemExit(f'too many setup candidates: {setup}/{n}')
+          if trend == 0:
+              raise SystemExit('trend-hold bucket is empty')
           PY
 
       - name: Commit v1.5.17 code
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Preserve rebuilt live data for the Pages artifact, but keep it out of the code commit.
+          mkdir -p /tmp/v1517-live
+          cp -a docs/data /tmp/v1517-live/data
           git add scripts/build_data.py docs/index.html docs/sw.js
           git diff --cached --quiet || git commit -m "Apply v1.5.17 Stage Engine 2.0"
+          # Generated data are intentionally not committed; clean them so rebase can proceed.
+          git reset --hard HEAD
+          git clean -fd
           ok=0
           for n in 1 2 3; do
             git fetch origin main
@@ -125,6 +152,8 @@ jobs:
             sleep 4
           done
           test "$ok" = 1
+          rm -rf docs/data
+          cp -a /tmp/v1517-live/data docs/data
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
