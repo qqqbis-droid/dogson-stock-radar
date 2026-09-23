@@ -1,4 +1,5 @@
 name: Install Radar v1.5.10 Sector Resonance Drilldown Fix
+# retrigger: ensure installer runs after workflow exists on main
 
 on:
   workflow_dispatch:
