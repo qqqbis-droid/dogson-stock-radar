@@ -1,0 +1,84 @@
+name: Install Radar v1.5.2 Full 60K Coverage
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "scripts/patch_v152.py"
+      - ".github/workflows/upgrade-v152.yml"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v152-install
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - name: Sync latest deployed data
+        run: python scripts/sync_live_data.py || true
+      - name: Apply v1.5.2 patch
+        run: python scripts/patch_v152.py
+      - name: Syntax check
+        run: python -m py_compile scripts/build_hourly.py
+      - name: Rebuild full 60K coverage
+        run: python scripts/build_hourly.py
+      - name: Verify every close card has a 60K state
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          c=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          h=json.loads(Path('docs/data/hourly.json').read_text(encoding='utf-8'))
+          close_codes={str(r.get('code')) for r in c.get('rows',[]) if r.get('code')}
+          all_rows=h.get('all_rows') or []
+          all_codes={str(r.get('code')) for r in all_rows if r.get('code')}
+          cand=h.get('rows') or []
+          covered=len(close_codes & all_codes)
+          ratio=(covered/len(close_codes)) if close_codes else 0
+          calc=sum(1 for r in all_rows if r.get('data_status')=='OK')
+          unavailable=sum(1 for r in all_rows if r.get('data_status')=='UNAVAILABLE')
+          noncand=sum(1 for r in all_rows if r.get('data_status')=='OK' and not r.get('is_candidate'))
+          print('close:',len(close_codes),'all60:',len(all_rows),'covered:',covered,'ratio:',round(ratio,3))
+          print('calculated:',calc,'non-candidate:',noncand,'unavailable:',unavailable,'candidates:',len(cand))
+          if close_codes and ratio < 0.95:
+              raise SystemExit('60K state coverage below 95% of close radar')
+          if not cand:
+              raise SystemExit('strict 60K candidate list unexpectedly empty')
+          if not any(r.get('data_status')=='OK' and not r.get('is_candidate') for r in all_rows):
+              raise SystemExit('non-candidate 60K rows were not preserved')
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          js=Path('docs/hourly.js').read_text(encoding='utf-8')
+          if 'v1.5.2' not in html or 'data.all_rows' not in js or '未進60K候選' not in js:
+              raise SystemExit('v1.5.2 UI markers missing')
+          PY
+      - name: Commit v1.5.2 source and data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_hourly.py docs/hourly.js docs/index.html docs/sw.js docs/data/hourly.json
+          git diff --cached --quiet || git commit -m "Apply v1.5.2 full 60K card coverage"
+          git pull --rebase origin main
+          git push origin HEAD:main
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
