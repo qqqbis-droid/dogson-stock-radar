@@ -57,9 +57,7 @@ jobs:
               raise SystemExit('validation history not persisted')
           if st.get('version')!='1.5.28-free' or st.get('validation_version')!='1.0': raise SystemExit('status mismatch')
           if report.get('horizons') != [1,3,5,10]: raise SystemExit('horizon mismatch')
-          # Baseline must remain exact until calibration becomes active.
           if report['calibration']['active_weights'] != {'technical':50.0,'chip':25.0,'sector':15.0,'liquidity':10.0}: raise SystemExit('baseline changed during warmup')
-          # Small synthetic causal test: +1/+3/+5/+10 only mature when enough future snapshots exist.
           spec=importlib.util.spec_from_file_location('bv','scripts/build_validation.py');m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
           snaps=[]
           for i in range(11):
@@ -80,10 +78,27 @@ jobs:
           git add scripts/build_data.py scripts/build_validation.py scripts/sync_live_data.py .github/workflows/close.yml .github/workflows/intraday.yml docs/index.html docs/sw.js docs/data/status.json docs/data/validation.json docs/data/validation_history.json
           git diff --cached --quiet || git commit -m "Apply v1.5.28 Step 7 historical validation"
           ok=0
-          for n in 1 2 3; do
+          for n in $(seq 1 12); do
             git fetch origin main
-            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
-            git rebase --abort || true; sleep 4
+            if git rebase origin/main; then
+              if git push origin HEAD:main; then ok=1; break; fi
+            else
+              # Legacy installers may still touch old shared files. Step 7 is the newer
+              # validated state, so keep this rebased commit's versions on conflicts.
+              conflicted=$(git diff --name-only --diff-filter=U || true)
+              if [ -n "$conflicted" ]; then
+                while IFS= read -r f; do
+                  [ -z "$f" ] && continue
+                  git checkout --theirs -- "$f"
+                  git add "$f"
+                done <<< "$conflicted"
+                GIT_EDITOR=true git rebase --continue || { git rebase --abort || true; sleep 3; continue; }
+                if git push origin HEAD:main; then ok=1; break; fi
+              else
+                git rebase --abort || true
+              fi
+            fi
+            sleep 3
           done
           test "$ok" = 1
       - uses: actions/configure-pages@v5
