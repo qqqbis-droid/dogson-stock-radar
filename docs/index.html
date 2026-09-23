@@ -41,7 +41,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.18｜生命週期可解釋化＋Stage Engine 2.0</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.19｜生命週期可解釋化＋Stage Engine 2.0</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -52,7 +52,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
  <div class="row"><input id="q" class="search" placeholder="輸入股票代號或名稱，例如 2308、台達電" autocomplete="off"><button id="scan" class="scan">掃描</button></div>
  <div id="suggestions" class="suggestions"></div>
  <div class="filters">
-  <button class="filter on" data-f="all">全部</button><button class="filter" data-f="蓄勢待發">🌱 蓄勢</button><button class="filter" data-f="剛啟動">🔥 剛啟動</button><button class="filter" data-f="回踩承接">🟡 回踩</button><button class="filter" data-f="趨勢持有">🚂 趨勢</button><button class="filter" data-f="轉弱警戒">⚠️ 轉弱</button><button class="filter" data-f="結構失效">❌ 失效</button><button class="filter" data-f="過熱不追">🚫 過熱</button><button class="filter" id="watchOnly">⭐ 我的關注</button>
+  <button class="filter on" data-f="all">全部</button><button class="filter" data-f="蓄勢待發">🌱 蓄勢待發</button><button class="filter" data-f="剛啟動">🔥 剛啟動</button><button class="filter" data-f="回踩承接">🟡 回踩承接</button><button class="filter" data-f="趨勢持有">🚂 趨勢持有</button><button class="filter" data-f="觀察">🔵 觀察</button><button class="filter" data-f="轉弱警戒">⚠️ 轉弱警戒</button><button class="filter" data-f="結構失效">❌ 結構失效</button><button class="filter" data-f="過熱不追">🚫 過熱不追</button><button class="filter" id="watchOnly">⭐ 我的關注</button>
  </div>
  <details class="help">
    <summary>❓ 每個數值怎麼看？第一次使用請點我</summary>
@@ -316,7 +316,7 @@ function rotationHTML(){
   const members=intraRows
    .filter(r=>(r.sector_group||"").trim()===(x.sector||"").trim())
    .sort((a,b)=>(+(b.intraday_score??b.score)||0)- (+(a.intraday_score??a.score)||0) || (+(b.day_change)||0)- (+(a.day_change)||0));
-  const memberHTML=members.length?members.slice(0,30).map(r=>`<button class="rotationmember peerlink" data-code="${r.code}"><span><b>${r.code} ${r.name}</b><small>${signed(r.day_change,1)} · ${r.category||"觀察"}</small></span><span class="rmscore">${num(r.intraday_score??r.score,0)}/100</span></button>`).join(""):`<div class="sub">目前沒有可展開的盤中個股資料</div>`;
+  const memberHTML=members.length?members.slice(0,30).map(r=>`<button class="rotationmember peerlink" data-code="${r.code}"><span><b>${r.code} ${r.name}</b><small>${signed(r.day_change,1)} · ${stageKey(r.category)||"觀察"}</small></span><span class="rmscore">${num(r.intraday_score??r.score,0)}/100</span></button>`).join(""):`<div class="sub">目前沒有可展開的盤中個股資料</div>`;
   return `<details class="rotationgroup"><summary class="rotationrow"><div><b>${x.state}｜${x.sector}</b><div class="rotationleaders">${(x.leaders||[]).map(s=>`${s.name} ${signed(s.change_pct,1)}`).join(" · ")}</div><span class="rotationopen">查看族群 ${members.length} 檔 ▾</span></div><div class="rotationnums">熱度 ${signed(x.heat,1,"")}<br>族群 ${signed(x.change_pct,1)}｜資金占比 ${num(x.turnover_share_pct,1)}%<br>${x.share_change_pp===null||x.share_change_pp===undefined?"占比變化待累積":`近${x.window_min||30}分占比 ${signed(x.share_change_pp,2,"pp")}`}｜VWAP上 ${num(x.above_vwap_pct,0)}%</div></summary><div class="rotationmembers">${memberHTML}</div></details>`;
  };
  const mini=x=>`<div class="closeflowpreviewitem"><span>${x.sector}</span><b>${signed(x.heat,1,"")}</b></div>`;
@@ -414,7 +414,7 @@ function showPeerPeek(code){
  ]:[
   ["收盤",num(r.close,2)],["波段延續",(r.score_reliable===false?"待補":num(r.swing_quality_score??r.score,0)+"/100")],["進場位置",num(r.entry_position_score,0)+"/100"],["籌碼",(+r.chip_coverage_pct||0)<60?"待補":num(r.chip_score,0)+"/25"],["族群共振",num(r.sector_score,1)+"/10"],["階段",r.category||"觀察"]
  ];
- back.innerHTML=`<div class="peerpeek"><div class="peerpeektop"><div><div class="peerpeekname">${r.name} <span class="code">${r.code}</span></div><div class="sub">${r.sector_group||r.industry_name||r.industry||"未分類"}｜${signed(r.day_change,1)}</div></div><span class="cat ${cls(r.category)}">${r.category||"觀察"}</span></div><div class="peerpeekgrid">${items.map(x=>`<div class="peerpeekitem"><div class="peerpeekv">${x[1]}</div><div class="peerpeekl">${x[0]}</div></div>`).join("")}</div>${stageExplainHTML(r,true)}<div class="peerpeekactions"><button class="peerpeekbtn" data-peer-open="${r.code}">查看完整個股</button><button class="peerpeekbtn secondary" data-peer-close="1">關閉</button></div></div>`;
+ back.innerHTML=`<div class="peerpeek"><div class="peerpeektop"><div><div class="peerpeekname">${r.name} <span class="code">${r.code}</span></div><div class="sub">${r.sector_group||r.industry_name||r.industry||"未分類"}｜${signed(r.day_change,1)}</div></div><span class="cat ${cls(r.category)}">${stageKey(r.category)||"觀察"}</span></div><div class="peerpeekgrid">${items.map(x=>`<div class="peerpeekitem"><div class="peerpeekv">${x[1]}</div><div class="peerpeekl">${x[0]}</div></div>`).join("")}</div>${stageExplainHTML(r,true)}<div class="peerpeekactions"><button class="peerpeekbtn" data-peer-open="${r.code}">查看完整個股</button><button class="peerpeekbtn secondary" data-peer-close="1">關閉</button></div></div>`;
  document.body.appendChild(back);
 }
 function focusPeer(code){
@@ -424,14 +424,29 @@ function focusPeer(code){
  setTimeout(()=>document.querySelector(".card")?.scrollIntoView({behavior:"smooth",block:"start"}),30);
 }
 
+function stageKey(v){
+ const raw=String(v||"").trim();
+ if(!raw)return "觀察";
+ const x=raw.replace(/[🌱🔥🟡🚂🔵⚠️❌🚫]/gu,"").replace(/\s+/g,"");
+ if(x.includes("蓄勢"))return "蓄勢待發";
+ if(x.includes("剛啟動")||x.includes("啟動"))return "剛啟動";
+ if(x.includes("回踩"))return "回踩承接";
+ if(x.includes("趨勢"))return "趨勢持有";
+ if(x.includes("轉弱"))return "轉弱警戒";
+ if(x.includes("失效"))return "結構失效";
+ if(x.includes("過熱"))return "過熱不追";
+ if(x.includes("觀察"))return "觀察";
+ return x;
+}
+
 function render(){
  rows=mode==="intraday"?intraRows:closeRows;
- let rr=rows.filter(r=>(filter==="all"||r.category===filter)&&(!watchOnly||watched(r.code)));
+ let rr=rows.filter(r=>(filter==="all"||stageKey(r.category)===stageKey(filter))&&(!watchOnly||watched(r.code)));
  const q=$("q").value.trim().toLowerCase();
  if(q){let hits=rr.filter(r=>String(r.code)===q||String(r.name).toLowerCase().includes(q));if(hits.length)rr=hits}
  if(!rr.length){$("cards").innerHTML='<div class="empty">目前沒有符合條件的資料。盤中會掃描所有通過流動性門檻的股票；若個別免費行情源暫缺，切到盤後仍可查完整日K資料。</div>';return}
  $("cards").innerHTML=rr.slice(0,70).map(r=>`<div class="card" data-code="${r.code}">
-  <div class="top"><div class="stockleft"><button class="star ${watched(r.code)?"on":""}" onclick="toggleWatch('${r.code}')">${watched(r.code)?"★":"☆"}</button><div><div class="name">${r.name}<span class="code">${r.code}</span></div><div class="sub">${r.industry_name||r.industry||"未分類"}${r.sector_group?" · "+r.sector_group:""} · ${mode==="intraday"?(r.time||""):(r.date||"")}</div><span class="cat ${cls(r.category)}">${r.category}</span><span class="quality ${qualityCls(r.quality_label)}">${mode==="intraday"?"動能":"波段"}：${r.quality_label||"一般"}</span></div></div><div><div class="score">${mode==="intraday"?num(r.intraday_score??r.score,0):(r.score_reliable===false?"—":num(r.swing_quality_score??r.score,0))}</div><div class="label">${mode==="intraday"?"盤中動能 /100":(r.score_reliable===false?"籌碼覆蓋不足":"波段延續 /100")}</div></div></div>
+  <div class="top"><div class="stockleft"><button class="star ${watched(r.code)?"on":""}" onclick="toggleWatch('${r.code}')">${watched(r.code)?"★":"☆"}</button><div><div class="name">${r.name}<span class="code">${r.code}</span></div><div class="sub">${r.industry_name||r.industry||"未分類"}${r.sector_group?" · "+r.sector_group:""} · ${mode==="intraday"?(r.time||""):(r.date||"")}</div><span class="cat ${cls(r.category)}">${stageKey(r.category)}</span><span class="quality ${qualityCls(r.quality_label)}">${mode==="intraday"?"動能":"波段"}：${r.quality_label||"一般"}</span></div></div><div><div class="score">${mode==="intraday"?num(r.intraday_score??r.score,0):(r.score_reliable===false?"—":num(r.swing_quality_score??r.score,0))}</div><div class="label">${mode==="intraday"?"盤中動能 /100":(r.score_reliable===false?"籌碼覆蓋不足":"波段延續 /100")}</div></div></div>
   ${stageExplainHTML(r)}
   ${partsHTML(r)}
   <div class="metrics">${metrics(r).map(m=>`<div class="metric"><div class="mval">${m[1]}</div><div class="mlab">${m[0]}</div></div>`).join("")}</div>
@@ -476,14 +491,14 @@ document.addEventListener("click",e=>{
 if("serviceWorker" in navigator){
  window.addEventListener("load",async()=>{
   try{
-   const reg=await navigator.serviceWorker.register("./sw.js?v=1518",{updateViaCache:"none"});
+   const reg=await navigator.serviceWorker.register("./sw.js?v=1519",{updateViaCache:"none"});
    await reg.update();
    let reloading=false;
    navigator.serviceWorker.addEventListener("controllerchange",()=>{
     if(reloading)return;
-    if(sessionStorage.getItem("dogsonSwReloaded1518")==="1")return;
+    if(sessionStorage.getItem("dogsonSwReloaded1519")==="1")return;
     reloading=true;
-    sessionStorage.setItem("dogsonSwReloaded1517b","1");
+    sessionStorage.setItem("dogsonSwReloaded1519","1");
     location.reload();
    });
   }catch(e){}
