@@ -1,0 +1,85 @@
+name: Install Radar v1.5 Execution + Swing Split
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "scripts/patch_v150.py"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v150-upgrade
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - name: Sync latest deployed data
+        run: python scripts/sync_live_data.py || true
+      - name: Apply v1.5 patch
+        run: python scripts/patch_v150.py
+      - name: Syntax check
+        run: python -m py_compile scripts/build_data.py scripts/bridge_intraday.py scripts/build_hourly.py
+      - name: Rebuild close swing radar
+        run: python scripts/build_data.py --mode close
+      - name: Rebuild 60K radar
+        run: python scripts/build_hourly.py
+      - name: Rebuild intraday execution radar
+        run: |
+          python scripts/build_data.py --mode intraday
+          python scripts/bridge_intraday.py
+      - name: Verify v1.5 split scoring and UI
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          h=Path('docs/index.html').read_text(encoding='utf-8')
+          hj=Path('docs/hourly.js').read_text(encoding='utf-8')
+          c=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          i=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
+          cr=c.get('rows') or []
+          ir=i.get('rows') or []
+          assert 'Free Edition v1.5.0' in h
+          assert '盤中動能 /100' in h and '波段延續 /100' in h
+          assert 'hourlyExpanded' in hj and '60分K 趨勢雷達' in hj
+          assert cr and ir
+          assert all('swing_quality_score' in r and 'entry_position_score' in r for r in cr[:50])
+          assert all('intraday_score' in r and 'intraday_components' in r for r in ir[:50])
+          assert all(r.get('score_reliable') is True for r in ir[:50])
+          print('close rows=',len(cr),'intraday rows=',len(ir))
+          print('close sample=',{k:cr[0].get(k) for k in ['code','score','swing_quality_score','entry_position_score','chip_score','sector_score']})
+          print('intraday sample=',{k:ir[0].get(k) for k in ['code','score','intraday_score','chip_background','sector_score','intraday_components']})
+          print('formula close=',c.get('score_formula'))
+          print('formula intraday=',i.get('score_formula'))
+          PY
+      - name: Commit v1.5 source and rebuilt data
+        run: |
+          git config user.name "qqqbis-droid"
+          git config user.email "qqqbis@gmail.com"
+          git add scripts/build_data.py docs/index.html docs/hourly.js docs/sw.js docs/data
+          git diff --cached --quiet || git commit -m "Apply Radar v1.5 execution and swing split"
+          git push
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
