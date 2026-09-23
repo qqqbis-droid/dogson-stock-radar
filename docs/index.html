@@ -16,7 +16,7 @@ h1{font-size:22px;margin:0}.sub{font-size:12px;color:var(--muted);margin-top:4px
 .marketbox{background:linear-gradient(180deg,#19202b,#131820);border:1px solid var(--line);border-radius:18px;padding:13px;margin-bottom:12px}
 .markettop{display:flex;justify-content:space-between;gap:10px}.marketmode{font-size:19px;font-weight:900}.marketscore{font-size:24px;font-weight:900}.marketgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:10px}
 .marketitem{background:#0e131a;border:1px solid #252d39;border-radius:11px;padding:9px}.marketv{font-weight:850}.marketl{font-size:10px;color:var(--muted);margin-top:3px}
-.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#11151c;padding:5px;border-radius:14px;position:sticky;top:5px;z-index:5}.tab{border:0;border-radius:11px;padding:11px;background:transparent;color:var(--muted);font-weight:800;font-size:15px}.tab.active{background:var(--card2);color:white}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:#11151c;padding:5px;border-radius:14px;position:sticky;top:5px;z-index:5}.tab{border:0;border-radius:11px;padding:11px;background:transparent;color:var(--muted);font-weight:800;font-size:15px}.tab.active{background:var(--card2);color:white}
 .controls{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px}.row{display:flex;gap:8px}.search{width:100%;background:#0f131a;border:1px solid var(--line);border-radius:12px;padding:12px;color:#fff;font-size:14px}.scan{border:0;background:var(--accent);color:#07101c;font-weight:900;border-radius:12px;padding:12px 15px}
 .suggestions{display:none;background:#0f131a;border:1px solid var(--line);border-radius:12px;margin-top:6px;overflow:hidden}.suggestions.show{display:block}.suggestion{width:100%;text-align:left;background:#0f131a;color:#fff;border:0;border-bottom:1px solid var(--line);padding:10px}.suggestion:last-child{border:0}.suggestion small{color:var(--muted);margin-left:6px}
 .filters{display:flex;gap:7px;overflow:auto;padding-top:10px}.filter{white-space:nowrap;border:1px solid var(--line);background:#242b38;color:#c7cfdb;padding:7px 10px;border-radius:999px;font-size:12px}.filter.on{border-color:#4d8ac7;color:#b9ddff;background:#17304a}
@@ -63,22 +63,27 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 .portfolio-decision{margin-top:9px;border:1px solid #34455a;background:#0f1721;border-radius:11px;padding:9px}.portfolio-decision-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.portfolio-decision-title{font-size:10px;color:#9ba5b6;font-weight:850}.portfolio-decision-badge{border-radius:999px;padding:5px 8px;font-size:11px;font-weight:900;white-space:nowrap}.portfolio-decision-badge.hold{background:#173527;color:#a5efbf}.portfolio-decision-badge.cool{background:#173049;color:#b7ddff}.portfolio-decision-badge.pause{background:#40300f;color:#ffd477}.portfolio-decision-badge.reduce{background:#43251c;color:#ffc29f}.portfolio-decision-badge.exit{background:#471820;color:#ff9cac}.portfolio-decision-head{font-size:12px;font-weight:900;margin-top:6px}.portfolio-decision-reasons{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}.portfolio-decision-reasons span{font-size:9px;background:#151f2a;border:1px solid #2a394a;border-radius:8px;padding:5px 7px;color:#c2ccda}.portfolio-decision-note{font-size:9px;color:var(--muted);line-height:1.45;margin-top:7px}
 
 .validationbox{background:linear-gradient(180deg,#171d27,#111720);border:1px solid #314056;border-radius:16px;padding:12px;margin:12px 0}.validationtop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.validationtitle{font-size:16px;font-weight:900}.validationbadge{font-size:10px;font-weight:900;padding:5px 8px;border-radius:999px;background:#40300f;color:#ffd477}.validationbadge.active{background:#173527;color:#a5efbf}.validationgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:9px}.validationitem{background:#0e141c;border:1px solid #293442;border-radius:10px;padding:8px}.validationv{font-size:13px;font-weight:900}.validationl{font-size:9px;color:var(--muted);margin-top:3px}.validationnote{font-size:9px;color:var(--muted);line-height:1.5;margin-top:8px}.validationweights{font-size:10px;color:#cfe2f7;margin-top:8px;line-height:1.6}
+
+/* v1.5.29 Step 8 independent daytrade */
+.daytradebox{margin-top:10px;border:1px solid #46516b;background:linear-gradient(180deg,#151a27,#0e141d);border-radius:13px;padding:10px}.daytradetop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.daytradetitle{font-size:11px;color:#aeb9ca;font-weight:850}.daytradestate{border-radius:999px;padding:6px 9px;font-size:11px;font-weight:900;white-space:nowrap}.daytradestate.go{background:#153323;color:#a6efbf}.daytradestate.wait{background:#3a2e12;color:#ffd77b}.daytradestate.watch{background:#17304a;color:#b9ddff}.daytradestate.hot{background:#3c1d3f;color:#eab4ff}.daytradestate.fail{background:#3d171d;color:#ffacb8}.daytradeheadline{font-size:12px;font-weight:900;margin-top:6px}.daytradesource{font-size:9px;color:var(--muted);margin-top:7px;line-height:1.45}.daytrade-only{display:none}
+@media(max-width:620px){.tabs{grid-template-columns:1fr}.tab{padding:9px;font-size:13px}}
+
 </style>
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.28｜Step 7 歷史驗證校準</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.29｜Step 8 獨立當沖模式</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
 
-<div class="tabs"><button class="tab active" data-mode="intraday">⚡ 盤中雷達</button><button class="tab" data-mode="close">🌙 盤後雷達</button></div>
+<div class="tabs"><button class="tab active" data-mode="intraday">⚡ 盤中波段</button><button class="tab" data-mode="daytrade">🎯 當沖模式</button><button class="tab" data-mode="close">🌙 盤後波段</button></div>
 
 <div class="controls">
  <div class="row"><input id="q" class="search" placeholder="輸入股票代號或名稱，例如 2308、台達電" autocomplete="off"><button id="scan" class="scan">掃描</button></div>
  <div id="suggestions" class="suggestions"></div>
  <div class="filters">
-  <button class="filter on" data-f="all">全部</button><button class="filter" data-f="蓄勢待發">🌱 蓄勢待發</button><button class="filter" data-f="剛啟動">🔥 剛啟動</button><button class="filter" data-f="回踩承接">🟡 回踩承接</button><button class="filter" data-f="趨勢持有">🚂 趨勢持有</button><button class="filter" data-f="觀察">🔵 觀察</button><button class="filter" data-f="轉弱警戒">⚠️ 轉弱警戒</button><button class="filter" data-f="結構失效">❌ 結構失效</button><button class="filter" data-f="過熱不追">🚫 過熱不追</button><button class="filter" id="watchOnly">⭐ 我的關注</button><button class="filter" id="portfolioOnly">💼 我的庫存</button>
+  <button class="filter on" data-f="all">全部</button><button class="filter" data-f="蓄勢待發">🌱 蓄勢待發</button><button class="filter" data-f="剛啟動">🔥 剛啟動</button><button class="filter" data-f="回踩承接">🟡 回踩承接</button><button class="filter" data-f="趨勢持有">🚂 趨勢持有</button><button class="filter" data-f="觀察">🔵 觀察</button><button class="filter" data-f="轉弱警戒">⚠️ 轉弱警戒</button><button class="filter" data-f="結構失效">❌ 結構失效</button><button class="filter" data-f="過熱不追">🚫 過熱不追</button><button class="filter daytrade-only" data-daytrade-only="1" data-f="可執行">🟢 可執行</button><button class="filter daytrade-only" data-daytrade-only="1" data-f="等回踩">🟡 等回踩</button><button class="filter daytrade-only" data-daytrade-only="1" data-f="失效">🔴 失效</button><button class="filter" id="watchOnly">⭐ 我的關注</button><button class="filter" id="portfolioOnly">💼 我的庫存</button>
  </div>
  <details class="help">
    <summary>❓ 每個數值怎麼看？第一次使用請點我</summary>
@@ -88,8 +93,9 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
     <div class="guide-title">① 先選對模式：盤中還是盤後？</div>
     <div class="guide-card">
       <div class="guide-line"><span class="guide-key">⚡ 盤中雷達</span>：看「現在正在變強的是誰」。適合交易時間觀察動能、族群輪動、突破與回踩。</div>
+      <div class="guide-line"><span class="guide-key">🎯 當沖模式</span>：只看當天 5 分K 執行條件，使用獨立的當沖100分與「可執行／等回踩／觀察／過熱不追／失效」狀態；不覆蓋盤中波段 Stage。</div>
       <div class="guide-line"><span class="guide-key">🌙 盤後雷達</span>：看「收盤後，這檔股票適不適合繼續追蹤成波段」。會加入日K、籌碼、法人與進場位置。</div>
-      <div class="guide-tip">同一檔股票盤中分數高、盤後分數普通，不代表資料打架；兩套雷達看的時間尺度不同。</div>
+      <div class="guide-tip">同一檔股票在三個頁籤分數不同是正常的：盤中波段、當沖、盤後波段本來就是三套不同時間尺度。</div>
     </div>
 
     <div class="guide-title">② 先看大盤 15 分：今天適合積極還是保守？</div>
@@ -252,9 +258,21 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
       <div class="guide-tip">盤中歷史只保存與驗證，不參與波段權重校準；Step 8 的當沖模式也會另做，避免邏輯互相污染。</div>
     </div>
 
-    <div class="guide-title">⑱ 第一次使用，照這個順序最快</div>
+    <div class="guide-title">⑱ Step 8｜獨立當沖模式：只回答今天這一筆好不好做</div>
+    <div class="guide-card">
+      <div class="guide-line"><span class="guide-key">獨立當沖 100 分</span>：執行價格結構 30＋量價推進 25＋相對強弱/族群 20＋進場時機/波動效率 15＋流動性/風險 10。</div>
+      <div class="guide-line"><span class="guide-key">🟢 可執行</span>：VWAP、5分短均、量價、相對強弱、族群與位置同步，而且大盤不是防守模式。</div>
+      <div class="guide-line"><span class="guide-key">🟡 等回踩</span>：股票夠強，但位置偏高、15分鐘推進偏快或突破後風險報酬不漂亮，先等回到合理執行區。</div>
+      <div class="guide-line"><span class="guide-key">🔵 觀察</span>：尚未形成足夠同步，沒有必要因為一根紅K就追。</div>
+      <div class="guide-line"><span class="guide-key">🚫 過熱不追</span>：超過 Step 6 的個股化漲幅／VWAP／15分／量速門檻，或振幅屬高震盪／沖高回落。</div>
+      <div class="guide-line"><span class="guide-key">🔴 失效</span>：跌回 VWAP 下且短均、15分鐘動能等同步轉弱，當沖執行結構不成立。</div>
+      <div class="guide-tip">隔離規則：當沖模式只讀 intraday.json，另寫 daytrade.json；不改 Stage 2.0、不改盤中波段100分、不改盤後波段100分。原盤中 Stage 會以「來源 Stage」保留給你對照。</div>
+    </div>
+
+    <div class="guide-title">⑲ 第一次使用，照這個順序最快</div>
     <div class="guide-card">
       <div class="guide-line"><b>盤中：</b>① 看大盤 15 分 → ② 看族群成交資金輪動 → ③ 找同族群高動能個股 → ④ 看 VWAP、量速、相對強弱與階段 → ⑤ 最後才決定要不要追、等回踩或只觀察。</div>
+      <div class="guide-line"><b>當沖：</b>① 先看大盤是否防守 → ② 找當沖「可執行／等回踩」→ ③ 看 VWAP、5分短均、量速與15分鐘推進 → ④ 檢查個股化過熱門檻 → ⑤ 不符合就放掉，不硬追。</div>
       <div class="guide-line"><b>盤後：</b>① 看大盤環境 → ② 看法人族群資金流 → ③ 看個股波段延續 → ④ 再看進場位置 → ⑤ 用籌碼、支撐壓力確認隔日計畫。</div>
       <div class="guide-tip"><b>最後一句：</b>分數是「條件有沒有一起出現」，不是上漲機率。最有用的不是找 100 分，而是找「市場配合、族群配合、個股配合，而且位置也合理」的股票。</div>
     </div>
@@ -274,7 +292,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 <div class="footer" id="footerText">盤中動能100＝價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10｜籌碼只作背景｜大盤15分獨立</div>
 
 <script>
-let mode="intraday",filter="all",watchOnly=false,portfolioOnly=false,portfolioData={},universe=[],closeRows=[],intraRows=[],rows=[],market={},marketLive={},closeMarket={},intraMarket={},sectorRotation=[],sectorFunds=[],changeRadar={},validationReport={};
+let mode="intraday",filter="all",watchOnly=false,portfolioOnly=false,portfolioData={},universe=[],closeRows=[],intraRows=[],daytradeRows=[],rows=[],market={},marketLive={},closeMarket={},intraMarket={},daytradeMarket={},sectorRotation=[],sectorFunds=[],changeRadar={},validationReport={},daytradeReport={};
 let sectorFundsOpen=localStorage.getItem("dogsonSectorFundsOpen")==="1";
 let sectorRotationOpen=localStorage.getItem("dogsonSectorRotationOpen")==="1";
 const $=id=>document.getElementById(id);
@@ -293,10 +311,10 @@ function reasonStatusClass(v){return v==="weak"?"weak":v==="invalid"?"invalid":"
 function portfolioMoney(v){if(v===null||v===undefined||Number.isNaN(+v))return "—";const n=+v,a=Math.abs(n),sign=n>0?"+":n<0?"-":"";if(a>=1e8)return sign+"$"+num(a/1e8,2)+"億";if(a>=1e4)return sign+"$"+num(a/1e4,1)+"萬";return sign+"$"+num(a,0)}
 function currentHoldingRow(code){
  code=String(code);
- const primary=mode==="intraday"?intraRows:closeRows;
- const secondary=mode==="intraday"?closeRows:intraRows;
+ const primary=mode==="daytrade"?daytradeRows:(mode==="intraday"?intraRows:closeRows);
+ const secondary=mode==="daytrade"?intraRows:(mode==="intraday"?closeRows:intraRows);
  const a=primary.find(x=>String(x.code)===code);if(a)return a;
- const b=secondary.find(x=>String(x.code)===code);if(b)return {...b,_portfolio_fallback:mode==="intraday"?"盤中行情暫缺，使用最近盤後資料":"盤後資料暫缺，使用最近盤中資料"};
+ const b=secondary.find(x=>String(x.code)===code);if(b)return {...b,_portfolio_fallback:mode==="close"?"盤後資料暫缺，使用最近盤中資料":(mode==="daytrade"?"當沖衍生資料暫缺，使用原盤中資料":"盤中行情暫缺，使用最近盤後資料")};
  const u=universe.find(x=>String(x.code)===code);
  return u?{...u,code,name:u.name||code,category:"觀察",score_reliable:false,reasons:[],_portfolio_fallback:"目前沒有可用行情，先保留庫存紀錄"}:null;
 }
@@ -380,11 +398,12 @@ function portfolioDecisionHTML(r,h){
 }
 function portfolioHTML(r){
  const h=holding(r.code);if(!h)return "";
+ const pr=mode==="daytrade"?(intraRows.find(x=>String(x.code)===String(r.code))||r):r;
  const sh=+(h.shares||0),co=h.cost===null||h.cost===undefined?null:+h.cost,px=+(r.close||0),p=portfolioPnL(h,px);
  const pc=p.pnl>0?"pnl up":p.pnl<0?"pnl down":"pnl";
- const st=stageKey(r.category),sys=st==="結構失效"?`<span class="portfolio-system bad">系統目前：❌ 結構失效，請對照你的失效條件</span>`:st==="轉弱警戒"?`<span class="portfolio-system warn">系統目前：⚠️ 轉弱警戒，請檢查持有理由</span>`:`<span class="portfolio-system">系統目前：${st||"觀察"}</span>`;
+ const st=stageKey(pr.category),sys=st==="結構失效"?`<span class="portfolio-system bad">系統目前：❌ 結構失效，請對照你的失效條件</span>`:st==="轉弱警戒"?`<span class="portfolio-system warn">系統目前：⚠️ 轉弱警戒，請檢查持有理由</span>`:`<span class="portfolio-system">系統目前：${st||"觀察"}</span>`;
  const reason=x=>escHTML(x||"尚未填寫").replace(/\n/g,"<br>");
- return `<div class="portfoliobox"><div class="portfolio-top"><div><div class="portfolio-title">💼 我的庫存</div><div class="portfolio-statusline"><span class="portfolio-status ${reasonStatusClass(h.reason_status)}">${reasonStatusText(h.reason_status)}</span>${sys}</div></div><button class="portfolio-editbtn" type="button" data-portfolio-edit="${r.code}">編輯庫存</button></div><div class="portfolio-grid"><div class="portfolio-metric"><div class="portfolio-metric-v">${sh>0?num(sh,0)+"股":"—"}</div><div class="portfolio-metric-l">持有股數</div></div><div class="portfolio-metric"><div class="portfolio-metric-v">${co&&co>0?num(co,2):"—"}</div><div class="portfolio-metric-l">平均成本</div></div><div class="portfolio-metric"><div class="portfolio-metric-v ${pc}">${portfolioMoney(p.pnl)}</div><div class="portfolio-metric-l">未實現損益</div></div><div class="portfolio-metric"><div class="portfolio-metric-v ${pc}">${p.pct===null?"—":signed(p.pct,2)}</div><div class="portfolio-metric-l">報酬率</div></div></div>${dynamicThresholdHTML(r)}${portfolioDecisionHTML(r,h)}<div class="portfolio-reasons"><div class="portfolio-reason"><b>🎯 進場理由</b>${reason(h.entry_reason)}</div><div class="portfolio-reason"><b>🧩 持有理由</b>${reason(h.hold_reason)}</div><div class="portfolio-reason"><b>🛑 結構失效條件</b>${reason(h.invalidation)}</div></div>${r._portfolio_fallback?`<div class="portfolio-fallback">⚠️ ${escHTML(r._portfolio_fallback)}</div>`:""}</div>`;
+ return `<div class="portfoliobox"><div class="portfolio-top"><div><div class="portfolio-title">💼 我的庫存</div><div class="portfolio-statusline"><span class="portfolio-status ${reasonStatusClass(h.reason_status)}">${reasonStatusText(h.reason_status)}</span>${sys}</div></div><button class="portfolio-editbtn" type="button" data-portfolio-edit="${r.code}">編輯庫存</button></div><div class="portfolio-grid"><div class="portfolio-metric"><div class="portfolio-metric-v">${sh>0?num(sh,0)+"股":"—"}</div><div class="portfolio-metric-l">持有股數</div></div><div class="portfolio-metric"><div class="portfolio-metric-v">${co&&co>0?num(co,2):"—"}</div><div class="portfolio-metric-l">平均成本</div></div><div class="portfolio-metric"><div class="portfolio-metric-v ${pc}">${portfolioMoney(p.pnl)}</div><div class="portfolio-metric-l">未實現損益</div></div><div class="portfolio-metric"><div class="portfolio-metric-v ${pc}">${p.pct===null?"—":signed(p.pct,2)}</div><div class="portfolio-metric-l">報酬率</div></div></div>${dynamicThresholdHTML(pr)}${portfolioDecisionHTML(pr,h)}<div class="portfolio-reasons"><div class="portfolio-reason"><b>🎯 進場理由</b>${reason(h.entry_reason)}</div><div class="portfolio-reason"><b>🧩 持有理由</b>${reason(h.hold_reason)}</div><div class="portfolio-reason"><b>🛑 結構失效條件</b>${reason(h.invalidation)}</div></div>${r._portfolio_fallback?`<div class="portfolio-fallback">⚠️ ${escHTML(r._portfolio_fallback)}</div>`:""}</div>`;
 }
 function showPortfolioEditor(code){
  code=String(code);const r=currentHoldingRow(code)||universe.find(x=>String(x.code)===code)||{code,name:code};const h=holding(code)||{};
@@ -413,8 +432,8 @@ function marketLots(v){if(v===null||v===undefined||Number.isNaN(+v))return "—"
 function signed(v,d=1,suffix="%"){if(v===null||v===undefined||Number.isNaN(+v))return "—";return ((+v)>=0?"+":"")+num(v,d)+suffix}
 function moneyTw(v){if(v===null||v===undefined||Number.isNaN(+v))return "—";v=+v;if(v>=1e8)return num(v/1e8,1)+"億";if(v>=1e7)return num(v/1e7,1)+"千萬";return num(v/1e6,1)+"百萬"}
 function flowMoney(v){if(v===null||v===undefined||Number.isNaN(+v))return "—";v=+v;if(v===0)return "0";const a=Math.abs(v);if(a>=1)return signed(v,2,"億");if(a>=.1)return signed(v*10,1,"千萬");return signed(v*100,1,"百萬")}
-function cls(c){return c==="蓄勢待發"?"setup":c==="剛啟動"?"start":c==="回踩承接"?"pull":c==="趨勢持有"?"trendhold":c==="轉弱警戒"?"weak":c==="結構失效"?"invalid":c==="過熱不追"?"hot":"watch"}
-function qualityCls(q){return (q==="高共振"||q==="高延續"||q==="強動能")?"high":(q==="強"||q==="轉強")?"strong":""}
+function cls(c){return c==="可執行"?"start":c==="等回踩"?"pull":c==="失效"?"invalid":c==="蓄勢待發"?"setup":c==="剛啟動"?"start":c==="回踩承接"?"pull":c==="趨勢持有"?"trendhold":c==="轉弱警戒"?"weak":c==="結構失效"?"invalid":c==="過熱不追"?"hot":"watch"}
+function qualityCls(q){return (q==="高共振"||q==="高延續"||q==="強動能"||q==="強勢")?"high":(q==="強"||q==="轉強"||q==="良好")?"strong":""}
 function validationHTML(){
  const v=validationReport||{},c=v.calibration||{};
  if(!v.version)return `<div class="validationtop"><div><div class="validationtitle">🧪 Step 7 歷史驗證</div><div class="sub">歷史樣本開始累積</div></div><span class="validationbadge">暖機中</span></div>`;
@@ -424,7 +443,9 @@ function validationHTML(){
 }
 function updateFooter(){
  const el=$("footerText");if(!el)return;
- el.textContent=mode==="intraday"
+ el.textContent=mode==="daytrade"
+  ?"獨立當沖100＝執行結構30＋量價推進25＋相對/族群20＋時機/波動15＋流動性/風險10｜只讀原盤中資料，不覆蓋Stage或波段分"
+  :mode==="intraday"
   ?"盤中動能100＝價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10｜籌碼只作背景｜大盤15分獨立"
   :"波段延續100＝日K技術50＋籌碼25＋族群15＋流動性10｜直接加總不換算｜進場位置100獨立｜大盤15分獨立";
 }
@@ -432,7 +453,7 @@ function updateFooter(){
 function marketHTML(){
  const m=market||{},live=marketLive||{};
  const modeClass=m.market_mode==="偏多"?"yes":m.market_mode==="防守"?"bad":"";
- if(mode==="intraday"&&m.intraday_only){
+ if((mode==="intraday"||mode==="daytrade")&&m.intraday_only){
   const c=m.components||{},ta=c.taiex||{},ot=c.otc||{},br=c.breadth||{},fu=c.funds||{},se=c.sector||{};
   const lt=live["^TWII"]||{},lo=live["^TWOII"]||{};
   const bg=m.background_foreign_date?`昨日/最近外資僅背景：${m.background_foreign_date} 上市 ${signed(m.background_foreign_twse_billion,1,"億")}｜上櫃 ${signed(m.background_foreign_tpex_billion,1,"億")}（不計分）`:`昨日外資僅背景，不計盤中分`;
@@ -521,7 +542,7 @@ function rotationHTML(){
  const hot=arr.filter(x=>(x.heat||0)>=2.5).slice(0,4);
  const cold=[...arr].sort((a,b)=>(a.heat||0)-(b.heat||0)).filter(x=>(x.heat||0)<=-2.5).slice(0,4);
  const one=x=>{
-  const members=intraRows
+  const members=(mode==="daytrade"?daytradeRows:intraRows)
    .filter(r=>(r.sector_group||"").trim()===(x.sector||"").trim())
    .sort((a,b)=>(+(b.intraday_score??b.score)||0)- (+(a.intraday_score??a.score)||0) || (+(b.day_change)||0)- (+(a.day_change)||0));
   const memberHTML=members.length?members.slice(0,30).map(r=>`<button class="rotationmember peerlink" data-code="${r.code}"><span><b>${r.code} ${r.name}</b><small>${signed(r.day_change,1)} · ${stageKey(r.category)||"觀察"}</small></span><span class="rmscore">${num(r.intraday_score??r.score,0)}/100</span></button>`).join(""):`<div class="sub">目前沒有可展開的盤中個股資料</div>`;
@@ -616,6 +637,11 @@ function entryDecisionHTML(r){
  return `<div class="entrybox"><div class="entrytop"><div><div class="entrytitle">🚦 Step 4｜盤中進場雷達</div><div class="entryheadline">${d.headline}</div></div><span class="entrylight ${d.key}">${d.icon} ${d.label}</span></div><div class="entrymeta"><span>個股動能 ${num(d.score,0)}/100</span><span>大盤 ${d.marketMode}${d.marketScore?` ${num(d.marketScore,1)}/15`:""} · 獨立</span><span>60K ${r?.multi_timeframe?.["60m"]?.label||"待補"}</span><span>相對強弱 ${r?.relative_multiframe?.label||"待補"}</span><span>MTF權重＝0</span></div><div class="entrywhy">${positives}${waits}${blocks}</div><div class="entrynote">三燈只做進場時機判斷，不改原本100分；🟢 代表可小量試單，不等於自動買進。</div></div>`;
 }
 function entrySummaryHTML(){
+ if(mode==="daytrade"){
+  const counts={"可執行":0,"等回踩":0,"觀察":0,"過熱不追":0,"失效":0};
+  (daytradeRows||[]).forEach(r=>{const k=r.daytrade_state||r.category||"觀察";counts[k]=(counts[k]||0)+1});
+  return `<div class="entrysummary"><div class="entrysummarytop"><div><div class="entrysummarytitle">🎯 Step 8｜獨立當沖雷達</div><div class="entrysummarysub">只回答今天的執行品質；不改盤中波段 Stage 2.0，也不改波段分數。</div></div></div><div class="entrycounts"><div class="entrycount"><div class="entrycountv">🟢 ${counts["可執行"]||0}</div><div class="entrycountl">可執行</div></div><div class="entrycount"><div class="entrycountv">🟡 ${counts["等回踩"]||0}</div><div class="entrycountl">等回踩</div></div><div class="entrycount"><div class="entrycountv">🚫 ${(counts["過熱不追"]||0)+(counts["失效"]||0)}</div><div class="entrycountl">過熱／失效</div></div></div></div>`;
+ }
  if(mode!=="intraday")return "";
  let green=0,yellow=0,red=0;
  (intraRows||[]).forEach(r=>{const k=entryDecision(r,intraMarket).key;if(k==="green")green++;else if(k==="red")red++;else yellow++});
@@ -663,6 +689,17 @@ function groupHTML(r){
 }
 
 function partsHTML(r){
+ if(mode==="daytrade"){
+  const c=r.daytrade_components||{};
+  return `<div class="parts intradayparts">
+   <div class="part"><div class="partv">${num(c.execution_structure,0)}/30</div><div class="partl">執行價格結構</div></div>
+   <div class="part"><div class="partv">${num(c.flow_volume,0)}/25</div><div class="partl">量價／即時推進</div></div>
+   <div class="part"><div class="partv">${num(c.relative_sector,0)}/20</div><div class="partl">相對強弱＋族群</div></div>
+   <div class="part"><div class="partv">${num(c.timing_volatility,0)}/15</div><div class="partl">時機／波動效率</div></div>
+   <div class="part"><div class="partv">${num(c.liquidity_risk,0)}/10</div><div class="partl">流動性／追價風險</div></div>
+   <div class="part"><div class="partv">${num(r.source_intraday_score,0)}/100</div><div class="partl">來源盤中分 · 不覆蓋</div></div>
+  </div>`;
+ }
  if(mode==="intraday"){
   const c=r.intraday_components||{};
   return `<div class="parts intradayparts">
@@ -698,27 +735,29 @@ function chipHTML(r){
 }
 
 function metrics(r){
- if(mode==="intraday")return [["現價",num(r.close,2)],["行情時間",r.quote_time||r.time||"—"],["5分K結構",r.structure_time||r.time||"—"],["同時間量速",num(r.pace,1)+"x"],["今日振幅",num(r.amplitude_pct,2)+"%"],["區間位置",num(r.range_position_pct,0)+"%"],["同時段振幅倍數",r.amp_baseline_ready?(num(r.amplitude_multiple,2)+"x"):((r.amp_sample_days||0)+"日樣本")],["振幅效率",num(r.amplitude_efficiency,2)],["振幅狀態",r.amplitude_regime||"中性"],["距VWAP",signed(r.vwap_dist,1)],["當日",signed(r.day_change,1)],["VWAP",num(r.vwap,2)],["流動性",(r.liquidity_level||"—")+" · "+moneyTw(r.avg_turnover20)],["族群共振",(r.sector_score_label?(num(r.sector_score,1)+"/10 · "+r.sector_score_label+(r.sector_score_source==="官方產業代理"?"（產業代理）":"")):"待分類")]];
+ if(mode!=="close")return [["現價",num(r.close,2)],["行情時間",r.quote_time||r.time||"—"],["5分K結構",r.structure_time||r.time||"—"],["同時間量速",num(r.pace,1)+"x"],["今日振幅",num(r.amplitude_pct,2)+"%"],["區間位置",num(r.range_position_pct,0)+"%"],["同時段振幅倍數",r.amp_baseline_ready?(num(r.amplitude_multiple,2)+"x"):((r.amp_sample_days||0)+"日樣本")],["振幅效率",num(r.amplitude_efficiency,2)],["振幅狀態",r.amplitude_regime||"中性"],["距VWAP",signed(r.vwap_dist,1)],["當日",signed(r.day_change,1)],["VWAP",num(r.vwap,2)],["流動性",(r.liquidity_level||"—")+" · "+moneyTw(r.avg_turnover20)],["族群共振",(r.sector_score_label?(num(r.sector_score,1)+"/10 · "+r.sector_score_label+(r.sector_score_source==="官方產業代理"?"（產業代理）":"")):"待分類")]];
  return [["收盤",num(r.close,2)],["日量比",num(r.vol_x,1)+"x"],["流動性",(r.liquidity_level||"—")+" · "+moneyTw(r.avg_turnover20)],["距20MA",signed(r.dist20,1)],["5日漲幅",signed(r.ret5,1)],["20日漲幅",signed(r.ret20,1)],["RSI",num(r.rsi,0)],["5MA",num(r.ma5,2)],["10MA",num(r.ma10,2)],["20MA",num(r.ma20,2)],["20日突破",r.break20?"是":"否"],["均線多頭",r.trend?"是":"否"],["族群共振",(r.sector_score_label?((r.sector_hot_count||0)+"檔 · "+r.sector_score_label+(r.sector_score_source==="官方產業代理"?"（產業代理）":"")):"待分類")]];
 }
 
 function stageExplainHTML(r,compact=false){
- const category=r.category||"觀察";
- const reason=(r.stage_reason||"目前沒有足夠資料形成明確生命週期判讀").trim();
+ const category=(mode==="daytrade"?(r.daytrade_state||r.category):r.category)||"觀察";
+ const reason=(r.stage_reason||(mode==="daytrade"?"目前沒有足夠資料形成明確當沖判讀":"目前沒有足夠資料形成明確生命週期判讀")).trim();
  const signals=[...(r.stage_signals||[])].filter(Boolean).slice(0,5);
  const risks=[...(r.stage_risks||[])].filter(Boolean).slice(0,5);
  const signalHTML=signals.map(x=>`<span class="stagechip">✓ ${x}</span>`).join("");
  const riskHTML=risks.map(x=>`<span class="stagechip risk">⚠ ${x}</span>`).join("");
  const evidence=(signalHTML||riskHTML)?`<div class="stagechips">${signalHTML}${riskHTML}</div>`:`<div class="stagehint">目前沒有額外的關鍵證據需要提示。</div>`;
- return `<div class="stagebox"><div class="stagetop"><span class="stagetitle">${compact?"生命週期":"🧭 生命週期判讀"}</span><span class="cat ${cls(category)}">${category}</span></div><div class="stagereason">${reason}</div>${evidence}</div>`;
+ return `<div class="stagebox"><div class="stagetop"><span class="stagetitle">${mode==="daytrade"?(compact?"當沖判讀":"🎯 當沖獨立判讀"):(compact?"生命週期":"🧭 生命週期判讀")}</span><span class="cat ${cls(category)}">${category}</span></div><div class="stagereason">${reason}</div>${evidence}${mode==="daytrade"?`<div class="stagehint">來源盤中 Stage 2.0：${escHTML(r.source_category||"—")}｜來源盤中動能 ${num(r.source_intraday_score,0)}/100｜兩套分數互不覆蓋</div>`:""}</div>`;
 }
 
 function showPeerPeek(code){
  const r=rows.find(x=>String(x.code)===String(code));if(!r)return;
  document.getElementById("peerPeekBack")?.remove();
  const back=document.createElement("div");back.id="peerPeekBack";back.className="peerpeekback";
- const intr=mode==="intraday";
- const items=intr?[
+ const dt=mode==="daytrade",intr=mode==="intraday";
+ const items=dt?[
+  ["現價",num(r.close,2)],["當沖分",num(r.daytrade_score??r.score,0)+"/100"],["當沖狀態",r.daytrade_state||"觀察"],["同時間量速",num(r.pace,1)+"x"],["距VWAP",signed(r.vwap_dist,1)],["來源Stage",r.source_category||"—"]
+ ]:intr?[
   ["現價",num(r.close,2)],["盤中動能",num(r.intraday_score??r.score,0)+"/100"],["同時間量速",num(r.pace,1)+"x"],["距VWAP",signed(r.vwap_dist,1)],["族群共振",num(r.sector_score,1)+"/10"],["籌碼背景",r.chip_background||"資料不足"]
  ]:[
   ["收盤",num(r.close,2)],["波段延續",(r.score_reliable===false?"待補":num(r.swing_quality_score??r.score,0)+"/100")],["進場位置",num(r.entry_position_score,0)+"/100"],["籌碼",(+r.chip_coverage_pct||0)<60?"待補":num(r.chip_score,0)+"/25"],["族群共振",num(r.sector_score,1)+"/10"],["階段",r.category||"觀察"]
@@ -737,6 +776,7 @@ function stageKey(v){
  const raw=String(v||"").trim();
  if(!raw)return "觀察";
  const x=raw.replace(/[🌱🔥🟡🚂🔵⚠️❌🚫]/gu,"").replace(/\s+/g,"");
+ if(raw==="可執行"||raw==="等回踩"||raw==="失效")return raw;
  if(x.includes("蓄勢"))return "蓄勢待發";
  if(x.includes("剛啟動")||x.includes("啟動"))return "剛啟動";
  if(x.includes("回踩"))return "回踩承接";
@@ -749,7 +789,7 @@ function stageKey(v){
 }
 
 function render(){
- rows=mode==="intraday"?intraRows:closeRows;
+ rows=mode==="daytrade"?daytradeRows:(mode==="intraday"?intraRows:closeRows);
  let source=rows;
  if(portfolioOnly)source=Object.keys(portfolioData).map(code=>currentHoldingRow(code)).filter(Boolean);
  let rr=source.filter(r=>(filter==="all"||stageKey(r.category)===stageKey(filter))&&(!watchOnly||watched(r.code)));
@@ -759,7 +799,7 @@ function render(){
  if(q){let hits=rr.filter(r=>String(r.code)===q||String(r.name).toLowerCase().includes(q));if(hits.length)rr=hits}
  if(!rr.length){$("cards").innerHTML='<div class="empty">目前沒有符合條件的資料。盤中會掃描所有通過流動性門檻的股票；若個別免費行情源暫缺，切到盤後仍可查完整日K資料。</div>';return}
  $("cards").innerHTML=rr.slice(0,70).map(r=>`<div class="card" data-code="${r.code}">
-  <div class="top"><div class="stockleft"><button class="star ${watched(r.code)?"on":""}" onclick="toggleWatch('${r.code}')">${watched(r.code)?"★":"☆"}</button><div><div class="name">${r.name}<span class="code">${r.code}</span></div><div class="sub">${r.industry_name||r.industry||"未分類"}${r.sector_group?" · "+r.sector_group:""} · ${mode==="intraday"?(r.time||""):(r.date||"")}</div><span class="cat ${cls(r.category)}">${stageKey(r.category)}</span><span class="quality ${qualityCls(r.quality_label)}">${mode==="intraday"?"動能":"波段"}：${r.quality_label||"一般"}</span><button class="portfolio-mini ${held(r.code)?"held":""}" type="button" data-portfolio-edit="${r.code}">${held(r.code)?"💼 已持有":"💼 加入庫存"}</button></div></div><div><div class="score">${mode==="intraday"?num(r.intraday_score??r.score,0):(r.score_reliable===false?"—":num(r.swing_quality_score??r.score,0))}</div><div class="label">${mode==="intraday"?"盤中動能 /100":(r.score_reliable===false?"籌碼覆蓋不足":"波段延續 /100")}</div></div></div>
+  <div class="top"><div class="stockleft"><button class="star ${watched(r.code)?"on":""}" onclick="toggleWatch('${r.code}')">${watched(r.code)?"★":"☆"}</button><div><div class="name">${r.name}<span class="code">${r.code}</span></div><div class="sub">${r.industry_name||r.industry||"未分類"}${r.sector_group?" · "+r.sector_group:""} · ${mode==="close"?(r.date||""):(r.quote_time||r.time||"")}</div><span class="cat ${cls(r.category)}">${stageKey(r.category)}</span><span class="quality ${qualityCls(r.quality_label)}">${mode==="daytrade"?"當沖":(mode==="intraday"?"動能":"波段")}：${r.quality_label||"一般"}</span><button class="portfolio-mini ${held(r.code)?"held":""}" type="button" data-portfolio-edit="${r.code}">${held(r.code)?"💼 已持有":"💼 加入庫存"}</button></div></div><div><div class="score">${mode==="daytrade"?num(r.daytrade_score??r.score,0):(mode==="intraday"?num(r.intraday_score??r.score,0):(r.score_reliable===false?"—":num(r.swing_quality_score??r.score,0)))}</div><div class="label">${mode==="daytrade"?"獨立當沖 /100":(mode==="intraday"?"盤中動能 /100":(r.score_reliable===false?"籌碼覆蓋不足":"波段延續 /100"))}</div></div></div>
   ${stageExplainHTML(r)}
   ${mtfHTML(r)}
   ${entryDecisionHTML(r)}
@@ -777,23 +817,32 @@ function render(){
 async function load(){
  try{
   const bust=Date.now();
-  const [u,c,i,s,m,v]=await Promise.all([
+  const [u,c,i,s,m,v,d]=await Promise.all([
    fetch("./data/universe.json?"+bust),fetch("./data/close.json?"+bust),
    fetch("./data/intraday.json?"+bust),fetch("./data/status.json?"+bust),
-   fetch("./data/market.json?"+bust),fetch("./data/validation.json?"+bust)
+   fetch("./data/market.json?"+bust),fetch("./data/validation.json?"+bust),fetch("./data/daytrade.json?"+bust)
   ]);
-  universe=await u.json();let cj=await c.json(),ij=await i.json(),sj=await s.json();validationReport=await v.json();
-  closeMarket=await m.json();intraMarket=ij.market||closeMarket;marketLive=ij.market_intraday||{};sectorRotation=ij.sector_rotation||[];changeRadar=ij.change_radar||{};market=intraMarket;
-  closeRows=cj.rows||[];sectorFunds=cj.sector_funds||[];intraRows=ij.rows||[];
+  universe=await u.json();let cj=await c.json(),ij=await i.json(),sj=await s.json();validationReport=await v.json();daytradeReport=await d.json();
+  closeMarket=await m.json();intraMarket=ij.market||closeMarket;daytradeMarket=daytradeReport.market||intraMarket;marketLive=ij.market_intraday||{};sectorRotation=ij.sector_rotation||[];changeRadar=ij.change_radar||{};market=intraMarket;
+  closeRows=cj.rows||[];sectorFunds=cj.sector_funds||[];intraRows=ij.rows||[];daytradeRows=daytradeReport.rows||[];
   $("updated").textContent=sj.updated_at?new Date(sj.updated_at).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
-  $("status").textContent="已更新";$("marketbox").innerHTML=marketHTML();$("validationbox").innerHTML=validationHTML();$("rotationbox").innerHTML=rotationHTML();$("changebox").innerHTML=changeRadarHTML();render();
+  $("status").textContent="已更新";syncModeFilters();$("marketbox").innerHTML=marketHTML();$("validationbox").innerHTML=validationHTML();$("rotationbox").innerHTML=rotationHTML();$("changebox").innerHTML=changeRadarHTML();render();
  }catch(e){
   $("status").textContent="資料尚未建立";
   $("cards").innerHTML='<div class="empty">第一次部署或更新中，請等 Actions 完成後再重新整理。</div>';
  }
 }
 
-document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;market=mode==="intraday"?intraMarket:closeMarket;$("modeText").textContent=mode==="intraday"?"盤中：執行雷達 / 動能 / 當沖與庫存進出 / 族群輪動":"盤後：波段雷達 / 延續性 / 進場位置 / 60分K";$("marketbox").innerHTML=marketHTML();$("rotationbox").innerHTML=rotationHTML();$("changebox").innerHTML=changeRadarHTML();updateFooter();render()});
+
+const DAYTRADE_FILTERS=new Set(["all","可執行","等回踩","觀察","過熱不追","失效"]);
+function syncModeFilters(){
+ document.querySelectorAll(".filter[data-f]").forEach(b=>{
+  const extra=b.dataset.daytradeOnly==="1",f=b.dataset.f||"all";
+  b.style.display=mode==="daytrade"?(DAYTRADE_FILTERS.has(f)?"":"none"):(extra?"none":"");
+ });
+}
+
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;filter="all";document.querySelectorAll(".filter[data-f]").forEach(x=>x.classList.toggle("on",x.dataset.f==="all"));market=mode==="daytrade"?daytradeMarket:(mode==="intraday"?intraMarket:closeMarket);$("modeText").textContent=mode==="daytrade"?"當沖：獨立100分 / VWAP / 5分執行 / 個股化追價門檻":(mode==="intraday"?"盤中波段：動能 / 三燈 / Stage / 族群輪動":"盤後波段：延續性 / 進場位置 / 60分K");syncModeFilters();$("marketbox").innerHTML=marketHTML();$("rotationbox").innerHTML=rotationHTML();$("changebox").innerHTML=changeRadarHTML();updateFooter();render()});
 document.querySelectorAll(".filter[data-f]").forEach(b=>b.onclick=()=>{document.querySelectorAll(".filter[data-f]").forEach(x=>x.classList.remove("on"));b.classList.add("on");filter=b.dataset.f;render()});
 $("watchOnly").onclick=()=>{watchOnly=!watchOnly;$("watchOnly").classList.toggle("on",watchOnly);render()};
 $("portfolioOnly").onclick=()=>{portfolioOnly=!portfolioOnly;$("portfolioOnly").classList.toggle("on",portfolioOnly);render()};
@@ -813,14 +862,14 @@ document.addEventListener("click",e=>{
 if("serviceWorker" in navigator){
  window.addEventListener("load",async()=>{
   try{
-   const reg=await navigator.serviceWorker.register("./sw.js?v=1528",{updateViaCache:"none"});
+   const reg=await navigator.serviceWorker.register("./sw.js?v=1529",{updateViaCache:"none"});
    await reg.update();
    let reloading=false;
    navigator.serviceWorker.addEventListener("controllerchange",()=>{
     if(reloading)return;
-    if(sessionStorage.getItem("dogsonSwReloaded1528")==="1")return;
+    if(sessionStorage.getItem("dogsonSwReloaded1529")==="1")return;
     reloading=true;
-    sessionStorage.setItem("dogsonSwReloaded1528","1");
+    sessionStorage.setItem("dogsonSwReloaded1529","1");
     location.reload();
    });
   }catch(e){}
@@ -828,7 +877,7 @@ if("serviceWorker" in navigator){
 }
 load();
 </script>
-<script src="./hourly.js?v=1528"></script>
+<script src="./hourly.js?v=1529"></script>
 <script src="./realtime-config.js?v=151"></script>
 <script src="./realtime.js?v=151"></script>
 </body>

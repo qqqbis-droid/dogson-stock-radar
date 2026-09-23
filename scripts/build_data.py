@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-犬子老師飆股雷達 Free Edition v1.5.28
+犬子老師飆股雷達 Free Edition v1.5.29
 =================================
 盤中＝執行雷達（即時動能100，籌碼只作背景）；盤後＝波段雷達（延續品質直接100分＋進場位置）；大盤15分獨立
 
@@ -3479,7 +3479,7 @@ def build_intraday():
                 "updated_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_attempted_at": now_tw().isoformat(timespec="seconds"),
                 "intraday_count": len(previous.get("rows", [])),
-                "version": "1.5.28-free",
+                "version": "1.5.29-free",
             })
             dump("status.json", status)
             print("intraday source empty; kept previous", len(previous.get("rows", [])))
@@ -3545,11 +3545,11 @@ def build_intraday():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_updated_at": now_tw().isoformat(timespec="seconds"),
         "intraday_count": len(rows),
-        "version": "1.5.28-free",
+        "version": "1.5.29-free",
         "multi_timeframe_version": "1.1",
         "relative_multiframe_version": "1.0",
         "dynamic_threshold_version": "1.0",
-        "version": "1.5.28-free",
+        "version": "1.5.29-free",
     })
     dump("status.json", status)
     print("intraday done", len(rows))

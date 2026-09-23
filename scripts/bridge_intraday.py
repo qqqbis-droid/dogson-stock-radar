@@ -320,7 +320,7 @@ def main():
         "multi_timeframe_version": "1.1",
         "relative_multiframe_version": "1.0",
         "dynamic_threshold_version": "1.0",
-        "version": "1.5.27-free",
+        "version": "1.5.29-free",
     })
     bd.dump("status.json", status)
     print("MIS bridge done", "rows", bridged, "volume_ok", volume_ok, "quote", quote_latest, "structure", structure_latest)
