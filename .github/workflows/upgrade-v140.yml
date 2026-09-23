@@ -1,0 +1,75 @@
+name: Install Radar v1.4.0
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "scripts/patch_v140.py"
+      - ".github/workflows/upgrade-v140.yml"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v140-upgrade
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Apply v1.4.0 patch
+        run: python scripts/patch_v140.py
+      - name: Commit production source upgrade
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py scripts/sector_groups.py docs/index.html docs/realtime.js docs/sw.js
+          git diff --cached --check
+          git commit -m "Apply Radar v1.4.0 realtime and scoring upgrade" || true
+          git push
+      - name: Install runtime requirements
+        run: pip install -r requirements.txt
+      - name: Sync last live data
+        run: python scripts/sync_live_data.py || true
+      - name: Rebuild intraday radar
+        run: python scripts/build_data.py --mode intraday
+      - name: Verify v1.4.0 output
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          j=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
+          rows=j.get('rows') or []
+          q=j.get('quote_layer') or {}
+          print('rows',len(rows),'quote_layer',q)
+          if not rows:
+              raise SystemExit('intraday rows empty')
+          if 'market_separate' not in (j.get('score_formula') or {}):
+              raise SystemExit('market score is still mixed into stock formula')
+          if int(q.get('coverage') or 0) <= 0:
+              raise SystemExit('MIS stock quote overlay has zero coverage')
+          peers=sum(1 for r in rows if r.get('sector_peers'))
+          print('rows with sector peers',peers)
+          sample=next((r for r in rows if str(r.get('code'))=='3044'),None)
+          if sample:
+              print('3044', {k:sample.get(k) for k in ['close','quote_time','structure_time','sector_group','sector_score','score','market_score','market_in_quality_score']})
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
