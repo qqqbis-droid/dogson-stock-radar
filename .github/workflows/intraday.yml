@@ -7,6 +7,7 @@ on:
       - "scripts/bridge_intraday.py"
       - "scripts/sync_live_data.py"
       - "scripts/build_validation.py"
+      - "scripts/build_daytrade.py"
       - ".github/workflows/intraday.yml"
   schedule:
     # 台灣時間約 09:00~13:59；GitHub cron 可能延遲數分鐘。
@@ -41,9 +42,11 @@ jobs:
         run: python scripts/build_data.py --mode intraday
       - name: Bridge delayed 5-minute tail with TWSE MIS snapshots
         run: python scripts/bridge_intraday.py
-      - name: Step 7 preserve this scan for future validation
+      - name: Step 8 build isolated day-trading radar
+        run: python scripts/build_daytrade.py
+      - name: Step 7 preserve source intraday scan for future validation
         run: python scripts/build_validation.py --mode intraday
-      - name: Verify intraday freshness
+      - name: Verify intraday freshness and Step 8 isolation
         run: |
           python - <<'PY'
           import json
@@ -54,7 +57,13 @@ jobs:
           print('bridge=', b)
           if not b.get('bridged_rows'):
               raise SystemExit('MIS bridge produced no bridged rows')
-          print('quote_time=', b.get('latest_quote_time'), 'structure_time=', b.get('latest_structure_time'))
+          d = json.loads(Path('docs/data/daytrade.json').read_text(encoding='utf-8'))
+          iso = d.get('isolation') or {}
+          if not d.get('rows'):
+              raise SystemExit('daytrade radar is empty')
+          if any(bool(iso.get(k)) for k in ['writes_intraday','changes_stage2','changes_swing_score','changes_intraday_score']):
+              raise SystemExit('Step 8 isolation contract violated')
+          print('quote_time=', b.get('latest_quote_time'), 'structure_time=', b.get('latest_structure_time'), 'daytrade=', len(d.get('rows') or []))
           PY
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
