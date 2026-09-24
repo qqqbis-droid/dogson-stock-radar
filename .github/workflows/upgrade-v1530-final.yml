@@ -31,10 +31,12 @@ jobs:
           cache: "pip"
       - run: pip install -r requirements.txt
       - name: Apply final original-vision completion patch
-        run: python scripts/patch_v1530_finalize.py
+        run: |
+          python scripts/patch_v1530_finalize.py
+          python scripts/patch_v1530_fix_js.py
       - name: Verify source contracts and causal behavior
         run: |
-          python -m py_compile scripts/build_data.py scripts/build_completion.py scripts/build_validation.py scripts/build_daytrade.py scripts/patch_v1530_finalize.py
+          python -m py_compile scripts/build_data.py scripts/build_completion.py scripts/build_validation.py scripts/build_daytrade.py scripts/patch_v1530_finalize.py scripts/patch_v1530_fix_js.py
           python - <<'PY'
           import json, re, sys, tempfile
           from pathlib import Path
@@ -84,6 +86,7 @@ jobs:
               assert x in ui, x
           assert '\\n const life=' not in ui
           assert '\\n const dirs=' not in ui
+          assert '\\nfunction chipHTML' not in ui
           m=re.search(r'<script>\s*(.*?)</script>\s*<script src="./hourly.js',ui,re.S)
           assert m
           Path('/tmp/dogson-inline.js').write_text(m.group(1),encoding='utf-8')
