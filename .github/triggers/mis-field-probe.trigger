@@ -1,1 +1,1 @@
-probe single-code and multi-code MIS fields
+probe repeated MIS sampling capture rate
