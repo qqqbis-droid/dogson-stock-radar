@@ -1,4 +1,4 @@
-name: Deploy Radar v1.5.31 UI
+name: Deploy Radar v1.5.32 UI
 
 on:
   push:
@@ -29,8 +29,12 @@ jobs:
       - name: Verify UI assets
         run: |
           node --check docs/ui-filters.js
+          node --check docs/ui-filters-core-v1531.js
+          node --check docs/redesign-v1532.js
           node --check docs/realtime.js
-          grep -q "ui-filters.js?v=1531" docs/realtime-config.js
+          grep -q "ui-filters.js?v=1532" docs/realtime-config.js
+          grep -q "redesign-v1532.css" docs/ui-filters.js
+          grep -q "redesign-v1532.js" docs/ui-filters.js
           grep -q "最近一筆成交價" docs/realtime.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
