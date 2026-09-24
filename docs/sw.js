@@ -1,9 +1,17 @@
-const CACHE='dogson-free-v1530';
+const CACHE='dogson-free-v1600';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(['./manifest.webmanifest','./hourly.js?v=1529','./realtime-config.js?v=151','./realtime.js?v=151']))
+    caches.open(CACHE).then(cache => cache.addAll([
+      './manifest.webmanifest',
+      './hourly.js?v=1530',
+      './realtime-config.js?v=1600',
+      './realtime.js?v=1600',
+      './ui-filters.js?v=1600',
+      './redesign-v160.css?v=1600-1',
+      './redesign-v160.js?v=1600-1'
+    ]))
   );
 });
 
@@ -20,13 +28,13 @@ self.addEventListener('fetch', event => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // JSON market data must always come from the network; the page already adds a cache-busting query.
+  // Market JSON is always network-only; the page adds its own cache buster too.
   if (url.pathname.includes('/data/')) {
     event.respondWith(fetch(req, { cache: 'no-store' }));
     return;
   }
 
-  // HTML/navigation is network-first so upgrades show immediately instead of being trapped in an old PWA cache.
+  // HTML/navigation is network-first so releases are visible immediately.
   if (req.mode === 'navigate' || req.destination === 'document') {
     event.respondWith(
       fetch(req, { cache: 'no-store' }).catch(() => caches.match('./index.html'))
@@ -34,9 +42,9 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Other static assets: network-first, cache fallback.
+  // Static assets are also network-first. Cache is only an offline fallback.
   event.respondWith(
-    fetch(req).then(res => {
+    fetch(req, { cache: 'no-store' }).then(res => {
       const copy = res.clone();
       caches.open(CACHE).then(cache => cache.put(req, copy));
       return res;
