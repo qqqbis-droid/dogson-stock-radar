@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """v1.5.30 completion 1.2: make final entry/portfolio decisions consume Step 6 dynamic gates.
-Also allow the first intraday scan to detect a true same-day transition from the prior close stage.
+Also allow the first intraday scan to detect a true same-day transition from the prior close stage,
+and prevent Step 8 from downgrading the app version during intraday refreshes.
 """
 from pathlib import Path
 import json,re
@@ -20,7 +21,6 @@ def patch_ui():
     s=one(s,old,new,'entry dynamic vars')
     s=one(s,' if(day>=8.5)block.push(`當日已漲 ${num(day,1)}%，追價風險高`);\n if(vwap>4.5)block.push(`距 VWAP +${num(vwap,1)}%，延伸過遠`);',''' if(day>=dayHot)block.push(`當日 ${num(day,1)}% ≥ 個股過熱門檻 ${num(dayHot,1)}%`);\n if(vwap>vwapHot)block.push(`距 VWAP +${num(vwap,1)}% > 個股門檻 ${num(vwapHot,1)}%`);\n if(pace>paceHot)block.push(`量速 ${num(pace,1)}x > 個股門檻 ${num(paceHot,1)}x`);\n if(ret15>ret15Hot)block.push(`15分鐘 ${num(ret15,1)}% > 個股門檻 ${num(ret15Hot,1)}%`);''','entry hard gates')
     s=s.replace(' if(pace>5)wait.push(`量速 ${num(pace,1)}x，先防爆量追價`);',' if(pace>Math.max(3.5,paceHot*.8))wait.push(`量速 ${num(pace,1)}x，接近個股過熱門檻 ${num(paceHot,1)}x`);',1)
-    # Marker in guide/footer so the contract is transparent to the user.
     if '三燈 hard gate 也使用個股動態門檻' not in s:
         s=s.replace('只改門檻，不改 30/25/15/20/10 權重。','只改門檻，不改 30/25/15/20/10 權重；三燈 hard gate 也使用個股動態門檻。',1)
     wr(p,s)
@@ -33,8 +33,13 @@ def patch_completion():
     s=s.replace('obj["completion_version"]="1.1"','obj["completion_version"]="1.2"').replace('"completion_version":"1.1"','"completion_version":"1.2"')
     wr(p,s)
 
+def patch_daytrade_version():
+    p='scripts/build_daytrade.py';s=rd(p)
+    s=s.replace('"version": "1.5.29-free",','"version": "1.5.30-free",')
+    wr(p,s)
+
 def patch_status():
     p='docs/data/status.json';d=json.loads(rd(p));d['version']='1.5.30-free';d['completion_version']='1.2';wr(p,json.dumps(d,ensure_ascii=False,separators=(',',':'))+'\n')
 
 if __name__=='__main__':
-    patch_ui();patch_completion();patch_status();print('v1.5.30 completion 1.2 decision sync applied')
+    patch_ui();patch_completion();patch_daytrade_version();patch_status();print('v1.5.30 completion 1.2 decision sync applied')
