@@ -1,6 +1,6 @@
 (()=>{
   const REFRESH_MS = 10000;
-  const MAX_CODES = 15;
+  const MAX_CODES = 24;
   const BATCH_SIZE = 5;
   const FRESHNESS_MS = 30000;
   const quotes = new Map();
@@ -22,8 +22,12 @@
     const q=document.getElementById('q')?.value.trim()||'';
     if(/^\d{4}$/.test(q))add(q);
     try{if(q&&!/^\d{4}$/.test(q)){const hit=(typeof universe!=='undefined'?universe:[]).find(x=>String(x.name)===q);if(hit)add(hit.code)}}catch{}
+    // What the user is looking at wins over cards that happen to be earlier in DOM order.
+    const cards=[...document.querySelectorAll('.card')];
+    cards.filter(card=>{const r=card.getBoundingClientRect();return r.bottom>=-240&&r.top<=window.innerHeight+240}).forEach(card=>add(codeFromCard(card)));
+    // Then keep portfolio/watchlist names warm in the remaining slots.
     try{(typeof watchlist==='function'?watchlist():[]).forEach(add)}catch{}
-    document.querySelectorAll('.card').forEach(card=>add(codeFromCard(card)));
+    cards.forEach(card=>add(codeFromCard(card)));
     return out;
   }
   function n(v){const x=Number(v);return Number.isFinite(x)?x:null}
@@ -78,7 +82,7 @@
     if(liveEl)liveEl.style.display='block';
     document.querySelectorAll('.card').forEach(card=>{const code=codeFromCard(card);if(!code)return;const q=quotes.get(code);let box=card.querySelector('.livequote');
       if(!box){box=document.createElement('div');box.className='livequote';const top=card.querySelector('.top');if(top)top.insertAdjacentElement('afterend',box);else card.prepend(box)}
-      if(!q){box.innerHTML='<div class="livecell"><div class="liveval">—</div><div class="livelab">官方即時價</div></div><div class="livecell"><div class="liveval">—</div><div class="livelab">即時漲跌</div></div><div class="livecell"><div class="liveval">5分K</div><div class="livelab">等待進入即時池</div></div>';return}
+      if(!q){const r=card.getBoundingClientRect(),onscreen=r.bottom>=-240&&r.top<=window.innerHeight+240;box.innerHTML=`<div class="livecell"><div class="liveval">—</div><div class="livelab">官方即時價</div></div><div class="livecell"><div class="liveval">—</div><div class="livelab">即時漲跌</div></div><div class="livecell"><div class="liveval">5分K</div><div class="livelab">${onscreen?'官方行情重試中':'滑到此卡即優先追蹤'}</div></div>`;return}
       box.innerHTML=`<div class="livecell"><div class="liveval">${fmtPrice(q.price)}</div><div class="livelab">官方即時價</div></div><div class="livecell"><div class="liveval">${fmtPct(q.change)}</div><div class="livelab">即時漲跌</div></div><div class="livecell"><div class="liveval">${fmtTime(q.time)}</div><div class="livelab">TWSE MIS｜結構仍採5分K</div></div>`;
       updateMainMetrics(card,q);
     });
@@ -99,7 +103,7 @@
   }
   function boot(){ensureStyles();applyQuotes();refresh();setTimeout(checkRadarFreshness,1000);setInterval(refresh,REFRESH_MS);setInterval(checkRadarFreshness,FRESHNESS_MS);
     const cards=document.getElementById('cards');if(cards){let t;new MutationObserver(()=>{clearTimeout(t);t=setTimeout(()=>{applyQuotes();refresh()},250)}).observe(cards,{childList:true,subtree:true})}
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});document.getElementById('q')?.addEventListener('change',refresh);document.getElementById('scan')?.addEventListener('click',()=>setTimeout(refresh,150));document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setTimeout(()=>{applyQuotes();refresh();checkRadarFreshness()},50)));
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});let scrollTimer;addEventListener('scroll',()=>{clearTimeout(scrollTimer);scrollTimer=setTimeout(refresh,180)},{passive:true});document.getElementById('q')?.addEventListener('change',refresh);document.getElementById('scan')?.addEventListener('click',()=>setTimeout(refresh,150));document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setTimeout(()=>{applyQuotes();refresh();checkRadarFreshness()},50)));
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();

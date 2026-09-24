@@ -2559,6 +2559,9 @@ def intraday_stock_snapshot(universe_df, codes=None):
     now = now_tw()
     today = now.date()
     out = {}
+    # MIS becomes unreliable when one ex_ch query carries too many symbols.
+    # Ten market-correct channels per request is intentionally conservative.
+    batch_size = 10
 
     def fnum(v):
         try:
@@ -2567,8 +2570,8 @@ def intraday_stock_snapshot(universe_df, codes=None):
         except Exception:
             return None
 
-    for i in range(0, len(recs), 80):
-        part = recs[i:i+80]
+    for i in range(0, len(recs), batch_size):
+        part = recs[i:i+batch_size]
         ex_ch = "|".join(
             f"{'otc' if r['market'] == '上櫃' else 'tse'}_{r['code']}.tw"
             for r in part

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""v1.4.2 MIS snapshot bridge.
+"""v1.4.3 MIS snapshot bridge.
 
 GitHub Pages 是靜態站，免費版無法取得交易所逐筆歷史 K 線；Yahoo 5m 又常慢 20~40 分鐘。
 這支程式在原本 Yahoo 5m 結構之後，持久化每輪 TWSE MIS 官方快照，將 Yahoo 最後一根之後
@@ -208,6 +208,30 @@ def main():
             print("MIS bridge yahoo base batch", i, e)
 
     by_code = {str(r.get("code")): r for r in rows}
+
+    # Official quote and 5-minute structure are two independent layers.
+    # A stock with a valid MIS quote must show the live price even when Yahoo
+    # history or the snapshot-built 5m bar is temporarily unavailable.
+    quoted_rows = 0
+    for code, q in quotes.items():
+        row = by_code.get(str(code))
+        if not row:
+            continue
+        row["quote_date"] = q.get("date")
+        row["quote_time"] = q.get("time")
+        row["quote_source"] = q.get("source")
+        row["quote_close"] = q.get("close")
+        if q.get("close") is not None:
+            row["close"] = q.get("close")
+        if q.get("change_pct") is not None:
+            row["day_change"] = round(float(q.get("change_pct")), 2)
+        if row.get("vwap") and row.get("close") is not None:
+            try:
+                row["vwap_dist"] = round((float(row["close"]) / float(row["vwap"]) - 1) * 100, 2)
+            except Exception:
+                pass
+        quoted_rows += 1
+
     bridged = 0
     volume_ok = 0
     fresh_times = []
@@ -289,7 +313,7 @@ def main():
         "dynamic_threshold_version": "1.0",
         "rows": out_rows,
         "bridge": {
-            "version": "1.4.2",
+            "version": "1.4.3",
             "source": "TWSE MIS snapshot bridge",
             "trade_date": trade_date,
             "bridged_rows": bridged,
@@ -320,10 +344,10 @@ def main():
         "multi_timeframe_version": "1.1",
         "relative_multiframe_version": "1.0",
         "dynamic_threshold_version": "1.0",
-        "version": "1.5.29-free",
+        "version": "1.5.30-free",
     })
     bd.dump("status.json", status)
-    print("MIS bridge done", "rows", bridged, "volume_ok", volume_ok, "quote", quote_latest, "structure", structure_latest)
+    print("MIS bridge done", "quotes", quoted_rows, "structure_rows", bridged, "volume_ok", volume_ok, "quote", quote_latest, "structure", structure_latest)
 
 
 if __name__ == "__main__":
