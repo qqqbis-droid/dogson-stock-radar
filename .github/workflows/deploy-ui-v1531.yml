@@ -1,4 +1,4 @@
-name: Deploy Radar v1.6.1 UI
+name: Deploy Radar v1.6.2 UI
 
 on:
   push:
@@ -32,17 +32,21 @@ jobs:
           node --check docs/ui-filters-core-v1531.js
           node --check docs/redesign-v160.js
           node --check docs/ui-polish-v160.js
+          node --check docs/ui-layout-v162.js
           node --check docs/realtime.js
           test -s docs/contrast-v160.css
-          grep -q "ui-filters.js?v=1601" docs/realtime-config.js
+          test -s docs/redesign-v162.css
+          grep -q "ui-filters.js?v=1620" docs/realtime-config.js
           grep -q "redesign-v160.css" docs/ui-filters.js
           grep -q "redesign-v160-dark.css" docs/ui-filters.js
           grep -q "contrast-v160.css" docs/ui-filters.js
+          grep -q "redesign-v162.css" docs/ui-filters.js
           grep -q "redesign-v160.js" docs/ui-filters.js
           grep -q "ui-polish-v160.js" docs/ui-filters.js
+          grep -q "ui-layout-v162.js" docs/ui-filters.js
           grep -q "dogson-overview" docs/redesign-v160.css
-          grep -q "dogson-card-headline" docs/redesign-v160.js
-          grep -q "html\[data-dogson-theme=\"light\"\]" docs/contrast-v160.css
+          grep -q "dogson-key-reasons" docs/redesign-v162.css
+          grep -q "Dogson Radar v1.6.2" docs/redesign-v162.css
           grep -q "多時間框架" docs/ui-polish-v160.js
           grep -q "最近一筆成交價" docs/realtime.js
       - uses: actions/configure-pages@v5
