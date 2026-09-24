@@ -72,7 +72,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 </head>
 <body>
 <div class="wrap">
-<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.29｜Step 8 獨立當沖模式</div></div><div class="pill" id="status">讀取中</div></header>
+<header><div><h1>🐶 犬子老師・飆股雷達</h1><div class="sub">Free Edition v1.5.30｜原始構想補完版</div></div><div class="pill" id="status">讀取中</div></header>
 
 <div id="marketbox" class="marketbox"><div class="empty" style="padding:8px">讀取大盤環境…</div></div>
 <div id="rotationbox"></div>
@@ -373,6 +373,14 @@ function portfolioDecision(r,h){
   if(manual==="weak")reasons.push("你手動標記持有理由轉弱");
   return {key:"pause",label:"⚠️ 暫停加碼",head:"結構尚未正式失效，但先提高警覺",reasons};
  }
+ const addOk=mode==="intraday"&&manual==="valid"&&["蓄勢待發","剛啟動","回踩承接","趨勢持有"].includes(st)&&h60.supportive===true&&String(daily.state||"")!=="WEAK"&&(rsState==="LEADING"||rsState==="IMPROVING")&&["量縮回踩","量增上攻"].includes(String(r?.execution_pattern||""))&&entryDecision(r).key==="green";
+ if(addOk){
+  reasons.push("原始持有理由仍成立");
+  reasons.push(r.execution_pattern==="量縮回踩"?"量縮回踩承接成功":"量增上攻重新發動");
+  reasons.push(h60.label||"60K結構支持");
+  reasons.push(rs.label||"相對強弱改善");
+  return {key:"hold",label:"🟢 可考慮加碼",head:"持有結構與新的舒服進場條件重新同步",reasons};
+ }
  const cooling=st==="回踩承接"||amp==="健康整理"||(mode==="intraday"&&score>0&&score<68&&h60.supportive===true&&String(daily.state||"")!=="WEAK");
  if(cooling){
   if(st==="回踩承接")reasons.push("目前屬發動後回踩承接");
@@ -563,14 +571,14 @@ function changeBadgeHTML(r){
 function changeRadarHTML(){
  if(mode!=="intraday")return "";
  const x=changeRadar||{},c=x.counts||{};
- const head=`<div class="changetop"><div><div class="changetitle">🚨 5分鐘變化雷達</div><div class="changesub">${x.ready?`比較上一輪${x.comparison_minutes?`（約 ${num(x.comparison_minutes,0)} 分鐘）`:""}｜只顯示新發生的變化`:x.reason||"等待下一輪建立比較基準"}</div></div></div>`;
- if(!x.ready)return `<div class="changebox">${head}<div class="changesub" style="margin-top:8px">第一輪只建立基準，不會把隔夜差異誤判成盤中訊號。</div></div>`;
+ const dirs=(intraRows||[]).reduce((a,r)=>{const k=r.today_direction||"尚未累積";a[k]=(a[k]||0)+1;return a},{});\n const life=(intraRows||[]).reduce((a,r)=>{const k=stageKey(r.category);a[k]=(a[k]||0)+1;return a},{});\n const heldWeak=(intraRows||[]).filter(r=>held(r.code)&&["轉弱警戒","結構失效"].includes(stageKey(r.category))).length;\n const overview=`<div class="changecounts"><span class="changecount">🌱新進蓄勢 ${life["蓄勢待發"]||0}</span><span class="changecount">🔥剛啟動 ${life["剛啟動"]||0}</span><span class="changecount">⬆️今日改善 ${dirs["一路改善"]||0}</span><span class="changecount">♻️重新轉強 ${dirs["重新轉強"]||0}</span><span class="changecount">⚠️庫存轉弱 ${heldWeak}</span><span class="changecount">🚫過熱 ${life["過熱不追"]||0}</span></div>`;\n const head=`<div class="changetop"><div><div class="changetitle">🚨 今日累積總覽＋5分鐘變化雷達</div><div class="changesub">${x.ready?`比較上一輪${x.comparison_minutes?`（約 ${num(x.comparison_minutes,0)} 分鐘）`:""}｜只顯示新發生的變化`:x.reason||"等待下一輪建立比較基準"}</div></div></div>`;
+ if(!x.ready)return `<div class="changebox">${head}${overview}<div class="changesub" style="margin-top:8px">第一輪只建立5分鐘比較基準；今日累積方向仍會持續保存。</div></div>`;
  const counts=`<div class="changecounts"><span class="changecount">⬆️轉強 ${c.turn_strong||0}</span><span class="changecount">⬇️轉弱 ${c.turn_weak||0}</span><span class="changecount">🚀突破 ${c.breakout||0}</span><span class="changecount">♻️站回VWAP ${c.vwap_reclaim||0}</span><span class="changecount">🔥族群加速 ${c.sector_accel||0}</span></div>`;
  const ev=(x.events||[]).slice(0,8);
  const items=ev.length?`<div class="changeevents">${ev.map(e=>`<button class="changeevent peerlink" data-code="${e.code}"><span class="changeeventmain"><span class="changeeventname">${e.label}｜${e.name} ${e.code}</span><div class="changeeventreason">${e.reason}</div></span><span class="changedelta">${e.score_delta===null||e.score_delta===undefined?"":signed(e.score_delta,0,"")}</span></button>`).join("")}</div>`:`<div class="changesub" style="margin-top:9px">這一輪沒有新的個股轉折訊號。</div>`;
  const se=(x.sector_events||[]).slice(0,5);
  const sectors=se.length?`<div class="sectorchange">${se.map(e=>`${e.label} ${e.sector}｜${e.reason}`).join("<br>")}</div>`:"";
- return `<div class="changebox">${head}${counts}${items}${sectors}</div>`;
+ return `<div class="changebox">${head}${overview}${counts}${items}${sectors}</div>`;
 }
 
 
@@ -721,13 +729,27 @@ function partsHTML(r){
  </div>`;
 }
 
-function chipHTML(r){
+function completionHTML(r){
+ if(mode==="daytrade")return "";
+ const force=r.foreign_3d_strength_pct;
+ const vol=r.breakout_volume_ratio;
+ const pat=r.execution_pattern;
+ const ch=r.today_change_summary||{};
+ const dir=r.today_direction;
+ const items=[];
+ if(force!==null&&force!==undefined)items.push(`<span class="reason">💰 外資3日力度 ${signed(force,1)}</span>`);
+ if(vol!==null&&vol!==undefined)items.push(`<span class="reason">📊 突破量/自身基準 ${num(vol,2)}x · ${r.breakout_volume_baseline_mode==="event20"?"歷史突破事件":"近20日自身代理"}</span>`);
+ if(mode==="intraday"&&pat)items.push(`<span class="reason">${pat==="量增上攻"?"🔥":pat==="量縮回踩"?"🟡":"🧩"} ${escHTML(pat)} · ${escHTML(r.execution_pattern_detail||"")}</span>`);
+ if(mode==="intraday"&&dir)items.push(`<span class="reason">🧭 今日 ${escHTML(dir)} · 動能 ${signed(ch.score_open_delta||0,1,"")} · 量速 ${num(ch.pace_open||0,1)}→${num(ch.pace_now||0,1)}x · RS ${num(ch.rs_open||0,1)}→${num(ch.rs_now||0,1)}</span>`);
+ return items.length?`<div class="reasons">${items.join("")}</div>`:"";
+}
+\nfunction chipHTML(r){
  const f=r.foreign_3buy===true?`<span class="yes">外資連3買 ✓</span>`:r.foreign_3buy===false?`外資未連3買`:`外資資料待補`;
  const s=r.sbl_3down===true?`<span class="yes">借券連3減 ✓</span>`:r.sbl_3down===false?`借券未連3減`:`借券資料待補`;
  const trust=r.trust_net_latest===null||r.trust_net_latest===undefined?"—":lots(r.trust_net_latest);
  const margin=r.margin_status||"—";
  return `<div class="chips">
-  <div class="chip">${f}<br><small>近3日 ${r.foreign_3d_net===null||r.foreign_3d_net===undefined?"—":lots(r.foreign_3d_net)}</small></div>
+  <div class="chip">${f}<br><small>近3日 ${r.foreign_3d_net===null||r.foreign_3d_net===undefined?"—":lots(r.foreign_3d_net)}${r.foreign_3d_strength_pct===null||r.foreign_3d_strength_pct===undefined?"":` · 力度 ${signed(r.foreign_3d_strength_pct,1)}`}</small></div>
   <div class="chip">${s}<br><small>3日變化 ${r.sbl_3change_pct===null||r.sbl_3change_pct===undefined?"—":signed(r.sbl_3change_pct,1)}</small></div>
   <div class="chip">投信 ${trust}<br><small>${r.chip_date||"最近交易日"}</small></div>
   <div class="chip">融資 ${margin}<br><small>3日 ${r.margin_3d_pct===null||r.margin_3d_pct===undefined?"—":signed(r.margin_3d_pct,1)}</small></div>
@@ -862,14 +884,14 @@ document.addEventListener("click",e=>{
 if("serviceWorker" in navigator){
  window.addEventListener("load",async()=>{
   try{
-   const reg=await navigator.serviceWorker.register("./sw.js?v=1529",{updateViaCache:"none"});
+   const reg=await navigator.serviceWorker.register("./sw.js?v=1530",{updateViaCache:"none"});
    await reg.update();
    let reloading=false;
    navigator.serviceWorker.addEventListener("controllerchange",()=>{
     if(reloading)return;
-    if(sessionStorage.getItem("dogsonSwReloaded1529")==="1")return;
+    if(sessionStorage.getItem("dogsonSwReloaded1530")==="1")return;
     reloading=true;
-    sessionStorage.setItem("dogsonSwReloaded1529","1");
+    sessionStorage.setItem("dogsonSwReloaded1530","1");
     location.reload();
    });
   }catch(e){}
@@ -877,7 +899,7 @@ if("serviceWorker" in navigator){
 }
 load();
 </script>
-<script src="./hourly.js?v=1529"></script>
+<script src="./hourly.js?v=1530"></script>
 <script src="./realtime-config.js?v=151"></script>
 <script src="./realtime.js?v=151"></script>
 </body>
