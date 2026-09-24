@@ -1,0 +1,40 @@
+name: Deploy Radar v1.5.31 UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/workflows/deploy-ui-v1531.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-ui-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify UI assets
+        run: |
+          node --check docs/ui-filters.js
+          node --check docs/realtime.js
+          grep -q "ui-filters.js?v=1531" docs/realtime-config.js
+          grep -q "最近一筆成交價" docs/realtime.js
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
