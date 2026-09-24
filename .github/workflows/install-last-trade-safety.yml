@@ -1,0 +1,55 @@
+name: Install Last Trade Safety
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/last-trade-safety.trigger"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dogson-live-patch
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply bridge safety patch
+        run: python scripts/patch_bridge_last_trade_safety.py
+      - name: Verify safety contract
+        run: |
+          python -m py_compile scripts/bridge_intraday.py
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/bridge_intraday.py').read_text(encoding='utf-8')
+          for x in [
+            'if not bool(q.get("quote_carried"))',
+            'quote_snapshot_time',
+            'latest_trade_time',
+            'snapshot_times =',
+            'trade_times =',
+          ]:
+              assert x in s, x
+          assert s.count('_merge_snapshot(store, code, q)') == 1
+          print('last-trade bridge safety contract OK')
+          PY
+      - name: Commit production safety fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/bridge_intraday.py
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Keep carried MIS quotes out of structural bars"
+            git push
+          fi
