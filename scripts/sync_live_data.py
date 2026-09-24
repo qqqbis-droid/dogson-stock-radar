@@ -5,6 +5,7 @@
 以及 v1.4.2 的 TWSE MIS 盤中快照橋接歷史、Step 7 驗證歷史、Step 8 當沖衍生資料。
 
 2026-09-24：觸發盤中重建，驗證 last-trade persistence + snapshot/trade time 分離。
+2026-09-24：觸發 MIS snapshot visibility 正式盤中重建。
 """
 from pathlib import Path
 import os
