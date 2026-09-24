@@ -39,7 +39,8 @@ jobs:
             'trade_times =',
           ]:
               assert x in s, x
-          assert s.count('_merge_snapshot(store, code, q)') == 1
+          guarded='for code, q in quotes.items():\n        if not bool(q.get("quote_carried")):\n            _merge_snapshot(store, code, q)'
+          assert guarded in s
           print('last-trade bridge safety contract OK')
           PY
       - name: Commit production safety fix
