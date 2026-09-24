@@ -1,0 +1,159 @@
+/* Dogson Radar v1.6.2 — coherent light mobile UI layer.
+   Presentation only: no scoring / decision logic changes. */
+:root{
+  --v162-bg:#f5f7f4;
+  --v162-card:#ffffff;
+  --v162-soft:#f7faf8;
+  --v162-soft-2:#eef5f1;
+  --v162-line:#dfe8e2;
+  --v162-ink:#1f2d27;
+  --v162-ink-2:#405149;
+  --v162-muted:#718079;
+  --v162-accent:#246b59;
+  --v162-accent-2:#1c5b4c;
+  --v162-accent-soft:#e8f3ee;
+  --v162-shadow:0 10px 30px rgba(38,67,54,.06);
+}
+
+/* Shared geometry */
+.wrap{max-width:900px!important;padding:16px 14px 110px!important}
+header{margin:6px 4px 14px!important;min-height:58px;align-items:center!important}
+h1{font-size:27px!important;line-height:1.12!important;letter-spacing:-.025em!important;font-weight:950!important}
+header .sub{font-size:13px!important;line-height:1.45!important;margin-top:6px!important}
+
+.dogson-view-nav{gap:7px!important;padding:6px!important;margin:0 0 14px!important;border-radius:20px!important;box-shadow:0 8px 24px rgba(35,61,49,.07)!important}
+.dogson-view-main{gap:5px!important}
+.dogson-view-main button,.dogson-theme-toggle{min-height:50px!important;border-radius:14px!important;font-size:14px!important;font-weight:900!important;padding:10px 9px!important}
+.dogson-theme-toggle{width:50px!important;flex:0 0 50px!important;font-size:20px!important}
+
+.controls{padding:13px!important;border-radius:21px!important;margin-bottom:12px!important}
+.controls .row{gap:10px!important;align-items:stretch!important}
+.search{min-height:54px!important;border-radius:16px!important;padding:0 16px!important;font-size:16px!important;line-height:54px!important}
+.scan{min-width:88px!important;min-height:54px!important;border-radius:16px!important;padding:0 17px!important;font-size:16px!important;font-weight:950!important}
+
+.dogson-overview{padding:15px!important;margin:12px 0 10px!important;border-radius:22px!important;box-shadow:var(--v162-shadow)!important}
+.dogson-section-title{font-size:18px!important;font-weight:950!important;line-height:1.25!important}
+.dogson-section-sub{font-size:12px!important;line-height:1.5!important;margin-top:5px!important}
+.dogson-overview-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:9px!important;margin-top:12px!important}
+.dogson-overview-grid button{min-height:82px!important;border-radius:16px!important;padding:11px 8px!important;display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important}
+.dogson-overview-grid b{font-size:22px!important;line-height:1.05!important;font-weight:950!important}
+.dogson-overview-grid span{font-size:12px!important;line-height:1.25!important;margin-top:7px!important;font-weight:750!important;overflow:visible!important;text-overflow:clip!important}
+
+.dogson-quick{margin:10px 0 14px!important}
+.dogson-quick-row{gap:8px!important;padding:2px 1px 7px!important}
+.dogson-quick button{min-height:40px!important;padding:8px 13px!important;border-radius:999px!important;font-size:13px!important;font-weight:850!important}
+
+.changebox{border-radius:20px!important;padding:14px!important;margin:10px 0 14px!important}
+.changetitle{font-size:17px!important;font-weight:950!important}
+.changesub{font-size:11px!important;line-height:1.5!important}
+.changeevent{border-radius:13px!important;padding:10px 11px!important}
+.changeeventname{font-size:13px!important}.changeeventreason{font-size:10.5px!important;line-height:1.45!important}
+
+.card{border-radius:24px!important;padding:18px!important;margin:14px 0!important;box-shadow:var(--v162-shadow)!important}
+.top{gap:12px!important;align-items:flex-start!important}
+.stockleft{gap:10px!important;align-items:flex-start!important}
+.star{font-size:31px!important;line-height:1!important;padding-top:2px!important}
+.name{font-size:24px!important;line-height:1.15!important;font-weight:950!important;letter-spacing:-.015em!important}
+.code{font-size:16px!important;margin-left:7px!important;font-weight:800!important}
+.top .sub{font-size:13px!important;line-height:1.45!important;margin-top:6px!important}
+.score{font-size:34px!important;line-height:1!important;font-weight:950!important;letter-spacing:-.03em!important}
+.label{font-size:12px!important;line-height:1.3!important;margin-top:5px!important}
+.portfolio-mini{min-height:34px!important;padding:7px 11px!important;font-size:12px!important;font-weight:900!important;margin:9px 0 0 5px!important}
+
+.dogson-card-brief{background:transparent!important;border:0!important;padding:0!important;margin-top:15px!important;border-radius:0!important}
+.dogson-card-badges{gap:8px!important;align-items:center!important}
+.dogson-card-badges .cat,.dogson-card-badges .quality,.dogson-card-badges .entrylight,.dogson-hold-pill,.dogson-reason-status{min-height:32px!important;align-items:center!important;padding:7px 11px!important;border-radius:999px!important;font-size:12.5px!important;font-weight:900!important}
+.dogson-card-headline{font-size:15.5px!important;line-height:1.62!important;margin-top:11px!important;color:var(--v162-ink)!important;font-weight:850!important}
+.dogson-card-subline{font-size:12px!important;line-height:1.55!important;margin-top:7px!important}
+.dogson-portfolio-facts{gap:18px!important;margin-top:10px!important;font-size:13px!important}
+
+.livequote{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:9px!important;margin-top:14px!important}
+.livecell{min-width:0!important;min-height:78px!important;border-radius:15px!important;padding:12px 12px 11px!important;display:flex!important;flex-direction:column!important;justify-content:center!important}
+.liveval{font-size:20px!important;line-height:1.15!important;font-weight:950!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+.livelab{font-size:10.5px!important;line-height:1.35!important;margin-top:6px!important}
+.liveval.v162-up{color:#bf4747!important}.liveval.v162-down{color:#23805b!important}
+
+.dogson-key-reasons{display:grid;grid-template-columns:auto 1fr;gap:9px 10px;align-items:start;margin-top:13px;padding-top:13px;border-top:1px solid var(--v162-line)}
+.dogson-key-title{font-size:12.5px;font-weight:950;color:var(--v162-ink-2);padding-top:6px;white-space:nowrap}
+.dogson-key-list{display:flex;gap:7px;flex-wrap:wrap;min-width:0}
+.dogson-key-list span{display:inline-flex;align-items:center;min-height:30px;border-radius:999px;padding:6px 10px;font-size:11.5px;line-height:1.3;font-weight:800;background:#edf7f1;border:1px solid #cfe5d9;color:#2c7158}
+
+.dogson-card-details{margin-top:14px!important;padding-top:0!important;border-top:0!important}
+.dogson-card-details>summary{min-height:50px!important;display:flex!important;align-items:center!important;justify-content:center!important;border-radius:15px!important;padding:12px 15px!important;font-size:14px!important;font-weight:950!important;letter-spacing:.01em!important}
+.dogson-card-details-body{padding-top:14px!important}
+
+/* Expanded analysis: one visual grammar */
+.stagebox,.mtfbox,.entrybox,.daytradebox,.portfolio-decision,.portfoliobox{margin-top:12px!important;border-radius:17px!important;padding:14px!important;box-shadow:none!important}
+.stagetop,.mtftop,.entrytop,.portfolio-decision-top,.portfolio-top{gap:10px!important;align-items:center!important}
+.stagetitle,.mtftitle,.entrytitle,.portfolio-decision-title,.daytradetitle,.portfolio-title{font-size:13px!important;line-height:1.35!important;font-weight:900!important}
+.stagereason,.entryheadline,.portfolio-decision-head,.daytradeheadline{font-size:14.5px!important;line-height:1.58!important;margin-top:10px!important;font-weight:850!important}
+.stagechips,.entrywhy,.entrymeta,.portfolio-decision-reasons{gap:7px!important;margin-top:10px!important}
+.stagechip,.entrywhy span,.entrymeta span,.reason,.portfolio-decision-reasons span{font-size:11.5px!important;line-height:1.35!important;padding:6px 9px!important;border-radius:9px!important}
+.stagehint,.entrynote,.mtfnote,.portfolio-decision-note{font-size:10.5px!important;line-height:1.55!important;margin-top:9px!important}
+.mtflabel{font-size:13px!important;font-weight:900!important}
+.mtfgrid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important;margin-top:11px!important}
+.mtfcell{border-radius:13px!important;padding:11px!important;min-width:0!important}
+.mtfcellv{font-size:13px!important;line-height:1.35!important;font-weight:950!important}
+.mtfcelll{font-size:10.5px!important;line-height:1.55!important;margin-top:5px!important}
+
+.parts,.metrics{gap:9px!important;margin-top:12px!important}.part,.metric{border-radius:13px!important;padding:10px!important}.partv,.mval{font-size:15px!important}.partl,.mlab{font-size:10.5px!important;line-height:1.35!important}
+.srbox,.chips{gap:9px!important;margin-top:12px!important}.sr,.chip{border-radius:13px!important;padding:11px!important}.srtitle{font-size:11px!important}.srprice{font-size:17px!important}
+
+.portfolio-summary{border-radius:22px!important;padding:16px!important;margin:12px 0 14px!important;box-shadow:var(--v162-shadow)!important}
+.portfolio-summary-title{font-size:20px!important;line-height:1.25!important;font-weight:950!important}
+.portfolio-summary-sub{font-size:11.5px!important;line-height:1.5!important;margin-top:5px!important}
+.portfolio-summary-grid{gap:9px!important;margin-top:13px!important}.portfolio-summary-item{border-radius:14px!important;padding:11px!important}.portfolio-summary-v{font-size:17px!important}.portfolio-summary-l{font-size:10.5px!important;margin-top:5px!important}
+.portfolio-grid{gap:9px!important;margin-top:11px!important}.portfolio-metric{border-radius:12px!important;padding:10px!important}.portfolio-metric-v{font-size:14px!important}.portfolio-metric-l{font-size:10px!important;margin-top:4px!important}
+
+/* LIGHT THEME */
+html[data-dogson-theme="light"] body{background:linear-gradient(180deg,#f8faf7 0,#f4f6f3 38%,#f5f7f4 100%)!important;color:var(--v162-ink)!important}
+html[data-dogson-theme="light"] header .sub,html[data-dogson-theme="light"] .top .sub,html[data-dogson-theme="light"] .label{color:var(--v162-muted)!important}
+html[data-dogson-theme="light"] .dogson-view-nav{background:rgba(244,247,244,.94)!important;border-color:#dce5df!important}
+html[data-dogson-theme="light"] .dogson-view-main button{color:#50655c!important}
+html[data-dogson-theme="light"] .dogson-view-main button.active{background:linear-gradient(180deg,#2e7865,#246957)!important;color:#fff!important;box-shadow:0 6px 14px rgba(32,99,80,.20)!important}
+html[data-dogson-theme="light"] .dogson-theme-toggle{background:#fff!important;border-color:#dbe4de!important;color:#50655c!important}
+html[data-dogson-theme="light"] .controls,html[data-dogson-theme="light"] .dogson-overview,html[data-dogson-theme="light"] .card,html[data-dogson-theme="light"] .portfolio-summary,html[data-dogson-theme="light"] .changebox{background:#fff!important;border-color:var(--v162-line)!important}
+html[data-dogson-theme="light"] .search{background:#fbfcfb!important;border-color:#d9e3dd!important;color:var(--v162-ink)!important}
+html[data-dogson-theme="light"] .search::placeholder{color:#8a9690!important}
+html[data-dogson-theme="light"] .scan{background:linear-gradient(180deg,#2f7865,#236553)!important;color:#fff!important;box-shadow:0 6px 14px rgba(35,101,83,.18)!important}
+html[data-dogson-theme="light"] .dogson-overview-grid button{background:#fbfcfb!important;border-color:#e1e9e4!important;color:var(--v162-ink-2)!important}
+html[data-dogson-theme="light"] .dogson-overview-grid b{color:#26342e!important}
+html[data-dogson-theme="light"] .dogson-overview-grid span{color:#6b7972!important}
+html[data-dogson-theme="light"] .dogson-quick button{background:#fff!important;border-color:#dbe5df!important;color:#4d6158!important}
+html[data-dogson-theme="light"] .dogson-quick button.active{background:#286f5d!important;border-color:#286f5d!important;color:#fff!important;box-shadow:0 4px 10px rgba(40,111,93,.14)!important}
+html[data-dogson-theme="light"] .code{color:#82918a!important}
+html[data-dogson-theme="light"] .portfolio-mini{background:#f1f7f4!important;border-color:#c7ddd2!important;color:#2d6856!important}
+html[data-dogson-theme="light"] .portfolio-mini.held{background:#fff6df!important;border-color:#e5d197!important;color:#7a5d18!important}
+html[data-dogson-theme="light"] .livecell{background:var(--v162-soft)!important;border:1px solid #dce7e1!important;box-shadow:none!important}
+html[data-dogson-theme="light"] .liveval{color:#1d5445!important}
+html[data-dogson-theme="light"] .livelab{color:#6e7d76!important}
+html[data-dogson-theme="light"] .dogson-card-details>summary{background:linear-gradient(180deg,#2e7865,#236553)!important;border:1px solid #236553!important;color:#fff!important;box-shadow:0 7px 16px rgba(35,101,83,.14)!important}
+html[data-dogson-theme="light"] .dogson-card-details[open]>summary{background:#eaf3ef!important;border-color:#c6dcd1!important;color:#2c6655!important;box-shadow:none!important}
+html[data-dogson-theme="light"] .stagebox,html[data-dogson-theme="light"] .mtfbox,html[data-dogson-theme="light"] .entrybox,html[data-dogson-theme="light"] .daytradebox,html[data-dogson-theme="light"] .portfolio-decision,html[data-dogson-theme="light"] .portfoliobox{background:#fbfcfb!important;border:1px solid #dfe8e2!important}
+html[data-dogson-theme="light"] .mtfcell,html[data-dogson-theme="light"] .metric,html[data-dogson-theme="light"] .part,html[data-dogson-theme="light"] .sr,html[data-dogson-theme="light"] .chip,html[data-dogson-theme="light"] .portfolio-metric{background:#fff!important;border:1px solid #e1e9e4!important;color:var(--v162-ink)!important}
+html[data-dogson-theme="light"] .portfolio-summary-item{background:#f8faf8!important;border:1px solid #e0e8e3!important;color:var(--v162-ink)!important}
+html[data-dogson-theme="light"] .portfolio-summary-v,html[data-dogson-theme="light"] .portfolio-metric-v{color:#25362f!important}
+html[data-dogson-theme="light"] .portfolio-summary-v.pnl.up,html[data-dogson-theme="light"] .portfolio-metric-v.pnl.up{color:#c84c4c!important}
+html[data-dogson-theme="light"] .portfolio-summary-v.pnl.down,html[data-dogson-theme="light"] .portfolio-metric-v.pnl.down{color:#2d8a63!important}
+
+@media(max-width:720px){
+  .wrap{padding:12px 10px 96px!important}
+  h1{font-size:25px!important}
+  .dogson-view-nav{border-radius:18px!important;padding:5px!important;gap:5px!important}
+  .dogson-view-main button{font-size:13px!important;min-height:48px!important;padding:9px 5px!important}
+  .dogson-theme-toggle{width:46px!important;flex-basis:46px!important;min-height:48px!important}
+  .controls{padding:11px!important}.search{font-size:15px!important;padding:0 13px!important}.scan{min-width:80px!important;padding:0 13px!important}
+  .dogson-overview{padding:13px!important}.dogson-overview-grid{gap:8px!important}.dogson-overview-grid button{min-height:76px!important}.dogson-overview-grid b{font-size:20px!important}.dogson-overview-grid span{font-size:11px!important}
+  .dogson-quick button{min-height:39px!important;padding:8px 12px!important;font-size:12.5px!important}
+  .card{padding:16px!important;border-radius:22px!important}.name{font-size:23px!important}.code{font-size:15px!important}.score{font-size:31px!important}.label{font-size:11px!important}
+  .dogson-card-headline{font-size:15px!important}.livecell{padding:11px 9px!important;min-height:76px!important}.liveval{font-size:18px!important}.livelab{font-size:9.5px!important}
+  .dogson-key-reasons{grid-template-columns:1fr!important;gap:7px!important}.dogson-key-title{padding-top:0!important}
+  .mtfgrid{grid-template-columns:1fr!important}
+}
+
+@media(max-width:390px){
+  .dogson-view-main button{font-size:12px!important;padding-inline:3px!important}.dogson-theme-toggle{width:42px!important;flex-basis:42px!important}
+  .scan{min-width:74px!important;font-size:15px!important}.search{font-size:14px!important}
+  .dogson-overview-grid button{padding-inline:5px!important}.dogson-overview-grid b{font-size:18px!important}.dogson-overview-grid span{font-size:10.5px!important}
+  .name{font-size:21px!important}.score{font-size:29px!important}.liveval{font-size:16px!important}.livelab{font-size:9px!important}
+}
