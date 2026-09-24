@@ -1,0 +1,69 @@
+/* Dogson Radar v1.6.4 — compact action strip + reliable quick detail. */
+.card.dogson-v164-card{padding:13px!important;border-radius:20px!important}
+.card.dogson-v164-card .name{font-size:19px!important;line-height:1.18!important}
+.card.dogson-v164-card .code{font-size:12.5px!important;margin-left:5px!important}
+.card.dogson-v164-card .top .sub{font-size:11.5px!important;margin-top:4px!important}
+.card.dogson-v164-card .score{font-size:27px!important}
+.card.dogson-v164-card .label{font-size:10px!important}
+.card.dogson-v164-card .dogson-card-headline{font-size:13px!important;line-height:1.55!important;margin-top:8px!important}
+.card.dogson-v164-card .dogson-card-brief{margin-top:8px!important}
+
+/* One decision row: lifecycle + entry light + quality on the left, inventory action on the right. */
+.dogson-action-strip-v164{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;margin-top:10px;margin-bottom:2px}
+.dogson-signal-buttons-v164{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:nowrap;overflow:hidden}
+.dogson-card-actions-v164{display:flex;align-items:center;justify-content:flex-end;flex:0 0 auto}
+.dogson-action-strip-v164 .dogson-signal-btn-v164{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:34px!important;margin:0!important;padding:7px 10px!important;border-radius:999px!important;font-size:11px!important;line-height:1!important;font-weight:850!important;white-space:nowrap!important;cursor:pointer!important;user-select:none!important;-webkit-tap-highlight-color:transparent;box-shadow:0 1px 0 rgba(35,55,46,.04);transition:transform .1s ease,box-shadow .1s ease,filter .1s ease!important}
+.dogson-action-strip-v164 .dogson-signal-btn-v164::after{content:none!important}
+.dogson-action-strip-v164 .dogson-signal-btn-v164:active{transform:scale(.96);filter:brightness(.97)}
+.dogson-action-strip-v164 .dogson-signal-btn-v164:focus-visible{outline:2px solid #2f7c68!important;outline-offset:2px!important}
+.dogson-action-strip-v164 .cat{border:1px solid #cfe6d9!important}
+.dogson-action-strip-v164 .entrylight.yellow{border:1px solid #d6b963!important;box-shadow:inset 0 0 0 1px rgba(145,106,27,.05)!important}
+.dogson-action-strip-v164 .entrylight.green{border:1px solid #b9dcc8!important}
+.dogson-action-strip-v164 .entrylight.red{border:1px solid #ecc7cb!important}
+.dogson-action-strip-v164 .quality{border:1px solid #d9e2dd!important;background:#f3f6f4!important;color:#53655d!important}
+.dogson-action-strip-v164 .quality.high{background:#fbf4df!important;border-color:#ecdca9!important;color:#87651c!important}
+.dogson-action-strip-v164 .quality.strong{background:#eef4f8!important;border-color:#d7e3eb!important;color:#4e7186!important}
+.dogson-action-strip-v164 .dogson-portfolio-btn-v164{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:34px!important;min-width:64px!important;margin:0!important;padding:7px 10px!important;border-radius:999px!important;border:1px solid #bfd9cd!important;background:#f6faf8!important;color:#2e6f5c!important;font-size:10.8px!important;font-weight:900!important;line-height:1!important;white-space:nowrap!important;box-shadow:none!important}
+.dogson-action-strip-v164 .dogson-portfolio-btn-v164.held{background:#edf6f1!important;border-color:#a9cfbd!important;color:#245f4f!important}
+
+/* The old score-column inventory placement is no longer used. */
+.dogson-score-wrap-v163{min-width:68px!important}
+.dogson-score-wrap-v163>.portfolio-mini{display:none!important}
+
+/* Keep the conclusion compact; key reasons remain tappable. */
+.card.dogson-v164-card .livequote{margin-top:10px!important;gap:7px!important}
+.card.dogson-v164-card .livecell{min-height:64px!important;padding:9px 10px!important;border-radius:13px!important}
+.card.dogson-v164-card .liveval{font-size:16.5px!important}
+.card.dogson-v164-card .livelab{font-size:9px!important;margin-top:4px!important}
+.card.dogson-v164-card .dogson-key-reasons{margin-top:10px!important;padding-top:10px!important}
+.card.dogson-v164-card .dogson-key-title{font-size:11px!important}
+.card.dogson-v164-card .dogson-key-list{gap:6px!important}
+.card.dogson-v164-card .dogson-key-list .dogson-key-btn-v164{min-height:30px!important;padding:6px 9px!important;font-size:10.5px!important;cursor:pointer!important;user-select:none!important;-webkit-tap-highlight-color:transparent;transition:transform .1s ease,filter .1s ease!important}
+.card.dogson-v164-card .dogson-key-list .dogson-key-btn-v164:active{transform:scale(.97);filter:brightness(.97)}
+.card.dogson-v164-card .dogson-card-details>summary{min-height:43px!important;padding:9px 12px!important;font-size:12.5px!important}
+
+/* v1.6.4: quick detail must always sit above sticky navigation/footer. */
+.dogson-quick-detail-back{z-index:500!important;pointer-events:auto!important}
+.dogson-quick-detail-back.show{pointer-events:auto!important}
+.dogson-quick-detail{overscroll-behavior:contain}
+
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .quality{background:#202a26!important;border-color:#37463f!important;color:#c4d1cb!important}
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .dogson-portfolio-btn-v164{background:#1c2823!important;border-color:#3b594c!important;color:#9dd4bd!important}
+
+@media(max-width:620px){
+  .card.dogson-v164-card{padding:12px!important}
+  .card.dogson-v164-card .name{font-size:18.5px!important}
+  .card.dogson-v164-card .score{font-size:26px!important}
+  .dogson-action-strip-v164{gap:6px;margin-top:9px}
+  .dogson-signal-buttons-v164{gap:5px}
+  .dogson-action-strip-v164 .dogson-signal-btn-v164{min-height:33px!important;padding:7px 8px!important;font-size:10.5px!important}
+  .dogson-action-strip-v164 .dogson-portfolio-btn-v164{min-height:33px!important;min-width:60px!important;padding:7px 8px!important;font-size:10.3px!important}
+  .card.dogson-v164-card .dogson-card-headline{font-size:12.7px!important}
+  .card.dogson-v164-card .liveval{font-size:16px!important}
+}
+
+@media(max-width:390px){
+  .dogson-action-strip-v164{grid-template-columns:minmax(0,1fr) auto!important}
+  .dogson-action-strip-v164 .dogson-signal-btn-v164{padding-left:7px!important;padding-right:7px!important;font-size:10px!important}
+  .dogson-action-strip-v164 .dogson-portfolio-btn-v164{padding-left:7px!important;padding-right:7px!important;font-size:10px!important;min-width:58px!important}
+}
