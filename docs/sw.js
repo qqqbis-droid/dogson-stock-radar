@@ -1,4 +1,4 @@
-const CACHE='dogson-free-v1600-2';
+const CACHE='dogson-free-v1600-3';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
@@ -6,12 +6,12 @@ self.addEventListener('install', event => {
     caches.open(CACHE).then(cache => cache.addAll([
       './manifest.webmanifest',
       './hourly.js?v=1530',
-      './realtime-config.js?v=1600',
-      './realtime.js?v=1600',
-      './ui-filters.js?v=1600-2',
-      './redesign-v160.css?v=1600-2',
-      './redesign-v160-dark.css?v=1600-2',
-      './redesign-v160.js?v=1600-2'
+      './realtime-config.js?v=1600-3',
+      './realtime.js?v=1600-3',
+      './ui-filters.js?v=1600-3',
+      './redesign-v160.css?v=1600-3',
+      './redesign-v160-dark.css?v=1600-3',
+      './redesign-v160.js?v=1600-3'
     ]))
   );
 });
