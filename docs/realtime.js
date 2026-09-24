@@ -25,10 +25,8 @@
     const q=document.getElementById('q')?.value.trim()||'';
     if(/^\d{4}$/.test(q))add(q);
     try{if(q&&!/^\d{4}$/.test(q)){const hit=(typeof universe!=='undefined'?universe:[]).find(x=>String(x.name)===q);if(hit)add(hit.code)}}catch{}
-    // What the user is looking at wins over cards that happen to be earlier in DOM order.
     const cards=[...document.querySelectorAll('.card')];
     cards.filter(card=>{const r=card.getBoundingClientRect();return r.bottom>=-240&&r.top<=window.innerHeight+240}).forEach(card=>add(codeFromCard(card)));
-    // Then keep portfolio/watchlist names warm in the remaining slots.
     try{(typeof watchlist==='function'?watchlist():[]).forEach(add)}catch{}
     cards.forEach(card=>add(codeFromCard(card)));
     return out;
@@ -54,13 +52,14 @@
       if(st)snapshots.set(c,{bid1:n(r.quote_bid1),ask1:n(r.quote_ask1),time:st,receivedAt:Date.now(),source:'TWSE MIS snapshot'});
       const px=n(r.quote_close),qd=String(r.quote_date||''),qt=String(r.quote_time||'');if(px==null||!qd||!qt)continue;
       const ms=Date.parse(`${qd}T${qt.length===5?qt+':00':qt}+08:00`);if(!Number.isFinite(ms)||Date.now()-ms>STORE_MAX_AGE)continue;
-      setQuote(c,{price:px,change:n(r.day_change),time:ms,receivedAt:Date.now(),source:r.quote_source||'TWSE MIS last trade'});
+      setQuote(c,{price:px,change:n(r.day_change),time:ms,receivedAt:Date.now(),source:r.quote_source||'TWSE MIS recent trade'});
     }}catch{}
   }
   function fmtPrice(v){if(v==null)return'—';return v>=1000?v.toFixed(0):v>=100?v.toFixed(1):v.toFixed(2)}
   function fmtPct(v){if(v==null)return'—';return `${v>=0?'+':''}${v.toFixed(2)}%`}
   function toDate(v){const x=n(v);if(!x)return null;let ms=x;if(ms>1e14)ms/=1000;else if(ms<1e12)ms*=1000;const d=new Date(ms);return Number.isNaN(d.getTime())?null:d}
   function fmtTime(v){const d=toDate(v);return d?d.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}):'—'}
+  function fmtSnapshotTime(v){if(v==null)return'—';if(typeof v==='string'&&/^\d{1,2}:\d{2}(:\d{2})?$/.test(v.trim()))return v.trim();return fmtTime(v)}
   function status(text,cls=''){const el=document.getElementById('liveStatus');if(!el)return;el.className=`live-status ${cls}`;el.textContent=text}
   function setRadarPill(text,level='ok'){
     const el=document.getElementById('status');if(!el)return;el.textContent=text;
@@ -81,13 +80,13 @@
       if(typeof mode!=='undefined'&&mode==='close'){setRadarPill('盤後資料','ok');return}
       const st=structureLatest();
       if(lastSuccessAt&&Date.now()-lastSuccessAt<45000){
-        setRadarPill(`即時價 ${latestQuoteLabel||'已連線'}｜5分K結構 ${st||'—'}`,'ok');return;
+        setRadarPill(`MIS ${latestQuoteLabel||'已連線'}｜5分K結構 ${st||'—'}`,'ok');return;
       }
       const now=taipeiClock();const nowMin=now.hour*60+now.minute;
       let latest=-1;for(const r of (typeof intraRows!=='undefined'?intraRows:[])){const m=String(r.structure_time||r.time||'').match(/^(\d{1,2}):(\d{2})/);if(m)latest=Math.max(latest,(+m[1])*60+(+m[2]))}
       if(latest<0){setRadarPill('行情連線中','warn');return}
       const age=nowMin-latest;const label=`${String(Math.floor(latest/60)).padStart(2,'0')}:${String(latest%60).padStart(2,'0')}`;
-      if(age>30)setRadarPill(`⚠️ 即時價未連線｜5分K結構 ${label}`,'bad');else setRadarPill(`5分K結構 ${label}｜即時價連線中`,'warn');
+      if(age>30)setRadarPill(`⚠️ MIS即時層未連線｜5分K結構 ${label}`,'bad');else setRadarPill(`5分K結構 ${label}｜MIS連線中`,'warn');
     }catch{}
   }
   function ensureStyles(){
@@ -109,11 +108,11 @@
     document.querySelectorAll('.card').forEach(card=>{const code=codeFromCard(card);if(!code)return;const q=quotes.get(code);let box=card.querySelector('.livequote');
       if(!box){box=document.createElement('div');box.className='livequote';const top=card.querySelector('.top');if(top)top.insertAdjacentElement('afterend',box);else card.prepend(box)}
       const snap=snapshots.get(code);
-      const snapTime=snap?(typeof snap.time==='number'?fmtTime(snap.time):String(snap.time||'—')):'—';
+      const snapTime=snap?fmtSnapshotTime(snap.time):'—';
       if(!q){const r=card.getBoundingClientRect(),onscreen=r.bottom>=-240&&r.top<=window.innerHeight+240;
-        if(snap){box.innerHTML=`<div class="livecell"><div class="liveval">買 ${fmtPrice(snap.bid1)}</div><div class="livelab">MIS 買一｜非成交價</div></div><div class="livecell"><div class="liveval">賣 ${fmtPrice(snap.ask1)}</div><div class="livelab">MIS 賣一｜非成交價</div></div><div class="livecell"><div class="liveval">${snapTime}</div><div class="livelab">官方快照｜等下一筆成交</div></div>`;return}
-        box.innerHTML=`<div class="livecell"><div class="liveval">—</div><div class="livelab">最後真實成交</div></div><div class="livecell"><div class="liveval">—</div><div class="livelab">MIS 買賣盤</div></div><div class="livecell"><div class="liveval">5分K</div><div class="livelab">${onscreen?'官方行情重試中':'滑到此卡即優先追蹤'}</div></div>`;return}
-      box.innerHTML=`<div class="livecell"><div class="liveval">${fmtPrice(q.price)}</div><div class="livelab">最後真實成交</div></div><div class="livecell"><div class="liveval">${fmtPct(q.change)}</div><div class="livelab">依最後成交計算</div></div><div class="livecell"><div class="liveval">${fmtTime(q.time)}</div><div class="livelab">成交時間｜MIS快照 ${snapTime}</div></div>`;
+        if(snap){box.innerHTML=`<div class="livecell"><div class="liveval">買 ${fmtPrice(snap.bid1)}</div><div class="livelab">MIS 買一｜非成交價</div></div><div class="livecell"><div class="liveval">賣 ${fmtPrice(snap.ask1)}</div><div class="livelab">MIS 賣一｜非成交價</div></div><div class="livecell"><div class="liveval">${snapTime}</div><div class="livelab">最新市場快照｜等待成交價</div></div>`;return}
+        box.innerHTML=`<div class="livecell"><div class="liveval">—</div><div class="livelab">最近一筆成交</div></div><div class="livecell"><div class="liveval">—</div><div class="livelab">MIS 買賣盤</div></div><div class="livecell"><div class="liveval">5分K</div><div class="livelab">${onscreen?'官方行情重試中':'滑到此卡即優先追蹤'}</div></div>`;return}
+      box.innerHTML=`<div class="livecell"><div class="liveval">${fmtPrice(q.price)}</div><div class="livelab">最近一筆成交價</div></div><div class="livecell"><div class="liveval">${fmtPct(q.change)}</div><div class="livelab">依最近成交計算</div></div><div class="livecell"><div class="liveval">${fmtTime(q.time)}</div><div class="livelab">成交時間｜MIS快照 ${snapTime}</div></div>`;
       updateMainMetrics(card,q);
     });
   }
@@ -127,11 +126,12 @@
       const endpoint=apiUrl(),batches=[];for(let i=0;i<codes.length;i+=BATCH_SIZE)batches.push(codes.slice(i,i+BATCH_SIZE));
       const results=await Promise.allSettled(batches.map(b=>fetchBatch(endpoint,b)));let count=0,snapshotCount=0,newest=null;
       for(const rr of results){if(rr.status!=='fulfilled')continue;for(const x of rr.value){const code=String(x.code||'');if(!/^\d{4}$/.test(code))continue;
-        snapshots.set(code,{bid1:n(x.bid1),ask1:n(x.ask1),time:x.time,receivedAt:Date.now(),source:x.source||'TWSE MIS snapshot'});snapshotCount++;const d=toDate(x.time);if(d&&(!newest||d>newest))newest=d;
-        const price=n(x.price);if(price==null)continue;setQuote(code,{price,change:n(x.changePct),time:x.time,receivedAt:Date.now(),source:'TWSE MIS live trade'});count++;}}
+        const snapTime=x.snapshotTime??x.time??Date.now();
+        snapshots.set(code,{bid1:n(x.bid1),ask1:n(x.ask1),time:snapTime,receivedAt:Date.now(),source:x.source||'TWSE MIS snapshot'});snapshotCount++;const sd=toDate(snapTime);if(sd&&(!newest||sd>newest))newest=sd;
+        const price=n(x.price);if(price==null||!x.time)continue;setQuote(code,{price,change:n(x.changePct),time:x.time,receivedAt:Date.now(),source:x.source||'TWSE MIS latest matched trade'});count++;}}
       if(!snapshotCount)throw new Error('no MIS snapshots');lastSuccessAt=Date.now();latestQuoteLabel=(newest||new Date()).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
-      saveStored();status(`🟢 MIS快照 ${latestQuoteLabel}｜覆蓋 ${snapshotCount}/${codes.length}｜本輪新成交 ${count}｜無成交顯示買一/賣一`);applyQuotes();checkRadarFreshness();
-    }catch(e){const age=lastSuccessAt?Math.round((Date.now()-lastSuccessAt)/1000):null;status(age!=null?`⚠️ 官方即時行情暫斷｜上次成功 ${age} 秒前｜5分K雷達仍可用`:'⚠️ 官方即時行情連線中｜5分K雷達仍可用','bad');applyQuotes();checkRadarFreshness()}finally{busy=false}
+      saveStored();status(`🟢 MIS快照 ${latestQuoteLabel}｜覆蓋 ${snapshotCount}/${codes.length}｜本輪取得成交價 ${count}｜無新成交沿用最近一筆`);applyQuotes();checkRadarFreshness();
+    }catch(e){const age=lastSuccessAt?Math.round((Date.now()-lastSuccessAt)/1000):null;status(age!=null?`⚠️ 官方行情暫斷｜上次成功 ${age} 秒前｜5分K雷達仍可用`:'⚠️ 官方行情連線中｜5分K雷達仍可用','bad');applyQuotes();checkRadarFreshness()}finally{busy=false}
   }
   function boot(){ensureStyles();loadStored();seedFromRows();applyQuotes();refresh();setTimeout(checkRadarFreshness,1000);setInterval(refresh,REFRESH_MS);setInterval(checkRadarFreshness,FRESHNESS_MS);
     const cards=document.getElementById('cards');if(cards){let t;new MutationObserver(()=>{clearTimeout(t);t=setTimeout(()=>{applyQuotes();refresh()},250)}).observe(cards,{childList:true,subtree:true})}
