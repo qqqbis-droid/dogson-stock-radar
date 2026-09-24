@@ -19,12 +19,21 @@ function firstBook(v) {
   return finite(x);
 }
 
-function normalizeTime(v) {
+function normalizeEpoch(v) {
   const n = finite(v);
   if (n == null) return Date.now();
   if (n > 1e14) return Math.round(n / 1000);
   if (n < 1e12) return n * 1000;
   return n;
+}
+
+function tradeEpoch(dateText, timeText, fallback = null) {
+  const d = String(dateText || '').trim();
+  const t = String(timeText || '').trim();
+  if (!/^\d{8}$/.test(d) || !/^\d{1,2}:\d{2}:\d{2}$/.test(t)) return fallback;
+  const iso = `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}T${t.padStart(8,'0')}+08:00`;
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? ms : fallback;
 }
 
 export default async function handler(req, res) {
@@ -64,6 +73,8 @@ export default async function handler(req, res) {
       const price = finite(x.z);
       const prev = finite(x.y);
       const hasTrade = price != null && price > 0;
+      const snapshotTime = normalizeEpoch(x.tlong);
+      const latestTradeTime = hasTrade ? tradeEpoch(x.d, x.t, snapshotTime) : null;
       const changePct = hasTrade && prev != null && prev > 0 ? (price / prev - 1) * 100 : null;
       const q = {
         code,
@@ -79,8 +90,11 @@ export default async function handler(req, res) {
         high: finite(x.h),
         low: finite(x.l),
         volume: finite(x.v),
-        time: normalizeTime(x.tlong),
-        source: hasTrade ? 'TWSE MIS live trade' : 'TWSE MIS orderbook snapshot'
+        time: latestTradeTime,
+        tradeTimeText: hasTrade ? (x.t || null) : null,
+        tradeDate: hasTrade ? (x.d || null) : null,
+        snapshotTime,
+        source: hasTrade ? 'TWSE MIS latest matched trade' : 'TWSE MIS orderbook snapshot'
       };
       const old = byCode.get(code);
       if (!old || (x.ex === 'tse' && old.market !== '上市') || (hasTrade && !old.hasTrade)) byCode.set(code, q);
