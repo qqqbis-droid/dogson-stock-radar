@@ -325,7 +325,7 @@ def main():
         "daytrade_version": "1.0",
         "daytrade_updated_at": out["updated_at"],
         "daytrade_count": len(out["rows"]),
-        "version": "1.5.29-free",
+        "version": "1.5.30-free",
     })
     dump(STATUS, status)
     print("daytrade done", len(out["rows"]), out["state_counts"])

@@ -57,6 +57,8 @@ def main(mode):
     today=datetime.now(TW).date().isoformat(); now=datetime.now(TW).isoformat(timespec="minutes")
     if hist.get("date")!=today: hist={"date":today,"codes":{},"transitions":[],"sector_accel":{}}
     hist.setdefault("transitions",[]); hist.setdefault("sector_accel",{})
+    close_obj=load(DATA/"close.json",{}) if mode=="intraday" else {}
+    prior_close_map={str(x.get("code") or ""):x for x in (close_obj.get("rows") or [])}
     for r in rows:
         enrich_chip(r);breakout_baseline(r)
         if mode=="intraday":
@@ -66,13 +68,17 @@ def main(mode):
             if not h or h[-1].get("t")!=snap["t"]: h.append(snap)
             h[:]=h[-80:]
             first=h[0] if h else snap; prev=h[-2] if len(h)>1 else first
-            oldstage=(previous or {}).get("stage"); newstage=snap.get("stage")
+            prior_close=prior_close_map.get(code) or {}
+            oldstage=(previous or {}).get("stage") if previous else prior_close.get("category")
+            baseline_source="previous_scan" if previous else ("prior_close" if oldstage else "none")
+            newstage=snap.get("stage"); has_baseline=bool(oldstage)
             flags={
-                "entered_setup": bool(previous and oldstage!="蓄勢待發" and newstage=="蓄勢待發"),
-                "entered_launch": bool(previous and oldstage!="剛啟動" and newstage=="剛啟動"),
-                "became_overheat": bool(previous and oldstage!="過熱不追" and newstage=="過熱不追"),
-                "became_weak": bool(previous and oldstage not in {"轉弱警戒","結構失效"} and newstage in {"轉弱警戒","結構失效"}),
+                "entered_setup": bool(has_baseline and oldstage!="蓄勢待發" and newstage=="蓄勢待發"),
+                "entered_launch": bool(has_baseline and oldstage!="剛啟動" and newstage=="剛啟動"),
+                "became_overheat": bool(has_baseline and oldstage!="過熱不追" and newstage=="過熱不追"),
+                "became_weak": bool(has_baseline and oldstage not in {"轉弱警戒","結構失效"} and newstage in {"轉弱警戒","結構失效"}),
             }
+            r["today_transition_baseline"]=baseline_source
             r["today_transitions"]=flags
             for typ,hit in flags.items():
                 if hit:
@@ -102,9 +108,9 @@ def main(mode):
         obj["today_change_radar"]=today_radar
         obj.setdefault("change_radar",{})["today"]=today_radar
         dump(HIST,hist)
-    obj["completion_version"]="1.1";obj["completion_updated_at"]=datetime.now(TW).isoformat(timespec="seconds")
+    obj["completion_version"]="1.2";obj["completion_updated_at"]=datetime.now(TW).isoformat(timespec="seconds")
     dump(path,obj)
-    st=load(DATA/"status.json",{});st.update({"version":"1.5.30-free","completion_version":"1.1"});dump(DATA/"status.json",st)
+    st=load(DATA/"status.json",{});st.update({"version":"1.5.30-free","completion_version":"1.2"});dump(DATA/"status.json",st)
     print("completion",mode,len(rows))
 if __name__=="__main__":
     ap=argparse.ArgumentParser();ap.add_argument("--mode",choices=["intraday","close"],required=True);main(ap.parse_args().mode)

@@ -341,7 +341,7 @@ function dynamicThresholdHTML(r){
  const d=r?.dynamic_thresholds||{}; if(!Object.keys(d).length)return "";
  const mode=d.mode==="personalized"?"✅ 個股化":d.mode==="warming"?"🟡 暖機中":"⚪ 固定門檻";
  const ev=(d.evidence||[]).join("＋")||"舊版固定值";
- return `<div class="mtf-note"><b>🎚️ 動態門檻 ${mode}</b>　漲幅 ${num(d.day_hot_pct,1)}%｜VWAP ${num(d.vwap_hot_pct,1)}%｜15分 ${num(d.ret15_hot_pct,1)}%｜量速 ${num(d.pace_hot_x,1)}x<br><span class="muted">依據：${escHTML(ev)}；ATR14 ${d.atr14_pct==null?"—":num(d.atr14_pct,1)+"%"}，同時段樣本 ${d.sample_days??0} 日。只改門檻，不改 30/25/15/20/10 權重。</span></div>`;
+ return `<div class="mtf-note"><b>🎚️ 動態門檻 ${mode}</b>　漲幅 ${num(d.day_hot_pct,1)}%｜VWAP ${num(d.vwap_hot_pct,1)}%｜15分 ${num(d.ret15_hot_pct,1)}%｜量速 ${num(d.pace_hot_x,1)}x<br><span class="muted">依據：${escHTML(ev)}；ATR14 ${d.atr14_pct==null?"—":num(d.atr14_pct,1)+"%"}，同時段樣本 ${d.sample_days??0} 日。只改門檻，不改 30/25/15/20/10 權重；三燈 hard gate 也使用個股動態門檻。</span></div>`;
 }
 function portfolioDecision(r,h){
  const st=stageKey(r?.category),score=+(r?.intraday_score??r?.score??0),amp=String(r?.amplitude_regime||"");
@@ -587,7 +587,9 @@ function entryDecision(r,mkt=market){
  const stage=stageKey(r?.category);
  const score=+(r?.intraday_score??r?.score??0);
  const ps=+(c.price_structure??0),flow=+(c.flow_volume??0),rel=+(c.relative_strength??0),sec=+(c.sector??0),liq=+(c.liquidity_risk??0);
- const vwap=+(r?.vwap_dist??0),day=+(r?.day_change??0),pos=+(r?.range_position_pct??50),pace=+(r?.pace??0);
+ const vwap=+(r?.vwap_dist??0),day=+(r?.day_change??0),pos=+(r?.range_position_pct??50),pace=+(r?.pace??0),ret15=+(r?.ret15??0);
+ const dyn=r?.dynamic_thresholds||{};
+ const dayHot=+(dyn.day_hot_pct??8.5),vwapHot=+(dyn.vwap_hot_pct??4.5),paceHot=+(dyn.pace_hot_x??5),ret15Hot=+(dyn.ret15_hot_pct??4);
  const marketMode=String(mkt?.market_mode||"—"),marketScore=+(mkt?.market_score??0);
  const mtf=r?.multi_timeframe||{},mtfState=String(mtf.state||""),mtf60=mtf["60m"]||{};
  const rsm=r?.relative_multiframe||{},rsStatus=String(rsm.status||"");
@@ -596,8 +598,10 @@ function entryDecision(r,mkt=market){
  // Hard gates：沿用既有過熱/失效概念，不重算100分。
  if(stage==="結構失效")block.push("生命週期：結構失效");
  if(stage==="過熱不追")block.push("生命週期：過熱不追");
- if(day>=8.5)block.push(`當日已漲 ${num(day,1)}%，追價風險高`);
- if(vwap>4.5)block.push(`距 VWAP +${num(vwap,1)}%，延伸過遠`);
+ if(day>=dayHot)block.push(`當日 ${num(day,1)}% ≥ 個股過熱門檻 ${num(dayHot,1)}%`);
+ if(vwap>vwapHot)block.push(`距 VWAP +${num(vwap,1)}% > 個股門檻 ${num(vwapHot,1)}%`);
+ if(pace>paceHot)block.push(`量速 ${num(pace,1)}x > 個股門檻 ${num(paceHot,1)}x`);
+ if(ret15>ret15Hot)block.push(`15分鐘 ${num(ret15,1)}% > 個股門檻 ${num(ret15Hot,1)}%`);
  if(score<42)block.push(`盤中動能僅 ${num(score,0)}/100`);
  if(ps<7&&score<55)block.push(`5分K價格結構僅 ${num(ps,0)}/30`);
 
@@ -614,7 +618,7 @@ function entryDecision(r,mkt=market){
  if(liq>=6)good.push(`流動性/風險 ${num(liq,0)}/10`);else wait.push(`流動性/追價風險 ${num(liq,0)}/10`);
  if(vwap>=-.5&&vwap<=2.5)good.push(`距 VWAP ${signed(vwap,1)} 合理`);else if(vwap<-.5)wait.push(`仍在 VWAP 下 ${signed(vwap,1)}`);else wait.push(`距 VWAP ${signed(vwap,1)}，等回踩`);
  if(pos>=45&&pos<=90)good.push(`區間位置 ${num(pos,0)}%`);else if(pos<45)wait.push(`區間位置 ${num(pos,0)}%，等轉強`);else wait.push(`區間位置 ${num(pos,0)}%，靠近高檔`);
- if(pace>5)wait.push(`量速 ${num(pace,1)}x，先防爆量追價`);
+ if(pace>Math.max(3.5,paceHot*.8))wait.push(`量速 ${num(pace,1)}x，接近個股過熱門檻 ${num(paceHot,1)}x`);
  if(stage==="轉弱警戒")wait.push("Stage 仍在轉弱警戒，需等5分K重新轉強");
  if(mtfState==="ALIGNED")good.push("5分＋60分＋日K三框共振");
  else if(mtfState==="SETUP")wait.unshift("60K 20T/60T蓄勢，等5分正式觸發");
