@@ -1,0 +1,50 @@
+name: Repair Live Coverage
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/live-coverage.trigger"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dogson-live-coverage-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply live coverage repair
+        run: python scripts/patch_live_coverage.py
+      - name: Verify source contracts
+        run: |
+          python -m py_compile scripts/build_data.py scripts/bridge_intraday.py scripts/patch_live_coverage.py
+          node --check docs/realtime.js
+          python - <<'PY'
+          from pathlib import Path
+          bd=Path('scripts/build_data.py').read_text(encoding='utf-8')
+          br=Path('scripts/bridge_intraday.py').read_text(encoding='utf-8')
+          rt=Path('docs/realtime.js').read_text(encoding='utf-8')
+          block=bd[bd.index('def intraday_stock_snapshot('):bd.index('def _weighted_pct(',bd.index('def intraday_stock_snapshot('))]
+          assert 'batch_size = 10' in block
+          assert 'quoted_rows = 0' in br and '1.4.3' in br
+          assert 'const MAX_CODES = 24;' in rt
+          assert 'getBoundingClientRect' in rt and "addEventListener('scroll'" in rt
+          print('source contract OK')
+          PY
+      - name: Commit repaired live layer
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py scripts/bridge_intraday.py docs/realtime.js
+          git diff --cached --quiet || git commit -m "Fix full-market live quote coverage"
+          git push
