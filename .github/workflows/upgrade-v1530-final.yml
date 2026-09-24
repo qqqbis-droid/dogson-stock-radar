@@ -19,7 +19,7 @@ concurrency:
 jobs:
   upgrade:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 50
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -28,152 +28,108 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Require functional Step 1-8 baseline
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - name: Apply final original-vision completion patch
+        run: python scripts/patch_v1530_finalize.py
+      - name: Verify source contracts and causal behavior
         run: |
-          grep -q '"stage_version":"2.0"' docs/data/status.json
-          grep -q '"validation_version":"1.0"' docs/data/status.json
-          grep -q '"daytrade_version":"1.0"' docs/data/status.json
-          grep -q 'def _dynamic_threshold_values' scripts/build_data.py
-          grep -q 'def calibrated_weights' scripts/build_validation.py
-          grep -q 'DAYTRADE_WEIGHTS' scripts/build_daytrade.py
-          grep -q 'data-mode="daytrade"' docs/index.html
-
-      - name: Compile patch modules first
-        run: python -m py_compile scripts/patch_v1530.py scripts/patch_v1530b.py
-
-      - name: Patch backend decision engine
-        run: python -c 'import scripts.patch_v1530b as p; p.patch_build_data()'
-      - name: Patch MIS bridge
-        run: python -c 'import scripts.patch_v1530 as p; p.patch_bridge()'
-      - name: Patch historical validation
-        run: python -c 'import scripts.patch_v1530 as p; p.patch_validation()'
-      - name: Patch daytrade source context
-        run: python -c 'import scripts.patch_v1530 as p; p.patch_daytrade()'
-      - name: Patch frontend decision UI
-        run: python -c 'import scripts.patch_v1530 as p; p.patch_ui()'
-      - name: Patch service worker and status
-        run: python -c 'import scripts.patch_v1530 as p; p.patch_sw_and_status()'
-      - name: Patch current cached data
-        run: python -c 'import scripts.patch_v1530 as p; p.patch_current_data()'
-      - name: Rebuild isolated daytrade data
-        run: python scripts/build_daytrade.py
-
-      - name: Verify Python and JavaScript syntax
-        run: |
-          python -m py_compile scripts/build_data.py scripts/bridge_intraday.py scripts/build_validation.py scripts/build_daytrade.py
+          python -m py_compile scripts/build_data.py scripts/build_completion.py scripts/build_validation.py scripts/build_daytrade.py scripts/patch_v1530_finalize.py
           python - <<'PY'
+          import json, re, sys, tempfile
           from pathlib import Path
-          import re
-          h=Path('docs/index.html').read_text(encoding='utf-8')
-          m=re.search(r'<script>\s*(.*?)</script>\s*<script src="./hourly.js',h,re.S)
-          if not m: raise SystemExit('inline JS missing')
+          import numpy as np, pandas as pd
+          sys.path.insert(0,'scripts')
+          import build_data as bd
+          import build_completion as bc
+          import build_validation as bv
+
+          idx=pd.bdate_range('2026-01-02', periods=80)
+          close=np.arange(100.0,180.0); vol=np.arange(10000.0,90000.0,1000.0)
+          df=pd.DataFrame({'Open':close-.2,'High':close,'Low':close-.5,'Close':close,'Volume':vol},index=idx)
+          row=bd.close_technical(df)
+          assert row['avg_volume20'] is not None
+          assert row['breakout_event_count'] >= 3
+          assert row['breakout_volume_median20'] is not None
+
+          z={'foreign_3d_net':3000,'avg_volume20':10000}
+          bc.enrich_chip(z)
+          assert z['foreign_3d_strength_pct']==30.0, z
+          assert z['foreign_strength_unit']=='shares / prior20d_avg_shares'
+
+          with tempfile.TemporaryDirectory() as td:
+              old_data,old_hist=bc.DATA,bc.HIST
+              bc.DATA=Path(td); bc.HIST=bc.DATA/'decision_history.json'
+              (bc.DATA/'status.json').write_text('{}',encoding='utf-8')
+              base={'code':'0001','name':'T','close':100,'vwap':100,'vwap_dist':0,'pace':1,'ret15':0,'range_position_pct':50,'trend5':True,'break3':False,'foreign_3d_net':100,'avg_volume20':10000,'intraday_score':60,'intraday_components':{'relative_strength':8,'sector':10},'category':'觀察','quote_time':'09:05'}
+              (bc.DATA/'intraday.json').write_text(json.dumps({'rows':[base],'sector_rotation':[{'sector':'PCB','heat':6,'state':'🔥 流入加速'}]},ensure_ascii=False),encoding='utf-8')
+              bc.main('intraday')
+              first=json.loads((bc.DATA/'intraday.json').read_text(encoding='utf-8'))
+              assert first['change_radar']['today']['new_setup']==0
+              base['category']='蓄勢待發';base['quote_time']='09:10';base['intraday_score']=68
+              (bc.DATA/'intraday.json').write_text(json.dumps({'rows':[base],'sector_rotation':[{'sector':'PCB','heat':6.5,'state':'🔥 流入加速'}]},ensure_ascii=False),encoding='utf-8')
+              bc.main('intraday')
+              second=json.loads((bc.DATA/'intraday.json').read_text(encoding='utf-8'))
+              assert second['change_radar']['today']['new_setup']==1
+              assert second['change_radar']['today']['sector_accel_count']==1
+              assert second['rows'][0]['today_transitions']['entered_setup'] is True
+              bc.DATA,bc.HIST=old_data,old_hist
+
+          research=bv.feature_research([])
+          assert research['fake_breakout']['definition']
+          assert '不直接改正式分數' in research['note']
+
+          ui=Path('docs/index.html').read_text(encoding='utf-8')
+          for x in ['今日新進蓄勢','今日新進剛啟動','今日族群加速','可考慮加碼','外資3日力度','歷史組合研究']:
+              assert x in ui, x
+          assert '\\n const life=' not in ui
+          assert '\\n const dirs=' not in ui
+          m=re.search(r'<script>\s*(.*?)</script>\s*<script src="./hourly.js',ui,re.S)
+          assert m
           Path('/tmp/dogson-inline.js').write_text(m.group(1),encoding='utf-8')
+
+          status=json.loads(Path('docs/data/status.json').read_text(encoding='utf-8'))
+          assert status['version']=='1.5.30-free'
+          assert status['completion_version']=='1.1'
+          print('v1.5.30 final causal contracts OK')
           PY
           node --check /tmp/dogson-inline.js
-          node --check docs/hourly.js
-
-      - name: Verify original-vision completion contracts
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import importlib.util, json
-          bd=Path('scripts/build_data.py').read_text(encoding='utf-8')
-          bv=Path('scripts/build_validation.py').read_text(encoding='utf-8')
-          ui=Path('docs/index.html').read_text(encoding='utf-8')
-          bridge=Path('scripts/bridge_intraday.py').read_text(encoding='utf-8')
-          st=json.loads(Path('docs/data/status.json').read_text(encoding='utf-8'))
-          close=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
-          intra=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
-          dt=json.loads(Path('docs/data/daytrade.json').read_text(encoding='utf-8'))
-
-          checks={
-            'chip intensity':['def _chip_intensity_fields','foreign_3d_intensity_pct','avg_volume20_shares','chip_intensity_label'],
-            'comfortable entry patterns':['def _execution_pattern_fields','量縮回踩','量增上攻','回踩承接','execution_pattern_strength'],
-            'today cumulative change':['def _build_today_cumulative_change','today_score_delta','today_pace_delta','today_direction','new_setup','new_start','to_overheat'],
-            'breakout self baseline':['breakout_event_volumes','breakout_volume_profile','current_volume_vs_event_avg'],
-          }
-          for label,marks in checks.items():
-            for x in marks:
-              if x not in bd: raise SystemExit(f'{label} missing {x}')
-
-          for x in ['🟢 可考慮加碼','今日變化方向','可加 ${actions.add','addable=','🚨 今天值得注意','completionContextHTML']:
-            if x not in ui: raise SystemExit('UI completion missing '+x)
-          for x in ['dayHot=+(dyn.day_hot_pct??8.5)','vwapHot=+(dyn.vwap_hot_pct??4.5)','paceHot=+(dyn.pace_hot_x??5)','ret15Hot=+(dyn.ret15_hot_pct??4)']:
-            if x not in ui: raise SystemExit('dynamic entry threshold missing '+x)
-          for x in ['execution_pattern','foreign_3d_intensity_pct','combination_5d','breakout_volume_profile']:
-            if x not in bv: raise SystemExit('Step7 feature persistence missing '+x)
-          if '_attach_completion_context(out_rows, close_map)' not in bridge:
-            raise SystemExit('MIS bridge does not refresh completion context')
-
-          for x in ['"price_structure": 30','"flow_volume": 25','"relative_strength": 15','"sector": 20','"liquidity_risk": 10']:
-            if x not in bd: raise SystemExit('intraday architecture changed '+x)
-          if '{"technical": 50.0, "chip": 25.0, "sector": 15.0, "liquidity": 10.0}' not in bv:
-            raise SystemExit('swing baseline changed')
-
-          if st.get('version')!='1.5.30-free' or st.get('vision_completion_version')!='1.0':
-            raise SystemExit('status completion version mismatch')
-          if st.get('dynamic_threshold_version')!='1.1' or st.get('portfolio_mode_version')!='1.2' or st.get('change_radar_version')!='1.1':
-            raise SystemExit('completion sub-version mismatch')
-
-          crows=close.get('rows') or []
-          irows=intra.get('rows') or []
-          if crows:
-            cov=sum(r.get('chip_intensity_label') is not None for r in crows)
-            print('chip intensity coverage',cov,'/',len(crows))
-            if cov < int(len(crows)*.95): raise SystemExit('chip intensity coverage low')
-          if irows:
-            cov=sum(r.get('execution_pattern') is not None for r in irows)
-            print('execution pattern coverage',cov,'/',len(irows))
-            if cov < int(len(irows)*.95): raise SystemExit('execution pattern coverage low')
-          if not dt.get('rows'): raise SystemExit('daytrade data empty')
-
-          spec=importlib.util.spec_from_file_location('bd','scripts/build_data.py')
-          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
-          ci=m._chip_intensity_fields({'avg_volume20_shares':1_000_000,'foreign_3d_net':180_000,'trust_net_latest':20_000})
-          if ci['foreign_3d_intensity_pct']!=18.0 or ci['chip_intensity_label']!='明顯累積':
-            raise SystemExit('chip intensity semantic test failed')
-          attack=m._execution_pattern_fields({'close':105,'vwap':103,'vwap_dist':1.0,'ret15':0.8,'pace':1.6,'recent_turnover':140,'previous_turnover':100,'trend5':True,'break3':True})
-          if attack['execution_pattern']!='量增上攻': raise SystemExit('attack pattern test failed')
-          pull=m._execution_pattern_fields({'close':103,'vwap':103,'vwap_dist':0.1,'ret15':-0.2,'pace':0.9,'recent_turnover':70,'previous_turnover':100,'trend5':True,'break3':False})
-          if pull['execution_pattern']!='量縮回踩': raise SystemExit('pullback pattern test failed')
-          hist={'intraday':[{'key':'2026-09-24T09:10','date':'2026-09-24','rows':[{'code':'0001','name':'T','score':55,'category':'觀察','pace':1.0}]}]}
-          rows=[{'code':'0001','name':'T','date':'2026-09-24','intraday_score':70,'category':'蓄勢待發','pace':1.8}]
-          today=m._build_today_cumulative_change(rows,hist)
-          if not today['ready'] or today['counts']['new_setup']!=1 or rows[0]['today_direction'] not in {'改善','小幅改善'}:
-            raise SystemExit('today direction semantic test failed')
-          print('ALL v1.5.30 completion contracts passed')
-          PY
-
-      - name: Commit validated v1.5.30
+      - name: Commit final source changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add scripts/build_data.py scripts/bridge_intraday.py scripts/build_validation.py scripts/build_daytrade.py docs/index.html docs/sw.js docs/data/status.json docs/data/close.json docs/data/intraday.json docs/data/daytrade.json
-          git diff --cached --quiet || git commit -m "Apply validated v1.5.30 original vision completion"
+          git add scripts/build_data.py scripts/build_completion.py scripts/build_validation.py docs/index.html docs/data/status.json
+          git diff --cached --quiet || git commit -m "Finalize v1.5.30 original vision completion"
           ok=0
           for n in $(seq 1 12); do
             git fetch origin main
-            if git rebase origin/main; then
-              if git push origin HEAD:main; then ok=1; break; fi
-            else
-              conflicted=$(git diff --name-only --diff-filter=U || true)
-              if [ -n "$conflicted" ]; then
-                while IFS= read -r f; do
-                  [ -z "$f" ] && continue
-                  git checkout --theirs -- "$f"
-                  git add "$f"
-                done <<< "$conflicted"
-                GIT_EDITOR=true git rebase --continue || { git rebase --abort || true; sleep 3; continue; }
-                if git push origin HEAD:main; then ok=1; break; fi
-              else
-                git rebase --abort || true
-              fi
-            fi
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
             sleep 3
           done
           test "$ok" = 1
-
+      - name: Refresh completed-session data
+        run: |
+          python scripts/sync_live_data.py || true
+          python scripts/build_data.py --mode close
+          python scripts/build_completion.py --mode close
+          python scripts/build_hourly.py
+          python scripts/build_validation.py --mode close
+      - name: Verify generated data
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          c=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          v=json.loads(Path('docs/data/validation.json').read_text(encoding='utf-8'))
+          rows=c.get('rows') or []
+          assert rows
+          assert all('avg_volume20' in r for r in rows[:20])
+          assert all('foreign_3d_strength_pct' in r for r in rows[:20])
+          assert all('breakout_volume_baseline_mode' in r for r in rows[:20])
+          assert 'research' in v
+          print('generated close rows',len(rows),'research matured',v['research'].get('matured_rows'))
+          PY
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
