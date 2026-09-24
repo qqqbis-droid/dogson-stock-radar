@@ -219,7 +219,9 @@ def main():
             continue
         row["quote_date"] = q.get("date")
         row["quote_time"] = q.get("time")
+        row["quote_snapshot_time"] = q.get("snapshot_time")
         row["quote_source"] = q.get("source")
+        row["quote_carried"] = bool(q.get("quote_carried"))
         row["quote_close"] = q.get("close")
         if q.get("close") is not None:
             row["close"] = q.get("close")

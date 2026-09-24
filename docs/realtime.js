@@ -4,6 +4,8 @@
   const BATCH_SIZE = 5;
   const FRESHNESS_MS = 30000;
   const quotes = new Map();
+  const STORE_KEY = 'dogson-last-real-trades-v1';
+  const STORE_MAX_AGE = 8*60*60*1000;
   let lastSuccessAt = 0;
   let latestQuoteLabel = '';
   let busy = false;
@@ -31,6 +33,26 @@
     return out;
   }
   function n(v){const x=Number(v);return Number.isFinite(x)?x:null}
+  function quoteEpoch(v){const d=toDate(v);return d?d.getTime():0}
+  function setQuote(code,q){
+    const old=quotes.get(code);const nt=quoteEpoch(q?.time),ot=quoteEpoch(old?.time);
+    if(!old||!ot||!nt||nt>=ot)quotes.set(code,q);
+  }
+  function saveStored(){
+    try{const o={};for(const [c,q] of quotes)o[c]=q;localStorage.setItem(STORE_KEY,JSON.stringify({savedAt:Date.now(),quotes:o}))}catch{}
+  }
+  function loadStored(){
+    try{const o=JSON.parse(localStorage.getItem(STORE_KEY)||'{}');if(!o?.savedAt||Date.now()-o.savedAt>STORE_MAX_AGE)return;
+      for(const [c,q] of Object.entries(o.quotes||{})){if(/^\d{4}$/.test(c)&&n(q?.price)!=null)setQuote(c,q)}
+    }catch{}
+  }
+  function seedFromRows(){
+    try{for(const r of (typeof intraRows!=='undefined'&&Array.isArray(intraRows)?intraRows:[])){
+      const c=String(r.code||''),px=n(r.quote_close),qd=String(r.quote_date||''),qt=String(r.quote_time||'');if(!/^\d{4}$/.test(c)||px==null||!qd||!qt)continue;
+      const ms=Date.parse(`${qd}T${qt.length===5?qt+':00':qt}+08:00`);if(!Number.isFinite(ms)||Date.now()-ms>STORE_MAX_AGE)continue;
+      setQuote(c,{price:px,change:n(r.day_change),time:ms,receivedAt:Date.now(),source:r.quote_source||'TWSE MIS last trade'});
+    }}catch{}
+  }
   function fmtPrice(v){if(v==null)return'—';return v>=1000?v.toFixed(0):v>=100?v.toFixed(1):v.toFixed(2)}
   function fmtPct(v){if(v==null)return'—';return `${v>=0?'+':''}${v.toFixed(2)}%`}
   function toDate(v){const x=n(v);if(!x)return null;let ms=x;if(ms>1e14)ms/=1000;else if(ms<1e12)ms*=1000;const d=new Date(ms);return Number.isNaN(d.getTime())?null:d}
@@ -96,12 +118,12 @@
     busy=true;try{
       const endpoint=apiUrl(),batches=[];for(let i=0;i<codes.length;i+=BATCH_SIZE)batches.push(codes.slice(i,i+BATCH_SIZE));
       const results=await Promise.allSettled(batches.map(b=>fetchBatch(endpoint,b)));let count=0,newest=null;
-      for(const rr of results){if(rr.status!=='fulfilled')continue;for(const x of rr.value){const code=String(x.code||''),price=n(x.price);if(!/^\d{4}$/.test(code)||price==null)continue;quotes.set(code,{price,change:n(x.changePct),time:x.time,receivedAt:Date.now()});count++;const d=toDate(x.time);if(d&&(!newest||d>newest))newest=d}}
+      for(const rr of results){if(rr.status!=='fulfilled')continue;for(const x of rr.value){const code=String(x.code||''),price=n(x.price);if(!/^\d{4}$/.test(code)||price==null)continue;setQuote(code,{price,change:n(x.changePct),time:x.time,receivedAt:Date.now(),source:'TWSE MIS live trade'});count++;const d=toDate(x.time);if(d&&(!newest||d>newest))newest=d}}
       if(!count)throw new Error('no quotes');lastSuccessAt=Date.now();latestQuoteLabel=(newest||new Date()).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
-      status(`🟢 官方近即時 ${latestQuoteLabel}｜更新 ${count}/${codes.length} 檔｜每10秒｜5分K結構分開顯示`);applyQuotes();checkRadarFreshness();
+      saveStored();status(`🟢 官方近即時 ${latestQuoteLabel}｜新成交 ${count}/${codes.length} 檔｜其餘沿用最後真實成交｜每10秒`);applyQuotes();checkRadarFreshness();
     }catch(e){const age=lastSuccessAt?Math.round((Date.now()-lastSuccessAt)/1000):null;status(age!=null?`⚠️ 官方即時行情暫斷｜上次成功 ${age} 秒前｜5分K雷達仍可用`:'⚠️ 官方即時行情連線中｜5分K雷達仍可用','bad');applyQuotes();checkRadarFreshness()}finally{busy=false}
   }
-  function boot(){ensureStyles();applyQuotes();refresh();setTimeout(checkRadarFreshness,1000);setInterval(refresh,REFRESH_MS);setInterval(checkRadarFreshness,FRESHNESS_MS);
+  function boot(){ensureStyles();loadStored();seedFromRows();applyQuotes();refresh();setTimeout(checkRadarFreshness,1000);setInterval(refresh,REFRESH_MS);setInterval(checkRadarFreshness,FRESHNESS_MS);
     const cards=document.getElementById('cards');if(cards){let t;new MutationObserver(()=>{clearTimeout(t);t=setTimeout(()=>{applyQuotes();refresh()},250)}).observe(cards,{childList:true,subtree:true})}
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});let scrollTimer;addEventListener('scroll',()=>{clearTimeout(scrollTimer);scrollTimer=setTimeout(refresh,180)},{passive:true});document.getElementById('q')?.addEventListener('change',refresh);document.getElementById('scan')?.addEventListener('click',()=>setTimeout(refresh,150));document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>setTimeout(()=>{applyQuotes();refresh();checkRadarFreshness()},50)));
   }
