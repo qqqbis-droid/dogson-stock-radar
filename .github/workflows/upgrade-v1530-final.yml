@@ -39,6 +39,9 @@ jobs:
           grep -q 'DAYTRADE_WEIGHTS' scripts/build_daytrade.py
           grep -q 'data-mode="daytrade"' docs/index.html
 
+      - name: Compile patch modules first
+        run: python -m py_compile scripts/patch_v1530.py scripts/patch_v1530b.py
+
       - name: Patch backend decision engine
         run: python -c 'import scripts.patch_v1530b as p; p.patch_build_data()'
       - name: Patch MIS bridge
@@ -58,7 +61,7 @@ jobs:
 
       - name: Verify Python and JavaScript syntax
         run: |
-          python -m py_compile scripts/patch_v1530.py scripts/patch_v1530b.py scripts/build_data.py scripts/bridge_intraday.py scripts/build_validation.py scripts/build_daytrade.py
+          python -m py_compile scripts/build_data.py scripts/bridge_intraday.py scripts/build_validation.py scripts/build_daytrade.py
           python - <<'PY'
           from pathlib import Path
           import re
@@ -103,7 +106,6 @@ jobs:
           if '_attach_completion_context(out_rows, close_map)' not in bridge:
             raise SystemExit('MIS bridge does not refresh completion context')
 
-          # Preserve score architecture exactly.
           for x in ['"price_structure": 30','"flow_volume": 25','"relative_strength": 15','"sector": 20','"liquidity_risk": 10']:
             if x not in bd: raise SystemExit('intraday architecture changed '+x)
           if '{"technical": 50.0, "chip": 25.0, "sector": 15.0, "liquidity": 10.0}' not in bv:
@@ -126,7 +128,6 @@ jobs:
             if cov < int(len(irows)*.95): raise SystemExit('execution pattern coverage low')
           if not dt.get('rows'): raise SystemExit('daytrade data empty')
 
-          # Synthetic semantic checks.
           spec=importlib.util.spec_from_file_location('bd','scripts/build_data.py')
           m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
           ci=m._chip_intensity_fields({'avg_volume20_shares':1_000_000,'foreign_3d_net':180_000,'trust_net_latest':20_000})
