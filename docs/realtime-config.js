@@ -1,4 +1,4 @@
-// v1.6.5 near-real-time quote backend + decision filters + unified semantic dashboard colors.
+// v1.6.6 near-real-time quote backend + decision filters + additive portfolio card UI.
 window.DOGSON_REALTIME_API = window.DOGSON_REALTIME_API || "";
 
 // Keep optional modules separate from the core page so a data-source/UI issue
@@ -14,7 +14,7 @@ if (!document.getElementById('dogson-hourly-module')) {
 if (!document.getElementById('dogson-decision-filters')) {
   const s = document.createElement('script');
   s.id = 'dogson-decision-filters';
-  s.src = './ui-filters.js?v=1650';
+  s.src = './ui-filters.js?v=1660';
   s.async = true;
   document.head.appendChild(s);
 }
