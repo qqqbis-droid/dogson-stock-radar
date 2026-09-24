@@ -1,0 +1,59 @@
+name: Install Last Trade Cache
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/last-trade-cache.trigger"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dogson-live-patch
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply backend last-trade persistence
+        run: python scripts/patch_last_trade_cache.py
+      - name: Apply bridge metadata
+        run: python scripts/patch_bridge_quote_meta.py
+      - name: Apply mobile realtime persistence
+        run: python scripts/patch_realtime_persistence.py
+      - name: Verify syntax and contract
+        run: |
+          python -m py_compile scripts/build_data.py scripts/bridge_intraday.py
+          node --check docs/realtime.js
+          python - <<'PY'
+          from pathlib import Path
+          b=Path('scripts/build_data.py').read_text(encoding='utf-8')
+          r=Path('docs/realtime.js').read_text(encoding='utf-8')
+          br=Path('scripts/bridge_intraday.py').read_text(encoding='utf-8')
+          for x in ['TWSE MIS last-trade cache','rounds = 3','cached_z','snapshot_time']:
+              assert x in b, x
+          for x in ['dogson-last-real-trades-v1','seedFromRows','saveStored','其餘沿用最後真實成交']:
+              assert x in r, x
+          for x in ['quote_snapshot_time','quote_carried']:
+              assert x in br, x
+          print('last-trade persistence contract OK')
+          PY
+      - name: Commit production fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py scripts/bridge_intraday.py docs/realtime.js
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Persist last real MIS trade across snapshots"
+            git push
+          fi
