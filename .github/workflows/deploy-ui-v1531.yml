@@ -1,4 +1,4 @@
-name: Deploy Radar v1.6.6 UI
+name: Deploy Radar v1.6.7 UI
 
 on:
   push:
@@ -35,6 +35,7 @@ jobs:
           node --check docs/ui-layout-v162.js
           node --check docs/ui-card-v164.js
           node --check docs/ui-card-v166.js
+          node --check docs/ui-fold-v167.js
           node --check docs/realtime.js
           node --check docs/sw.js
           test -s docs/contrast-v160.css
@@ -44,12 +45,12 @@ jobs:
           test -s docs/redesign-v164.css
           test -s docs/redesign-v165.css
           test -s docs/redesign-v166.css
-          grep -q "ui-filters.js?v=1660" docs/realtime-config.js
-          grep -q "redesign-v166.css" docs/ui-filters.js
-          grep -q "ui-card-v166.js" docs/ui-filters.js
+          grep -q "ui-filters.js?v=1670" docs/realtime-config.js
+          grep -q "ui-fold-v167.js" docs/ui-filters.js
+          grep -q "dogson-free-v1670" docs/sw.js
+          grep -q "dogson-card-details" docs/ui-fold-v167.js
+          grep -q "openState" docs/ui-fold-v167.js
           ! grep -q "ui-interactions-v163.js" docs/ui-filters.js
-          grep -q "dogson-portfolio-addon-v166" docs/ui-card-v166.js
-          grep -q "dogson-free-v1660" docs/sw.js
           grep -q "多時間框架" docs/ui-polish-v160.js
           grep -q "最近一筆成交價" docs/realtime.js
       - uses: actions/configure-pages@v5
