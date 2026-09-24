@@ -1,0 +1,152 @@
+/* v1.6.0 contrast pass: light mode only.
+   Goal: keep the calm light dashboard while eliminating legacy dark-theme
+   text colors that become too faint on white / warm-gray surfaces. */
+
+html[data-dogson-theme="light"]{
+  --dogson-ink:#26312c;
+  --dogson-ink-2:#45564e;
+  --dogson-muted-strong:#5f6e67;
+  --dogson-accent-strong:#315f52;
+}
+
+html[data-dogson-theme="light"] body{
+  color:var(--dogson-ink)!important;
+}
+
+/* Navigation, search and common controls */
+html[data-dogson-theme="light"] .dogson-view-main button{
+  color:#506159!important;
+}
+html[data-dogson-theme="light"] .dogson-view-main button.active{
+  color:#214a3d!important;
+}
+html[data-dogson-theme="light"] .dogson-quick button,
+html[data-dogson-theme="light"] .decision-filterbtn{
+  color:#53645d!important;
+}
+html[data-dogson-theme="light"] .search::placeholder{
+  color:#7a8781!important;
+  opacity:1!important;
+}
+html[data-dogson-theme="light"] .dogson-card-details>summary,
+html[data-dogson-theme="light"] .dogson-more-market>summary{
+  color:#405149!important;
+}
+
+/* First-use help: remove white / pale-blue text left from the old dark UI */
+html[data-dogson-theme="light"] .help summary{
+  color:#45564e!important;
+}
+html[data-dogson-theme="light"] .helptext,
+html[data-dogson-theme="light"] .guide-card,
+html[data-dogson-theme="light"] .guide-intro,
+html[data-dogson-theme="light"] .guide-line{
+  color:#2f3a35!important;
+}
+html[data-dogson-theme="light"] .helptext b,
+html[data-dogson-theme="light"] .guide-key{
+  color:#21302a!important;
+}
+html[data-dogson-theme="light"] .guide-title{
+  color:#315f52!important;
+}
+html[data-dogson-theme="light"] .guide-formula,
+html[data-dogson-theme="light"] .guide-mini{
+  color:#617069!important;
+}
+html[data-dogson-theme="light"] .guide-tip{
+  background:#edf4f0!important;
+  color:#3b4d45!important;
+  border-left-color:#6c9584!important;
+}
+html[data-dogson-theme="light"] .guide-warn{
+  color:#795b17!important;
+}
+
+/* Decision / stage / multi-timeframe detail cards */
+html[data-dogson-theme="light"] .entrytitle,
+html[data-dogson-theme="light"] .stagetitle,
+html[data-dogson-theme="light"] .mtftitle,
+html[data-dogson-theme="light"] .portfolio-decision-title,
+html[data-dogson-theme="light"] .daytradetitle{
+  color:#52635b!important;
+}
+html[data-dogson-theme="light"] .mtflabel{
+  color:#315f52!important;
+}
+html[data-dogson-theme="light"] .mtfcellv{
+  color:#26312c!important;
+}
+html[data-dogson-theme="light"] .mtfcelll,
+html[data-dogson-theme="light"] .mtfnote,
+html[data-dogson-theme="light"] .entrynote,
+html[data-dogson-theme="light"] .portfolio-decision-note{
+  color:#64736c!important;
+}
+html[data-dogson-theme="light"] .entrymeta span,
+html[data-dogson-theme="light"] .reason,
+html[data-dogson-theme="light"] .portfolio-decision-reasons span{
+  background:#f1f4f2!important;
+  border-color:#dfe5e1!important;
+  color:#56675f!important;
+}
+
+/* Portfolio buttons and labels should look like light-mode controls, not old navy pills */
+html[data-dogson-theme="light"] .portfolio-mini{
+  background:#edf4f0!important;
+  border-color:#cbdcd3!important;
+  color:#315f52!important;
+}
+html[data-dogson-theme="light"] .portfolio-mini.held{
+  background:#faf3df!important;
+  border-color:#dfcf9f!important;
+  color:#795b17!important;
+}
+html[data-dogson-theme="light"] .portfolio-editbtn,
+html[data-dogson-theme="light"] .peerpeekbtn,
+html[data-dogson-theme="light"] .rotationtoggle{
+  background:#eaf2ee!important;
+  border-color:#c9dbd1!important;
+  color:#315f52!important;
+}
+html[data-dogson-theme="light"] .peerpeekbtn.secondary{
+  background:#f3f5f3!important;
+  border-color:#dfe5e1!important;
+  color:#53645d!important;
+}
+html[data-dogson-theme="light"] .portfolio-reason b,
+html[data-dogson-theme="light"] .portfolio-metric-l,
+html[data-dogson-theme="light"] .portfolio-summary-l,
+html[data-dogson-theme="light"] .peerpeekl{
+  color:#64736c!important;
+}
+
+/* Misc secondary text that still inherited pale dark-theme colors */
+html[data-dogson-theme="light"] .rotationnums,
+html[data-dogson-theme="light"] .closeflowitem,
+html[data-dogson-theme="light"] .closeflowpreviewitem{
+  color:#56675f!important;
+}
+html[data-dogson-theme="light"] .rotationopen,
+html[data-dogson-theme="light"] .rotationmember .rmscore{
+  color:#315f52!important;
+}
+
+/* Tiny copy is harder to read on phones; slightly raise its floor. */
+@media(max-width:720px){
+  html[data-dogson-theme="light"] .mtfcelll,
+  html[data-dogson-theme="light"] .mtfnote,
+  html[data-dogson-theme="light"] .entrynote,
+  html[data-dogson-theme="light"] .portfolio-decision-note,
+  html[data-dogson-theme="light"] .changeeventreason{
+    font-size:10px!important;
+    line-height:1.5!important;
+  }
+  html[data-dogson-theme="light"] .helptext{
+    font-size:12.5px!important;
+    line-height:1.7!important;
+  }
+  html[data-dogson-theme="light"] .guide-title{
+    font-size:14px!important;
+  }
+}
