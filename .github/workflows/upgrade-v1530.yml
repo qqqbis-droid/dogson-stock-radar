@@ -37,7 +37,7 @@ jobs:
           grep -q 'def calibrated_weights' scripts/build_validation.py
 
       - name: Patch backend decision engine
-        run: python -c 'import scripts.patch_v1530 as p; p.patch_build_data()'
+        run: python -c 'import scripts.patch_v1530b as p; p.patch_build_data()'
       - name: Patch MIS bridge
         run: python -c 'import scripts.patch_v1530 as p; p.patch_bridge()'
       - name: Patch historical validation
@@ -55,7 +55,7 @@ jobs:
 
       - name: Verify Python syntax
         run: |
-          python -m py_compile scripts/patch_v1530.py scripts/build_data.py scripts/bridge_intraday.py scripts/build_validation.py scripts/build_daytrade.py
+          python -m py_compile scripts/patch_v1530.py scripts/patch_v1530b.py scripts/build_data.py scripts/bridge_intraday.py scripts/build_validation.py scripts/build_daytrade.py
 
       - name: Verify six completion contracts
         run: |
