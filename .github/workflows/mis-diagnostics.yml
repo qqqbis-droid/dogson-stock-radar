@@ -1,0 +1,33 @@
+name: Install MIS Diagnostics
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/mis-diag.trigger"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dogson-mis-diagnostics
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/patch_mis_diag.py
+      - run: python -m py_compile scripts/build_data.py
+      - name: Commit diagnostics
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py
+          git diff --cached --quiet || git commit -m "Instrument MIS quote coverage"
+          git push
