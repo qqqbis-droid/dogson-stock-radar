@@ -7,7 +7,7 @@ on:
       - "scripts/bridge_intraday.py"
       - "scripts/sync_live_data.py"
       - "scripts/build_validation.py"
-      - "scripts/build_daytrade.py"
+      - "scripts/build_daytrade.py"\n      - "scripts/build_completion.py"
       - ".github/workflows/intraday.yml"
   schedule:
     # 台灣時間約 09:00~13:59；GitHub cron 可能延遲數分鐘。
