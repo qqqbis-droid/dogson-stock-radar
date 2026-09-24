@@ -23,6 +23,87 @@
 /* Key reasons remain visible for holdings too. */
 .card.dogson-v166-card .dogson-key-reasons{display:block!important}
 
+/* v1.6.7.2 — portfolio light-mode contrast repair.
+   Keep every inventory surface light with dark text; presentation only. */
+.portfolio-summary{
+  background:#FFFFFF!important;
+  border-color:#DCE6E1!important;
+  color:#26332E!important;
+}
+.portfolio-summary-title{color:#26332E!important}
+.portfolio-summary-sub{color:#74817B!important}
+.portfolio-summary-item{
+  background:#F6F9F7!important;
+  border-color:#DCE6E1!important;
+  color:#26332E!important;
+  box-shadow:none!important;
+}
+.portfolio-summary-v{color:#20312A!important}
+.portfolio-summary-l{color:#74817B!important}
+.portfolio-summary-v.pnl.up{color:#C84C4C!important}
+.portfolio-summary-v.pnl.down{color:#2D8A63!important}
+
+.portfoliobox{
+  background:#F7FAF8!important;
+  border-color:#D9E5DF!important;
+  color:#26332E!important;
+  box-shadow:none!important;
+}
+.portfolio-title{color:#26332E!important}
+.portfolio-editbtn{
+  background:#EFF6F2!important;
+  border-color:#BFD5C9!important;
+  color:#2B6650!important;
+  box-shadow:none!important;
+}
+.portfolio-metric{
+  background:#FFFFFF!important;
+  border-color:#DCE6E1!important;
+  color:#26332E!important;
+}
+.portfolio-metric-v{color:#20312A!important}
+.portfolio-metric-l{color:#74817B!important}
+.portfolio-metric-v.pnl.up{color:#C84C4C!important}
+.portfolio-metric-v.pnl.down{color:#2D8A63!important}
+.portfolio-status.valid{background:#EAF5EF!important;color:#255F49!important;border:1px solid #A9CBB9!important}
+.portfolio-status.weak{background:#FFF6DC!important;color:#7B590B!important;border:1px solid #D7B553!important}
+.portfolio-status.invalid{background:#FCEBED!important;color:#A23A45!important;border:1px solid #D99BA2!important}
+.portfolio-system{color:#6F7F77!important}
+.portfolio-system.warn{color:#8B681B!important}
+.portfolio-system.bad{color:#A23A45!important}
+.portfolio-reason{
+  background:#FFFFFF!important;
+  border-color:#DCE6E1!important;
+  color:#33413B!important;
+}
+.portfolio-reason b{color:#6F7F77!important}
+.portfolio-fallback{color:#8B681B!important}
+
+.portfolio-modal{
+  background:#FFFFFF!important;
+  border-color:#D9E3DE!important;
+  color:#26332E!important;
+  box-shadow:0 18px 50px rgba(30,45,38,.18)!important;
+}
+.portfolio-modal-title{color:#26332E!important}
+.portfolio-close{
+  background:#F3F6F4!important;
+  border:1px solid #DCE4E0!important;
+  color:#4E5E56!important;
+}
+.portfolio-field label{color:#66766F!important}
+.portfolio-input,.portfolio-textarea,.portfolio-select{
+  background:#F8FAF8!important;
+  color:#26332E!important;
+  border-color:#D9E3DE!important;
+  caret-color:#315F52!important;
+}
+.portfolio-input::placeholder,.portfolio-textarea::placeholder{color:#99A49E!important}
+.portfolio-save{background:#EAF5EF!important;border-color:#9EC7B2!important;color:#255F49!important}
+.portfolio-remove{background:#FCEBED!important;border-color:#D99BA2!important;color:#A23A45!important}
+.portfolio-cancel{background:#F3F6F4!important;border-color:#DCE4E0!important;color:#52615A!important}
+.portfolio-privacy{color:#74817B!important}
+
 html[data-dogson-theme="dark"] .card.dogson-v166-card .dogson-card-brief .dogson-card-headline{color:#E4ECE8!important}
 html[data-dogson-theme="dark"] .dogson-portfolio-addon-v166{background:#17211D;border-color:#32423A;color:#DCE6E1}
 html[data-dogson-theme="dark"] .dogson-portfolio-addon-title-v166{color:#AFC0B8}
@@ -32,6 +113,28 @@ html[data-dogson-theme="dark"] .dogson-portfolio-addon-facts-v166 b{color:#D5E1D
 html[data-dogson-theme="dark"] .dogson-portfolio-addon-head-v166{color:#E2EBE6}
 html[data-dogson-theme="dark"] .dogson-portfolio-addon-status-v166,
 html[data-dogson-theme="dark"] .dogson-portfolio-addon-reason-v166{color:#98A79F}
+
+/* Explicit dark-mode inventory palette so the light repair never creates low contrast. */
+html[data-dogson-theme="dark"] .portfolio-summary,
+html[data-dogson-theme="dark"] .portfoliobox,
+html[data-dogson-theme="dark"] .portfolio-modal{background:#202522!important;border-color:#343B37!important;color:#E8EEEA!important}
+html[data-dogson-theme="dark"] .portfolio-summary-title,
+html[data-dogson-theme="dark"] .portfolio-modal-title,
+html[data-dogson-theme="dark"] .portfolio-title{color:#EEF2EF!important}
+html[data-dogson-theme="dark"] .portfolio-summary-item,
+html[data-dogson-theme="dark"] .portfolio-metric,
+html[data-dogson-theme="dark"] .portfolio-reason,
+html[data-dogson-theme="dark"] .portfolio-input,
+html[data-dogson-theme="dark"] .portfolio-textarea,
+html[data-dogson-theme="dark"] .portfolio-select{background:#252B27!important;border-color:#3A443E!important;color:#E6ECE8!important}
+html[data-dogson-theme="dark"] .portfolio-summary-v,
+html[data-dogson-theme="dark"] .portfolio-metric-v{color:#EEF2EF!important}
+html[data-dogson-theme="dark"] .portfolio-summary-l,
+html[data-dogson-theme="dark"] .portfolio-metric-l,
+html[data-dogson-theme="dark"] .portfolio-summary-sub,
+html[data-dogson-theme="dark"] .portfolio-reason b,
+html[data-dogson-theme="dark"] .portfolio-field label,
+html[data-dogson-theme="dark"] .portfolio-privacy{color:#9AA69F!important}
 
 @media(max-width:620px){
   .dogson-portfolio-addon-v166{padding:9px 10px;border-radius:12px}
