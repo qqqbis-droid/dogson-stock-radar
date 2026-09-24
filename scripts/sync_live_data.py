@@ -3,6 +3,8 @@
 """從目前 GitHub Pages 把上一版 data JSON 拉回 Actions 工作目錄。
 讓盤中 workflow 不必每 5 分鐘重跑全市場日K/籌碼，並保留逐日籌碼歷史、60K盤後快照，
 以及 v1.4.2 的 TWSE MIS 盤中快照橋接歷史、Step 7 驗證歷史、Step 8 當沖衍生資料。
+
+2026-09-24：觸發盤中重建，驗證 last-trade persistence + snapshot/trade time 分離。
 """
 from pathlib import Path
 import os
