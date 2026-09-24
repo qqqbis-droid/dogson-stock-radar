@@ -1,0 +1,57 @@
+name: Install MIS Snapshot Visibility
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/mis-snapshot-visibility.trigger"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dogson-live-patch
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Add full MIS snapshot metadata
+        run: python scripts/patch_mis_snapshot_visibility.py
+      - name: Add mobile orderbook fallback UI
+        run: python scripts/patch_realtime_snapshot_ui.py
+      - name: Verify Python and JavaScript
+        run: |
+          python -m py_compile scripts/build_data.py scripts/bridge_intraday.py
+          node --check docs/realtime.js
+          python - <<'PY'
+          from pathlib import Path
+          b=Path('scripts/build_data.py').read_text(encoding='utf-8')
+          br=Path('scripts/bridge_intraday.py').read_text(encoding='utf-8')
+          js=Path('docs/realtime.js').read_text(encoding='utf-8')
+          for x in ['TWSE MIS orderbook snapshot','"bid1": meta.get("bid1")','"quote_has_trade": False']:
+              assert x in b, x
+          for x in ['quote_bid1','quote_ask1','quote_snapshot_time']:
+              assert x in br, x
+          for x in ['const snapshots = new Map()','MIS 買一｜非成交價','無成交顯示買一/賣一','snapshotCount']:
+              assert x in js, x
+          print('MIS snapshot visibility contract OK')
+          PY
+      - name: Commit production changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/build_data.py scripts/bridge_intraday.py docs/realtime.js
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Show live MIS snapshots when no trade prints"
+            git push
+          fi
