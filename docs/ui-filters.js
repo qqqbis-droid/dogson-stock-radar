@@ -3,7 +3,7 @@
   window.__DOGSON_UI_LOADER_V160__ = true;
   const src=document.currentScript?.src||location.href;
   const base=new URL('.',src);
-  const version='1600-4';
+  const version='1601';
 
   function loadCss(name,id){
     if(document.getElementById(id)) return;
@@ -24,5 +24,6 @@
   loadCss('contrast-v160.css','dogson-dashboard-contrast-css');
   loadScript('ui-filters-core-v1531.js','dogson-filter-core-v1531')
     .then(()=>loadScript('redesign-v160.js','dogson-redesign-v160'))
+    .then(()=>loadScript('ui-polish-v160.js','dogson-ui-polish-v160'))
     .catch(err=>console.warn('Dogson UI module load failed',err));
 })();
