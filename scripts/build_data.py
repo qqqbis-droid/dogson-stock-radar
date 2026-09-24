@@ -2631,6 +2631,11 @@ def intraday_stock_snapshot(universe_df, codes=None):
                         "snapshot_time": tm,
                         "prev_close": prev,
                         "volume_lots": fnum(x.get("v")),
+                        "bid1": fnum(str(x.get("b") or "").split("_")[0]),
+                        "ask1": fnum(str(x.get("a") or "").split("_")[0]),
+                        "open": fnum(x.get("o")),
+                        "high": fnum(x.get("h")),
+                        "low": fnum(x.get("l")),
                         "market": x.get("ex"),
                     }
                     latest_meta[code] = meta
@@ -2654,11 +2659,31 @@ def intraday_stock_snapshot(universe_df, codes=None):
         if tr is None:
             tr = cached.get(code)
             carried = tr is not None
+        prev = meta.get("prev_close")
         if tr is None:
+            # No trade happened exactly during our sampling window.  Still keep
+            # the official order-book snapshot so the UI can prove the market
+            # data is fresh without inventing a transaction price.
             diag["missing"] += 1
+            out[code] = {
+                "date": today_s,
+                "time": None,
+                "snapshot_time": meta.get("snapshot_time"),
+                "close": None,
+                "prev_close": prev,
+                "change_pct": None,
+                "volume_lots": meta.get("volume_lots"),
+                "bid1": meta.get("bid1"),
+                "ask1": meta.get("ask1"),
+                "open": meta.get("open"),
+                "high": meta.get("high"),
+                "low": meta.get("low"),
+                "source": "TWSE MIS orderbook snapshot",
+                "quote_carried": False,
+                "quote_has_trade": False,
+            }
             continue
         last = float(tr["close"])
-        prev = meta.get("prev_close")
         out[code] = {
             "date": today_s,
             "time": tr.get("time"),              # last REAL trade we observed
@@ -2667,8 +2692,14 @@ def intraday_stock_snapshot(universe_df, codes=None):
             "prev_close": prev,
             "change_pct": ((last / prev - 1) * 100) if prev and prev > 0 else None,
             "volume_lots": meta.get("volume_lots"),
+            "bid1": meta.get("bid1"),
+            "ask1": meta.get("ask1"),
+            "open": meta.get("open"),
+            "high": meta.get("high"),
+            "low": meta.get("low"),
             "source": "TWSE MIS last-trade cache" if carried else "TWSE MIS live trade",
             "quote_carried": bool(carried),
+            "quote_has_trade": True,
         }
         if carried:
             diag["cached_z"] += 1

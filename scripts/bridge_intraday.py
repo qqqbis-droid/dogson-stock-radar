@@ -226,6 +226,10 @@ def main():
         row["quote_snapshot_time"] = q.get("snapshot_time")
         row["quote_source"] = q.get("source")
         row["quote_carried"] = bool(q.get("quote_carried"))
+        row["quote_has_trade"] = bool(q.get("quote_has_trade", q.get("close") is not None))
+        row["quote_bid1"] = q.get("bid1")
+        row["quote_ask1"] = q.get("ask1")
+        row["quote_volume_lots"] = q.get("volume_lots")
         row["quote_close"] = q.get("close")
         if q.get("close") is not None:
             row["close"] = q.get("close")
@@ -268,7 +272,8 @@ def main():
             row["quote_source"] = q.get("source")
             row["quote_carried"] = bool(q.get("quote_carried"))
             row["quote_close"] = q.get("close")
-            row["close"] = q.get("close")
+            if q.get("close") is not None:
+                row["close"] = q.get("close")
             if q.get("change_pct") is not None:
                 row["day_change"] = round(float(q.get("change_pct")), 2)
             if row.get("vwap"):
