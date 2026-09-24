@@ -45,9 +45,9 @@ jobs:
           test -s docs/redesign-v164.css
           test -s docs/redesign-v165.css
           test -s docs/redesign-v166.css
-          grep -q "ui-filters.js?v=1670" docs/realtime-config.js
+          grep -q "ui-filters.js?v=1671" docs/realtime-config.js
           grep -q "ui-fold-v167.js" docs/ui-filters.js
-          grep -q "dogson-free-v1670" docs/sw.js
+          grep -q "dogson-free-v1671" docs/sw.js
           grep -q "dogson-card-details" docs/ui-fold-v167.js
           grep -q "openState" docs/ui-fold-v167.js
           ! grep -q "ui-interactions-v163.js" docs/ui-filters.js
