@@ -68,13 +68,26 @@
     return chip;
   }
 
+  function signalSpec(card){
+    return [['cat','stage'],['entrylight','entry'],['quality','quality']].map(([cls,type])=>{
+      const src=source(card,cls);if(!src)return null;
+      return {cls,type,text:shortLabel(type,src.textContent||''),full:src.textContent||''};
+    }).filter(Boolean);
+  }
+
   function dedupeStrip(card){
     const strips=$$('.dogson-action-strip-v164',card);
     if(!strips.length)return null;
     const keep=strips[0];strips.slice(1).forEach(x=>x.remove());
     const signals=$('.dogson-signal-buttons-v164',keep);if(!signals)return keep;
-    signals.innerHTML='';
-    [['cat','stage'],['entrylight','entry'],['quality','quality']].forEach(([cls,type])=>{const chip=cloneSignal(card,cls,type);if(chip)signals.appendChild(chip)});
+    const spec=signalSpec(card);
+    const sig=spec.map(x=>`${x.type}|${x.text}|${x.full}`).join('||');
+    if(signals.dataset.v166Sig!==sig){
+      const frag=document.createDocumentFragment();
+      spec.forEach(({cls,type})=>{const chip=cloneSignal(card,cls,type);if(chip)frag.appendChild(chip)});
+      signals.replaceChildren(frag);
+      signals.dataset.v166Sig=sig;
+    }
     const actions=$('.dogson-card-actions-v164',keep);
     if(actions){
       const btns=$$('.portfolio-mini',card);
@@ -144,9 +157,10 @@
   function schedule(){if(busy)return;clearTimeout(timer);timer=setTimeout(run,80)}
   function start(){
     run();
+    const root=$('#cards');
     const obs=new MutationObserver(schedule);
-    if(document.body)obs.observe(document.body,{subtree:true,childList:true});
-    setTimeout(run,250);setTimeout(run,900);setInterval(run,3500);
+    if(root)obs.observe(root,{subtree:true,childList:true});
+    setTimeout(run,250);setTimeout(run,900);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
