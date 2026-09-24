@@ -1,0 +1,74 @@
+name: Verify Radar v1.5.30 Completion
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1530.trigger"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1530-verify
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Sync last live state
+        run: python scripts/sync_live_data.py || true
+      - name: Rebuild close completion layer
+        run: python scripts/build_completion.py --mode close
+      - name: Rebuild intraday completion layer
+        run: python scripts/build_completion.py --mode intraday
+      - name: Rebuild independent daytrade from enriched intraday
+        run: python scripts/build_daytrade.py
+      - name: Verify v1.5.30 contract
+        run: |
+          python -m py_compile scripts/build_completion.py scripts/build_validation.py scripts/build_daytrade.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          close=json.loads(Path("docs/data/close.json").read_text(encoding="utf-8"))
+          intra=json.loads(Path("docs/data/intraday.json").read_text(encoding="utf-8"))
+          status=json.loads(Path("docs/data/status.json").read_text(encoding="utf-8"))
+          ui=Path("docs/index.html").read_text(encoding="utf-8")
+          sync=Path("scripts/sync_live_data.py").read_text(encoding="utf-8")
+          val=Path("scripts/build_validation.py").read_text(encoding="utf-8")
+          assert status.get("version")=="1.5.30-free"
+          assert status.get("completion_version")=="1.0"
+          assert "decision_history.json" in sync
+          for x in ["foreign_3d_strength_pct","breakout_volume_ratio","execution_pattern","today_direction"]:
+              assert x in val, x
+          for x in ["可考慮加碼","今日累積總覽","completionHTML","外資3日力度","突破量/自身基準"]:
+              assert x in ui, x
+          if intra.get("rows"):
+              r=intra["rows"][0]
+              for x in ["foreign_3d_strength_pct","breakout_volume_ratio","execution_pattern","today_change_summary","today_direction"]:
+                  assert x in r, x
+          if close.get("rows"):
+              r=close["rows"][0]
+              for x in ["foreign_3d_strength_pct","breakout_volume_ratio"]:
+                  assert x in r, x
+          print("v1.5.30 completion contract OK",len(close.get("rows") or []),len(intra.get("rows") or []))
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
