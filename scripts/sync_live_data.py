@@ -21,7 +21,7 @@ base = f"https://{owner}.github.io/{repo}/data/"
 files = [
     "universe.json", "close.json", "market.json", "intraday.json", "hourly.json", "status.json",
     "chip_history.json", "chip_status.json", "mis_snapshots.json",
-    "validation_history.json", "validation.json", "daytrade.json",
+    "validation_history.json", "validation.json", "daytrade.json", "decision_history.json",
 ]
 
 for name in files:
