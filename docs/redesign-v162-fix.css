@@ -1,0 +1,5 @@
+/* v1.6.2 final light-mode specificity fixes */
+html[data-dogson-theme="light"] .liveval.v162-up{color:#c84c4c!important}
+html[data-dogson-theme="light"] .liveval.v162-down{color:#2d8a63!important}
+html[data-dogson-theme="light"] .pnl.up,html[data-dogson-theme="light"] .flowtag.buy{color:#c84c4c!important}
+html[data-dogson-theme="light"] .pnl.down,html[data-dogson-theme="light"] .flowtag.sell{color:#2d8a63!important}
