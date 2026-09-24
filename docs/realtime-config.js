@@ -1,14 +1,20 @@
-// v1.4 near-real-time quote backend + 60K close module loader.
-// After the free Vercel API is connected, set this to e.g.
-// https://dogson-stock-radar.vercel.app
+// v1.5.31 near-real-time quote backend + decision filter module loaders.
 window.DOGSON_REALTIME_API = window.DOGSON_REALTIME_API || "";
 
-// Keep the 60K module separate from the core page so a data-source issue cannot
-// break the existing intraday / close radar rendering.
+// Keep optional modules separate from the core page so a data-source/UI issue
+// cannot break the existing intraday / close radar rendering.
 if (!document.getElementById('dogson-hourly-module')) {
   const s = document.createElement('script');
   s.id = 'dogson-hourly-module';
-  s.src = './hourly.js?v=140';
+  s.src = './hourly.js?v=1530';
+  s.async = true;
+  document.head.appendChild(s);
+}
+
+if (!document.getElementById('dogson-decision-filters')) {
+  const s = document.createElement('script');
+  s.id = 'dogson-decision-filters';
+  s.src = './ui-filters.js?v=1531';
   s.async = true;
   document.head.appendChild(s);
 }
