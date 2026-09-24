@@ -9,8 +9,14 @@ function cors(req, res) {
 }
 
 function finite(v) {
+  if (v == null || v === '' || v === '-' || v === '--') return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+function firstBook(v) {
+  const x = String(v || '').split('_')[0];
+  return finite(x);
 }
 
 function normalizeTime(v) {
@@ -35,7 +41,6 @@ export default async function handler(req, res) {
   }
   if (!codes.length) return res.status(400).json({ ok: false, error: 'codes is required' });
 
-  // 同時嘗試上市與上櫃代碼，實際有資料者才保留。
   const exCh = codes.flatMap(c => [`tse_${c}.tw`, `otc_${c}.tw`]).join('|');
   const url = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=${encodeURIComponent(exCh)}&json=1&delay=0&_=${Date.now()}`;
 
@@ -44,7 +49,7 @@ export default async function handler(req, res) {
       cache: 'no-store',
       headers: {
         'Accept': 'application/json,text/plain,*/*',
-        'User-Agent': 'Mozilla/5.0 DogsonStockRadar/1.3',
+        'User-Agent': 'Mozilla/5.0 DogsonStockRadar/1.5',
         'Referer': 'https://mis.twse.com.tw/stock/index.jsp'
       }
     });
@@ -58,28 +63,31 @@ export default async function handler(req, res) {
       if (!/^\d{4}$/.test(code) || !codes.includes(code)) continue;
       const price = finite(x.z);
       const prev = finite(x.y);
-      if (price == null || price <= 0) continue;
-      const changePct = prev != null && prev > 0 ? (price / prev - 1) * 100 : null;
+      const hasTrade = price != null && price > 0;
+      const changePct = hasTrade && prev != null && prev > 0 ? (price / prev - 1) * 100 : null;
       const q = {
         code,
         name: x.n || null,
         market: x.ex === 'otc' ? '上櫃' : x.ex === 'tse' ? '上市' : (x.ex || null),
-        price,
+        price: hasTrade ? price : null,
+        hasTrade,
         previousClose: prev,
         changePct: changePct == null ? null : Math.round(changePct * 10000) / 10000,
+        bid1: firstBook(x.b),
+        ask1: firstBook(x.a),
         open: finite(x.o),
         high: finite(x.h),
         low: finite(x.l),
         volume: finite(x.v),
         time: normalizeTime(x.tlong),
-        source: 'TWSE MIS'
+        source: hasTrade ? 'TWSE MIS live trade' : 'TWSE MIS orderbook snapshot'
       };
       const old = byCode.get(code);
-      if (!old || (x.ex === 'tse' && old.market !== '上市')) byCode.set(code, q);
+      if (!old || (x.ex === 'tse' && old.market !== '上市') || (hasTrade && !old.hasTrade)) byCode.set(code, q);
     }
 
     const quotes = codes.map(c => byCode.get(c)).filter(Boolean);
-    const errors = codes.filter(c => !byCode.has(c)).map(code => ({ code, error: 'no valid quote' }));
+    const errors = codes.filter(c => !byCode.has(c)).map(code => ({ code, error: 'no MIS snapshot' }));
     return res.status(quotes.length ? 200 : 502).json({
       ok: quotes.length > 0,
       quotes,
