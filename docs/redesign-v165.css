@@ -1,0 +1,191 @@
+/* Dogson Radar v1.6.5 — unified semantic chip color system.
+   Presentation only. No scoring / lifecycle / entry-decision logic changes. */
+
+:root{
+  --dogson-chip-border:1.5px;
+  --dogson-stage-green-bg:#EAF5EE;
+  --dogson-stage-green-bd:#AFCFBC;
+  --dogson-stage-green-tx:#236749;
+  --dogson-stage-amber-bg:#FBF4E2;
+  --dogson-stage-amber-bd:#D9BE74;
+  --dogson-stage-amber-tx:#7A5B18;
+  --dogson-stage-blue-bg:#EDF3F8;
+  --dogson-stage-blue-bd:#BFD0DD;
+  --dogson-stage-blue-tx:#3E647D;
+  --dogson-stage-orange-bg:#FFF1E7;
+  --dogson-stage-orange-bd:#E3B48B;
+  --dogson-stage-orange-tx:#955024;
+  --dogson-stage-red-bg:#FBECEE;
+  --dogson-stage-red-bd:#DDA6AB;
+  --dogson-stage-red-tx:#A13E47;
+
+  --dogson-entry-green-bg:#E8F5ED;
+  --dogson-entry-green-bd:#93C6A7;
+  --dogson-entry-green-tx:#1F6A49;
+  --dogson-entry-yellow-bg:#FFF6DC;
+  --dogson-entry-yellow-bd:#D7B553;
+  --dogson-entry-yellow-tx:#7B590B;
+  --dogson-entry-red-bg:#FCEBED;
+  --dogson-entry-red-bd:#D99BA2;
+  --dogson-entry-red-tx:#A23A45;
+
+  --dogson-quality-blue-bg:#EAF2F8;
+  --dogson-quality-blue-bd:#B8CDDd;
+  --dogson-quality-blue-tx:#3B627C;
+  --dogson-quality-neutral-bg:#F1F4F3;
+  --dogson-quality-neutral-bd:#CDD7D2;
+  --dogson-quality-neutral-tx:#586A62;
+
+  --dogson-inventory-bg:#F7FAF8;
+  --dogson-inventory-bd:#C8D8D0;
+  --dogson-inventory-tx:#486057;
+  --dogson-inventory-held-bg:#EAF5EF;
+  --dogson-inventory-held-bd:#9EC7B2;
+  --dogson-inventory-held-tx:#255F49;
+}
+
+/* One visual grammar for every pill in the decision row. */
+.dogson-action-strip-v164 .dogson-signal-btn-v164,
+.dogson-action-strip-v164 .dogson-portfolio-btn-v164{
+  min-height:34px!important;
+  height:34px!important;
+  padding:0 10px!important;
+  border-width:var(--dogson-chip-border)!important;
+  border-style:solid!important;
+  border-radius:999px!important;
+  box-shadow:none!important;
+  font-size:10.6px!important;
+  font-weight:820!important;
+  line-height:1!important;
+  letter-spacing:0!important;
+}
+
+/* Lifecycle = where the stock is in its swing lifecycle. */
+.dogson-action-strip-v164 .cat,
+.dogson-action-strip-v164 .cat.setup{
+  background:var(--dogson-stage-green-bg)!important;
+  border-color:var(--dogson-stage-green-bd)!important;
+  color:var(--dogson-stage-green-tx)!important;
+}
+.dogson-action-strip-v164 .cat.start{
+  background:var(--dogson-stage-green-bg)!important;
+  border-color:#8FC5A4!important;
+  color:#176440!important;
+}
+.dogson-action-strip-v164 .cat.pull{
+  background:var(--dogson-stage-amber-bg)!important;
+  border-color:var(--dogson-stage-amber-bd)!important;
+  color:var(--dogson-stage-amber-tx)!important;
+}
+.dogson-action-strip-v164 .cat.trendhold,
+.dogson-action-strip-v164 .cat.watch{
+  background:var(--dogson-stage-blue-bg)!important;
+  border-color:var(--dogson-stage-blue-bd)!important;
+  color:var(--dogson-stage-blue-tx)!important;
+}
+.dogson-action-strip-v164 .cat.weak{
+  background:var(--dogson-stage-orange-bg)!important;
+  border-color:var(--dogson-stage-orange-bd)!important;
+  color:var(--dogson-stage-orange-tx)!important;
+}
+.dogson-action-strip-v164 .cat.hot,
+.dogson-action-strip-v164 .cat.invalid{
+  background:var(--dogson-stage-red-bg)!important;
+  border-color:var(--dogson-stage-red-bd)!important;
+  color:var(--dogson-stage-red-tx)!important;
+}
+
+/* Entry decision = traffic-light semantics only. */
+.dogson-action-strip-v164 .entrylight.green{
+  background:var(--dogson-entry-green-bg)!important;
+  border-color:var(--dogson-entry-green-bd)!important;
+  color:var(--dogson-entry-green-tx)!important;
+}
+.dogson-action-strip-v164 .entrylight.yellow{
+  background:var(--dogson-entry-yellow-bg)!important;
+  border-color:var(--dogson-entry-yellow-bd)!important;
+  color:var(--dogson-entry-yellow-tx)!important;
+}
+.dogson-action-strip-v164 .entrylight.red{
+  background:var(--dogson-entry-red-bg)!important;
+  border-color:var(--dogson-entry-red-bd)!important;
+  color:var(--dogson-entry-red-tx)!important;
+}
+
+/* Quality / momentum = blue family, never yellow. */
+.dogson-action-strip-v164 .quality,
+.dogson-action-strip-v164 .quality.high,
+.dogson-action-strip-v164 .quality.strong{
+  background:var(--dogson-quality-blue-bg)!important;
+  border-color:var(--dogson-quality-blue-bd)!important;
+  color:var(--dogson-quality-blue-tx)!important;
+}
+.dogson-action-strip-v164 .quality:not(.high):not(.strong){
+  background:var(--dogson-quality-neutral-bg)!important;
+  border-color:var(--dogson-quality-neutral-bd)!important;
+  color:var(--dogson-quality-neutral-tx)!important;
+}
+
+/* Inventory is an action, not a signal. Keep it deliberately neutral. */
+.dogson-action-strip-v164 .dogson-portfolio-btn-v164{
+  background:var(--dogson-inventory-bg)!important;
+  border-color:var(--dogson-inventory-bd)!important;
+  color:var(--dogson-inventory-tx)!important;
+  font-weight:800!important;
+}
+.dogson-action-strip-v164 .dogson-portfolio-btn-v164.held{
+  background:var(--dogson-inventory-held-bg)!important;
+  border-color:var(--dogson-inventory-held-bd)!important;
+  color:var(--dogson-inventory-held-tx)!important;
+}
+
+/* Key reasons are evidence chips, not decisions: keep one quiet green style. */
+.card.dogson-v164-card .dogson-key-list .dogson-key-btn-v164{
+  background:#EFF7F2!important;
+  border:1px solid #C7DFD2!important;
+  color:#2D725B!important;
+  box-shadow:none!important;
+  font-weight:760!important;
+}
+
+/* Click/focus states are consistent across all decision chips. */
+.dogson-action-strip-v164 [data-dogson-quick]{
+  transition:transform .1s ease,box-shadow .12s ease,filter .1s ease!important;
+}
+.dogson-action-strip-v164 [data-dogson-quick]:active{
+  transform:scale(.965)!important;
+  filter:brightness(.965)!important;
+}
+.dogson-action-strip-v164 [data-dogson-quick]:focus-visible{
+  outline:2px solid #2A735F!important;
+  outline-offset:2px!important;
+}
+
+/* Dark mode follows the same semantic families. */
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .cat.setup,
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .cat.start{background:#193026!important;border-color:#3C7058!important;color:#A9D9BF!important}
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .cat.pull{background:#302A18!important;border-color:#705F32!important;color:#E6CD83!important}
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .cat.trendhold,
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .cat.watch{background:#1A2933!important;border-color:#405E72!important;color:#B6D2E4!important}
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .cat.weak{background:#33251B!important;border-color:#765236!important;color:#E5B486!important}
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .cat.hot,
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .cat.invalid{background:#341F22!important;border-color:#74434A!important;color:#E8B0B7!important}
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .entrylight.green{background:#173026!important;border-color:#3C7658!important;color:#A9DCBF!important}
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .entrylight.yellow{background:#322A17!important;border-color:#7E6932!important;color:#F0D37A!important}
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .entrylight.red{background:#341E22!important;border-color:#7A414A!important;color:#F0B0B8!important}
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .quality,
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .quality.high,
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .quality.strong{background:#192A35!important;border-color:#405F73!important;color:#B5D2E5!important}
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .dogson-portfolio-btn-v164{background:#1C2622!important;border-color:#405048!important;color:#BCCBC4!important}
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .dogson-portfolio-btn-v164.held{background:#193027!important;border-color:#3F715B!important;color:#A9D8C0!important}
+
+@media(max-width:620px){
+  .dogson-action-strip-v164 .dogson-signal-btn-v164,
+  .dogson-action-strip-v164 .dogson-portfolio-btn-v164{
+    min-height:33px!important;
+    height:33px!important;
+    padding-left:8px!important;
+    padding-right:8px!important;
+    font-size:10.2px!important;
+  }
+}
