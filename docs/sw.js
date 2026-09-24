@@ -1,4 +1,4 @@
-const CACHE='dogson-free-v1660';
+const CACHE='dogson-free-v1670';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
@@ -6,23 +6,24 @@ self.addEventListener('install', event => {
     caches.open(CACHE).then(cache => cache.addAll([
       './manifest.webmanifest',
       './hourly.js?v=1530',
-      './realtime-config.js?v=1660',
-      './realtime.js?v=1660',
-      './ui-filters.js?v=1660',
-      './redesign-v160.css?v=1660',
-      './redesign-v160-dark.css?v=1660',
-      './contrast-v160.css?v=1660',
-      './redesign-v162.css?v=1660',
-      './redesign-v162-fix.css?v=1660',
-      './redesign-v163.css?v=1660',
-      './redesign-v164.css?v=1660',
-      './redesign-v165.css?v=1660',
-      './redesign-v166.css?v=1660',
-      './redesign-v160.js?v=1660',
-      './ui-polish-v160.js?v=1660',
-      './ui-layout-v162.js?v=1660',
-      './ui-card-v164.js?v=1660',
-      './ui-card-v166.js?v=1660'
+      './realtime-config.js?v=1670',
+      './realtime.js?v=1670',
+      './ui-filters.js?v=1670',
+      './redesign-v160.css?v=1670',
+      './redesign-v160-dark.css?v=1670',
+      './contrast-v160.css?v=1670',
+      './redesign-v162.css?v=1670',
+      './redesign-v162-fix.css?v=1670',
+      './redesign-v163.css?v=1670',
+      './redesign-v164.css?v=1670',
+      './redesign-v165.css?v=1670',
+      './redesign-v166.css?v=1670',
+      './redesign-v160.js?v=1670',
+      './ui-polish-v160.js?v=1670',
+      './ui-layout-v162.js?v=1670',
+      './ui-card-v164.js?v=1670',
+      './ui-card-v166.js?v=1670',
+      './ui-fold-v167.js?v=1670'
     ]))
   );
 });
