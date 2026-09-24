@@ -1,4 +1,4 @@
-name: Deploy Radar v1.6.7 UI
+name: Deploy Radar v1.6.7.4 UI
 
 on:
   push:
@@ -45,8 +45,10 @@ jobs:
           test -s docs/redesign-v164.css
           test -s docs/redesign-v165.css
           test -s docs/redesign-v166.css
-          grep -q "ui-filters.js?v=1673" docs/realtime-config.js
-          grep -q "dogson-free-v1673" docs/sw.js
+          grep -q "ui-filters.js?v=1674" docs/realtime-config.js
+          grep -q "dogson-free-v1674" docs/sw.js
+          grep -q "normalizePortfolioButton" docs/ui-card-v166.js
+          grep -q "portfolioView" docs/ui-card-v166.js
           grep -q "portfolio-mini.held" docs/redesign-v165.css
           grep -q "dogson-signal-btn-v166" docs/redesign-v165.css
           grep -q "portfolio-summary-item" docs/redesign-v166.css
