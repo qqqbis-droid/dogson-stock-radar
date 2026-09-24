@@ -9,7 +9,7 @@ on:
       - "scripts/chip_data.py"
       - "scripts/build_hourly.py"
       - "scripts/sync_live_data.py"
-      - "scripts/build_validation.py"
+      - "scripts/build_validation.py"\n      - "scripts/build_completion.py"
       - "docs/hourly.js"
       - "docs/realtime-config.js"
       - ".github/workflows/close.yml"
