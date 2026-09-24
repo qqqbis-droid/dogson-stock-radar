@@ -1,0 +1,53 @@
+:root{
+  --bg:#f5f6f3!important;
+  --card:#ffffff!important;
+  --card2:#f0f3ef!important;
+  --text:#202725!important;
+  --muted:#74807b!important;
+  --line:#e1e6e2!important;
+  --accent:#315f52!important;
+  --green:#2d8a63!important;
+  --red:#c84c4c!important;
+  --gold:#a9771c!important;
+}
+html{background:#f5f6f3!important;color-scheme:light}
+body{background:#f5f6f3!important;color:#202725!important;letter-spacing:.01em}
+.wrap{max-width:900px!important;padding:14px 14px 96px!important}
+header{align-items:center!important;margin:4px 2px 12px!important}
+h1{font-size:22px!important;color:#1e2925!important;letter-spacing:-.02em}
+.sub,.marketl,.mlab,.partl,.label,.srtitle,.srbasis,.stagehint,.changesub,.validationnote,.mtfnote,.daytradesource,.note{color:#7b8782!important}
+.pill{background:#edf4f0!important;border:1px solid #d3e2da!important;color:#315f52!important;padding:6px 9px!important}
+.tabs{order:1;grid-template-columns:repeat(3,1fr)!important;gap:4px!important;background:#e9ede9!important;padding:4px!important;border:1px solid #dde3df!important;border-radius:13px!important;top:6px!important;box-shadow:0 4px 16px rgba(31,48,40,.06)}
+.tab{color:#68746f!important;padding:10px 8px!important;font-size:14px!important;border-radius:10px!important}
+.tab.active{background:#fff!important;color:#274d42!important;box-shadow:0 1px 5px rgba(33,55,45,.08)}
+.controls,.marketbox,.card,.changebox,.rotationbox,.validationbox,.entrysummary,.portfolio-summary,.help{background:#fff!important;border:1px solid #e1e6e2!important;box-shadow:0 3px 14px rgba(34,51,43,.045)!important}
+.controls{margin-top:10px!important;border-radius:15px!important;padding:10px!important}
+.search{background:#f7f9f7!important;border:1px solid #dfe5e1!important;color:#26302c!important;padding:11px 12px!important}
+.search::placeholder{color:#99a39e!important}
+.scan{background:#315f52!important;color:#fff!important;padding:11px 15px!important}
+.suggestions,.suggestion{background:#fff!important;color:#26302c!important;border-color:#e5e9e6!important}
+.filters{padding-top:8px!important}.filter{background:#f5f7f5!important;color:#60706a!important;border-color:#e0e5e1!important}.filter.on{background:#e9f2ed!important;color:#315f52!important;border-color:#bfd3c8!important}
+.marketbox{border-radius:16px!important;padding:12px!important;margin:10px 0!important;background:#fff!important}
+.marketitem,.metric,.part,.sr,.chip,.g,.guide-card,.guide-intro,.validationitem,.rotationrow,.rotationmember,.closeflowcard,.closeflowpreviewcol,.closeflowmetric,.entrycount,.changeevent,.changecount,.mtfcell,.peerpeekitem{background:#f8faf8!important;border-color:#e6ebe7!important;color:#26302c!important}
+.marketmode,.marketscore,.marketv,.rotationtitle,.changetitle,.validationtitle,.entrysummarytitle{color:#25302c!important}
+.marketgrid{gap:6px!important}.marketitem{padding:8px!important}
+.changebox,.entrysummary{border-radius:16px!important;margin:10px 0!important;padding:12px!important}
+.changecounts,.decision-filterbar,.yellow-reasons{gap:6px!important}
+.changecount,.entrycount{border-radius:10px!important}
+.changeevent{color:#26302c!important}.changeeventreason{color:#818d87!important}
+.decision-filterbtn{background:#f7f9f7!important;color:#64716b!important;border:1px solid #dfe5e1!important}
+.decision-filterbtn.on,.entrycount.df-on,.changecount.df-on{background:#e8f1ec!important;color:#315f52!important;border-color:#bcd1c6!important;outline:none!important}
+.decision-filter-note{color:#87918c!important}
+.card{border-radius:16px!important;padding:14px!important;margin:9px 0!important;background:#fff!important}.card:hover{border-color:#d5ded8!important}
+.top{align-items:flex-start!important}.name{font-size:18px!important;color:#202925!important}.code{color:#84908b!important}.score{font-size:23px!important;color:#26302c!important}.star{color:#aab3af!important}.star.on{color:#c89222!important}
+.dogson-card-brief{margin-top:9px;padding:10px 11px;border-radius:12px;background:#f7f9f7;border:1px solid #e8ece9}.dogson-card-badges{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.dogson-card-badges .cat,.dogson-card-badges .quality,.dogson-card-badges .entrylight{display:inline-flex!important;margin:0!important}.dogson-card-headline{font-size:13px;font-weight:750;line-height:1.55;color:#33403a;margin-top:7px}
+.dogson-card-details{border-top:0!important;margin-top:9px!important;padding-top:0!important}.dogson-card-details>summary{list-style:none;display:flex;align-items:center;justify-content:center;padding:9px 10px;border-radius:10px;background:#f2f5f2;color:#4b5b54!important;font-weight:800;font-size:12px;border:1px solid #e1e6e2}.dogson-card-details>summary::-webkit-details-marker{display:none}.dogson-card-details[open]>summary{background:#edf3ef;color:#315f52!important}.dogson-card-details-body{padding-top:8px}
+.entrybox,.stagebox,.mtfbox,.daytradebox,.portfolio-decision{background:#fafbfa!important;border-color:#e2e8e4!important;box-shadow:none!important}.entrytitle,.stagetitle,.mtftitle,.portfolio-decision-title,.daytradetitle{color:#74807b!important}.entryheadline,.stagereason,.portfolio-decision-head,.daytradeheadline{color:#28332f!important}.entrymeta span,.reason,.portfolio-decision-reasons span{background:#f1f4f2!important;color:#64716b!important;border-color:#e1e6e2!important}.stagechip,.entrywhy span{background:#edf6f0!important;border-color:#d3e7da!important;color:#377057!important}.stagechip.risk,.entrywhy span.block{background:#fbefef!important;border-color:#f1d7d7!important;color:#b74a4a!important}.entrywhy span.wait{background:#faf5e8!important;border-color:#eadfbe!important;color:#9a741e!important}
+.setup,.start{background:#e9f4ed!important;color:#2f7654!important}.pull,.weak{background:#faf3df!important;color:#8b681b!important}.trendhold,.watch{background:#edf3f8!important;color:#456d8a!important}.invalid{background:#faecee!important;color:#b9444e!important}.hot{background:#f4edf6!important;color:#805a88!important}.quality{background:#f0f3f1!important;color:#67736e!important}.quality.high{background:#f8f0dc!important;color:#8d681b!important}.quality.strong{background:#edf3f8!important;color:#4d7591!important}
+.entrylight.green,.daytradestate.go,.portfolio-decision-badge.hold{background:#e7f3eb!important;border-color:#cee5d7!important;color:#2f7654!important}.entrylight.yellow,.daytradestate.wait,.portfolio-decision-badge.pause{background:#faf3df!important;border-color:#eadbb0!important;color:#8b681b!important}.entrylight.red,.daytradestate.fail,.portfolio-decision-badge.exit{background:#fae9eb!important;border-color:#efced2!important;color:#b9434d!important}
+.dogson-more-market{margin:12px 0;border:1px solid #e1e6e2;border-radius:14px;background:#fff;box-shadow:0 3px 14px rgba(34,51,43,.035)}.dogson-more-market>summary{list-style:none;padding:12px 14px;color:#4d5b55!important;font-weight:800;font-size:13px}.dogson-more-market>summary::-webkit-details-marker{display:none}.dogson-more-market[open]>summary{border-bottom:1px solid #edf0ed}.dogson-more-market-body{padding:0 10px 10px}.dogson-more-market .rotationbox,.dogson-more-market .validationbox{box-shadow:none!important;border:0!important;margin:8px 0!important;padding:8px!important}
+.help{border-radius:14px!important}.helptext{color:#52615b!important}.helptext b,.guide-key{color:#27322e!important}.guide-title{color:#315f52!important;font-size:14px!important;margin-top:14px!important}.guide-tip{background:#eff5f1!important;color:#4b5d55!important;border-left-color:#7aa28f!important}.guide-formula,.guide-mini{color:#7c8882!important}.dogson-long-copy{line-height:1.65!important}
+.live-status{background:#faf6e9!important;border-color:#eadfbd!important;color:#8b6d24!important}.meta{margin:8px 2px!important}.footer{background:rgba(249,250,248,.94)!important;color:#7b8782!important;border-color:#e3e8e4!important;box-shadow:0 -4px 20px rgba(30,48,40,.04)}
+.peerpeekback{background:rgba(34,43,39,.35)!important}.peerpeek{background:#fff!important;border-color:#e1e6e2!important;box-shadow:0 18px 50px rgba(37,54,46,.16)!important}.peerpeekname,.peerpeekv{color:#27312d!important}.peerpeekbtn{background:#eaf2ee!important;border-color:#c9dbd1!important;color:#315f52!important}.peerpeekbtn.secondary{background:#f3f5f3!important;border-color:#e1e6e2!important;color:#5e6b65!important}
+.pnl.up,.flowtag.buy{color:#c84c4c!important}.pnl.down,.flowtag.sell{color:#2d8a63!important}
+@media(max-width:620px){.wrap{padding:10px 10px 88px!important}.tabs{grid-template-columns:repeat(3,1fr)!important}.tab{font-size:12px!important;padding:9px 4px!important}.marketgrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.card{padding:12px!important}.name{font-size:17px!important}.score{font-size:21px!important}.dogson-card-headline{font-size:12px!important}.controls{padding:9px!important}.changebox,.entrysummary,.marketbox{padding:10px!important}}
