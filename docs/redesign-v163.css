@@ -1,0 +1,126 @@
+/* Dogson Radar v1.6.3 — compact decision cards + quick-detail interactions.
+   Presentation only; scoring, lifecycle and entry-light logic are unchanged. */
+
+/* Card hierarchy: one step smaller and calmer than v1.6.2 */
+.card.dogson-v162-card{padding:15px!important;border-radius:22px!important;margin:12px 0!important}
+.card.dogson-v162-card .top{gap:10px!important}
+.card.dogson-v162-card .stockleft{gap:8px!important;min-width:0!important;flex:1 1 auto!important}
+.card.dogson-v162-card .star{font-size:27px!important;padding-top:1px!important}
+.card.dogson-v162-card .name{font-size:21px!important;line-height:1.18!important;font-weight:920!important}
+.card.dogson-v162-card .code{font-size:14px!important;margin-left:6px!important;font-weight:780!important}
+.card.dogson-v162-card .top .sub{font-size:12px!important;line-height:1.4!important;margin-top:5px!important}
+.card.dogson-v162-card .score{font-size:30px!important;line-height:1!important;font-weight:930!important}
+.card.dogson-v162-card .label{font-size:10.5px!important;margin-top:4px!important;line-height:1.3!important}
+
+.card.dogson-v162-card .dogson-card-brief{margin-top:13px!important}
+.card.dogson-v162-card .dogson-card-badges{gap:7px!important}
+.card.dogson-v162-card .dogson-card-badges .cat,
+.card.dogson-v162-card .dogson-card-badges .quality,
+.card.dogson-v162-card .dogson-card-badges .entrylight,
+.card.dogson-v162-card .dogson-hold-pill,
+.card.dogson-v162-card .dogson-reason-status{min-height:29px!important;padding:6px 10px!important;font-size:11.5px!important;font-weight:850!important}
+.card.dogson-v162-card .dogson-card-headline{font-size:14px!important;line-height:1.56!important;margin-top:10px!important;font-weight:800!important;letter-spacing:0!important}
+.card.dogson-v162-card .dogson-card-subline{font-size:11.5px!important;line-height:1.5!important}
+.card.dogson-v162-card .dogson-portfolio-facts{font-size:12px!important;gap:15px!important;margin-top:9px!important}
+
+.card.dogson-v162-card .livequote{gap:8px!important;margin-top:12px!important}
+.card.dogson-v162-card .livecell{min-height:70px!important;padding:10px 11px!important;border-radius:14px!important}
+.card.dogson-v162-card .liveval{font-size:18px!important;line-height:1.12!important;font-weight:900!important}
+.card.dogson-v162-card .livelab{font-size:9.8px!important;line-height:1.35!important;margin-top:5px!important}
+
+.card.dogson-v162-card .dogson-key-reasons{gap:8px 9px!important;margin-top:11px!important;padding-top:11px!important}
+.card.dogson-v162-card .dogson-key-title{font-size:11.5px!important;padding-top:5px!important}
+.card.dogson-v162-card .dogson-key-list{gap:6px!important}
+.card.dogson-v162-card .dogson-key-list span{min-height:28px!important;padding:5px 9px!important;font-size:10.8px!important;font-weight:780!important}
+
+.card.dogson-v162-card .dogson-card-details{margin-top:12px!important}
+.card.dogson-v162-card .dogson-card-details>summary{min-height:46px!important;padding:10px 13px!important;font-size:13px!important;border-radius:14px!important}
+.card.dogson-v162-card .dogson-card-details-body{padding-top:12px!important}
+
+/* Move the inventory action into the score column; text remains short enough to understand. */
+.dogson-score-wrap-v163{display:flex!important;flex-direction:column!important;align-items:flex-end!important;flex:0 0 auto!important;min-width:82px!important}
+.dogson-score-wrap-v163 .dogson-portfolio-action-v163{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:29px!important;min-width:66px!important;margin:8px 0 0!important;padding:5px 9px!important;border-radius:999px!important;font-size:10.5px!important;font-weight:850!important;white-space:nowrap!important;line-height:1.1!important}
+
+/* Clickable status chips: make the interaction discoverable without adding visual noise. */
+.dogson-clickable-status{cursor:pointer!important;user-select:none!important;-webkit-tap-highlight-color:transparent;position:relative!important;padding-right:19px!important;transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease!important}
+.dogson-clickable-status::after{content:'›';position:absolute;right:7px;top:50%;transform:translateY(-52%);font-size:14px;font-weight:900;opacity:.48}
+.dogson-clickable-status:active{transform:scale(.97)}
+.dogson-clickable-status:focus-visible{outline:2px solid #2b7662!important;outline-offset:2px!important}
+
+/* Quick detail bottom sheet */
+body.dogson-sheet-open{overflow:hidden!important}
+.dogson-quick-detail-back{position:fixed;inset:0;z-index:120;background:rgba(24,37,31,.28);display:flex;align-items:flex-end;justify-content:center;padding:18px 12px 0;opacity:0;transition:opacity .16s ease;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+.dogson-quick-detail-back[hidden]{display:none!important}
+.dogson-quick-detail-back.show{opacity:1}
+.dogson-quick-detail{width:min(760px,100%);max-height:min(78vh,780px);overflow:auto;background:#fff;border:1px solid #dce6e0;border-bottom:0;border-radius:24px 24px 0 0;padding:10px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -18px 48px rgba(31,52,43,.16);transform:translateY(18px);transition:transform .18s ease}
+.dogson-quick-detail-back.show .dogson-quick-detail{transform:translateY(0)}
+.dogson-quick-detail-handle{width:42px;height:5px;border-radius:999px;background:#d3ddd7;margin:2px auto 10px}
+.dogson-quick-detail-top{position:sticky;top:-10px;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0 12px;background:rgba(255,255,255,.96);border-bottom:1px solid #edf1ee;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.dogson-quick-detail-kicker{font-size:10.5px;line-height:1.3;color:#718079;font-weight:800;letter-spacing:.04em}
+.dogson-quick-detail-title{font-size:17px;line-height:1.35;color:#203029;font-weight:920;margin-top:3px}
+.dogson-quick-detail-close{width:40px;height:40px;flex:0 0 40px;border-radius:12px;border:1px solid #dbe5df;background:#f5f8f6;color:#44574e;font-size:24px;line-height:1;font-weight:500}
+.dogson-quick-detail-body{padding-top:12px;color:#24322c}
+.dogson-quick-detail-stack{display:grid;gap:10px}
+.dogson-quick-detail-intro{padding:11px 12px;border-radius:13px;background:#f3f7f4;border:1px solid #dfe9e3;color:#53655c;font-size:12px;line-height:1.55}
+.dogson-quick-detail-empty{padding:24px 12px;text-align:center;color:#718079;font-size:13px}
+
+/* Normalize cloned analysis sections inside the sheet. */
+.dogson-quick-detail-body .stagebox,
+.dogson-quick-detail-body .entrybox,
+.dogson-quick-detail-body .mtfbox,
+.dogson-quick-detail-body .daytradebox,
+.dogson-quick-detail-body .portfolio-decision,
+.dogson-quick-detail-body .portfoliobox{margin:0!important;background:#fbfcfb!important;border:1px solid #dfe8e2!important;border-radius:17px!important;padding:14px!important;color:#24322c!important;box-shadow:none!important}
+.dogson-quick-detail-body .parts,
+.dogson-quick-detail-body .metrics{margin-top:0!important;gap:8px!important}
+.dogson-quick-detail-body .part,
+.dogson-quick-detail-body .metric,
+.dogson-quick-detail-body .mtfcell{background:#fff!important;border:1px solid #e0e8e3!important;color:#24322c!important}
+.dogson-quick-detail-body .stagetitle,
+.dogson-quick-detail-body .entrytitle,
+.dogson-quick-detail-body .mtftitle,
+.dogson-quick-detail-body .portfolio-decision-title{color:#53655c!important;font-size:12.5px!important;font-weight:900!important}
+.dogson-quick-detail-body .stagereason,
+.dogson-quick-detail-body .entryheadline,
+.dogson-quick-detail-body .portfolio-decision-head{color:#203029!important;font-size:14px!important;line-height:1.55!important;font-weight:820!important}
+.dogson-quick-detail-body .stagehint,
+.dogson-quick-detail-body .entrynote,
+.dogson-quick-detail-body .mtfnote,
+.dogson-quick-detail-body .portfolio-decision-note{color:#718079!important}
+
+/* Keep dark mode usable even though light remains the default. */
+html[data-dogson-theme="dark"] .dogson-quick-detail{background:#151c19;border-color:#33443c;box-shadow:0 -18px 48px rgba(0,0,0,.35)}
+html[data-dogson-theme="dark"] .dogson-quick-detail-top{background:rgba(21,28,25,.96);border-color:#293831}
+html[data-dogson-theme="dark"] .dogson-quick-detail-title{color:#eef4f1}
+html[data-dogson-theme="dark"] .dogson-quick-detail-kicker{color:#9aaba3}
+html[data-dogson-theme="dark"] .dogson-quick-detail-close{background:#202a26;border-color:#34453d;color:#e2ece7}
+html[data-dogson-theme="dark"] .dogson-quick-detail-body{color:#eef4f1}
+html[data-dogson-theme="dark"] .dogson-quick-detail-intro{background:#1c2722;border-color:#304239;color:#b8c7c0}
+html[data-dogson-theme="dark"] .dogson-quick-detail-body .stagebox,
+html[data-dogson-theme="dark"] .dogson-quick-detail-body .entrybox,
+html[data-dogson-theme="dark"] .dogson-quick-detail-body .mtfbox,
+html[data-dogson-theme="dark"] .dogson-quick-detail-body .daytradebox,
+html[data-dogson-theme="dark"] .dogson-quick-detail-body .portfolio-decision,
+html[data-dogson-theme="dark"] .dogson-quick-detail-body .portfoliobox{background:#19231f!important;border-color:#304139!important;color:#edf4f0!important}
+html[data-dogson-theme="dark"] .dogson-quick-detail-body .part,
+html[data-dogson-theme="dark"] .dogson-quick-detail-body .metric,
+html[data-dogson-theme="dark"] .dogson-quick-detail-body .mtfcell{background:#151d1a!important;border-color:#2f3e38!important;color:#edf4f0!important}
+html[data-dogson-theme="dark"] .dogson-quick-detail-body .stagereason,
+html[data-dogson-theme="dark"] .dogson-quick-detail-body .entryheadline,
+html[data-dogson-theme="dark"] .dogson-quick-detail-body .portfolio-decision-head{color:#edf4f0!important}
+
+@media(max-width:620px){
+  .card.dogson-v162-card{padding:14px!important;border-radius:20px!important}
+  .card.dogson-v162-card .name{font-size:20px!important}
+  .card.dogson-v162-card .code{font-size:13.5px!important}
+  .card.dogson-v162-card .score{font-size:28px!important}
+  .card.dogson-v162-card .dogson-card-headline{font-size:13.5px!important;line-height:1.55!important}
+  .card.dogson-v162-card .livecell{min-height:67px!important;padding:9px 10px!important}
+  .card.dogson-v162-card .liveval{font-size:17px!important}
+  .card.dogson-v162-card .livelab{font-size:9.3px!important}
+  .dogson-score-wrap-v163{min-width:76px!important}
+  .dogson-score-wrap-v163 .dogson-portfolio-action-v163{min-width:62px!important;font-size:10px!important;padding:5px 8px!important}
+  .dogson-quick-detail-back{padding:12px 0 0!important}
+  .dogson-quick-detail{max-height:82vh;border-radius:22px 22px 0 0;padding-left:14px;padding-right:14px}
+  .dogson-quick-detail-title{font-size:16px}
+}
