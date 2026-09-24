@@ -30,7 +30,7 @@
   --dogson-entry-red-tx:#A23A45;
 
   --dogson-quality-blue-bg:#EAF2F8;
-  --dogson-quality-blue-bd:#B8CDDd;
+  --dogson-quality-blue-bd:#B8CDDD;
   --dogson-quality-blue-tx:#3B627C;
   --dogson-quality-neutral-bg:#F1F4F3;
   --dogson-quality-neutral-bd:#CDD7D2;
@@ -46,9 +46,15 @@
 
 /* One visual grammar for every pill in the decision row. */
 .dogson-action-strip-v164 .dogson-signal-btn-v164,
-.dogson-action-strip-v164 .dogson-portfolio-btn-v164{
+.dogson-action-strip-v164 .dogson-signal-btn-v166,
+.dogson-action-strip-v164 .dogson-portfolio-btn-v164,
+.dogson-action-strip-v164 .portfolio-mini{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
   min-height:34px!important;
   height:34px!important;
+  margin:0!important;
   padding:0 10px!important;
   border-width:var(--dogson-chip-border)!important;
   border-style:solid!important;
@@ -58,6 +64,7 @@
   font-weight:820!important;
   line-height:1!important;
   letter-spacing:0!important;
+  white-space:nowrap!important;
 }
 
 /* Lifecycle = where the stock is in its swing lifecycle. */
@@ -126,14 +133,18 @@
   color:var(--dogson-quality-neutral-tx)!important;
 }
 
-/* Inventory is an action, not a signal. Keep it deliberately neutral. */
-.dogson-action-strip-v164 .dogson-portfolio-btn-v164{
+/* Inventory is an action, not a signal. Keep it neutral even when the JS rebuild
+   has not yet restored dogson-portfolio-btn-v164. */
+.dogson-action-strip-v164 .dogson-portfolio-btn-v164,
+.dogson-action-strip-v164 .portfolio-mini{
+  min-width:64px!important;
   background:var(--dogson-inventory-bg)!important;
   border-color:var(--dogson-inventory-bd)!important;
   color:var(--dogson-inventory-tx)!important;
   font-weight:800!important;
 }
-.dogson-action-strip-v164 .dogson-portfolio-btn-v164.held{
+.dogson-action-strip-v164 .dogson-portfolio-btn-v164.held,
+.dogson-action-strip-v164 .portfolio-mini.held{
   background:var(--dogson-inventory-held-bg)!important;
   border-color:var(--dogson-inventory-held-bd)!important;
   color:var(--dogson-inventory-held-tx)!important;
@@ -176,16 +187,22 @@ html[data-dogson-theme="dark"] .dogson-action-strip-v164 .entrylight.red{backgro
 html[data-dogson-theme="dark"] .dogson-action-strip-v164 .quality,
 html[data-dogson-theme="dark"] .dogson-action-strip-v164 .quality.high,
 html[data-dogson-theme="dark"] .dogson-action-strip-v164 .quality.strong{background:#192A35!important;border-color:#405F73!important;color:#B5D2E5!important}
-html[data-dogson-theme="dark"] .dogson-action-strip-v164 .dogson-portfolio-btn-v164{background:#1C2622!important;border-color:#405048!important;color:#BCCBC4!important}
-html[data-dogson-theme="dark"] .dogson-action-strip-v164 .dogson-portfolio-btn-v164.held{background:#193027!important;border-color:#3F715B!important;color:#A9D8C0!important}
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .dogson-portfolio-btn-v164,
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .portfolio-mini{background:#1C2622!important;border-color:#405048!important;color:#BCCBC4!important}
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .dogson-portfolio-btn-v164.held,
+html[data-dogson-theme="dark"] .dogson-action-strip-v164 .portfolio-mini.held{background:#193027!important;border-color:#3F715B!important;color:#A9D8C0!important}
 
 @media(max-width:620px){
   .dogson-action-strip-v164 .dogson-signal-btn-v164,
-  .dogson-action-strip-v164 .dogson-portfolio-btn-v164{
+  .dogson-action-strip-v164 .dogson-signal-btn-v166,
+  .dogson-action-strip-v164 .dogson-portfolio-btn-v164,
+  .dogson-action-strip-v164 .portfolio-mini{
     min-height:33px!important;
     height:33px!important;
     padding-left:8px!important;
     padding-right:8px!important;
     font-size:10.2px!important;
   }
+  .dogson-action-strip-v164 .dogson-portfolio-btn-v164,
+  .dogson-action-strip-v164 .portfolio-mini{min-width:60px!important}
 }
