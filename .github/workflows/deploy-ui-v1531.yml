@@ -32,11 +32,15 @@ jobs:
           node --check docs/ui-filters-core-v1531.js
           node --check docs/redesign-v160.js
           node --check docs/realtime.js
-          grep -q "ui-filters.js?v=1600" docs/realtime-config.js
+          test -s docs/contrast-v160.css
+          grep -q "ui-filters.js?v=1600-4" docs/realtime-config.js
           grep -q "redesign-v160.css" docs/ui-filters.js
+          grep -q "redesign-v160-dark.css" docs/ui-filters.js
+          grep -q "contrast-v160.css" docs/ui-filters.js
           grep -q "redesign-v160.js" docs/ui-filters.js
           grep -q "dogson-overview" docs/redesign-v160.css
           grep -q "dogson-card-headline" docs/redesign-v160.js
+          grep -q "html\[data-dogson-theme=\"light\"\]" docs/contrast-v160.css
           grep -q "最近一筆成交價" docs/realtime.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
