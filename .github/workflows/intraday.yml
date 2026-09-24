@@ -10,6 +10,11 @@ on:
       - "scripts/build_validation.py"
       - "scripts/build_daytrade.py"
       - "scripts/build_completion.py"
+      - "docs/index.html"
+      - "docs/realtime.js"
+      - "docs/realtime-config.js"
+      - "docs/ui-filters.js"
+      - "api/quote.js"
       - ".github/workflows/intraday.yml"
   schedule:
     # 台灣時間約 09:00~13:59；GitHub cron 可能延遲數分鐘。
