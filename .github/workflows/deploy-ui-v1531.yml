@@ -1,4 +1,4 @@
-name: Deploy Radar v1.6.4 UI
+name: Deploy Radar v1.6.5 UI
 
 on:
   push:
@@ -42,12 +42,13 @@ jobs:
           test -s docs/redesign-v162-fix.css
           test -s docs/redesign-v163.css
           test -s docs/redesign-v164.css
-          grep -q "ui-filters.js?v=1640" docs/realtime-config.js
-          grep -q "redesign-v164.css" docs/ui-filters.js
-          grep -q "ui-card-v164.js" docs/ui-filters.js
-          grep -q "dogson-action-strip-v164" docs/redesign-v164.css
+          test -s docs/redesign-v165.css
+          grep -q "ui-filters.js?v=1650" docs/realtime-config.js
+          grep -q "redesign-v165.css" docs/ui-filters.js
+          grep -q "dogson-entry-yellow-bg" docs/redesign-v165.css
+          grep -q "dogson-quality-blue-bg" docs/redesign-v165.css
+          grep -q "dogson-free-v1650" docs/sw.js
           grep -q "data-dogson-quick" docs/ui-card-v164.js
-          grep -q "dogson-free-v1640" docs/sw.js
           grep -q "多時間框架" docs/ui-polish-v160.js
           grep -q "最近一筆成交價" docs/realtime.js
       - uses: actions/configure-pages@v5
