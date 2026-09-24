@@ -5,7 +5,10 @@
 Keeps Stage/score core intact and attaches the original-vision completion layer
 before/after existing scoring, reducing fragile edits inside stable Stage code.
 """
-from patch_v1530 import COMPLETION_HELPERS, read, write, must
+try:
+    from scripts.patch_v1530 import COMPLETION_HELPERS, read, write, must
+except ImportError:
+    from patch_v1530 import COMPLETION_HELPERS, read, write, must
 
 
 def patch_build_data():
@@ -72,7 +75,6 @@ def _enrich_completion_stage_signals(rows):
     return rows
 
 '''
-        # Insert immediately before add_component_scores, which calls Stage logic.
         s=must(s,'def add_component_scores(rows, market, preliminary_intraday=False):',helper+'def add_component_scores(rows, market, preliminary_intraday=False):','stage enrichment helper')
 
     # Intraday post-Stage enrichment and cumulative today summary.
@@ -90,6 +92,5 @@ def _enrich_completion_stage_signals(rows):
           '        "dynamic_threshold_version": "1.0",\n        "score_formula":',
           '        "dynamic_threshold_version": "1.1",\n        "vision_completion_version": "1.0",\n        "score_formula":',
           'intraday completion version')
-    # Normalize status dynamic version and add completion marker near status update.
     s=s.replace('"dynamic_threshold_version": "1.0",\n        "version": "1.5.30-free",', '"dynamic_threshold_version": "1.1",\n        "vision_completion_version": "1.0",\n        "version": "1.5.30-free",')
     write(p,s)
