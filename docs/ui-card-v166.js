@@ -10,6 +10,10 @@
   let busy=false,timer=null;
 
   function held(card){return !!($('.portfoliobox',card)||$('.portfolio-decision',card));}
+  function portfolioView(){
+    try{if(typeof portfolioOnly!=='undefined')return !!portfolioOnly}catch{}
+    return document.documentElement.classList.contains('dogson-portfolio-view');
+  }
 
   function source(card,cls){
     return $(`.dogson-card-details .${cls}`,card)||$$(`.${cls}`,card).find(x=>!x.closest('.dogson-action-strip-v164')&&!x.closest('.dogson-card-brief'))||$(`.${cls}`,card);
@@ -52,7 +56,7 @@
     brief.classList.remove('portfolio-brief');
     const line=marketConclusion(card);
     const html=`<div class="dogson-card-headline">${esc(line)}</div>`;
-    if(brief.dataset.v166Html!==html){brief.innerHTML=html;brief.dataset.v166Html=html;}
+    if(brief.dataset.v166Html!==html||brief.innerHTML!==html){brief.innerHTML=html;brief.dataset.v166Html=html;}
   }
 
   function cloneSignal(card,cls,type){
@@ -75,6 +79,20 @@
     }).filter(Boolean);
   }
 
+  function normalizePortfolioButton(card,actions){
+    const btns=$$('.portfolio-mini',card);
+    const p=btns.find(x=>x===actions?.querySelector('.portfolio-mini'))||btns[0];
+    if(!p)return;
+    if(actions&&p.parentElement!==actions)actions.appendChild(p);
+    p.classList.add('dogson-portfolio-btn-v164');
+    p.classList.remove('dogson-portfolio-action-v163');
+    const isHeld=p.classList.contains('held')||/已持有|已加入|✓/.test(p.textContent||'')||held(card);
+    const label=isHeld?'✓ 庫存':'＋ 庫存';
+    if(p.textContent!==label)p.textContent=label;
+    p.setAttribute('aria-label',isHeld?'編輯庫存':'加入庫存');
+    if(actions)$$(':scope>.portfolio-mini',actions).slice(1).forEach(x=>x.remove());
+  }
+
   function dedupeStrip(card){
     const strips=$$('.dogson-action-strip-v164',card);
     if(!strips.length)return null;
@@ -82,19 +100,14 @@
     const signals=$('.dogson-signal-buttons-v164',keep);if(!signals)return keep;
     const spec=signalSpec(card);
     const sig=spec.map(x=>`${x.type}|${x.text}|${x.full}`).join('||');
-    if(signals.dataset.v166Sig!==sig){
+    if(signals.dataset.v166Sig!==sig||signals.children.length!==spec.length){
       const frag=document.createDocumentFragment();
       spec.forEach(({cls,type})=>{const chip=cloneSignal(card,cls,type);if(chip)frag.appendChild(chip)});
       signals.replaceChildren(frag);
       signals.dataset.v166Sig=sig;
     }
     const actions=$('.dogson-card-actions-v164',keep);
-    if(actions){
-      const btns=$$('.portfolio-mini',card);
-      const p=btns.find(x=>x===actions.querySelector('.portfolio-mini'))||btns[0];
-      if(p&&p.parentElement!==actions)actions.appendChild(p);
-      $$(':scope>.portfolio-mini',actions).slice(1).forEach(x=>x.remove());
-    }
+    if(actions)normalizePortfolioButton(card,actions);
     return keep;
   }
 
@@ -116,7 +129,7 @@
 
   function portfolioAddon(card){
     let box=$('.dogson-portfolio-addon-v166',card);
-    if(!held(card)){box?.remove();return;}
+    if(!held(card)||!portfolioView()){box?.remove();return;}
     const p=portfolioData(card);
     if(!box){
       box=document.createElement('section');box.className='dogson-portfolio-addon-v166';
@@ -136,7 +149,6 @@
   }
 
   function ensureReasons(card){
-    if(!held(card))return;
     const details=$('.dogson-card-details',card);if(!details)return;
     const rs=reasonTexts(card);if(!rs.length)return;
     let box=$('.dogson-key-reasons',card);
@@ -154,13 +166,17 @@
   }
 
   function run(){if(busy)return;busy=true;try{$$('#cards .card').forEach(card)}finally{busy=false}}
-  function schedule(){if(busy)return;clearTimeout(timer);timer=setTimeout(run,80)}
+  function schedule(delay=80){if(busy)return;clearTimeout(timer);timer=setTimeout(run,delay)}
   function start(){
     run();
     const root=$('#cards');
-    const obs=new MutationObserver(schedule);
-    if(root)obs.observe(root,{subtree:true,childList:true});
-    setTimeout(run,250);setTimeout(run,900);
+    const obs=new MutationObserver(()=>schedule(70));
+    if(root)obs.observe(root,{subtree:true,childList:true,characterData:true});
+    document.addEventListener('click',e=>{
+      if(!e.target.closest?.('[data-portfolio-save],[data-portfolio-remove]'))return;
+      [40,120,280,650].forEach(ms=>setTimeout(run,ms));
+    },true);
+    setTimeout(run,250);setTimeout(run,900);setInterval(run,4000);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
