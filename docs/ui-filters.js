@@ -1,9 +1,9 @@
 (()=>{
-  if(window.__DOGSON_UI_LOADER_V164__) return;
-  window.__DOGSON_UI_LOADER_V164__ = true;
+  if(window.__DOGSON_UI_LOADER_V165__) return;
+  window.__DOGSON_UI_LOADER_V165__ = true;
   const src=document.currentScript?.src||location.href;
   const base=new URL('.',src);
-  const version='1640';
+  const version='1650';
 
   function loadCss(name,id){
     if(document.getElementById(id)) return;
@@ -26,6 +26,7 @@
   loadCss('redesign-v162-fix.css','dogson-dashboard-v162-fix-css');
   loadCss('redesign-v163.css','dogson-dashboard-v163-css');
   loadCss('redesign-v164.css','dogson-dashboard-v164-css');
+  loadCss('redesign-v165.css','dogson-dashboard-v165-css');
   loadScript('ui-filters-core-v1531.js','dogson-filter-core-v1531')
     .then(()=>loadScript('redesign-v160.js','dogson-redesign-v160'))
     .then(()=>loadScript('ui-polish-v160.js','dogson-ui-polish-v160'))
