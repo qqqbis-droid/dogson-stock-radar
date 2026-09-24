@@ -1,9 +1,9 @@
 (()=>{
-  if(window.__DOGSON_UI_LOADER_V163__) return;
-  window.__DOGSON_UI_LOADER_V163__ = true;
+  if(window.__DOGSON_UI_LOADER_V164__) return;
+  window.__DOGSON_UI_LOADER_V164__ = true;
   const src=document.currentScript?.src||location.href;
   const base=new URL('.',src);
-  const version='1630';
+  const version='1640';
 
   function loadCss(name,id){
     if(document.getElementById(id)) return;
@@ -25,10 +25,12 @@
   loadCss('redesign-v162.css','dogson-dashboard-v162-css');
   loadCss('redesign-v162-fix.css','dogson-dashboard-v162-fix-css');
   loadCss('redesign-v163.css','dogson-dashboard-v163-css');
+  loadCss('redesign-v164.css','dogson-dashboard-v164-css');
   loadScript('ui-filters-core-v1531.js','dogson-filter-core-v1531')
     .then(()=>loadScript('redesign-v160.js','dogson-redesign-v160'))
     .then(()=>loadScript('ui-polish-v160.js','dogson-ui-polish-v160'))
     .then(()=>loadScript('ui-layout-v162.js','dogson-ui-layout-v162'))
     .then(()=>loadScript('ui-interactions-v163.js','dogson-ui-interactions-v163'))
+    .then(()=>loadScript('ui-card-v164.js','dogson-ui-card-v164'))
     .catch(err=>console.warn('Dogson UI module load failed',err));
 })();
