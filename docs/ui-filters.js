@@ -3,7 +3,7 @@
   window.__DOGSON_UI_LOADER_V160__ = true;
   const src=document.currentScript?.src||location.href;
   const base=new URL('.',src);
-  const version='1600-2';
+  const version='1600-3';
 
   function loadCss(name,id){
     if(document.getElementById(id)) return;
