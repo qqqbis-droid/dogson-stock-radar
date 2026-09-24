@@ -1,0 +1,40 @@
+/* Dogson Radar v1.6.6 — preserve market summary and append portfolio tracking. */
+
+/* One decision row only. The v166 script rebuilds this row from the canonical source nodes. */
+.card.dogson-v166-card .dogson-action-strip-v164{margin-top:9px!important;margin-bottom:5px!important}
+.card.dogson-v166-card .dogson-signal-buttons-v164{gap:6px!important}
+.card.dogson-v166-card .dogson-signal-btn-v166{flex:0 0 auto!important}
+
+/* Market conclusion always stays, even for holdings. */
+.card.dogson-v166-card .dogson-card-brief{background:transparent!important;border:0!important;padding:0!important;margin:9px 0 0!important}
+.card.dogson-v166-card .dogson-card-brief .dogson-card-headline{margin:0!important;color:#26332e!important;font-size:12.6px!important;line-height:1.55!important;font-weight:800!important}
+
+/* Portfolio is additive, not a replacement for the market decision. */
+.dogson-portfolio-addon-v166{margin:9px 0 0;padding:10px 11px;border:1px solid #D9E5DF;border-radius:13px;background:#F7FAF8;color:#31423B}
+.dogson-portfolio-addon-top-v166{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.dogson-portfolio-addon-title-v166{font-size:10.8px;font-weight:900;color:#486057;letter-spacing:.01em}
+.dogson-portfolio-addon-badge-v166{display:inline-flex;align-items:center;min-height:27px;padding:0 9px;border:1px solid #A9CBB9;border-radius:999px;background:#EAF5EF;color:#255F49;font-size:9.8px;font-weight:850;white-space:nowrap}
+.dogson-portfolio-addon-facts-v166{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:7px;color:#6A7A73;font-size:10.2px}
+.dogson-portfolio-addon-facts-v166 b{color:#33463E;font-weight:850}
+.dogson-portfolio-dot-v166{color:#A3AEA9}
+.dogson-portfolio-addon-head-v166{margin-top:7px;color:#2B3933;font-size:11.4px;line-height:1.5;font-weight:820}
+.dogson-portfolio-addon-status-v166,.dogson-portfolio-addon-reason-v166{margin-top:5px;color:#75837D;font-size:9.8px;line-height:1.45}
+
+/* Key reasons remain visible for holdings too. */
+.card.dogson-v166-card .dogson-key-reasons{display:block!important}
+
+html[data-dogson-theme="dark"] .card.dogson-v166-card .dogson-card-brief .dogson-card-headline{color:#E4ECE8!important}
+html[data-dogson-theme="dark"] .dogson-portfolio-addon-v166{background:#17211D;border-color:#32423A;color:#DCE6E1}
+html[data-dogson-theme="dark"] .dogson-portfolio-addon-title-v166{color:#AFC0B8}
+html[data-dogson-theme="dark"] .dogson-portfolio-addon-badge-v166{background:#193027;border-color:#3F715B;color:#A9D8C0}
+html[data-dogson-theme="dark"] .dogson-portfolio-addon-facts-v166{color:#98A79F}
+html[data-dogson-theme="dark"] .dogson-portfolio-addon-facts-v166 b{color:#D5E1DB}
+html[data-dogson-theme="dark"] .dogson-portfolio-addon-head-v166{color:#E2EBE6}
+html[data-dogson-theme="dark"] .dogson-portfolio-addon-status-v166,
+html[data-dogson-theme="dark"] .dogson-portfolio-addon-reason-v166{color:#98A79F}
+
+@media(max-width:620px){
+  .dogson-portfolio-addon-v166{padding:9px 10px;border-radius:12px}
+  .dogson-portfolio-addon-head-v166{font-size:11px}
+  .dogson-portfolio-addon-status-v166,.dogson-portfolio-addon-reason-v166{font-size:9.5px}
+}
