@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - "scripts/build_data.py"
       - "scripts/bridge_intraday.py"
       - "scripts/sync_live_data.py"
       - "scripts/build_validation.py"
