@@ -74,7 +74,9 @@
       $('.dogson-key-reasons',card),
       details
     ].filter(Boolean);
-    order.forEach(node=>card.appendChild(node));
+    const children=[...card.children];
+    const same=children.length===order.length&&order.every((node,i)=>children[i]===node);
+    if(!same)order.forEach(node=>card.appendChild(node));
   }
 
   function card(card){
@@ -89,9 +91,10 @@
   function schedule(){if(busy)return;clearTimeout(timer);timer=setTimeout(run,55)}
   function start(){
     run();
+    const root=$('#cards');
     const obs=new MutationObserver(schedule);
-    if(document.body)obs.observe(document.body,{subtree:true,childList:true});
-    setTimeout(run,180);setTimeout(run,650);setInterval(run,3000);
+    if(root)obs.observe(root,{subtree:true,childList:true});
+    setTimeout(run,180);setTimeout(run,650);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
