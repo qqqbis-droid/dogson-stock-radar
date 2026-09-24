@@ -17,18 +17,14 @@ def f(x,d=0.0):
         v=float(x);return v if math.isfinite(v) else d
     except:return d
 def enrich_chip(r):
-    net=f(r.get("foreign_3d_net"))
-    avgvol=f(r.get("avg_volume20") or r.get("volume20_avg") or r.get("avg_vol20"))
-    if avgvol<=0:
-        avgturn=f(r.get("avg_turnover20")); px=f(r.get("close"))
-        if avgturn>0 and px>0: avgvol=avgturn/px
+    net_raw=r.get("foreign_3d_net")
+    avgvol=f(r.get("avg_volume20"))
     strength=None
-    if avgvol>0:
-        # institutional data may be shares while volume may be shares; if ratio is absurd, try lots->shares normalization.
-        ratio=net/avgvol*100
-        if abs(ratio)>500: ratio=(net*1000)/avgvol*100
-        strength=round(ratio,2)
+    if net_raw is not None and avgvol>0:
+        # TWSE/TPEx institutional fields are 股數; Yahoo Volume is shares. Units match directly.
+        strength=round(float(net_raw)/avgvol*100,2)
     r["foreign_3d_strength_pct"]=strength
+    r["foreign_strength_unit"]="shares / prior20d_avg_shares"
     r["chip_force_label"]="資料不足" if strength is None else ("強力買超" if strength>=15 else "明顯買超" if strength>=5 else "小幅買超" if strength>0 else "偏賣超" if strength<0 else "中性")
 def breakout_baseline(r):
     # Prefer a true event baseline when upstream has it; otherwise use the stock's own recent volume distribution proxy.
@@ -57,24 +53,58 @@ def pattern(r):
 def main(mode):
     path=DATA/("intraday.json" if mode=="intraday" else "close.json")
     obj=load(path,{}); rows=obj.get("rows") or []
-    hist=load(HIST,{"date":None,"codes":{}})
-    today=datetime.now(TW).date().isoformat()
-    if hist.get("date")!=today: hist={"date":today,"codes":{}}
+    hist=load(HIST,{"date":None,"codes":{},"transitions":[],"sector_accel":{}})
+    today=datetime.now(TW).date().isoformat(); now=datetime.now(TW).isoformat(timespec="minutes")
+    if hist.get("date")!=today: hist={"date":today,"codes":{},"transitions":[],"sector_accel":{}}
+    hist.setdefault("transitions",[]); hist.setdefault("sector_accel",{})
     for r in rows:
         enrich_chip(r);breakout_baseline(r)
         if mode=="intraday":
             pattern(r); code=str(r.get("code") or ""); h=hist["codes"].setdefault(code,[])
-            snap={"t":r.get("quote_time") or r.get("time") or datetime.now(TW).isoformat(timespec="minutes"),"score":f(r.get("intraday_score") or r.get("score")),"stage":r.get("category"),"pace":f(r.get("pace"),1),"rs":f((r.get("intraday_components") or {}).get("relative_strength")),"sector":f((r.get("intraday_components") or {}).get("sector")),"vwap_dist":f(r.get("vwap_dist")),"pattern":r.get("execution_pattern")}
+            snap={"t":r.get("quote_time") or r.get("time") or now,"score":f(r.get("intraday_score") or r.get("score")),"stage":r.get("category"),"pace":f(r.get("pace"),1),"rs":f((r.get("intraday_components") or {}).get("relative_strength")),"sector":f((r.get("intraday_components") or {}).get("sector")),"vwap_dist":f(r.get("vwap_dist")),"pattern":r.get("execution_pattern")}
+            previous=h[-1] if h else None
             if not h or h[-1].get("t")!=snap["t"]: h.append(snap)
             h[:]=h[-80:]
             first=h[0] if h else snap; prev=h[-2] if len(h)>1 else first
+            oldstage=(previous or {}).get("stage"); newstage=snap.get("stage")
+            flags={
+                "entered_setup": bool(previous and oldstage!="蓄勢待發" and newstage=="蓄勢待發"),
+                "entered_launch": bool(previous and oldstage!="剛啟動" and newstage=="剛啟動"),
+                "became_overheat": bool(previous and oldstage!="過熱不追" and newstage=="過熱不追"),
+                "became_weak": bool(previous and oldstage not in {"轉弱警戒","結構失效"} and newstage in {"轉弱警戒","結構失效"}),
+            }
+            r["today_transitions"]=flags
+            for typ,hit in flags.items():
+                if hit:
+                    key=f"{code}:{typ}"
+                    if not any(x.get("key")==key for x in hist["transitions"]): hist["transitions"].append({"key":key,"code":code,"name":r.get("name"),"type":typ,"time":snap["t"]})
             r["today_change_summary"]={"score_open_delta":round(snap["score"]-first["score"],1),"score_last_delta":round(snap["score"]-prev["score"],1),"pace_open":first["pace"],"pace_now":snap["pace"],"rs_open":first["rs"],"rs_now":snap["rs"],"stage_open":first["stage"],"stage_now":snap["stage"]}
             d=r["today_change_summary"]["score_open_delta"]
             r["today_direction"]="一路改善" if d>=10 and snap["score"]>=prev["score"] else "重新轉強" if snap["score"]-prev["score"]>=6 else "先強後弱" if d<=-8 else "持平整理"
-    obj["completion_version"]="1.0";obj["completion_updated_at"]=datetime.now(TW).isoformat(timespec="seconds")
+    if mode=="intraday":
+        for z in obj.get("sector_rotation") or []:
+            name=str(z.get("sector") or '').strip(); heat=f(z.get("heat")); state=str(z.get("state") or '')
+            if name and (heat>=5 or '流入加速' in state):
+                old=hist["sector_accel"].get(name) or {"sector":name,"first_time":now}
+                old.update({"latest_time":now,"heat":heat,"state":state}); hist["sector_accel"][name]=old
+        trans=hist.get("transitions") or []
+        dirs={}
+        for r in rows: dirs[r.get("today_direction")]=(dirs.get(r.get("today_direction"),0)+1)
+        today_radar={
+            "new_setup":sum(x.get("type")=="entered_setup" for x in trans),
+            "new_launch":sum(x.get("type")=="entered_launch" for x in trans),
+            "became_overheat":sum(x.get("type")=="became_overheat" for x in trans),
+            "became_weak":sum(x.get("type")=="became_weak" for x in trans),
+            "improving":dirs.get("一路改善",0),"restrengthening":dirs.get("重新轉強",0),
+            "sector_accel_count":len(hist["sector_accel"]),
+            "sector_accel":sorted(hist["sector_accel"].values(),key=lambda x:f(x.get("heat")),reverse=True),
+        }
+        obj["today_change_radar"]=today_radar
+        obj.setdefault("change_radar",{})["today"]=today_radar
+        dump(HIST,hist)
+    obj["completion_version"]="1.1";obj["completion_updated_at"]=datetime.now(TW).isoformat(timespec="seconds")
     dump(path,obj)
-    if mode=="intraday": dump(HIST,hist)
-    st=load(DATA/"status.json",{});st.update({"version":"1.5.30-free","completion_version":"1.0"});dump(DATA/"status.json",st)
+    st=load(DATA/"status.json",{});st.update({"version":"1.5.30-free","completion_version":"1.1"});dump(DATA/"status.json",st)
     print("completion",mode,len(rows))
 if __name__=="__main__":
     ap=argparse.ArgumentParser();ap.add_argument("--mode",choices=["intraday","close"],required=True);main(ap.parse_args().mode)

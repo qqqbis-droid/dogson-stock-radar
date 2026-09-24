@@ -447,7 +447,7 @@ function validationHTML(){
  if(!v.version)return `<div class="validationtop"><div><div class="validationtitle">🧪 Step 7 歷史驗證</div><div class="sub">歷史樣本開始累積</div></div><span class="validationbadge">暖機中</span></div>`;
  const active=!!c.active,w=c.active_weights||c.baseline_weights||{};
  const h=v.high_quality_5d||{};
- return `<div class="validationtop"><div><div class="validationtitle">🧪 Step 7｜真實結果校準</div><div class="sub">1／3／5／10日＋10日 MFE／MAE｜只用已發生結果</div></div><span class="validationbadge ${active?"active":""}">${active?"✅ 校準啟用":"🟡 暖機中"}</span></div><div class="validationgrid"><div class="validationitem"><div class="validationv">${v.close_snapshot_days??0} 日</div><div class="validationl">盤後快照</div></div><div class="validationitem"><div class="validationv">${c.sample_rows??0} / ${c.minimum_rows??3000}</div><div class="validationl">成熟校準樣本</div></div><div class="validationitem"><div class="validationv">${c.sample_dates??0} / ${c.minimum_dates??15}</div><div class="validationl">成熟交易日</div></div><div class="validationitem"><div class="validationv">${h.n?num(h.win_rate,1)+"%":"—"}</div><div class="validationl">70分↑訊號 5日正報酬率（${h.n||0}筆）</div></div></div><div class="validationweights">目前波段權重：技術 ${num(w.technical??50,1)}｜籌碼 ${num(w.chip??25,1)}｜族群 ${num(w.sector??15,1)}｜流動性 ${num(w.liquidity??10,1)}</div><div class="validationnote">${escHTML(c.guardrail||v.note||"樣本不足時正式權重維持50/25/15/10。")}</div>`;
+ return `<div class="validationtop"><div><div class="validationtitle">🧪 Step 7｜真實結果校準</div><div class="sub">1／3／5／10日＋10日 MFE／MAE｜只用已發生結果</div></div><span class="validationbadge ${active?"active":""}">${active?"✅ 校準啟用":"🟡 暖機中"}</span></div><div class="validationgrid"><div class="validationitem"><div class="validationv">${v.close_snapshot_days??0} 日</div><div class="validationl">盤後快照</div></div><div class="validationitem"><div class="validationv">${c.sample_rows??0} / ${c.minimum_rows??3000}</div><div class="validationl">成熟校準樣本</div></div><div class="validationitem"><div class="validationv">${c.sample_dates??0} / ${c.minimum_dates??15}</div><div class="validationl">成熟交易日</div></div><div class="validationitem"><div class="validationv">${h.n?num(h.win_rate,1)+"%":"—"}</div><div class="validationl">70分↑訊號 5日正報酬率（${h.n||0}筆）</div></div></div><div class="validationweights">目前波段權重：技術 ${num(w.technical??50,1)}｜籌碼 ${num(w.chip??25,1)}｜族群 ${num(w.sector??15,1)}｜流動性 ${num(w.liquidity??10,1)}</div><div class="validationnote">${escHTML(c.guardrail||v.note||"樣本不足時正式權重維持50/25/15/10。")}</div><div class="validationnote">🔬 歷史組合研究：${v.research?.matured_rows||0} 筆成熟樣本｜剛啟動假突破率 ${v.research?.fake_breakout?.fake_rate==null?"—":num(v.research.fake_breakout.fake_rate,1)+"%"}｜只研究，不自動改分。</div>`;
 }
 function updateFooter(){
  const el=$("footerText");if(!el)return;
@@ -570,17 +570,17 @@ function changeBadgeHTML(r){
 }
 function changeRadarHTML(){
  if(mode!=="intraday")return "";
- const x=changeRadar||{},c=x.counts||{};
- const dirs=(intraRows||[]).reduce((a,r)=>{const k=r.today_direction||"尚未累積";a[k]=(a[k]||0)+1;return a},{});\n const life=(intraRows||[]).reduce((a,r)=>{const k=stageKey(r.category);a[k]=(a[k]||0)+1;return a},{});\n const heldWeak=(intraRows||[]).filter(r=>held(r.code)&&["轉弱警戒","結構失效"].includes(stageKey(r.category))).length;\n const overview=`<div class="changecounts"><span class="changecount">🌱新進蓄勢 ${life["蓄勢待發"]||0}</span><span class="changecount">🔥剛啟動 ${life["剛啟動"]||0}</span><span class="changecount">⬆️今日改善 ${dirs["一路改善"]||0}</span><span class="changecount">♻️重新轉強 ${dirs["重新轉強"]||0}</span><span class="changecount">⚠️庫存轉弱 ${heldWeak}</span><span class="changecount">🚫過熱 ${life["過熱不追"]||0}</span></div>`;\n const head=`<div class="changetop"><div><div class="changetitle">🚨 今日累積總覽＋5分鐘變化雷達</div><div class="changesub">${x.ready?`比較上一輪${x.comparison_minutes?`（約 ${num(x.comparison_minutes,0)} 分鐘）`:""}｜只顯示新發生的變化`:x.reason||"等待下一輪建立比較基準"}</div></div></div>`;
- if(!x.ready)return `<div class="changebox">${head}${overview}<div class="changesub" style="margin-top:8px">第一輪只建立5分鐘比較基準；今日累積方向仍會持續保存。</div></div>`;
- const counts=`<div class="changecounts"><span class="changecount">⬆️轉強 ${c.turn_strong||0}</span><span class="changecount">⬇️轉弱 ${c.turn_weak||0}</span><span class="changecount">🚀突破 ${c.breakout||0}</span><span class="changecount">♻️站回VWAP ${c.vwap_reclaim||0}</span><span class="changecount">🔥族群加速 ${c.sector_accel||0}</span></div>`;
+ const x=changeRadar||{},c=x.counts||{},t=x.today||{};
+ const heldWeak=(intraRows||[]).filter(r=>held(r.code)&&r.today_transitions?.became_weak).length;
+ const overview=`<div class="changecounts"><span class="changecount">🌱今日新進蓄勢 ${t.new_setup||0}</span><span class="changecount">🔥今日新進剛啟動 ${t.new_launch||0}</span><span class="changecount">⬆️一路改善 ${t.improving||0}</span><span class="changecount">♻️重新轉強 ${t.restrengthening||0}</span><span class="changecount">⚠️庫存今日轉弱 ${heldWeak}</span><span class="changecount">🚫今日轉過熱 ${t.became_overheat||0}</span><span class="changecount">💰今日族群加速 ${t.sector_accel_count||0}</span></div>`;
+ const head=`<div class="changetop"><div><div class="changetitle">🚨 今天值得注意</div><div class="changesub">今日累積事件＋最近5分鐘變化；「新進」只計真正從其他階段轉入，不是目前總檔數。</div></div></div>`;
+ const counts=x.ready?`<div class="changecounts"><span class="changecount">⬆️5分轉強 ${c.turn_strong||0}</span><span class="changecount">⬇️5分轉弱 ${c.turn_weak||0}</span><span class="changecount">🚀剛突破 ${c.breakout||0}</span><span class="changecount">♻️剛站回VWAP ${c.vwap_reclaim||0}</span><span class="changecount">🔥族群剛加速 ${c.sector_accel||0}</span></div>`:"";
  const ev=(x.events||[]).slice(0,8);
- const items=ev.length?`<div class="changeevents">${ev.map(e=>`<button class="changeevent peerlink" data-code="${e.code}"><span class="changeeventmain"><span class="changeeventname">${e.label}｜${e.name} ${e.code}</span><div class="changeeventreason">${e.reason}</div></span><span class="changedelta">${e.score_delta===null||e.score_delta===undefined?"":signed(e.score_delta,0,"")}</span></button>`).join("")}</div>`:`<div class="changesub" style="margin-top:9px">這一輪沒有新的個股轉折訊號。</div>`;
- const se=(x.sector_events||[]).slice(0,5);
- const sectors=se.length?`<div class="sectorchange">${se.map(e=>`${e.label} ${e.sector}｜${e.reason}`).join("<br>")}</div>`:"";
+ const items=x.ready?(ev.length?`<div class="changeevents">${ev.map(e=>`<button class="changeevent peerlink" data-code="${e.code}"><span class="changeeventmain"><span class="changeeventname">${e.label}｜${e.name} ${e.code}</span><div class="changeeventreason">${e.reason}</div></span><span class="changedelta">${e.score_delta===null||e.score_delta===undefined?"":signed(e.score_delta,0,"")}</span></button>`).join("")}</div>`:`<div class="changesub" style="margin-top:9px">這一輪沒有新的個股轉折訊號。</div>`):`<div class="changesub" style="margin-top:9px">5分鐘比較基準正在建立；今日累積事件仍持續保存。</div>`;
+ const se=(t.sector_accel||[]).slice(0,5);
+ const sectors=se.length?`<div class="sectorchange">今日曾進入資金加速：${se.map(e=>`${e.sector} ${signed(e.heat,1,"")}`).join(" · ")}</div>`:"";
  return `<div class="changebox">${head}${overview}${counts}${items}${sectors}</div>`;
 }
-
 
 function entryDecision(r,mkt=market){
  const c=r?.intraday_components||{};
@@ -743,7 +743,8 @@ function completionHTML(r){
  if(mode==="intraday"&&dir)items.push(`<span class="reason">🧭 今日 ${escHTML(dir)} · 動能 ${signed(ch.score_open_delta||0,1,"")} · 量速 ${num(ch.pace_open||0,1)}→${num(ch.pace_now||0,1)}x · RS ${num(ch.rs_open||0,1)}→${num(ch.rs_now||0,1)}</span>`);
  return items.length?`<div class="reasons">${items.join("")}</div>`:"";
 }
-\nfunction chipHTML(r){
+
+function chipHTML(r){
  const f=r.foreign_3buy===true?`<span class="yes">外資連3買 ✓</span>`:r.foreign_3buy===false?`外資未連3買`:`外資資料待補`;
  const s=r.sbl_3down===true?`<span class="yes">借券連3減 ✓</span>`:r.sbl_3down===false?`借券未連3減`:`借券資料待補`;
  const trust=r.trust_net_latest===null||r.trust_net_latest===undefined?"—":lots(r.trust_net_latest);

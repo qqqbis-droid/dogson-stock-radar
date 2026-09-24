@@ -74,6 +74,9 @@ def compact_close_row(r):
         "chip_coverage_pct": f(r.get("chip_coverage_pct"), 0.0),
         "sector_score": f(r.get("sector_score"), 0.0),
         "liquidity_level": r.get("liquidity_level"),
+        "foreign_3d_strength_pct": f(r.get("foreign_3d_strength_pct")),
+        "breakout_volume_ratio": f(r.get("breakout_volume_ratio")),
+        "breakout_volume_baseline_mode": r.get("breakout_volume_baseline_mode"),
         "components": {
             "technical": f(comps.get("technical"), 0.0),
             "chip": f(comps.get("chip"), 0.0),
@@ -102,6 +105,11 @@ def compact_intraday_row(r):
         "chip_background": r.get("chip_background"),
         "chip_score": f(r.get("chip_score")),
         "dynamic_thresholds": r.get("dynamic_thresholds") or {},
+        "execution_pattern": r.get("execution_pattern"),
+        "today_direction": r.get("today_direction"),
+        "today_change_summary": r.get("today_change_summary") or {},
+        "foreign_3d_strength_pct": f(r.get("foreign_3d_strength_pct")),
+        "breakout_volume_ratio": f(r.get("breakout_volume_ratio")),
     }
 
 
@@ -193,6 +201,9 @@ def outcome_records(snaps):
                 "category": r.get("category"), "quality": r.get("quality"),
                 "sector_group": r.get("sector_group"), "market_mode": r.get("market_mode"),
                 "components": r.get("components") or {}, "returns": {},
+                "foreign_3d_strength_pct": r.get("foreign_3d_strength_pct"),
+                "breakout_volume_ratio": r.get("breakout_volume_ratio"),
+                "breakout_volume_baseline_mode": r.get("breakout_volume_baseline_mode"),
             }
             for h in HORIZONS:
                 if i + h < len(snaps):
@@ -276,6 +287,30 @@ def calibrated_weights(records):
     }
 
 
+def feature_research(records):
+    matured=[r for r in records if (r.get("returns") or {}).get("5") is not None]
+    def stat(items):
+        vals=[f((r.get("returns") or {}).get("5")) for r in items]; vals=[x for x in vals if x is not None]
+        return {"n":len(vals),"win_rate":round(sum(x>0 for x in vals)/len(vals)*100,1) if vals else None,"avg5":round(sum(vals)/len(vals),3) if vals else None,"median5":round(statistics.median(vals),3) if vals else None}
+    def chip_bucket(r):
+        x=f(r.get("foreign_3d_strength_pct"))
+        return "未知" if x is None else "強買≥15%" if x>=15 else "買5~15%" if x>=5 else "小買0~5%" if x>0 else "賣超≤0%"
+    def vol_bucket(r):
+        x=f(r.get("breakout_volume_ratio"))
+        return "未知" if x is None else "≥2x" if x>=2 else "1.3~2x" if x>=1.3 else "0.8~1.3x" if x>=.8 else "<0.8x"
+    by_chip={k:stat([r for r in matured if chip_bucket(r)==k]) for k in ["強買≥15%","買5~15%","小買0~5%","賣超≤0%"]}
+    by_vol={k:stat([r for r in matured if vol_bucket(r)==k]) for k in ["≥2x","1.3~2x","0.8~1.3x","<0.8x"]}
+    launched=[r for r in matured if r.get("category")=="剛啟動"]
+    fake=[r for r in launched if f((r.get("returns") or {}).get("5"),0)<=0 and f(r.get("mfe10"),0)<5]
+    combos={}
+    for r in matured:
+        key=f"{r.get('category') or '觀察'}｜{chip_bucket(r)}｜{vol_bucket(r)}"
+        combos.setdefault(key,[]).append(r)
+    combo_stats=[{"key":k,**stat(v)} for k,v in combos.items() if len(v)>=5]
+    combo_stats.sort(key=lambda x:(x.get("n") or 0,x.get("avg5") or -999),reverse=True)
+    return {"version":"1.0","status":"warming" if len(matured)<500 else "research_ready","matured_rows":len(matured),"chip_force_5d":by_chip,"breakout_volume_5d":by_vol,"fake_breakout":{"definition":"剛啟動後5日報酬<=0且10日MFE<5%","n":len(launched),"fake_n":len(fake),"fake_rate":round(len(fake)/len(launched)*100,1) if launched else None},"combinations":combo_stats[:30],"note":"研究層只描述歷史關聯，不直接改正式分數。"}
+
+
 def summarize(records, calibration, history):
     matured5 = [r for r in records if (r.get("returns") or {}).get("5") is not None]
     def stats(items, horizon="5"):
@@ -321,6 +356,7 @@ def summarize(records, calibration, history):
         "high_quality_5d": high_quality,
         "stage_5d": stage,
         "calibration": calibration,
+        "research": feature_research(records),
         "recent_matured_signals": recent,
         "horizons": [1, 3, 5, 10],
         "mfe_mae_window": 10,

@@ -634,6 +634,11 @@ def close_technical(x):
     mh = macd_hist(c)
     p3 = h.shift(1).rolling(3).max()
     p20 = h.shift(1).rolling(20).max()
+    # v1.5.30: causal self baselines. Average volume excludes the current day;
+    # breakout-event volume uses only prior completed 20-day breakout events.
+    avgvol20 = v.shift(1).rolling(20).mean()
+    breakout_mask = (c > p20) & p20.notna()
+    hist_breakout_vol = v.iloc[:-1][breakout_mask.iloc[:-1]].dropna().tail(20)
 
     row = {
         "close": float(c.iloc[-1]),
@@ -653,6 +658,11 @@ def close_technical(x):
         "break3": bool(c.iloc[-1] > p3.iloc[-1]) if pd.notna(p3.iloc[-1]) else False,
         "break20": bool(c.iloc[-1] > p20.iloc[-1]) if pd.notna(p20.iloc[-1]) else False,
         "trend": bool(c.iloc[-1] > ma5.iloc[-1] > ma10.iloc[-1] > ma20.iloc[-1]),
+        "volume": float(v.iloc[-1]),
+        "avg_volume20": float(avgvol20.iloc[-1]) if pd.notna(avgvol20.iloc[-1]) else None,
+        "breakout_event_count": int(len(hist_breakout_vol)),
+        "breakout_volume_median20": float(hist_breakout_vol.median()) if len(hist_breakout_vol) >= 3 else None,
+        "breakout_volume_avg20": float(hist_breakout_vol.mean()) if len(hist_breakout_vol) >= 3 else None,
         "avg_turnover20": float((c*v).rolling(20).mean().iloc[-1]),
         "date": str(x.index[-1].date()),
     }
