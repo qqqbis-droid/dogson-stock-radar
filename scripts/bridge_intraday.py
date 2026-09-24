@@ -191,8 +191,12 @@ def main():
     store = _load_snapshots()
     if store.get("date") != trade_date:
         store = {"date": trade_date, "stocks": {}}
+    # Only a newly observed REAL trade may enter the structural snapshot store.
+    # Carried quotes are display continuity only; attaching current cumulative
+    # volume to an older trade timestamp would fabricate a 5-minute volume bar.
     for code, q in quotes.items():
-        _merge_snapshot(store, code, q)
+        if not bool(q.get("quote_carried")):
+            _merge_snapshot(store, code, q)
     store["updated_at"] = bd.now_tw().isoformat(timespec="seconds")
     _save_snapshots(store)
 
@@ -260,7 +264,9 @@ def main():
         if q:
             row["quote_date"] = q.get("date")
             row["quote_time"] = q.get("time")
+            row["quote_snapshot_time"] = q.get("snapshot_time")
             row["quote_source"] = q.get("source")
+            row["quote_carried"] = bool(q.get("quote_carried"))
             row["quote_close"] = q.get("close")
             row["close"] = q.get("close")
             if q.get("change_pct") is not None:
@@ -300,8 +306,13 @@ def main():
         previous_obj = {}
     change_radar = bd.build_change_radar(out_rows, rotation, previous_obj)
 
-    quote_times = [str(q.get("time") or "")[:5] for q in quotes.values() if q.get("time")]
-    quote_latest = max(quote_times) if quote_times else None
+    # Market-data freshness and last-trade freshness are different clocks.
+    # snapshot_time proves the MIS response is current even when that stock has
+    # not traded in the last few seconds; time is the timestamp of the real trade.
+    snapshot_times = [str(q.get("snapshot_time") or q.get("time") or "")[:5] for q in quotes.values() if (q.get("snapshot_time") or q.get("time"))]
+    trade_times = [str(q.get("time") or "")[:5] for q in quotes.values() if q.get("time")]
+    quote_latest = max(snapshot_times) if snapshot_times else None
+    trade_latest = max(trade_times) if trade_times else None
     structure_latest = max(fresh_times) if fresh_times else obj.get("quote_layer", {}).get("structure_latest_time")
 
     obj.update({
@@ -321,6 +332,7 @@ def main():
             "bridged_rows": bridged,
             "volume_verified_rows": volume_ok,
             "latest_quote_time": quote_latest,
+            "latest_trade_time": trade_latest,
             "latest_structure_time": structure_latest,
             "note": "Yahoo只作歷史底座；最後數根5分結構由每輪官方MIS快照橋接。橋接High/Low為快照估計，不冒充逐筆K線。",
         },
@@ -329,8 +341,9 @@ def main():
             "coverage": len(quotes),
             "row_count": len(out_rows),
             "latest_time": quote_latest,
+            "latest_trade_time": trade_latest,
             "structure_latest_time": structure_latest,
-            "note": "現價/當日漲跌採官方MIS；技術尾端採持久化MIS快照橋接，Yahoo僅作較早5分K底座",
+            "note": "latest_time=官方MIS快照新鮮度；每檔quote_time=最後真實成交時間。現價只沿用同日曾實際觀測到的成交價，不用買賣盤推估成交價。",
         },
     })
     bd.dump("intraday.json", obj)
