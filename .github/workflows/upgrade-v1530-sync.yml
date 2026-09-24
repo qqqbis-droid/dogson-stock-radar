@@ -1,0 +1,105 @@
+name: Install Radar v1.5.30 Decision Sync
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/triggers/v1530-sync.trigger"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-v1530-final
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - name: Apply final decision synchronization
+        run: python scripts/patch_v1530_decision_sync.py
+      - name: Verify dynamic gates, prior-close transitions, and version guard
+        run: |
+          python -m py_compile scripts/build_completion.py scripts/build_daytrade.py scripts/patch_v1530_decision_sync.py
+          python - <<'PY'
+          import json,re,sys,tempfile
+          from pathlib import Path
+          sys.path.insert(0,'scripts')
+          import build_completion as bc
+          ui=Path('docs/index.html').read_text(encoding='utf-8')
+          dt=Path('scripts/build_daytrade.py').read_text(encoding='utf-8')
+          for x in ['dayHot=+(dyn.day_hot_pct','vwapHot=+(dyn.vwap_hot_pct','paceHot=+(dyn.pace_hot_x','ret15Hot=+(dyn.ret15_hot_pct','if(day>=dayHot)','if(vwap>vwapHot)','if(pace>paceHot)','if(ret15>ret15Hot)']:
+              assert x in ui, x
+          assert 'if(day>=8.5)' not in ui
+          assert 'if(vwap>4.5)' not in ui
+          assert '"version": "1.5.30-free"' in dt
+          m=re.search(r'<script>\s*(.*?)</script>\s*<script src="./hourly.js',ui,re.S); assert m
+          Path('/tmp/dogson-inline.js').write_text(m.group(1),encoding='utf-8')
+          with tempfile.TemporaryDirectory() as td:
+              old_data,old_hist=bc.DATA,bc.HIST
+              bc.DATA=Path(td);bc.HIST=bc.DATA/'decision_history.json'
+              (bc.DATA/'status.json').write_text('{}',encoding='utf-8')
+              (bc.DATA/'close.json').write_text(json.dumps({'rows':[{'code':'0001','category':'觀察'}]},ensure_ascii=False),encoding='utf-8')
+              row={'code':'0001','name':'T','close':100,'vwap':100,'vwap_dist':0,'pace':1,'ret15':0,'range_position_pct':50,'trend5':True,'break3':False,'foreign_3d_net':0,'avg_volume20':10000,'intraday_score':65,'intraday_components':{'relative_strength':8,'sector':10},'category':'蓄勢待發','quote_time':'09:05'}
+              (bc.DATA/'intraday.json').write_text(json.dumps({'rows':[row]},ensure_ascii=False),encoding='utf-8')
+              bc.main('intraday')
+              out=json.loads((bc.DATA/'intraday.json').read_text(encoding='utf-8'))
+              assert out['change_radar']['today']['new_setup']==1
+              assert out['rows'][0]['today_transition_baseline']=='prior_close'
+              bc.DATA,bc.HIST=old_data,old_hist
+          status=json.loads(Path('docs/data/status.json').read_text(encoding='utf-8'))
+          assert status['version']=='1.5.30-free' and status['completion_version']=='1.2'
+          print('v1.5.30 decision sync contracts OK')
+          PY
+          node --check /tmp/dogson-inline.js
+      - name: Commit synchronized decision layer
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html docs/data/status.json scripts/build_completion.py scripts/build_daytrade.py
+          git diff --cached --quiet || git commit -m "Synchronize v1.5.30 dynamic decision layer"
+          ok=0
+          for n in $(seq 1 12); do
+            git fetch origin main
+            if git rebase origin/main && git push origin HEAD:main; then ok=1; break; fi
+            git rebase --abort || true
+            sleep 3
+          done
+          test "$ok" = 1
+      - name: Refresh from current live data
+        run: |
+          python scripts/sync_live_data.py || true
+          python scripts/build_completion.py --mode close
+          python scripts/build_completion.py --mode intraday
+          python scripts/build_daytrade.py
+      - name: Final status guard
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          s=json.loads(Path('docs/data/status.json').read_text(encoding='utf-8'))
+          assert s.get('version')=='1.5.30-free',s
+          assert s.get('completion_version')=='1.2',s
+          assert s.get('daytrade_version')=='1.0',s
+          print('final status guard OK')
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
