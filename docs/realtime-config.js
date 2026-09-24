@@ -14,7 +14,7 @@ if (!document.getElementById('dogson-hourly-module')) {
 if (!document.getElementById('dogson-decision-filters')) {
   const s = document.createElement('script');
   s.id = 'dogson-decision-filters';
-  s.src = './ui-filters.js?v=1600';
+  s.src = './ui-filters.js?v=1600-3';
   s.async = true;
   document.head.appendChild(s);
 }
