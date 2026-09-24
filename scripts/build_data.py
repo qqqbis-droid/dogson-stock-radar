@@ -2559,6 +2559,8 @@ def intraday_stock_snapshot(universe_df, codes=None):
     now = now_tw()
     today = now.date()
     out = {}
+    MIS_DIAG = {"requests":0,"msg_entries":0,"wanted_entries":0,"today_entries":0,"valid_z":0,"missing_z":0,"wrong_date":0}
+    MIS_SAMPLES = []
     # MIS becomes unreliable when one ex_ch query carries too many symbols.
     # Ten market-correct channels per request is intentionally conservative.
     batch_size = 10
@@ -2577,6 +2579,7 @@ def intraday_stock_snapshot(universe_df, codes=None):
             for r in part
         )
         try:
+            MIS_DIAG["requests"] += 1
             rr = requests.get(
                 "https://mis.twse.com.tw/stock/api/getStockInfo.jsp",
                 params={"ex_ch": ex_ch, "json": "1", "delay": "0", "_": int(now.timestamp()*1000)},
@@ -2588,15 +2591,28 @@ def intraday_stock_snapshot(universe_df, codes=None):
                 timeout=20,
             )
             rr.raise_for_status()
-            for x in rr.json().get("msgArray") or []:
+            arr = rr.json().get("msgArray") or []
+            MIS_DIAG["msg_entries"] += len(arr)
+            for x in arr:
                 code = str(x.get("c") or "").strip()
                 td = _parse_mis_trade_date(x.get("d"))
-                if not code or td != today:
+                if not code:
                     continue
+                MIS_DIAG["wanted_entries"] += 1
+                if td != today:
+                    MIS_DIAG["wrong_date"] += 1
+                    if len(MIS_SAMPLES) < 8:
+                        MIS_SAMPLES.append({"code":code,"why":"date","d":x.get("d"),"t":x.get("t"),"z":x.get("z"),"ex":x.get("ex")})
+                    continue
+                MIS_DIAG["today_entries"] += 1
                 last = fnum(x.get("z"))
                 prev = fnum(x.get("y"))
                 if last is None or last <= 0:
+                    MIS_DIAG["missing_z"] += 1
+                    if code in {"3189","4707"} or len(MIS_SAMPLES) < 16:
+                        MIS_SAMPLES.append({"code":code,"why":"z","d":x.get("d"),"t":x.get("t"),"z":x.get("z"),"tv":x.get("tv"),"y":x.get("y"),"o":x.get("o"),"h":x.get("h"),"l":x.get("l"),"v":x.get("v"),"b":x.get("b"),"a":x.get("a"),"ex":x.get("ex")})
                     continue
+                MIS_DIAG["valid_z"] += 1
                 tm = str(x.get("t") or "").strip()
                 # Some MIS responses include HH:MM:SS, some HH:MM.
                 if len(tm) >= 5:
@@ -2612,7 +2628,7 @@ def intraday_stock_snapshot(universe_df, codes=None):
                 }
         except Exception as e:
             print("MIS intraday stock batch", i, e)
-    print("MIS intraday stock quotes", len(out), "/", len(recs))
+    print("MIS intraday stock quotes", len(out), "/", len(recs)); print("MIS_DIAG", json.dumps(MIS_DIAG,ensure_ascii=False), "samples", json.dumps(MIS_SAMPLES,ensure_ascii=False))
     return out
 
 def _weighted_pct(rows, predicate, weight_key="current_turnover"):
