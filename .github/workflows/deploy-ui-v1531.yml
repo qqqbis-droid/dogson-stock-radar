@@ -15,7 +15,7 @@ permissions:
   id-token: write
 
 # Canonical production publisher queue. UI publishes wait for market-data
-# publishes to finish; no production publisher may cancel another publisher.
+# publishers to finish, and obsolete upgrade installers are no longer active.
 concurrency:
   group: dogson-pages
   cancel-in-progress: false
