@@ -1,5 +1,5 @@
-const CACHE='dogson-free-v1690';
-const UI_VERSION='1690';
+const CACHE='dogson-free-v1700';
+const UI_VERSION='1700';
 
 const UI_HEAD=`
 <link id="dogson-dashboard-css" rel="stylesheet" href="./redesign-v160.css?v=${UI_VERSION}">
@@ -57,33 +57,34 @@ self.addEventListener('install',event=>{
     await cache.addAll([
       './manifest.webmanifest',
       './hourly.js?v=1530',
-      './realtime-config.js?v=1690',
-      './realtime.js?v=1690',
-      './ui-filters.js?v=1690',
-      './redesign-v160.css?v=1690',
-      './redesign-v160-dark.css?v=1690',
-      './contrast-v160.css?v=1690',
-      './redesign-v162.css?v=1690',
-      './redesign-v162-fix.css?v=1690',
-      './redesign-v163.css?v=1690',
-      './redesign-v164.css?v=1690',
-      './redesign-v165.css?v=1690',
-      './redesign-v166.css?v=1690',
-      './redesign-v1679.css?v=1690',
-      './redesign-v1685.css?v=1690',
-      './redesign-v1686.css?v=1690',
-      './redesign-v160.js?v=1690',
-      './ui-polish-v160.js?v=1690',
-      './ui-layout-v162.js?v=1690',
-      './ui-card-v164.js?v=1690',
-      './ui-card-v166.js?v=1690',
-      './ui-fold-v167.js?v=1690',
-      './ui-entry-v1679.js?v=1690',
-      './ui-freshness-v1688.js?v=1690',
-      './ui-dual-decision-v1690.js?v=1690',
-      './ui-load-more-v1681.js?v=1690',
-      './ui-market-v1685.js?v=1690',
-      './ui-market-ticker-v1686.js?v=1690'
+      './realtime-config.js?v=1700',
+      './realtime.js?v=1700',
+      './ui-filters.js?v=1700',
+      './redesign-v160.css?v=1700',
+      './redesign-v160-dark.css?v=1700',
+      './contrast-v160.css?v=1700',
+      './redesign-v162.css?v=1700',
+      './redesign-v162-fix.css?v=1700',
+      './redesign-v163.css?v=1700',
+      './redesign-v164.css?v=1700',
+      './redesign-v165.css?v=1700',
+      './redesign-v166.css?v=1700',
+      './redesign-v1679.css?v=1700',
+      './redesign-v1685.css?v=1700',
+      './redesign-v1686.css?v=1700',
+      './redesign-v160.js?v=1700',
+      './ui-polish-v160.js?v=1700',
+      './ui-layout-v162.js?v=1700',
+      './ui-card-v164.js?v=1700',
+      './ui-card-v166.js?v=1700',
+      './ui-fold-v167.js?v=1700',
+      './ui-entry-v1679.js?v=1700',
+      './ui-freshness-v1688.js?v=1700',
+      './ui-system-status-v1700.js?v=1700',
+      './ui-dual-decision-v1690.js?v=1700',
+      './ui-load-more-v1681.js?v=1700',
+      './ui-market-v1685.js?v=1700',
+      './ui-market-ticker-v1686.js?v=1700'
     ]);
     try{
       const res=await fetch('./index.html',{cache:'no-store'});
@@ -96,8 +97,6 @@ self.addEventListener('install',event=>{
 self.addEventListener('activate',event=>{
   event.waitUntil((async()=>{
     await caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))));
-    // Claim immediately, but do NOT navigate/reload open windows. The old
-    // navigate + controllerchange reload combination caused blank launches.
     await self.clients.claim();
   })());
 });
