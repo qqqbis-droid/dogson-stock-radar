@@ -1,5 +1,5 @@
-const CACHE='dogson-free-v1688';
-const UI_VERSION='1688';
+const CACHE='dogson-free-v1690';
+const UI_VERSION='1690';
 
 const UI_HEAD=`
 <link id="dogson-dashboard-css" rel="stylesheet" href="./redesign-v160.css?v=${UI_VERSION}">
@@ -57,32 +57,33 @@ self.addEventListener('install',event=>{
     await cache.addAll([
       './manifest.webmanifest',
       './hourly.js?v=1530',
-      './realtime-config.js?v=1688',
-      './realtime.js?v=1688',
-      './ui-filters.js?v=1688',
-      './redesign-v160.css?v=1688',
-      './redesign-v160-dark.css?v=1688',
-      './contrast-v160.css?v=1688',
-      './redesign-v162.css?v=1688',
-      './redesign-v162-fix.css?v=1688',
-      './redesign-v163.css?v=1688',
-      './redesign-v164.css?v=1688',
-      './redesign-v165.css?v=1688',
-      './redesign-v166.css?v=1688',
-      './redesign-v1679.css?v=1688',
-      './redesign-v1685.css?v=1688',
-      './redesign-v1686.css?v=1688',
-      './redesign-v160.js?v=1688',
-      './ui-polish-v160.js?v=1688',
-      './ui-layout-v162.js?v=1688',
-      './ui-card-v164.js?v=1688',
-      './ui-card-v166.js?v=1688',
-      './ui-fold-v167.js?v=1688',
-      './ui-entry-v1679.js?v=1688',
-      './ui-freshness-v1688.js?v=1688',
-      './ui-load-more-v1681.js?v=1688',
-      './ui-market-v1685.js?v=1688',
-      './ui-market-ticker-v1686.js?v=1688'
+      './realtime-config.js?v=1690',
+      './realtime.js?v=1690',
+      './ui-filters.js?v=1690',
+      './redesign-v160.css?v=1690',
+      './redesign-v160-dark.css?v=1690',
+      './contrast-v160.css?v=1690',
+      './redesign-v162.css?v=1690',
+      './redesign-v162-fix.css?v=1690',
+      './redesign-v163.css?v=1690',
+      './redesign-v164.css?v=1690',
+      './redesign-v165.css?v=1690',
+      './redesign-v166.css?v=1690',
+      './redesign-v1679.css?v=1690',
+      './redesign-v1685.css?v=1690',
+      './redesign-v1686.css?v=1690',
+      './redesign-v160.js?v=1690',
+      './ui-polish-v160.js?v=1690',
+      './ui-layout-v162.js?v=1690',
+      './ui-card-v164.js?v=1690',
+      './ui-card-v166.js?v=1690',
+      './ui-fold-v167.js?v=1690',
+      './ui-entry-v1679.js?v=1690',
+      './ui-freshness-v1688.js?v=1690',
+      './ui-dual-decision-v1690.js?v=1690',
+      './ui-load-more-v1681.js?v=1690',
+      './ui-market-v1685.js?v=1690',
+      './ui-market-ticker-v1686.js?v=1690'
     ]);
     try{
       const res=await fetch('./index.html',{cache:'no-store'});
