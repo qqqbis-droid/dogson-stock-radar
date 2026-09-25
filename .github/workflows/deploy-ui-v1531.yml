@@ -1,4 +1,4 @@
-name: Deploy Radar v1.6.8.0 UI
+name: Deploy Radar v1.6.8.1 UI
 
 on:
   push:
@@ -37,6 +37,7 @@ jobs:
           node --check docs/ui-card-v166.js
           node --check docs/ui-fold-v167.js
           node --check docs/ui-entry-v1679.js
+          node --check docs/ui-load-more-v1681.js
           node --check docs/realtime.js
           node --check docs/sw.js
           test -s docs/contrast-v160.css
@@ -47,8 +48,12 @@ jobs:
           test -s docs/redesign-v165.css
           test -s docs/redesign-v166.css
           test -s docs/redesign-v1679.css
-          grep -q "ui-filters.js?v=1680" docs/realtime-config.js
-          grep -q "dogson-free-v1680" docs/sw.js
+          grep -q "ui-filters.js?v=1681" docs/realtime-config.js
+          grep -q "dogson-free-v1681" docs/sw.js
+          grep -q "ui-load-more-v1681.js" docs/ui-filters.js
+          grep -q "ui-load-more-v1681.js?v=1681" docs/sw.js
+          grep -q "DOGSON_LOAD_MORE_V1681" docs/ui-load-more-v1681.js
+          grep -q "dogsonOriginalLoadMore" docs/ui-load-more-v1681.js
           grep -q "DOGSON_MARKET_ADVISORY_V1680" docs/ui-entry-v1679.js
           grep -q "市場環境提醒" docs/ui-entry-v1679.js
           grep -q "系統性風險煞車" docs/ui-entry-v1679.js
