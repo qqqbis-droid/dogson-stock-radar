@@ -4,7 +4,9 @@
   if(typeof render!=='function' || typeof entryDecision!=='function') return;
 
   const state={
-    defaultFocus:true,
+    // v1.6.8.3: default view is the full scan. Filters only apply after
+    // the user explicitly chooses one.
+    defaultFocus:false,
     light:null,
     event:null,
     yellowReason:null,
@@ -16,15 +18,16 @@
   let fullRowsRef=null;
 
   const n=v=>{const x=Number(v);return Number.isFinite(x)?x:0};
+  const scoreOf=r=>n(r?.intraday_score??r?.score);
   const stage=r=>typeof stageKey==='function'?stageKey(r?.category):String(r?.category||'');
-  function decision(r){try{return entryDecision(r,intraMarket)}catch{return {key:'yellow',wait:[],block:[],score:n(r?.intraday_score??r?.score)}}}
+  function decision(r){try{return entryDecision(r,intraMarket)}catch{return {key:'yellow',wait:[],block:[],score:scoreOf(r)}}}
 
   function coreMisses(r){
     const c=r?.intraday_components||{};
     const mtf=r?.multi_timeframe||{}, rsm=r?.relative_multiframe||{};
     const vwap=n(r?.vwap_dist), pos=n(r?.range_position_pct||50);
     return [
-      n(r?.intraday_score??r?.score)<70,
+      scoreOf(r)<70,
       n(c.price_structure)<20,
       n(c.flow_volume)<14,
       n(c.relative_strength)<8,
@@ -42,7 +45,7 @@
     if(d.key==='green') return true;
     if(d.key!=='yellow') return false;
     if(['轉弱警戒','結構失效','過熱不追'].includes(s)) return false;
-    const score=n(r?.intraday_score??r?.score);
+    const score=scoreOf(r);
     const pattern=String(r?.execution_pattern||'');
     const patternOK=['量縮回踩','量增上攻','承接整理'].includes(pattern)||Boolean(r?.break3)||Boolean(r?.trend5);
     return score>=58 && n(c.price_structure)>=15 && n(c.flow_volume)>=10 && n(c.relative_strength)>=6 && n(c.sector)>=6 && n(c.liquidity_risk)>=5 && coreMisses(r)<=4 && patternOK;
@@ -133,7 +136,7 @@
     }
     let bar=box.querySelector('.decision-filterbar');
     if(!bar){bar=document.createElement('div');bar.className='decision-filterbar';box.appendChild(bar)}
-    bar.innerHTML=`<button class="decision-filterbtn ${state.defaultFocus&&!state.light&&!state.event?'on':''}" data-df="focus">✨ 綠燈＋高品質黃</button><button class="decision-filterbtn ${!state.defaultFocus&&!state.light&&!state.event?'on':''}" data-df="all">全部</button>`;
+    bar.innerHTML=`<button class="decision-filterbtn ${state.defaultFocus&&!state.light&&!state.event?'on':''}" data-df="focus">✨ 精選機會</button><button class="decision-filterbtn ${!state.defaultFocus&&!state.light&&!state.event?'on':''}" data-df="all">全部</button>`;
     bar.querySelector('[data-df="focus"]')?.addEventListener('click',()=>{state.defaultFocus=true;state.light=null;state.event=null;state.yellowReason=null;rerender()});
     bar.querySelector('[data-df="all"]')?.addEventListener('click',()=>{clearSelection();rerender()});
 
@@ -146,7 +149,7 @@
     }else if(yr)yr.remove();
 
     let note=box.querySelector('.decision-filter-note');if(!note){note=document.createElement('div');note.className='decision-filter-note';box.appendChild(note)}
-    note.textContent=state.defaultFocus&&!state.light&&!state.event?'目前預設：只顯示 🟢 可試單＋高品質 🟡；紅燈不佔注意力。':'點三燈或上方事件即可直接篩選；再次點擊可取消。';
+    note.textContent=state.defaultFocus&&!state.light&&!state.event?'精選機會：只顯示 🟢 可試單＋高品質 🟡。':'目前顯示全部掃描結果，依盤中動能分數由高到低排列；需要時再使用上方篩選。';
   }
 
   function enhanceChange(){
@@ -161,17 +164,28 @@
     if(!bar){bar=document.createElement('div');bar.className='decision-filterbar event-quality';const top=box.querySelector('.changetop');(top||box).insertAdjacentElement('afterend',bar)}
     bar.innerHTML=`<button class="decision-filterbtn ${state.highQuality?'on':''}" data-quality="1">✨ 高品質二次篩選 ${state.highQuality?'ON':'OFF'}</button>${state.event?'<button class="decision-filterbtn on" data-clear-event="1">清除事件篩選</button>':''}`;
     bar.querySelector('[data-quality]')?.addEventListener('click',()=>{state.highQuality=!state.highQuality;if(state.event)rerender();else enhance()});
-    bar.querySelector('[data-clear-event]')?.addEventListener('click',()=>{state.event=null;state.defaultFocus=true;rerender()});
+    bar.querySelector('[data-clear-event]')?.addEventListener('click',()=>{state.event=null;state.defaultFocus=false;rerender()});
   }
 
   function enhance(){addStyles();enhanceEntry();enhanceChange()}
+
+  // The visible top-level「全部」button must also clear this decision layer.
+  // It previously reset only the lifecycle filter, leaving an invisible focus
+  // filter active and making the result list look mysteriously short.
+  document.addEventListener('click',e=>{
+    const b=e.target?.closest?.('#dogsonQuickFilters [data-all]');
+    if(!b) return;
+    clearSelection();
+    setTimeout(rerender,0);
+  },true);
 
   render=function(){
     if(typeof mode==='undefined'||mode!=='intraday'){
       baseRender();setTimeout(enhance,0);return;
     }
     const full=Array.isArray(intraRows)?intraRows:[];fullRowsRef=full;
-    const filtered=full.filter(rowMatch);const cur=intraRows;intraRows=filtered;
+    const filtered=full.filter(rowMatch).slice().sort((a,b)=>scoreOf(b)-scoreOf(a));
+    const cur=intraRows;intraRows=filtered;
     try{baseRender()}finally{intraRows=cur;fullRowsRef=null}
     setTimeout(enhance,0);
   };
