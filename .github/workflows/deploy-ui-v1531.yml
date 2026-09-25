@@ -71,7 +71,7 @@ jobs:
         run: |
           set -u
           base="https://qqqbis-droid.github.io/dogson-stock-radar/data"
-          files=(universe.json close.json market.json intraday.json hourly.json status.json chip_history.json chip_status.json mis_snapshots.json validation_history.json validation.json daytrade.json decision_history.json)
+          files=(universe.json close.json market.json intraday.json hourly.json status.json system_status.json chip_history.json chip_status.json mis_snapshots.json validation_history.json validation.json daytrade.json decision_history.json)
           mkdir -p docs/data
           for name in "${files[@]}"; do
             tmp="docs/data/${name}.live"
