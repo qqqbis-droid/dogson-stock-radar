@@ -1,9 +1,9 @@
 (()=>{
-  if(window.__DOGSON_UI_LOADER_V1680__) return;
-  window.__DOGSON_UI_LOADER_V1680__ = true;
+  if(window.__DOGSON_UI_LOADER_V1681__) return;
+  window.__DOGSON_UI_LOADER_V1681__ = true;
   const src=document.currentScript?.src||location.href;
   const base=new URL('.',src);
-  const version='1680';
+  const version='1681';
 
   function loadCss(name,id){
     if(document.getElementById(id)) return;
@@ -37,5 +37,6 @@
     .then(()=>loadScript('ui-card-v166.js','dogson-ui-card-v166'))
     .then(()=>loadScript('ui-fold-v167.js','dogson-ui-fold-v167'))
     .then(()=>loadScript('ui-entry-v1679.js','dogson-ui-entry-v1679'))
+    .then(()=>loadScript('ui-load-more-v1681.js','dogson-ui-load-more-v1681'))
     .catch(err=>console.warn('Dogson UI module load failed',err));
 })();
