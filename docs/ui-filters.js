@@ -13,7 +13,6 @@
     document.documentElement.dataset.dogsonUiReady=version;
   }
 
-  // Never leave the user on a loading shell if an optional UI module fails.
   const safetyTimer=setTimeout(reveal,4500);
 
   function loadCss(name,id){
@@ -42,6 +41,7 @@
   loadCss('redesign-v1679.css','dogson-dashboard-v1679-css');
   loadCss('redesign-v1685.css','dogson-dashboard-v1685-css');
   loadCss('redesign-v1686.css','dogson-dashboard-v1686-css');
+  loadCss('redesign-v1690.css','dogson-dashboard-v1690-css');
   loadScript('ui-filters-core-v1531.js','dogson-filter-core-v1531')
     .then(()=>loadScript('redesign-v160.js','dogson-redesign-v160'))
     .then(()=>loadScript('ui-polish-v160.js','dogson-ui-polish-v160'))
