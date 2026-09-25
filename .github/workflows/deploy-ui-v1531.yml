@@ -14,8 +14,8 @@ permissions:
   pages: write
   id-token: write
 
-# All production publishers share one queue. UI-only publishing waits for any
-# in-flight market-data publish instead of cancelling it or racing its snapshot.
+# Canonical production publisher queue. UI publishes wait for market-data
+# publishes to finish; no production publisher may cancel another publisher.
 concurrency:
   group: dogson-pages
   cancel-in-progress: false
