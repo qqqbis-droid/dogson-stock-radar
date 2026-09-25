@@ -11,6 +11,7 @@ on:
       - "scripts/build_daytrade.py"
       - "scripts/build_completion.py"
       - "scripts/build_system_status.py"
+      - "scripts/validate_intraday_publish.py"
       - "docs/index.html"
       - "docs/realtime.js"
       - "docs/realtime-config.js"
@@ -26,6 +27,8 @@ permissions:
   pages: write
   id-token: write
 
+# All production Pages publishers share one group. A UI-only deployment must
+# never race a market-data deployment and overwrite a newer snapshot.
 concurrency:
   group: dogson-pages
   cancel-in-progress: true
@@ -50,83 +53,51 @@ jobs:
         run: python scripts/build_data.py --mode intraday
       - name: Bridge delayed 5-minute tail with TWSE MIS snapshots
         run: python scripts/bridge_intraday.py
-      - name: v1.5.30 enrich swing decision details
+      - name: Enrich swing decision details
         run: python scripts/build_completion.py --mode intraday
-      - name: Step 8 build isolated day-trading radar
+      - name: Build isolated day-trading radar
         run: python scripts/build_daytrade.py
-      - name: Step 7 preserve source intraday scan for future validation
+      - name: Preserve source intraday scan for future validation
         run: python scripts/build_validation.py --mode intraday
       - name: Build canonical data status
         run: python scripts/build_system_status.py
-      - name: Verify intraday freshness, Step 8 isolation and canonical status
+
+      - name: Strict trading-date publish gate
+        run: python scripts/validate_intraday_publish.py
+
+      - name: Verify isolation and canonical status contract
         run: |
           python - <<'PY'
           import json
-          from datetime import datetime
           from pathlib import Path
-          from zoneinfo import ZoneInfo
 
-          def ymd(v):
-              s = str(v or '')
-              for i in range(max(0, len(s)-9)):
-                  x=s[i:i+10]
-                  if len(x)==10 and x[4]=='-' and x[7]=='-' and x[:4].isdigit() and x[5:7].isdigit() and x[8:10].isdigit():
-                      return x
-              return None
+          intra=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
+          day=json.loads(Path('docs/data/daytrade.json').read_text(encoding='utf-8'))
+          bridge=intra.get('bridge') or {}
+          iso=day.get('isolation') or {}
 
-          def obj_date(o):
-              if not isinstance(o, dict): return None
-              for k in ('trade_date','date','updated_at'):
-                  d=ymd(o.get(k))
-                  if d:return d
-              for r in (o.get('rows') or [])[:100]:
-                  if not isinstance(r,dict):continue
-                  for k in ('trade_date','quote_date','date','updated_at'):
-                      d=ymd(r.get(k))
-                      if d:return d
-              return None
-
-          p = Path('docs/data/intraday.json')
-          o = json.loads(p.read_text(encoding='utf-8'))
-          b = o.get('bridge') or {}
-          print('bridge=', b)
-          if not b.get('bridged_rows'):
-              raise SystemExit('MIS bridge produced no bridged rows')
-          if o.get('completion_version') is None:
-              raise SystemExit('v1.5.30 completion layer missing')
-
-          d = json.loads(Path('docs/data/daytrade.json').read_text(encoding='utf-8'))
-          iso = d.get('isolation') or {}
-          if not d.get('rows'):
-              raise SystemExit('daytrade radar is empty')
+          if intra.get('completion_version') is None:
+              raise SystemExit('completion layer missing')
           if any(bool(iso.get(k)) for k in ['writes_intraday','changes_stage2','changes_swing_score','changes_intraday_score']):
-              raise SystemExit('Step 8 isolation contract violated')
+              raise SystemExit('daytrade isolation contract violated')
 
-          close = json.loads(Path('docs/data/close.json').read_text(encoding='utf-8')) if Path('docs/data/close.json').exists() else {}
-          intra_date=obj_date(o)
-          day_date=obj_date(d)
-          close_date=obj_date(close)
-          now=datetime.now(ZoneInfo('Asia/Taipei'))
-          today=now.date().isoformat()
-          minute=now.hour*60+now.minute
-          market_window=now.weekday()<5 and 8*60+55 <= minute <= 14*60+15
-
-          print('freshness dates=', {'today':today,'intraday':intra_date,'daytrade':day_date,'close':close_date,'market_window':market_window})
-          if close_date and (not intra_date or intra_date < close_date):
-              raise SystemExit(f'intraday stale versus latest close: intraday={intra_date} close={close_date}')
-          if day_date != intra_date:
-              raise SystemExit(f'daytrade/intraday date mismatch: daytrade={day_date} intraday={intra_date}')
-          if market_window and intra_date != today:
-              raise SystemExit(f'intraday is not current Taipei trading date: intraday={intra_date} today={today}; refuse stale deploy')
-
-          s = json.loads(Path('docs/data/system_status.json').read_text(encoding='utf-8'))
-          if s.get('app_version') != '1.7.0':
-              raise SystemExit('canonical system status app_version mismatch')
-          freshness=s.get('freshness') or {}
+          status=json.loads(Path('docs/data/system_status.json').read_text(encoding='utf-8'))
+          if status.get('app_version') != '1.7.1':
+              raise SystemExit(f"canonical app_version mismatch: {status.get('app_version')}")
+          freshness=status.get('freshness') or {}
           if freshness.get('intraday_stale') or freshness.get('daytrade_stale'):
-              raise SystemExit(f'canonical status marks intraday/daytrade stale: {freshness}')
-          print('quote_time=', b.get('latest_quote_time'), 'structure_time=', b.get('latest_structure_time'), 'daytrade=', len(d.get('rows') or []), 'completion=', o.get('completion_version'), 'system=', s)
+              raise SystemExit(f'canonical status marks actionable data stale: {freshness}')
+
+          print('publish contract ok', {
+              'bridge_trade_date': bridge.get('trade_date'),
+              'quote_time': bridge.get('latest_quote_time'),
+              'structure_time': bridge.get('latest_structure_time'),
+              'intraday_rows': len(intra.get('rows') or []),
+              'daytrade_rows': len(day.get('rows') or []),
+              'system_dates': status.get('dates'),
+          })
           PY
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
