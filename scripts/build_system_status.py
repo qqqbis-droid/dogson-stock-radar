@@ -86,20 +86,48 @@ def main():
     }
     valid = sorted(d for d in dates.values() if d)
     newest = valid[-1] if valid else None
+    completed_candidates = [d for d in (dates.get("market"), dates.get("close")) if d]
+    latest_completed = max(completed_candidates) if completed_candidates else newest
     lagging = [k for k, d in dates.items() if d and newest and d < newest]
+
+    intraday_stale = bool(latest_completed and (not dates.get("intraday") or dates["intraday"] < latest_completed))
+    daytrade_stale = bool(
+        latest_completed
+        and (
+            not dates.get("daytrade")
+            or dates["daytrade"] < latest_completed
+            or (dates.get("intraday") and dates.get("daytrade") != dates.get("intraday"))
+        )
+    )
 
     out = {
         "app_version": APP_VERSION,
         "data_engine_version": status.get("version"),
         "generated_at": datetime.now(TW).isoformat(timespec="seconds"),
         "newest_trade_date": newest,
+        "latest_completed_trade_date": latest_completed,
         "dates": dates,
         "lagging_sources": lagging,
+        "freshness": {
+            "intraday_stale": intraday_stale,
+            "daytrade_stale": daytrade_stale,
+        },
+        "effective_sources": {
+            "swing_cards": "close" if intraday_stale else "intraday",
+            "daytrade": "disabled_stale" if daytrade_stale else "daytrade",
+        },
+        "usability": {
+            "close": "ready" if dates.get("close") else "unavailable",
+            "intraday": "fallback_to_close" if intraday_stale else "ready",
+            "daytrade": "disabled_stale" if daytrade_stale else "ready",
+            "hourly": "ready" if dates.get("hourly") else "unavailable",
+            "chips": "ready" if dates.get("chips") else "unavailable",
+        },
         "rules": {
-            "intraday": "近即時5分雷達；最新成交價可由TWSE MIS補充",
+            "intraday": "近即時5分雷達；若日期落後最近完成交易日，個股卡片自動改用close，不把舊盤中訊號當最新",
             "close": "最近完成交易日盤後波段資料",
             "hourly": "60分K波段骨架",
-            "daytrade": "獨立當沖資料，不改盤中波段分數",
+            "daytrade": "獨立當沖資料；若來源日期落後，停用舊當沖訊號，不改盤中波段分數",
             "chips": "最近已公布完成交易日籌碼，不冒充即時資料",
         },
         "sources": {
