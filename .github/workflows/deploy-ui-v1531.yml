@@ -1,4 +1,4 @@
-name: Deploy Radar v1.6.7.8 UI
+name: Deploy Radar v1.6.7.9 UI
 
 on:
   push:
@@ -36,6 +36,7 @@ jobs:
           node --check docs/ui-card-v164.js
           node --check docs/ui-card-v166.js
           node --check docs/ui-fold-v167.js
+          node --check docs/ui-entry-v1679.js
           node --check docs/realtime.js
           node --check docs/sw.js
           test -s docs/contrast-v160.css
@@ -45,14 +46,19 @@ jobs:
           test -s docs/redesign-v164.css
           test -s docs/redesign-v165.css
           test -s docs/redesign-v166.css
-          grep -q "ui-filters.js?v=1678" docs/realtime-config.js
-          grep -q "dogson-free-v1678" docs/sw.js
+          test -s docs/redesign-v1679.css
+          grep -q "ui-filters.js?v=1679" docs/realtime-config.js
+          grep -q "dogson-free-v1679" docs/sw.js
+          grep -q "ui-entry-v1679.js" docs/ui-filters.js
+          grep -q "redesign-v1679.css" docs/ui-filters.js
+          grep -q "還差什麼" docs/ui-entry-v1679.js
+          grep -q "已經成立" docs/ui-entry-v1679.js
+          grep -q "失效警戒" docs/ui-entry-v1679.js
+          grep -q "查看技術細節" docs/ui-entry-v1679.js
           grep -q "stageGuide" docs/ui-card-v164.js
-          grep -q "這階段代表什麼" docs/ui-card-v164.js
           grep -q "階段定位" docs/ui-card-v164.js
           grep -q "進場燈號" docs/ui-card-v164.js
           ! grep -q "目前策略" docs/ui-card-v164.js
-          grep -q "dogson-stage-guide" docs/redesign-v164.css
           grep -q "canonicalRow" docs/ui-card-v166.js
           grep -q "canonicalSignalSpec" docs/ui-card-v166.js
           grep -q "canonicalConclusion" docs/ui-card-v166.js
