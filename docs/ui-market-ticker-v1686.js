@@ -1,15 +1,22 @@
 (()=>{
-  if(window.__DOGSON_MARKET_TICKER_V1686__) return;
-  window.__DOGSON_MARKET_TICKER_V1686__=true;
+  if(window.__DOGSON_MARKET_TICKER_V1687__) return;
+  window.__DOGSON_MARKET_TICKER_V1687__=true;
 
   const $=(s,r=document)=>r.querySelector(s);
   const num=v=>{const n=Number(v);return Number.isFinite(n)?n:null};
   const pick=(o,keys)=>{for(const k of keys){const v=num(o?.[k]);if(v!==null)return v}return null};
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const staleIntraday=()=>!!window.DOGSON_INTRADAY_STALE;
+  const tradeDay=v=>{const m=String(v||'').match(/20\d{2}-(\d{2})-(\d{2})/);return m?`${Number(m[1])}/${Number(m[2])}`:''};
 
   function currentMode(){try{return mode||'intraday'}catch{return'intraday'}}
-  function currentMarket(){try{return market||{}}catch{return{}}}
-  function liveMarket(){try{return marketLive||{}}catch{return{}}}
+  function currentMarket(){
+    if(currentMode()!=='close'&&staleIntraday()){
+      try{return closeMarket||{}}catch{return{}}
+    }
+    try{return market||{}}catch{return{}}
+  }
+  function liveMarket(){if(staleIntraday())return{};try{return marketLive||{}}catch{return{}}}
 
   function snap(symbol,component){
     const live=liveMarket()?.[symbol]||{};
@@ -24,7 +31,7 @@
   }
 
   function marketData(){
-    const m=currentMarket(),intraday=(currentMode()!=='close')&&!!m.intraday_only;
+    const m=currentMarket(),intraday=(currentMode()!=='close')&&!!m.intraday_only&&!staleIntraday();
     const ta=intraday?(m.components?.taiex||{}):(m.taiex||{});
     const ot=intraday?(m.components?.otc||{}):(m.otc||{});
     return{m,tw:snap('^TWII',ta),two:snap('^TWOII',ot)};
@@ -47,6 +54,10 @@
     return{icon:'🟡',cls:'neutral'};
   }
   function updateTime(){
+    if(staleIntraday()){
+      const d=tradeDay(window.DOGSON_EFFECTIVE_MARKET_DATE||window.DOGSON_CLOSE_TRADE_DATE);
+      if(d)return`${d}收盤`;
+    }
     const raw=$('#updated')?.textContent?.trim()||'';
     const m=raw.match(/(?:^|\s)([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?/);
     return m?`${String(m[1]).padStart(2,'0')}:${m[2]}`:'更新中';
@@ -90,6 +101,7 @@
   function boot(){
     render();
     watch($('#marketbox'));watch($('#updated'));
+    window.addEventListener('dogson:freshness',()=>setTimeout(render,0));
     document.addEventListener('click',e=>{
       if(e.target?.closest?.('.tab,#dogsonViewNav'))setTimeout(render,80);
     });
