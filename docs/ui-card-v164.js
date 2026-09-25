@@ -61,59 +61,59 @@
   function stageGuide(label){
     const s=clean(label);
     if(/蓄勢/.test(s))return{
-      meaning:'尚未正式發動，結構正在收斂或累積條件，現在重點是等待真正的發動訊號。',
+      meaning:'尚未正式發動，結構正在收斂或累積條件，重點是確認是否能進入真正的啟動階段。',
       up:'突破關鍵價＋量價同步 → 升級為「剛啟動」',
       down:'支撐失守或相對市場明顯轉弱 → 降級為「轉弱」',
-      strategy:'以觀察為主，等發動條件出現再提高積極度。'
+      position:'仍在準備階段；是否適合進場，請以「進場燈號」為準。'
     };
     if(/剛啟動/.test(s))return{
       meaning:'股價剛從整理區轉強，方向開始成立，但仍要確認不是短暫脈衝。',
       up:'持續站穩 VWAP／突破區，量價續航 → 轉入「趨勢持有」',
       down:'快速跌回突破區且無法站回 → 回到蓄勢或轉弱',
-      strategy:'可小量試單，但避免追離支撐過遠。'
+      position:'已進入波段候選區；是否適合現在進場，請以「進場燈號」為準。'
     };
     if(/回踩|承接/.test(s))return{
-      meaning:'原結構仍在，價格回到支撐附近測試承接；目前重點不是追價，而是看是否止穩。',
+      meaning:'原結構仍在，價格回到支撐附近測試承接，目前是在確認支撐能否守住。',
       up:'站穩 VWAP／短線重新轉強 → 維持承接或升級為「剛啟動」',
       down:'跌破短線結構且反抽站不回 → 降級為「轉弱」',
-      strategy:'先等止穩，不追價；確認承接後再考慮進場。'
+      position:'屬於結構測試階段；是否適合承接，請以「進場燈號」為準。'
     };
     if(/趨勢|持有|超勢/.test(s))return{
-      meaning:'趨勢已成形，現在重點從找買點轉為守結構與管理持有。',
+      meaning:'趨勢已成形，目前重點是確認結構能否延續，以及回檔是否仍有承接。',
       up:'均線續揚、回檔有承接 → 維持「趨勢持有」',
       down:'短線結構破壞且反抽失敗 → 降級為「轉弱」',
-      strategy:'不追加速段；以回檔承接或續抱管理為主。'
+      position:'屬於趨勢延續階段；新進場時機仍由「進場燈號」另外判斷。'
     };
     if(/轉弱/.test(s))return{
       meaning:'原本結構開始弱化，需要重新確認支撐與相對強勢是否還在。',
       up:'重新站回 VWAP／關鍵均線並恢復相對強勢 → 回到回踩或趨勢',
       down:'前低失守且反抽失敗 → 降級為「失效」',
-      strategy:'先降低積極度，不急著加碼；等待結構重新站穩。'
+      position:'目前生命週期偏弱；是否重新具備進場條件，請看「進場燈號」。'
     };
     if(/過熱/.test(s))return{
-      meaning:'趨勢可能仍強，但短線已離支撐太遠，追價風險明顯升高。',
+      meaning:'趨勢可能仍強，但短線延伸幅度已偏大，生命週期進入高風險位置。',
       up:'高檔整理後仍守住支撐 → 回到正常趨勢判讀',
       down:'爆量轉弱或快速跌回關鍵結構 → 轉為回踩／轉弱',
-      strategy:'不追價，等整理或回踩後重新評估風險報酬。'
+      position:'這裡只標記短線位置風險；是否適合進場，仍以「進場燈號」為準。'
     };
     if(/失效/.test(s))return{
-      meaning:'原本多頭結構已被破壞，這一輪進場邏輯暫時不再成立。',
+      meaning:'原本多頭結構已被破壞，這一輪生命週期暫時結束，需要重新建立新的結構。',
       up:'重新站回關鍵結構並重新累積條件 → 回到蓄勢或回踩',
       down:'持續破低 → 維持失效判定',
-      strategy:'不做新的進場，等待新的結構重新建立。'
+      position:'目前不屬於原本的有效多頭週期；新的進場條件由「進場燈號」另行判斷。'
     };
     return{
       meaning:'目前屬於過渡階段，先用結構、VWAP 與相對強弱確認下一步方向。',
       up:'結構轉強且條件同步 → 升級到更積極的生命週期',
       down:'支撐失守且無法站回 → 降級為轉弱',
-      strategy:'先觀察，不急著追價。'
+      position:'生命週期只描述目前位置；是否進場，請以「進場燈號」為準。'
     };
   }
 
   function stagePanel(label){
     const g=stageGuide(label),box=document.createElement('div');
     box.className='dogson-stage-guide';
-    box.innerHTML=`<section class="dogson-stage-guide-block"><div class="dogson-stage-guide-label">這階段代表什麼</div><div class="dogson-stage-guide-text">${g.meaning}</div></section><section class="dogson-stage-guide-block"><div class="dogson-stage-guide-label">接下來看什麼</div><div class="dogson-stage-guide-path dogson-stage-guide-up"><span>↑</span><b>轉強：</b>${g.up}</div><div class="dogson-stage-guide-path dogson-stage-guide-down"><span>↓</span><b>轉弱：</b>${g.down}</div></section><section class="dogson-stage-guide-block dogson-stage-guide-strategy"><div class="dogson-stage-guide-label">目前策略</div><div class="dogson-stage-guide-text">${g.strategy}</div></section>`;
+    box.innerHTML=`<section class="dogson-stage-guide-block"><div class="dogson-stage-guide-label">這階段代表什麼</div><div class="dogson-stage-guide-text">${g.meaning}</div></section><section class="dogson-stage-guide-block"><div class="dogson-stage-guide-label">接下來看什麼</div><div class="dogson-stage-guide-path dogson-stage-guide-up"><span>↑</span><b>轉強：</b>${g.up}</div><div class="dogson-stage-guide-path dogson-stage-guide-down"><span>↓</span><b>轉弱：</b>${g.down}</div></section><section class="dogson-stage-guide-block dogson-stage-guide-strategy"><div class="dogson-stage-guide-label">階段定位</div><div class="dogson-stage-guide-text">${g.position}</div></section>`;
     return box;
   }
 
@@ -122,7 +122,7 @@
     const intro=document.createElement('div');intro.className='dogson-quick-detail-intro';
     let nodes=[];
     if(type==='stage'){
-      intro.textContent='生命週期：主卡已顯示「為什麼」，這裡只告訴你目前階段的意義、下一步確認與操作節奏。';
+      intro.textContent='生命週期只回答「現在走到哪個階段」；是否適合進場，請以「進場燈號」為準。';
       wrap.append(intro,stagePanel(label));
       return wrap;
     }else if(type==='entry'){
