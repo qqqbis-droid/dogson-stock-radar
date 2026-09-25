@@ -1,5 +1,5 @@
-const CACHE='dogson-free-v1675';
-const UI_VERSION='1675';
+const CACHE='dogson-free-v1676';
+const UI_VERSION='1676';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
@@ -7,24 +7,24 @@ self.addEventListener('install', event => {
     caches.open(CACHE).then(cache => cache.addAll([
       './manifest.webmanifest',
       './hourly.js?v=1530',
-      './realtime-config.js?v=1675',
-      './realtime.js?v=1675',
-      './ui-filters.js?v=1675',
-      './redesign-v160.css?v=1675',
-      './redesign-v160-dark.css?v=1675',
-      './contrast-v160.css?v=1675',
-      './redesign-v162.css?v=1675',
-      './redesign-v162-fix.css?v=1675',
-      './redesign-v163.css?v=1675',
-      './redesign-v164.css?v=1675',
-      './redesign-v165.css?v=1675',
-      './redesign-v166.css?v=1675',
-      './redesign-v160.js?v=1675',
-      './ui-polish-v160.js?v=1675',
-      './ui-layout-v162.js?v=1675',
-      './ui-card-v164.js?v=1675',
-      './ui-card-v166.js?v=1675',
-      './ui-fold-v167.js?v=1675'
+      './realtime-config.js?v=1676',
+      './realtime.js?v=1676',
+      './ui-filters.js?v=1676',
+      './redesign-v160.css?v=1676',
+      './redesign-v160-dark.css?v=1676',
+      './contrast-v160.css?v=1676',
+      './redesign-v162.css?v=1676',
+      './redesign-v162-fix.css?v=1676',
+      './redesign-v163.css?v=1676',
+      './redesign-v164.css?v=1676',
+      './redesign-v165.css?v=1676',
+      './redesign-v166.css?v=1676',
+      './redesign-v160.js?v=1676',
+      './ui-polish-v160.js?v=1676',
+      './ui-layout-v162.js?v=1676',
+      './ui-card-v164.js?v=1676',
+      './ui-card-v166.js?v=1676',
+      './ui-fold-v167.js?v=1676'
     ]))
   );
 });
@@ -33,8 +33,6 @@ self.addEventListener('activate', event => {
   event.waitUntil((async()=>{
     await caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))));
     await self.clients.claim();
-    // One activation-time navigation clears iOS/PWA pages that are still holding
-    // the legacy v151/v1530 boot URLs. This runs only when this worker activates.
     const clients = await self.clients.matchAll({type:'window', includeUncontrolled:true});
     await Promise.all(clients.map(async client => {
       try { await client.navigate(client.url); } catch (_) {}
@@ -48,9 +46,6 @@ async function freshDocument(req){
   if (!res.ok || !type.includes('text/html')) return res;
 
   let html = await res.text();
-  // The large legacy index still contains old static boot query strings.
-  // Rewrite only those boot URLs at response time so the current UI loader wins,
-  // without touching scoring/render logic in index.html.
   html = html
     .replaceAll('./sw.js?v=1530', `./sw.js?v=${UI_VERSION}`)
     .replaceAll('dogsonSwReloaded1530', `dogsonSwReloaded${UI_VERSION}`)
