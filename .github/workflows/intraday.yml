@@ -10,6 +10,7 @@ on:
       - "scripts/build_validation.py"
       - "scripts/build_daytrade.py"
       - "scripts/build_completion.py"
+      - "scripts/build_system_status.py"
       - "docs/index.html"
       - "docs/realtime.js"
       - "docs/realtime-config.js"
@@ -55,7 +56,9 @@ jobs:
         run: python scripts/build_daytrade.py
       - name: Step 7 preserve source intraday scan for future validation
         run: python scripts/build_validation.py --mode intraday
-      - name: Verify intraday freshness and Step 8 isolation
+      - name: Build canonical data status
+        run: python scripts/build_system_status.py
+      - name: Verify intraday freshness, Step 8 isolation and canonical status
         run: |
           python - <<'PY'
           import json
@@ -74,7 +77,10 @@ jobs:
               raise SystemExit('daytrade radar is empty')
           if any(bool(iso.get(k)) for k in ['writes_intraday','changes_stage2','changes_swing_score','changes_intraday_score']):
               raise SystemExit('Step 8 isolation contract violated')
-          print('quote_time=', b.get('latest_quote_time'), 'structure_time=', b.get('latest_structure_time'), 'daytrade=', len(d.get('rows') or []), 'completion=', o.get('completion_version'))
+          s = json.loads(Path('docs/data/system_status.json').read_text(encoding='utf-8'))
+          if s.get('app_version') != '1.7.0':
+              raise SystemExit('canonical system status app_version mismatch')
+          print('quote_time=', b.get('latest_quote_time'), 'structure_time=', b.get('latest_structure_time'), 'daytrade=', len(d.get('rows') or []), 'completion=', o.get('completion_version'), 'system=', s)
           PY
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
