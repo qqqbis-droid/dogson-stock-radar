@@ -1,4 +1,4 @@
-// v1.6.7.6 near-real-time quote backend + duplicate signal row cleanup.
+// v1.6.7.7 near-real-time quote backend + lifecycle quick guide.
 window.DOGSON_REALTIME_API = window.DOGSON_REALTIME_API || "";
 
 // Keep optional modules separate from the core page so a data-source/UI issue
@@ -14,7 +14,7 @@ if (!document.getElementById('dogson-hourly-module')) {
 if (!document.getElementById('dogson-decision-filters')) {
   const s = document.createElement('script');
   s.id = 'dogson-decision-filters';
-  s.src = './ui-filters.js?v=1676';
+  s.src = './ui-filters.js?v=1677';
   s.async = true;
   document.head.appendChild(s);
 }
