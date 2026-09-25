@@ -27,11 +27,11 @@ permissions:
   pages: write
   id-token: write
 
-# All production Pages publishers share one group. A UI-only deployment must
-# never race a market-data deployment and overwrite a newer snapshot.
+# All production Pages publishers share one group. Queue instead of cancelling
+# so UI / close work cannot terminate an in-flight market-data publish.
 concurrency:
   group: dogson-pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   intraday:
