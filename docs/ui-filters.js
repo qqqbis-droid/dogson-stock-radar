@@ -1,9 +1,9 @@
 (()=>{
-  if(window.__DOGSON_UI_LOADER_V1684__) return;
-  window.__DOGSON_UI_LOADER_V1684__ = true;
+  if(window.__DOGSON_UI_LOADER_V1685__) return;
+  window.__DOGSON_UI_LOADER_V1685__ = true;
   const src=document.currentScript?.src||location.href;
   const base=new URL('.',src);
-  const version='1684';
+  const version='1685';
   let revealed=false;
 
   function reveal(){
@@ -40,6 +40,7 @@
   loadCss('redesign-v165.css','dogson-dashboard-v165-css');
   loadCss('redesign-v166.css','dogson-dashboard-v166-css');
   loadCss('redesign-v1679.css','dogson-dashboard-v1679-css');
+  loadCss('redesign-v1685.css','dogson-dashboard-v1685-css');
   loadScript('ui-filters-core-v1531.js','dogson-filter-core-v1531')
     .then(()=>loadScript('redesign-v160.js','dogson-redesign-v160'))
     .then(()=>loadScript('ui-polish-v160.js','dogson-ui-polish-v160'))
@@ -49,6 +50,7 @@
     .then(()=>loadScript('ui-fold-v167.js','dogson-ui-fold-v167'))
     .then(()=>loadScript('ui-entry-v1679.js','dogson-ui-entry-v1679'))
     .then(()=>loadScript('ui-load-more-v1681.js','dogson-ui-load-more-v1681'))
+    .then(()=>loadScript('ui-market-v1685.js','dogson-ui-market-v1685'))
     .then(()=>{
       clearTimeout(safetyTimer);
       requestAnimationFrame(()=>requestAnimationFrame(reveal));
