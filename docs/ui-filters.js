@@ -1,9 +1,9 @@
 (()=>{
-  if(window.__DOGSON_UI_LOADER_V1683__) return;
-  window.__DOGSON_UI_LOADER_V1683__ = true;
+  if(window.__DOGSON_UI_LOADER_V1684__) return;
+  window.__DOGSON_UI_LOADER_V1684__ = true;
   const src=document.currentScript?.src||location.href;
   const base=new URL('.',src);
-  const version='1683';
+  const version='1684';
   let revealed=false;
 
   function reveal(){
