@@ -49,6 +49,12 @@ body.dogson-entry-sheet-open{overflow:hidden}
 .dogson-entry-tech-body .mtfcelll,.dogson-entry-tech-body .mtfnote{color:#74817b!important}
 .dogson-entry-detail-empty{font-size:11px;color:#78867f;padding:6px 0}
 
+/* v1.6.8.4 — the legacy badge row is only a staging copy used by older render code.
+   Keep it hidden at all times so realtime refreshes cannot briefly flash a second
+   set of lifecycle / entry / momentum buttons before the canonical action strip
+   finishes normalizing the card. */
+#cards .card .dogson-card-brief>.dogson-card-badges{display:none!important}
+
 html[data-dogson-theme="dark"] .dogson-entry-detail{background:#1b221f;border-color:#34433c;color:#e7eee9}
 html[data-dogson-theme="dark"] .dogson-entry-detail-top{background:rgba(27,34,31,.96);border-color:#34433c}
 html[data-dogson-theme="dark"] .dogson-entry-detail-kicker{color:#9fb0a7}
