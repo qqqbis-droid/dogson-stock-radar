@@ -1,6 +1,6 @@
 (()=>{
-  if(window.__DOGSON_FRESHNESS_V1687__) return;
-  window.__DOGSON_FRESHNESS_V1687__=true;
+  if(window.__DOGSON_FRESHNESS_V1688__) return;
+  window.__DOGSON_FRESHNESS_V1688__=true;
 
   const ymd=v=>{
     const s=String(v||'').trim();
@@ -16,36 +16,6 @@
     }catch(_){return null;}
   }
 
-  function modeNow(){try{return mode||'intraday'}catch{return'intraday'}}
-
-  function refreshLegacyBoxes(){
-    try{
-      if(typeof marketHTML==='function'){
-        const el=document.getElementById('marketbox');
-        if(el) el.innerHTML=marketHTML();
-      }
-      if(typeof rotationHTML==='function'){
-        const el=document.getElementById('rotationbox');
-        if(el) el.innerHTML=rotationHTML();
-      }
-    }catch(_){ }
-  }
-
-  function fallbackToClose(src,closeDate){
-    if(modeNow()!=='intraday') return false;
-    try{
-      mode='close';
-      market=src.close||{};
-      window.DOGSON_FRESHNESS_FORCED_CLOSE=true;
-      if(typeof syncModeFilters==='function') syncModeFilters();
-      const text=document.getElementById('modeText');
-      if(text) text.textContent=`找波段：盤中資料較舊，已自動使用 ${closeDate||'最近交易日'} 最新盤後資料`;
-      refreshLegacyBoxes();
-      if(typeof render==='function') render();
-      return true;
-    }catch(_){return false;}
-  }
-
   function apply(){
     const src=readSources();
     if(!src) return false;
@@ -59,16 +29,13 @@
     window.DOGSON_CLOSE_TRADE_DATE=closeDate;
     window.DOGSON_INTRADAY_TRADE_DATE=intraDate;
     window.DOGSON_EFFECTIVE_MARKET_DATE=stale?closeDate:(intraDate||closeDate);
+    window.DOGSON_EFFECTIVE_MARKET_DATA=stale?(src.close||{}):(src.intra||src.close||{});
 
-    if(stale){
-      if(!fallbackToClose(src,closeDate)){
-        try{if(modeNow()!=='daytrade')market=src.close||{};}catch(_){ }
-        refreshLegacyBoxes();
-      }
-    }
-
-    if(prev!==stale||!window.__DOGSON_FRESHNESS_EMITTED_V1687__){
-      window.__DOGSON_FRESHNESS_EMITTED_V1687__=true;
+    // Freshness is data selection only. Never change `mode` or the active tab here.
+    // Find Swing must remain intraday even when its market summary falls back to
+    // the newest completed trading day; Close remains an explicit user choice.
+    if(prev!==stale||!window.__DOGSON_FRESHNESS_EMITTED_V1688__){
+      window.__DOGSON_FRESHNESS_EMITTED_V1688__=true;
       try{window.dispatchEvent(new CustomEvent('dogson:freshness',{detail:{stale,closeDate,intraDate,effectiveDate:window.DOGSON_EFFECTIVE_MARKET_DATE}}));}catch(_){ }
     }
     return true;
