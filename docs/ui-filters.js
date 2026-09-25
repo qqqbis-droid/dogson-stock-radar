@@ -1,9 +1,20 @@
 (()=>{
-  if(window.__DOGSON_UI_LOADER_V1681__) return;
-  window.__DOGSON_UI_LOADER_V1681__ = true;
+  if(window.__DOGSON_UI_LOADER_V1682__) return;
+  window.__DOGSON_UI_LOADER_V1682__ = true;
   const src=document.currentScript?.src||location.href;
   const base=new URL('.',src);
-  const version='1681';
+  const version='1682';
+  let revealed=false;
+
+  function reveal(){
+    if(revealed) return;
+    revealed=true;
+    document.documentElement.classList.remove('dogson-booting');
+    document.documentElement.dataset.dogsonUiReady=version;
+  }
+
+  // Never leave the user on a loading shell if an optional UI module fails.
+  const safetyTimer=setTimeout(reveal,4500);
 
   function loadCss(name,id){
     if(document.getElementById(id)) return;
@@ -38,5 +49,13 @@
     .then(()=>loadScript('ui-fold-v167.js','dogson-ui-fold-v167'))
     .then(()=>loadScript('ui-entry-v1679.js','dogson-ui-entry-v1679'))
     .then(()=>loadScript('ui-load-more-v1681.js','dogson-ui-load-more-v1681'))
-    .catch(err=>console.warn('Dogson UI module load failed',err));
+    .then(()=>{
+      clearTimeout(safetyTimer);
+      requestAnimationFrame(()=>requestAnimationFrame(reveal));
+    })
+    .catch(err=>{
+      clearTimeout(safetyTimer);
+      reveal();
+      console.warn('Dogson UI module load failed',err);
+    });
 })();
