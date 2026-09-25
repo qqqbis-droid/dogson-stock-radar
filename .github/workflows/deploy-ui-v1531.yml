@@ -1,4 +1,4 @@
-name: Deploy Radar v1.6.8.4 UI
+name: Deploy Radar v1.6.8.5 UI
 
 on:
   push:
@@ -38,6 +38,7 @@ jobs:
           node --check docs/ui-fold-v167.js
           node --check docs/ui-entry-v1679.js
           node --check docs/ui-load-more-v1681.js
+          node --check docs/ui-market-v1685.js
           node --check docs/realtime.js
           node --check docs/sw.js
           test -s docs/contrast-v160.css
@@ -48,19 +49,33 @@ jobs:
           test -s docs/redesign-v165.css
           test -s docs/redesign-v166.css
           test -s docs/redesign-v1679.css
-          grep -q "ui-filters.js?v=1684" docs/realtime-config.js
-          grep -q "dogson-free-v1684" docs/sw.js
-          grep -q "dogson-boot-v1684" docs/sw.js
-          grep -q "DOGSON_UI_LOADER_V1684" docs/ui-filters.js
+          test -s docs/redesign-v1685.css
+          grep -q "ui-filters.js?v=1685" docs/realtime-config.js
+          grep -q "dogson-free-v1685" docs/sw.js
+          grep -q "dogson-boot-v1685" docs/sw.js
+          grep -q "DOGSON_UI_LOADER_V1685" docs/ui-filters.js
           grep -q "dogson-booting" docs/ui-filters.js
           grep -q "dogsonUiReady" docs/ui-filters.js
+          grep -q "redesign-v1685.css" docs/ui-filters.js
+          grep -q "ui-market-v1685.js" docs/ui-filters.js
+          grep -q "ui-market-v1685.js?v=1685" docs/sw.js
+          grep -q "redesign-v1685.css?v=1685" docs/sw.js
+          grep -q "DOGSON_MARKET_HOME_V1685" docs/ui-market-v1685.js
+          grep -q "市場環境" docs/ui-market-v1685.js
+          grep -q "市場分數" docs/ui-market-v1685.js
+          grep -q "加權指數" docs/ui-market-v1685.js
+          grep -q "櫃買指數" docs/ui-market-v1685.js
+          grep -q "資金流向" docs/ui-market-v1685.js
+          grep -q "個股雷達" docs/ui-market-v1685.js
+          grep -q "查看市場細節" docs/ui-market-v1685.js
+          grep -q "查看完整資金流向" docs/ui-market-v1685.js
           grep -q "defaultFocus:false" docs/ui-filters-core-v1531.js
           grep -q "sort((a,b)=>scoreOf(b)-scoreOf(a))" docs/ui-filters-core-v1531.js
           grep -q "目前顯示全部掃描結果" docs/ui-filters-core-v1531.js
           grep -q "#dogsonQuickFilters \[data-all\]" docs/ui-filters-core-v1531.js
           grep -q "dogson-card-brief>.dogson-card-badges" docs/redesign-v1679.css
           grep -q "ui-load-more-v1681.js" docs/ui-filters.js
-          grep -q "ui-load-more-v1681.js?v=1684" docs/sw.js
+          grep -q "ui-load-more-v1681.js?v=1685" docs/sw.js
           grep -q "DOGSON_LOAD_MORE_V1681" docs/ui-load-more-v1681.js
           grep -q "dogsonOriginalLoadMore" docs/ui-load-more-v1681.js
           ! grep -q "client.navigate" docs/sw.js
