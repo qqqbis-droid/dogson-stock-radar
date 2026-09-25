@@ -1,5 +1,5 @@
-const CACHE='dogson-free-v1700';
-const UI_VERSION='1700';
+const CACHE='dogson-free-v1710';
+const UI_VERSION='1710';
 
 const UI_HEAD=`
 <link id="dogson-dashboard-css" rel="stylesheet" href="./redesign-v160.css?v=${UI_VERSION}">
@@ -57,36 +57,36 @@ self.addEventListener('install',event=>{
     await cache.addAll([
       './manifest.webmanifest',
       './hourly.js?v=1530',
-      './realtime-config.js?v=1700',
-      './realtime.js?v=1700',
-      './ui-filters.js?v=1700',
-      './redesign-v160.css?v=1700',
-      './redesign-v160-dark.css?v=1700',
-      './contrast-v160.css?v=1700',
-      './redesign-v162.css?v=1700',
-      './redesign-v162-fix.css?v=1700',
-      './redesign-v163.css?v=1700',
-      './redesign-v164.css?v=1700',
-      './redesign-v165.css?v=1700',
-      './redesign-v166.css?v=1700',
-      './redesign-v1679.css?v=1700',
-      './redesign-v1685.css?v=1700',
-      './redesign-v1686.css?v=1700',
-      './redesign-v160.js?v=1700',
-      './ui-polish-v160.js?v=1700',
-      './ui-layout-v162.js?v=1700',
-      './ui-card-v164.js?v=1700',
-      './ui-card-v166.js?v=1700',
-      './ui-fold-v167.js?v=1700',
-      './ui-entry-v1679.js?v=1700',
-      './ui-freshness-v1688.js?v=1700',
-      './ui-system-status-v1700.js?v=1700',
-      './ui-dual-decision-v1690.js?v=1700',
-      './ui-load-more-v1681.js?v=1700',
-      './ui-market-v1685.js?v=1700',
-      './ui-market-ticker-v1686.js?v=1700',
-      './ui-page-architecture-v1701.js?v=1700',
-      './ui-accuracy-guard-v1702.js?v=1700'
+      './realtime-config.js?v=1710',
+      './realtime.js?v=1710',
+      './ui-filters.js?v=1710',
+      './redesign-v160.css?v=1710',
+      './redesign-v160-dark.css?v=1710',
+      './contrast-v160.css?v=1710',
+      './redesign-v162.css?v=1710',
+      './redesign-v162-fix.css?v=1710',
+      './redesign-v163.css?v=1710',
+      './redesign-v164.css?v=1710',
+      './redesign-v165.css?v=1710',
+      './redesign-v166.css?v=1710',
+      './redesign-v1679.css?v=1710',
+      './redesign-v1685.css?v=1710',
+      './redesign-v1686.css?v=1710',
+      './redesign-v160.js?v=1710',
+      './ui-polish-v160.js?v=1710',
+      './ui-layout-v162.js?v=1710',
+      './ui-card-v164.js?v=1710',
+      './ui-card-v166.js?v=1710',
+      './ui-fold-v167.js?v=1710',
+      './ui-entry-v1679.js?v=1710',
+      './ui-freshness-v1688.js?v=1710',
+      './ui-system-status-v1700.js?v=1710',
+      './ui-dual-decision-v1690.js?v=1710',
+      './ui-load-more-v1681.js?v=1710',
+      './ui-market-v1685.js?v=1710',
+      './ui-market-ticker-v1686.js?v=1710',
+      './ui-page-architecture-v1701.js?v=1710',
+      './ui-accuracy-guard-v1702.js?v=1710'
     ]);
     try{
       const res=await fetch('./index.html',{cache:'no-store'});
@@ -116,24 +116,7 @@ async function freshDocument(req){
 self.addEventListener('fetch',event=>{
   const req=event.request;
   const url=new URL(req.url);
-
-  if(url.pathname.includes('/data/')){
-    event.respondWith(fetch(req,{cache:'no-store'}));
-    return;
-  }
-
-  if(req.mode==='navigate'||req.destination==='document'){
-    event.respondWith(
-      freshDocument(req).catch(async()=>await caches.match('./index.html')||Response.error())
-    );
-    return;
-  }
-
-  event.respondWith(
-    fetch(req,{cache:'no-store'}).then(res=>{
-      const copy=res.clone();
-      caches.open(CACHE).then(cache=>cache.put(req,copy));
-      return res;
-    }).catch(()=>caches.match(req))
-  );
+  if(url.pathname.includes('/data/')){event.respondWith(fetch(req,{cache:'no-store'}));return;}
+  if(req.mode==='navigate'||req.destination==='document'){event.respondWith(freshDocument(req).catch(async()=>await caches.match('./index.html')||Response.error()));return;}
+  event.respondWith(fetch(req,{cache:'no-store'}).then(res=>{const copy=res.clone();caches.open(CACHE).then(cache=>cache.put(req,copy));return res;}).catch(()=>caches.match(req)));
 });
