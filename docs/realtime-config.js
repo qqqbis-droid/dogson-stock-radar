@@ -1,4 +1,4 @@
-// v1.6.8.2 near-real-time quote backend + stable first-paint boot.
+// v1.6.8.3 near-real-time quote backend + default full result view sorted by score.
 window.DOGSON_REALTIME_API = window.DOGSON_REALTIME_API || "";
 
 // Keep optional modules separate from the core page so a data-source/UI issue
@@ -14,7 +14,7 @@ if (!document.getElementById('dogson-hourly-module')) {
 if (!document.getElementById('dogson-decision-filters')) {
   const s = document.createElement('script');
   s.id = 'dogson-decision-filters';
-  s.src = './ui-filters.js?v=1682';
+  s.src = './ui-filters.js?v=1683';
   s.async = true;
   document.head.appendChild(s);
 }
