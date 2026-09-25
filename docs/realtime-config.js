@@ -1,4 +1,4 @@
-// v1.7.1 data-integrity guard; keeps existing radar scoring isolated.
+// v1.7.2 live-actionability guard; keeps existing radar scoring isolated.
 window.DOGSON_REALTIME_API = window.DOGSON_REALTIME_API || "";
 
 // Keep optional modules separate from the core page so a data-source/UI issue
@@ -14,7 +14,7 @@ if (!document.getElementById('dogson-hourly-module')) {
 if (!document.getElementById('dogson-decision-filters')) {
   const s = document.createElement('script');
   s.id = 'dogson-decision-filters';
-  s.src = './ui-filters.js?v=1710';
+  s.src = './ui-filters.js?v=1720';
   s.async = true;
   document.head.appendChild(s);
 }
