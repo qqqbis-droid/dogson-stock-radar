@@ -1,4 +1,4 @@
-name: Deploy Radar v1.6.8.2 UI
+name: Deploy Radar v1.6.8.3 UI
 
 on:
   push:
@@ -48,13 +48,18 @@ jobs:
           test -s docs/redesign-v165.css
           test -s docs/redesign-v166.css
           test -s docs/redesign-v1679.css
-          grep -q "ui-filters.js?v=1682" docs/realtime-config.js
-          grep -q "dogson-free-v1682" docs/sw.js
-          grep -q "dogson-boot-v1682" docs/sw.js
+          grep -q "ui-filters.js?v=1683" docs/realtime-config.js
+          grep -q "dogson-free-v1683" docs/sw.js
+          grep -q "dogson-boot-v1683" docs/sw.js
+          grep -q "DOGSON_UI_LOADER_V1683" docs/ui-filters.js
           grep -q "dogson-booting" docs/ui-filters.js
           grep -q "dogsonUiReady" docs/ui-filters.js
+          grep -q "defaultFocus:false" docs/ui-filters-core-v1531.js
+          grep -q "sort((a,b)=>scoreOf(b)-scoreOf(a))" docs/ui-filters-core-v1531.js
+          grep -q "目前顯示全部掃描結果" docs/ui-filters-core-v1531.js
+          grep -q "#dogsonQuickFilters \[data-all\]" docs/ui-filters-core-v1531.js
           grep -q "ui-load-more-v1681.js" docs/ui-filters.js
-          grep -q "ui-load-more-v1681.js?v=1682" docs/sw.js
+          grep -q "ui-load-more-v1681.js?v=1683" docs/sw.js
           grep -q "DOGSON_LOAD_MORE_V1681" docs/ui-load-more-v1681.js
           grep -q "dogsonOriginalLoadMore" docs/ui-load-more-v1681.js
           ! grep -q "client.navigate" docs/sw.js
