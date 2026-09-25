@@ -1,9 +1,9 @@
 (()=>{
-  if(window.__DOGSON_UI_LOADER_V1688__) return;
-  window.__DOGSON_UI_LOADER_V1688__ = true;
+  if(window.__DOGSON_UI_LOADER_V1690__) return;
+  window.__DOGSON_UI_LOADER_V1690__ = true;
   const src=document.currentScript?.src||location.href;
   const base=new URL('.',src);
-  const version='1688';
+  const version='1690';
   let revealed=false;
 
   function reveal(){
@@ -51,6 +51,7 @@
     .then(()=>loadScript('ui-fold-v167.js','dogson-ui-fold-v167'))
     .then(()=>loadScript('ui-entry-v1679.js','dogson-ui-entry-v1679'))
     .then(()=>loadScript('ui-freshness-v1688.js','dogson-ui-freshness-v1688'))
+    .then(()=>loadScript('ui-dual-decision-v1690.js','dogson-ui-dual-decision-v1690'))
     .then(()=>loadScript('ui-load-more-v1681.js','dogson-ui-load-more-v1681'))
     .then(()=>loadScript('ui-market-v1685.js','dogson-ui-market-v1685'))
     .then(()=>loadScript('ui-market-ticker-v1686.js','dogson-ui-market-ticker-v1688'))
