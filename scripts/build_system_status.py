@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -8,7 +9,7 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "docs" / "data"
 TW = ZoneInfo("Asia/Taipei")
-APP_VERSION = "1.7.0"
+APP_VERSION = "1.7.1"
 
 
 def load(name):
@@ -30,41 +31,76 @@ def ymd(value):
     return None
 
 
-def object_date(obj, keys=()):
+def explicit_date(obj, *keys):
+    if not isinstance(obj, dict):
+        return None
     for key in keys:
-        d = ymd(obj.get(key)) if isinstance(obj, dict) else None
+        d = ymd(obj.get(key))
         if d:
             return d
-    if isinstance(obj, dict):
-        for key in ("trade_date", "date", "updated_at", "close_updated_at", "intraday_updated_at"):
-            d = ymd(obj.get(key))
-            if d:
-                return d
-        rows = obj.get("rows") or []
-        if isinstance(rows, list):
-            for row in rows[:100]:
-                if not isinstance(row, dict):
-                    continue
-                for key in ("trade_date", "quote_date", "date", "chip_date", "updated_at"):
-                    d = ymd(row.get(key))
-                    if d:
-                        return d
     return None
 
 
-def latest_chip_date(obj):
+def dominant_row_date(obj):
+    """Trading date represented by the actual stock rows, not file generated_at."""
+    if not isinstance(obj, dict):
+        return None
     ds = []
-    rows = obj.get("rows") or [] if isinstance(obj, dict) else []
+    rows = obj.get("rows") or []
     if isinstance(rows, list):
         for row in rows:
             if not isinstance(row, dict):
                 continue
-            for key in ("chip_date", "foreign_date", "date"):
-                d = ymd(row.get(key))
+            d = (
+                ymd(row.get("quote_date"))
+                or ymd(row.get("date"))
+                or ymd(row.get("trade_date"))
+            )
+            if d:
+                ds.append(d)
+    return Counter(ds).most_common(1)[0][0] if ds else None
+
+
+def intraday_date(obj):
+    if not isinstance(obj, dict):
+        return None
+    bridge = obj.get("bridge") or {}
+    return (
+        ymd(bridge.get("trade_date"))
+        or dominant_row_date(obj)
+        or explicit_date(obj, "trade_date")
+    )
+
+
+def daytrade_date(obj):
+    if not isinstance(obj, dict):
+        return None
+    # Important: updated_at/source_updated_at are generation timestamps, not
+    # quote dates. A file rebuilt after midnight can still contain prior-session
+    # prices, so only source/row trading dates are allowed here.
+    return (
+        explicit_date(obj, "source_trade_date", "trade_date")
+        or dominant_row_date(obj)
+    )
+
+
+def latest_chip_date(obj):
+    """Support both {rows:[...]} and chip_history's {code:[daily records]} shape."""
+    ds = []
+    if isinstance(obj, dict):
+        rows = obj.get("rows")
+        if isinstance(rows, list):
+            iterables = [rows]
+        else:
+            iterables = [v for v in obj.values() if isinstance(v, list)]
+        for records in iterables:
+            for row in records:
+                if not isinstance(row, dict):
+                    continue
+                d = ymd(row.get("chip_date")) or ymd(row.get("foreign_date")) or ymd(row.get("date"))
                 if d:
                     ds.append(d)
-                    break
-    return max(ds) if ds else object_date(obj)
+    return max(ds) if ds else explicit_date(obj, "trade_date", "date")
 
 
 def main():
@@ -77,18 +113,18 @@ def main():
     chips = load("chip_history.json")
 
     dates = {
-        "market": object_date(market, ("trade_date",)),
-        "close": object_date(close, ("trade_date",)),
-        "intraday": object_date(intra, ("trade_date",)),
-        "hourly": object_date(hourly, ("trade_date", "updated_at")),
-        "daytrade": object_date(daytrade, ("trade_date", "updated_at")),
+        "market": explicit_date(market, "trade_date"),
+        "close": explicit_date(close, "trade_date"),
+        "intraday": intraday_date(intra),
+        "hourly": explicit_date(hourly, "trade_date"),
+        "daytrade": daytrade_date(daytrade),
         "chips": latest_chip_date(chips),
     }
     valid = sorted(d for d in dates.values() if d)
     newest = valid[-1] if valid else None
     completed_candidates = [d for d in (dates.get("market"), dates.get("close")) if d]
     latest_completed = max(completed_candidates) if completed_candidates else newest
-    lagging = [k for k, d in dates.items() if d and newest and d < newest]
+    lagging = [k for k, d in dates.items() if d and latest_completed and d < latest_completed]
 
     intraday_stale = bool(latest_completed and (not dates.get("intraday") or dates["intraday"] < latest_completed))
     daytrade_stale = bool(
@@ -107,6 +143,14 @@ def main():
         "newest_trade_date": newest,
         "latest_completed_trade_date": latest_completed,
         "dates": dates,
+        "date_basis": {
+            "market": "market.trade_date",
+            "close": "close.trade_date",
+            "intraday": "MIS bridge.trade_date, then dominant row quote_date/date",
+            "hourly": "hourly.trade_date",
+            "daytrade": "source/row quote date; never updated_at",
+            "chips": "latest dated chip-history record across symbols",
+        },
         "lagging_sources": lagging,
         "freshness": {
             "intraday_stale": intraday_stale,
@@ -127,7 +171,7 @@ def main():
             "intraday": "近即時5分雷達；若日期落後最近完成交易日，個股卡片自動改用close，不把舊盤中訊號當最新",
             "close": "最近完成交易日盤後波段資料",
             "hourly": "60分K波段骨架",
-            "daytrade": "獨立當沖資料；若來源日期落後，停用舊當沖訊號，不改盤中波段分數",
+            "daytrade": "獨立當沖資料；若來源行情日期落後，停用舊當沖訊號，不以檔案生成日冒充交易日",
             "chips": "最近已公布完成交易日籌碼，不冒充即時資料",
         },
         "sources": {
