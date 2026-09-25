@@ -153,12 +153,11 @@
   }
   function renderFlow(){
     const host=$('#dogsonFlowHomeV1685');if(!host)return;
-    const fallback=staleIntraday()&&currentMode()!=='close';
-    const closeMode=currentMode()==='close'||fallback;
+    const closeMode=currentMode()==='close';
     const {hot,cold}=closeMode?closeFlow():intradayFlow();
     const lead=hot.slice(0,3).map(x=>x.sector).filter(Boolean);
-    const sentence=lead.length?`資金目前較集中在：${lead.join('、')}。`:'目前沒有明顯集中族群，先以個股相對強弱為主。';
-    const subtitle=fallback?'最新有效交易日法人族群資金':(closeMode?'盤後法人族群資金':'盤中成交資金輪動');
+    const sentence=lead.length?(closeMode?`資金目前較集中在：${lead.join('、')}。`:`盤中動能目前較集中在：${lead.join('、')}。`):'目前沒有明顯集中族群，先以個股相對強弱為主。';
+    const subtitle=closeMode?'盤後法人族群資金':'盤中族群動能／熱度';
     const html=`
       <div class="dogson-layer-head-v1685"><div><div class="dogson-layer-kicker-v1685">資金流向</div><div class="dogson-layer-sub-v1685">${esc(subtitle)}｜先看錢往哪裡走，再挑個股。</div></div></div>
       <div class="dogson-flow-summary-v1685">${esc(sentence)}</div>
