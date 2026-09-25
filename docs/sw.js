@@ -1,5 +1,5 @@
-const CACHE='dogson-free-v1674';
-const UI_VERSION='1674';
+const CACHE='dogson-free-v1675';
+const UI_VERSION='1675';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
@@ -7,24 +7,24 @@ self.addEventListener('install', event => {
     caches.open(CACHE).then(cache => cache.addAll([
       './manifest.webmanifest',
       './hourly.js?v=1530',
-      './realtime-config.js?v=1674',
-      './realtime.js?v=1674',
-      './ui-filters.js?v=1674',
-      './redesign-v160.css?v=1674',
-      './redesign-v160-dark.css?v=1674',
-      './contrast-v160.css?v=1674',
-      './redesign-v162.css?v=1674',
-      './redesign-v162-fix.css?v=1674',
-      './redesign-v163.css?v=1674',
-      './redesign-v164.css?v=1674',
-      './redesign-v165.css?v=1674',
-      './redesign-v166.css?v=1674',
-      './redesign-v160.js?v=1674',
-      './ui-polish-v160.js?v=1674',
-      './ui-layout-v162.js?v=1674',
-      './ui-card-v164.js?v=1674',
-      './ui-card-v166.js?v=1674',
-      './ui-fold-v167.js?v=1674'
+      './realtime-config.js?v=1675',
+      './realtime.js?v=1675',
+      './ui-filters.js?v=1675',
+      './redesign-v160.css?v=1675',
+      './redesign-v160-dark.css?v=1675',
+      './contrast-v160.css?v=1675',
+      './redesign-v162.css?v=1675',
+      './redesign-v162-fix.css?v=1675',
+      './redesign-v163.css?v=1675',
+      './redesign-v164.css?v=1675',
+      './redesign-v165.css?v=1675',
+      './redesign-v166.css?v=1675',
+      './redesign-v160.js?v=1675',
+      './ui-polish-v160.js?v=1675',
+      './ui-layout-v162.js?v=1675',
+      './ui-card-v164.js?v=1675',
+      './ui-card-v166.js?v=1675',
+      './ui-fold-v167.js?v=1675'
     ]))
   );
 });
