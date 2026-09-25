@@ -5,6 +5,12 @@
 .card.dogson-v166-card .dogson-signal-buttons-v164{gap:6px!important}
 .card.dogson-v166-card .dogson-signal-btn-v166{flex:0 0 auto!important}
 
+/* v1.6.7.6 — the original category/quality badges live inside .top.
+   Keep them as data sources, but never render them in the header because the
+   canonical decision row below already shows stage / entry / quality once. */
+.card.dogson-v166-card > .top .cat,
+.card.dogson-v166-card > .top .quality{display:none!important}
+
 /* Market conclusion always stays, even for holdings. */
 .card.dogson-v166-card .dogson-card-brief{background:transparent!important;border:0!important;padding:0!important;margin:9px 0 0!important}
 .card.dogson-v166-card .dogson-card-brief .dogson-card-headline{margin:0!important;color:#26332e!important;font-size:12.6px!important;line-height:1.55!important;font-weight:800!important}
