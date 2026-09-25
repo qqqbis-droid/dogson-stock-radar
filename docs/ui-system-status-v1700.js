@@ -5,7 +5,6 @@
   const $=(s,r=document)=>r.querySelector(s);
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const ymd=v=>{const m=String(v||'').match(/(20\d{2})-(\d{2})-(\d{2})/);return m?`${m[1]}-${m[2]}-${m[3]}`:''};
-  const shortDate=v=>{const d=ymd(v);return d?d.slice(5).replace('-','/'):''};
   const nowTs=()=>Date.now();
   const json=async name=>{
     try{
@@ -64,41 +63,42 @@
   }
   let snapshot=null;
   async function loadTruth(){
-    const [market,intra,close,hourly,daytrade,chips,status]=await Promise.all(['market','intraday','close','hourly','daytrade','chip_history','status'].map(json));
-    const dates={
-      market:dateFrom(market,['trade_date']),
-      intraday:dateFrom(intra,['trade_date']),
-      close:dateFrom(close,['trade_date']),
-      hourly:dateFrom(hourly,['trade_date','updated_at']),
-      daytrade:dateFrom(daytrade,['trade_date','updated_at']),
-      chips:chipDate(chips)
+    const [market,intra,close,hourly,daytrade,chips,status,system]=await Promise.all(['market','intraday','close','hourly','daytrade','chip_history','status','system_status'].map(json));
+    const dates=system?.dates&&typeof system.dates==='object'?{
+      market:ymd(system.dates.market),intraday:ymd(system.dates.intraday),close:ymd(system.dates.close),hourly:ymd(system.dates.hourly),daytrade:ymd(system.dates.daytrade),chips:ymd(system.dates.chips)
+    }:{
+      market:dateFrom(market,['trade_date']),intraday:dateFrom(intra,['trade_date']),close:dateFrom(close,['trade_date']),hourly:dateFrom(hourly,['trade_date','updated_at']),daytrade:dateFrom(daytrade,['trade_date','updated_at']),chips:chipDate(chips)
     };
     const valid=Object.values(dates).filter(Boolean).sort();
-    const latest=valid.at(-1)||'';
-    const errors=[market,intra,close,hourly,daytrade,chips,status].filter(x=>x?._error).length;
-    snapshot={dates,latest,errors,status,market};
+    const latest=ymd(system?.latest_completed_trade_date)||valid.at(-1)||'';
+    const errors=[market,intra,close,hourly,daytrade,chips,status,system].filter(x=>x?._error).length;
+    snapshot={dates,latest,errors,status,market,system};
     window.DOGSON_DATA_TRUTH_V1700=snapshot;
     renderTruth();
   }
   function sourceLabel(){
-    const m=currentMode();
+    const m=currentMode(),stale=window.DOGSON_INTRADAY_STALE===true;
     if(m==='close')return'盤後頁使用 close + market + hourly + 已完成交易日籌碼';
-    if(m==='daytrade')return'當沖頁使用 daytrade / intraday；波段與昨日法人只作背景';
-    if(window.DOGSON_INTRADAY_STALE)return'找波段頁保留 intraday 模式；市場環境改用較新的 close 市場資料';
+    if(m==='daytrade')return stale?'當沖來源落後，舊訊號已停用；等待下一個實際交易時段重新建立':'當沖頁使用 daytrade / intraday；波段與昨日法人只作背景';
+    if(stale)return'找波段的舊 intraday 已隔離；個股卡片改用較新的 close，盤中5分鐘訊號暫停';
     return'找波段頁使用 intraday；即時報價另由 TWSE MIS 補充';
   }
   function renderTruth(){
     const anchor=$('#dogsonMissionV1700')||$('#dogsonViewNav');if(!anchor||!snapshot)return;
     let d=$('#dogsonDataTruthV1700');if(!d){d=document.createElement('details');d.id='dogsonDataTruthV1700';d.className='dogson-truth-v1700';anchor.after(d)}
-    const {dates,latest,errors}=snapshot;
-    const current=[dates.market,dates.close].filter(Boolean).sort().at(-1)||latest;
+    const {dates,latest,errors,system}=snapshot;
+    const current=ymd(system?.latest_completed_trade_date)||[dates.market,dates.close].filter(Boolean).sort().at(-1)||latest;
+    const staleIntra=system?.freshness?.intraday_stale===true||!!(dates.intraday&&current&&dates.intraday<current);
+    const staleDay=system?.freshness?.daytrade_stale===true||!!(dates.daytrade&&current&&dates.daytrade<current);
     const lag=Object.entries(dates).filter(([,v])=>v&&current&&v<current).map(([k])=>k);
-    const tone=errors?'bad':lag.length?'warn':'ok';
-    const badge=errors?'部分資料讀取失敗':lag.length?'不同步，已標示日期':'日期一致';
+    const guarded=staleIntra||staleDay;
+    const tone=errors?'bad':guarded?'warn':lag.length?'warn':'ok';
+    const badge=errors?'部分資料讀取失敗':guarded?'舊盤中已隔離':lag.length?'公布時差，已標示':'日期一致';
     const items=[['市場',dates.market],['盤中波段',dates.intraday],['盤後波段',dates.close],['60分K',dates.hourly],['當沖',dates.daytrade],['籌碼',dates.chips]];
     const grid=items.map(([k,v])=>`<div class="dogson-truth-item-v1700"><div class="dogson-truth-k-v1700">${esc(k)}</div><div class="dogson-truth-v-v1700">${esc(v||'讀取中／無日期')}</div></div>`).join('');
-    const sub=current?`目前最新交易日 ${current}｜點開核對各資料日期`:'正在核對資料日期…';
-    const html=`<summary><div class="dogson-truth-head-v1700"><div class="dogson-truth-title-v1700">資料狀態・v1.7.0</div><div class="dogson-truth-sub-v1700">${esc(sub)}</div></div><span class="dogson-truth-badge-v1700 ${tone}">${esc(badge)}</span></summary><div class="dogson-truth-body-v1700"><div class="dogson-truth-grid-v1700">${grid}</div><div class="dogson-truth-note-v1700">日期不同不一定代表錯誤：盤中技術、60分K、法人籌碼公布時間本來不同。系統不會把尚未公布的籌碼冒充成即時資料。</div><div class="dogson-truth-source-v1700"><b>目前頁面資料規則：</b>${esc(sourceLabel())}<br><b>報價：</b>TWSE MIS｜<b>市場／法人：</b>TWSE、TPEx 官方資料與雷達產出檔。</div></div>`;
+    const sub=current?`最近完整交易日 ${current}｜點開核對各資料日期`:'正在核對資料日期…';
+    const guardNote=guarded?' 系統已自動隔離落後的盤中／當沖來源，不會把它們冒充成最新訊號。':'';
+    const html=`<summary><div class="dogson-truth-head-v1700"><div class="dogson-truth-title-v1700">資料狀態・v1.7.0</div><div class="dogson-truth-sub-v1700">${esc(sub)}</div></div><span class="dogson-truth-badge-v1700 ${tone}">${esc(badge)}</span></summary><div class="dogson-truth-body-v1700"><div class="dogson-truth-grid-v1700">${grid}</div><div class="dogson-truth-note-v1700">日期不同不一定代表錯誤：60分K、法人籌碼公布時間本來不同。${esc(guardNote)}</div><div class="dogson-truth-source-v1700"><b>目前頁面資料規則：</b>${esc(sourceLabel())}<br><b>報價：</b>TWSE MIS｜<b>市場／法人：</b>TWSE、TPEx 官方資料與雷達產出檔。</div></div>`;
     if(d.dataset.h!==html){d.innerHTML=html;d.dataset.h=html}
   }
   let timer;
