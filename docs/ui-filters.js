@@ -1,9 +1,9 @@
 (()=>{
-  if(window.__DOGSON_UI_LOADER_V1677__) return;
-  window.__DOGSON_UI_LOADER_V1677__ = true;
+  if(window.__DOGSON_UI_LOADER_V1678__) return;
+  window.__DOGSON_UI_LOADER_V1678__ = true;
   const src=document.currentScript?.src||location.href;
   const base=new URL('.',src);
-  const version='1677';
+  const version='1678';
 
   function loadCss(name,id){
     if(document.getElementById(id)) return;
