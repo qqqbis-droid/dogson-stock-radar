@@ -9,8 +9,10 @@
   function state(){let m='intraday',p=false;try{m=mode||m;p=!!portfolioOnly}catch{}return{m,p}}
   function sourceRows(m){
     try{
-      if(m==='daytrade') return Array.isArray(daytradeRows)?daytradeRows:[];
+      const stale=window.DOGSON_INTRADAY_STALE===true;
+      if(m==='daytrade') return stale?[]:(Array.isArray(daytradeRows)?daytradeRows:[]);
       if(m==='close') return Array.isArray(closeRows)?closeRows:[];
+      if(stale) return Array.isArray(closeRows)?closeRows:[];
       return Array.isArray(intraRows)?intraRows:[];
     }catch{return[]}
   }
@@ -18,7 +20,7 @@
   function heldCodes(){try{return new Set(Object.keys(portfolioData||{}).map(String))}catch{return new Set()}}
   function entryKey(r,m){
     try{
-      const mk=m==='close'?(typeof closeMarket!=='undefined'?closeMarket:undefined):(typeof intraMarket!=='undefined'?intraMarket:undefined);
+      const mk=m==='close'||window.DOGSON_INTRADAY_STALE===true?(typeof closeMarket!=='undefined'?closeMarket:undefined):(typeof intraMarket!=='undefined'?intraMarket:undefined);
       return entryDecision(r,mk)?.key||'';
     }catch{return''}
   }
@@ -27,14 +29,16 @@
   function swingSummary(rows,m,title){
     const setup=countLike(rows,/蓄勢/),launch=countLike(rows,/剛啟動/),pull=countLike(rows,/回踩/),trend=countLike(rows,/趨勢|持有/),hot=countLike(rows,/過熱/),weak=countLike(rows,/轉弱|失效/);
     const green=rows.filter(r=>entryKey(r,m)==='green').length;
-    return{title,sub:m==='close'?'收盤後用完整日K、60分K、籌碼與位置整理明日觀察名單。':'盤中用市場、族群、波段結構與目前位置找值得追蹤的機會。',items:[
-      ['🌱',setup,'蓄勢'],['🔥',launch,'剛啟動'],['🟡',pull,'回踩'],['🚂',trend,'趨勢中'],['🟢',green,m==='close'?'位置可觀察':'可試單'],['🚫',hot,'過熱'],['⚠️',weak,'轉弱/失效']
+    const fallback=m==='intraday'&&window.DOGSON_INTRADAY_STALE===true;
+    return{title,sub:fallback?'盤中資料較舊，這裡暫以最近完整盤後波段資料呈現，不把舊5分鐘訊號當成最新。':m==='close'?'收盤後用完整日K、60分K、籌碼與位置整理明日觀察名單。':'盤中用市場、族群、波段結構與目前位置找值得追蹤的機會。',items:[
+      ['🌱',setup,'蓄勢'],['🔥',launch,'剛啟動'],['🟡',pull,'回踩'],['🚂',trend,'趨勢中'],['🟢',green,m==='close'||fallback?'位置可觀察':'可試單'],['🚫',hot,'過熱'],['⚠️',weak,'轉弱/失效']
     ]};
   }
   function daytradeSummary(rows){
+    const stale=window.DOGSON_INTRADAY_STALE===true;
     const c=s=>rows.filter(r=>clean(r?.daytrade_state)===s).length;
     const high=rows.filter(r=>Number(r?.daytrade_score)>=75).length;
-    return{title:'今日當沖候選',sub:'只統計獨立 daytrade 資料；波段 Stage 與昨日法人不混入當沖分。',items:[
+    return{title:'今日當沖候選',sub:stale?'盤中來源不是最近交易日，舊當沖訊號已停用；等下一個實際交易時段重新建立。':'只統計獨立 daytrade 資料；波段 Stage 與昨日法人不混入當沖分。',items:[
       ['🟢',c('可執行'),'可執行'],['🟡',c('等回踩'),'等回踩'],['🔵',c('觀察'),'觀察'],['🚫',c('過熱不追'),'過熱不追'],['🔴',c('失效'),'失效'],['⚡',high,'75分以上']
     ]};
   }
@@ -43,7 +47,7 @@
     let invalid=0,weak=0,healthy=0,hot=0;
     rows.forEach(r=>{const s=stage(r);if(/失效/.test(s))invalid++;else if(/轉弱/.test(s))weak++;else if(/過熱/.test(s))hot++;else healthy++});
     const missing=Math.max(0,codes.size-rows.length);
-    return{title:'庫存優先處理',sub:'這裡只看你的實際庫存：先找失效與轉弱，再看正常持有；不是新股排行榜。',items:[
+    return{title:'庫存優先處理',sub:window.DOGSON_INTRADAY_STALE===true?'盤中資料較舊，庫存先用最近完整盤後結構判讀；不使用舊盤中轉折。':'這裡只看你的實際庫存：先找失效與轉弱，再看正常持有；不是新股排行榜。',items:[
       ['💼',codes.size,'持有檔數'],['❌',invalid,'結構失效'],['⚠️',weak,'轉弱警戒'],['✅',healthy,'結構正常'],['🚫',hot,'短線過熱'],['…',missing,'行情待補']
     ]};
   }
@@ -70,7 +74,7 @@
     const quick=$('#dogsonQuickFilters');
     if(quick)quick.hidden=(s.p||s.m==='daytrade');
     const changes=$('#changebox');
-    if(changes)changes.hidden=(s.p||s.m!=='intraday');
+    if(changes)changes.hidden=(s.p||s.m!=='intraday'||window.DOGSON_INTRADAY_STALE===true);
     const ps=$('#portfolioSummary');
     if(ps)ps.hidden=!s.p;
     const more=$('#dogsonMoreMarket');
