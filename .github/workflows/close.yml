@@ -11,6 +11,7 @@ on:
       - "scripts/sync_live_data.py"
       - "scripts/build_validation.py"
       - "scripts/build_completion.py"
+      - "scripts/build_close_fresh.py"
       - "docs/hourly.js"
       - "docs/realtime-config.js"
       - ".github/workflows/close.yml"
@@ -47,8 +48,8 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Keep last live intraday/hourly data if available
         run: python scripts/sync_live_data.py || true
-      - name: Build full close + chips + market
-        run: python scripts/build_data.py --mode close
+      - name: Build full close + chips + market with latest-session guard
+        run: python scripts/build_close_fresh.py
       - name: Build 60m lifecycle + entry-position lights
         run: python scripts/build_hourly.py
       - name: Step 7 archive signals + resolve real outcomes
