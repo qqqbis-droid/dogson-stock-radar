@@ -56,6 +56,7 @@
     .then(()=>loadScript('ui-load-more-v1681.js','dogson-ui-load-more-v1681'))
     .then(()=>loadScript('ui-market-v1685.js','dogson-ui-market-v1685'))
     .then(()=>loadScript('ui-market-ticker-v1686.js','dogson-ui-market-ticker-v1688'))
+    .then(()=>loadScript('ui-page-architecture-v1701.js','dogson-ui-page-architecture-v1701'))
     .then(()=>{
       clearTimeout(safetyTimer);
       requestAnimationFrame(()=>requestAnimationFrame(reveal));
