@@ -1,6 +1,6 @@
 name: Radar - Close Update
 
-# Production refresh marker: v1.6.8.7 freshness guard + latest valid trading day rebuild.
+# Production refresh marker: v1.7.0 canonical metadata + latest valid trading day rebuild.
 on:
   workflow_dispatch:
   push:
@@ -12,6 +12,7 @@ on:
       - "scripts/build_validation.py"
       - "scripts/build_completion.py"
       - "scripts/build_close_fresh.py"
+      - "scripts/build_system_status.py"
       - "docs/hourly.js"
       - "docs/realtime-config.js"
       - ".github/workflows/close.yml"
@@ -27,7 +28,6 @@ permissions:
   pages: write
   id-token: write
 
-# 籌碼補抓不可被其他 Pages 更新互相取消；否則會出現程式已修正、資料卻永遠沒重建的狀況。
 concurrency:
   group: dogson-close-pages
   cancel-in-progress: false
@@ -54,7 +54,9 @@ jobs:
         run: python scripts/build_hourly.py
       - name: Step 7 archive signals + resolve real outcomes
         run: python scripts/build_validation.py --mode close
-      - name: Verify chip and 60K recovery
+      - name: Build canonical data status
+        run: python scripts/build_system_status.py
+      - name: Verify chip, 60K and canonical status
         run: |
           python - <<'PY'
           import json
@@ -76,6 +78,10 @@ jobs:
           print('60K rows:', len(hrows), 'lights:', hj.get('entry_light_counts'))
           if not hrows:
             raise SystemExit('60K radar is empty; abort Pages deploy instead of publishing a blank panel')
+          s = json.loads(Path('docs/data/system_status.json').read_text(encoding='utf-8'))
+          print('system status:', s)
+          if s.get('app_version') != '1.7.0':
+            raise SystemExit('canonical system status app_version mismatch')
           PY
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
