@@ -1,17 +1,21 @@
-name: Deploy Radar v1.2.3 Static
+name: Legacy Radar v1.2.3 Static (manual only)
+
+# Historical recovery workflow only. It must never participate in normal
+# production pushes, because v1.7.1 is now the canonical production pipeline.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+
 permissions:
   contents: read
   pages: write
   id-token: write
+
 concurrency:
-  group: dogson-pages-static
-  cancel-in-progress: true
+  group: dogson-pages
+  cancel-in-progress: false
+
 jobs:
   deploy:
-    if: github.event.head_commit.message == 'Deploy v1.2.3 static refresh'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -24,9 +28,9 @@ jobs:
           python-version: "3.12"
           cache: "pip"
       - run: pip install -r requirements.txt
-      - name: Sync newest live data before static deploy
+      - name: Sync newest live data before legacy recovery deploy
         run: python scripts/sync_live_data.py || true
-      - name: Rebuild intraday snapshot before static deploy
+      - name: Rebuild intraday snapshot before legacy recovery deploy
         run: python scripts/build_data.py --mode intraday
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
