@@ -20,12 +20,30 @@
 
   function refreshLegacyBoxes(){
     try{
-      if(modeNow()==='intraday'&&window.DOGSON_INTRADAY_STALE&&typeof market!=='undefined') market=closeMarket||{};
       if(typeof marketHTML==='function'){
         const el=document.getElementById('marketbox');
         if(el) el.innerHTML=marketHTML();
       }
+      if(typeof rotationHTML==='function'){
+        const el=document.getElementById('rotationbox');
+        if(el) el.innerHTML=rotationHTML();
+      }
     }catch(_){ }
+  }
+
+  function fallbackToClose(src,closeDate){
+    if(modeNow()!=='intraday') return false;
+    try{
+      mode='close';
+      market=src.close||{};
+      window.DOGSON_FRESHNESS_FORCED_CLOSE=true;
+      if(typeof syncModeFilters==='function') syncModeFilters();
+      const text=document.getElementById('modeText');
+      if(text) text.textContent=`找波段：盤中資料較舊，已自動使用 ${closeDate||'最近交易日'} 最新盤後資料`;
+      refreshLegacyBoxes();
+      if(typeof render==='function') render();
+      return true;
+    }catch(_){return false;}
   }
 
   function apply(){
@@ -42,10 +60,12 @@
     window.DOGSON_INTRADAY_TRADE_DATE=intraDate;
     window.DOGSON_EFFECTIVE_MARKET_DATE=stale?closeDate:(intraDate||closeDate);
 
-    if(stale&&modeNow()==='intraday'){
-      try{market=src.close||{};}catch(_){ }
+    if(stale){
+      if(!fallbackToClose(src,closeDate)){
+        try{if(modeNow()!=='daytrade')market=src.close||{};}catch(_){ }
+        refreshLegacyBoxes();
+      }
     }
-    refreshLegacyBoxes();
 
     if(prev!==stale||!window.__DOGSON_FRESHNESS_EMITTED_V1687__){
       window.__DOGSON_FRESHNESS_EMITTED_V1687__=true;
