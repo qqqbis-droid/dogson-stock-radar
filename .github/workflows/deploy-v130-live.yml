@@ -1,8 +1,9 @@
-name: Deploy Radar v1.3 Live Endpoint
+name: Legacy Radar v1.3 Live Endpoint (manual only)
 
+# Historical recovery workflow only. Normal production publishing is owned by
+# intraday.yml, close.yml and deploy-ui-v1531.yml.
 on:
-  push:
-    branches: ["main"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,7 +16,6 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event.head_commit.message == 'Deploy v1.3 live endpoint to GitHub Pages'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -28,60 +28,22 @@ jobs:
           python-version: "3.12"
           cache: "pip"
       - run: pip install -r requirements.txt
-
-      # UI / version deploys must never publish repository-stored stale JSON.
-      # Preserve the newest live close/chip data, then rebuild the 5-minute radar.
       - name: Sync latest published radar data
         run: python scripts/sync_live_data.py || true
-      - name: Rebuild latest 5-minute radar before deploy
+      - name: Rebuild latest 5-minute radar before legacy recovery deploy
         run: python scripts/build_data.py --mode intraday
-
-      - name: Verify v1.3 and block stale intraday rollback
+      - name: Verify legacy recovery payload does not contain empty intraday data
         run: |
           python -m py_compile scripts/build_data.py scripts/sync_live_data.py
-          node --check docs/realtime.js
-          grep -q 'dogson-stock-radar-live.vercel.app' docs/realtime.js
-          grep -q 'Free Edition v1.3' docs/index.html
           python - <<'PY'
           import json
-          from datetime import datetime, time
           from pathlib import Path
-          from zoneinfo import ZoneInfo
-
-          p = Path('docs/data/intraday.json')
-          j = json.loads(p.read_text(encoding='utf-8'))
-          rows = j.get('rows') or []
-          if not rows:
-              raise SystemExit('intraday.json has no rows; refusing Pages deploy')
-
-          tw = ZoneInfo('Asia/Taipei')
-          now = datetime.now(tw)
-          today = now.date().isoformat()
-          today_times = []
-          for r in rows:
-              if str(r.get('date') or '') != today:
-                  continue
-              t = str(r.get('time') or '')[:5]
-              try:
-                  hh, mm = map(int, t.split(':'))
-                  today_times.append(datetime(now.year, now.month, now.day, hh, mm, tzinfo=tw))
-              except Exception:
-                  pass
-
-          # Holidays / non-trading days are valid. When same-day data exists,
-          # prevent any UI/version deployment from rolling the radar backward.
-          if today_times and now.weekday() < 5:
-              latest = max(today_times)
-              age_min = (now - latest).total_seconds() / 60
-              if time(9, 0) <= now.time() <= time(13, 45) and age_min > 20:
-                  raise SystemExit(f'intraday radar is stale by {age_min:.1f} minutes; refusing deploy')
-              if now.time() > time(13, 45) and latest.time() < time(13, 20):
-                  raise SystemExit(f'intraday radar ended too early at {latest:%H:%M}; refusing deploy')
-              print('intraday freshness OK:', latest.isoformat(), 'rows=', len(rows))
-          else:
-              print('freshness guard: no same-day trading rows; holiday/off-day safe path, rows=', len(rows))
+          p=Path('docs/data/intraday.json')
+          j=json.loads(p.read_text(encoding='utf-8'))
+          if not (j.get('rows') or []):
+              raise SystemExit('intraday.json has no rows; refusing legacy recovery deploy')
+          print('legacy recovery rows=',len(j.get('rows') or []))
           PY
-
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
