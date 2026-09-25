@@ -1,6 +1,6 @@
 name: Radar - Close Update
 
-# Production refresh marker: v1.7.0 canonical metadata + latest valid trading day rebuild.
+# Production refresh marker: v1.7.1 canonical metadata + latest valid trading day rebuild.
 on:
   workflow_dispatch:
   push:
@@ -29,7 +29,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: dogson-close-pages
+  group: dogson-pages
   cancel-in-progress: false
 
 jobs:
@@ -52,7 +52,7 @@ jobs:
         run: python scripts/build_close_fresh.py
       - name: Build 60m lifecycle + entry-position lights
         run: python scripts/build_hourly.py
-      - name: Step 7 archive signals + resolve real outcomes
+      - name: Archive signals + resolve real outcomes
         run: python scripts/build_validation.py --mode close
       - name: Build canonical data status
         run: python scripts/build_system_status.py
@@ -66,22 +66,22 @@ jobs:
           rows = obj.get('rows') or []
           covered = [r for r in rows if float(r.get('chip_coverage_pct') or 0) > 0]
           print('chip covered rows:', len(covered), '/', len(rows))
-          x = next((r for r in rows if str(r.get('code')) == '5483'), None)
-          if x:
-            keys = ['chip_date','foreign_net_latest','foreign_3d_net','trust_net_latest','sbl_balance_latest','sbl_3change_pct','margin_3d_pct','margin_status','chip_coverage_pct','chip_history_days']
-            print('5483:', {k:x.get(k) for k in keys})
           if rows and not covered:
             raise SystemExit('chip coverage is still 0% for all rows')
+
           h = Path('docs/data/hourly.json')
           hj = json.loads(h.read_text(encoding='utf-8')) if h.exists() else {}
           hrows = hj.get('rows') or []
           print('60K rows:', len(hrows), 'lights:', hj.get('entry_light_counts'))
           if not hrows:
             raise SystemExit('60K radar is empty; abort Pages deploy instead of publishing a blank panel')
+
           s = json.loads(Path('docs/data/system_status.json').read_text(encoding='utf-8'))
           print('system status:', s)
-          if s.get('app_version') != '1.7.0':
-            raise SystemExit('canonical system status app_version mismatch')
+          if s.get('app_version') != '1.7.1':
+            raise SystemExit(f"canonical system status app_version mismatch: {s.get('app_version')}")
+          if not s.get('latest_completed_trade_date'):
+            raise SystemExit('latest_completed_trade_date missing')
           PY
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
