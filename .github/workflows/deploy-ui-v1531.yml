@@ -1,4 +1,4 @@
-name: Deploy Radar v1.6.8.7 UI
+name: Deploy Radar v1.6.8.8 UI
 
 on:
   push:
@@ -37,7 +37,7 @@ jobs:
           node --check docs/ui-card-v166.js
           node --check docs/ui-fold-v167.js
           node --check docs/ui-entry-v1679.js
-          node --check docs/ui-freshness-v1687.js
+          node --check docs/ui-freshness-v1688.js
           node --check docs/ui-load-more-v1681.js
           node --check docs/ui-market-v1685.js
           node --check docs/ui-market-ticker-v1686.js
@@ -53,23 +53,25 @@ jobs:
           test -s docs/redesign-v1679.css
           test -s docs/redesign-v1685.css
           test -s docs/redesign-v1686.css
-          grep -q "ui-filters.js?v=1687" docs/realtime-config.js
-          grep -q "dogson-free-v1687" docs/sw.js
-          grep -q "dogson-boot-v1687" docs/sw.js
-          grep -q "DOGSON_UI_LOADER_V1687" docs/ui-filters.js
+          grep -q "ui-filters.js?v=1688" docs/realtime-config.js
+          grep -q "dogson-free-v1688" docs/sw.js
+          grep -q "dogson-boot-v1688" docs/sw.js
+          grep -q "DOGSON_UI_LOADER_V1688" docs/ui-filters.js
           grep -q "dogson-booting" docs/ui-filters.js
           grep -q "dogsonUiReady" docs/ui-filters.js
           grep -q "redesign-v1685.css" docs/ui-filters.js
           grep -q "redesign-v1686.css" docs/ui-filters.js
-          grep -q "ui-freshness-v1687.js" docs/ui-filters.js
+          grep -q "ui-freshness-v1688.js" docs/ui-filters.js
           grep -q "ui-market-v1685.js" docs/ui-filters.js
           grep -q "ui-market-ticker-v1686.js" docs/ui-filters.js
-          grep -q "ui-freshness-v1687.js?v=1687" docs/sw.js
-          grep -q "ui-market-ticker-v1686.js?v=1687" docs/sw.js
-          grep -q "redesign-v1686.css?v=1687" docs/sw.js
-          grep -q "DOGSON_FRESHNESS_V1687" docs/ui-freshness-v1687.js
-          grep -q "DOGSON_INTRADAY_STALE" docs/ui-freshness-v1687.js
-          grep -q "最新盤後資料" docs/ui-freshness-v1687.js
+          grep -q "ui-freshness-v1688.js?v=1688" docs/sw.js
+          grep -q "ui-market-ticker-v1686.js?v=1688" docs/sw.js
+          grep -q "redesign-v1686.css?v=1688" docs/sw.js
+          grep -q "DOGSON_FRESHNESS_V1688" docs/ui-freshness-v1688.js
+          grep -q "DOGSON_INTRADAY_STALE" docs/ui-freshness-v1688.js
+          grep -q "DOGSON_EFFECTIVE_MARKET_SOURCE" docs/ui-freshness-v1688.js
+          grep -q "頁面仍維持找波段" docs/ui-freshness-v1688.js
+          ! grep -q "mode='close'" docs/ui-freshness-v1688.js
           grep -q "DOGSON_MARKET_TICKER_V1687" docs/ui-market-ticker-v1686.js
           grep -q "9/" docs/ui-market-ticker-v1686.js || true
           grep -q "加權" docs/ui-market-ticker-v1686.js
@@ -92,7 +94,7 @@ jobs:
           grep -q "#dogsonQuickFilters \[data-all\]" docs/ui-filters-core-v1531.js
           grep -q "dogson-card-brief>.dogson-card-badges" docs/redesign-v1679.css
           grep -q "ui-load-more-v1681.js" docs/ui-filters.js
-          grep -q "ui-load-more-v1681.js?v=1687" docs/sw.js
+          grep -q "ui-load-more-v1681.js?v=1688" docs/sw.js
           grep -q "DOGSON_LOAD_MORE_V1681" docs/ui-load-more-v1681.js
           grep -q "dogsonOriginalLoadMore" docs/ui-load-more-v1681.js
           ! grep -q "client.navigate" docs/sw.js
