@@ -14,8 +14,8 @@ permissions:
   pages: write
   id-token: write
 
-# Use the same production lock as intraday/close publishers so an UI-only
-# publish cannot restore an older market snapshot over a newer data publish.
+# All production publishers share one queue. UI-only publishing waits for any
+# in-flight market-data publish instead of cancelling it or racing its snapshot.
 concurrency:
   group: dogson-pages
   cancel-in-progress: false
