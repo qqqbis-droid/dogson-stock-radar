@@ -1,9 +1,9 @@
 (()=>{
-  if(window.__DOGSON_UI_LOADER_V1686__) return;
-  window.__DOGSON_UI_LOADER_V1686__ = true;
+  if(window.__DOGSON_UI_LOADER_V1687__) return;
+  window.__DOGSON_UI_LOADER_V1687__ = true;
   const src=document.currentScript?.src||location.href;
   const base=new URL('.',src);
-  const version='1686';
+  const version='1687';
   let revealed=false;
 
   function reveal(){
@@ -50,9 +50,10 @@
     .then(()=>loadScript('ui-card-v166.js','dogson-ui-card-v166'))
     .then(()=>loadScript('ui-fold-v167.js','dogson-ui-fold-v167'))
     .then(()=>loadScript('ui-entry-v1679.js','dogson-ui-entry-v1679'))
+    .then(()=>loadScript('ui-freshness-v1687.js','dogson-ui-freshness-v1687'))
     .then(()=>loadScript('ui-load-more-v1681.js','dogson-ui-load-more-v1681'))
     .then(()=>loadScript('ui-market-v1685.js','dogson-ui-market-v1685'))
-    .then(()=>loadScript('ui-market-ticker-v1686.js','dogson-ui-market-ticker-v1686'))
+    .then(()=>loadScript('ui-market-ticker-v1686.js','dogson-ui-market-ticker-v1687'))
     .then(()=>{
       clearTimeout(safetyTimer);
       requestAnimationFrame(()=>requestAnimationFrame(reveal));
