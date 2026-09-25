@@ -47,8 +47,26 @@
 .dogson-quick-detail-back.show{pointer-events:auto!important}
 .dogson-quick-detail{overscroll-behavior:contain}
 
+/* v1.6.7.7 — lifecycle quick view explains what to do next instead of repeating key reasons. */
+.dogson-stage-guide{display:grid;gap:10px;margin-top:10px}
+.dogson-stage-guide-block{padding:13px 14px;border:1px solid #dce7e1;border-radius:16px;background:#fbfcfb}
+.dogson-stage-guide-label{margin-bottom:7px;color:#50635a;font-size:11px;font-weight:900;letter-spacing:.01em}
+.dogson-stage-guide-text{color:#26352f;font-size:13px;line-height:1.65;font-weight:650}
+.dogson-stage-guide-path{display:flex;align-items:flex-start;gap:5px;margin-top:7px;color:#405149;font-size:12.5px;line-height:1.55}
+.dogson-stage-guide-path span{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;flex:0 0 20px;border-radius:999px;font-size:11px;font-weight:900}
+.dogson-stage-guide-up span{background:#e8f5ee;color:#28745a}
+.dogson-stage-guide-down span{background:#f9ecee;color:#a84b55}
+.dogson-stage-guide-path b{flex:0 0 auto;color:#34463e}
+.dogson-stage-guide-strategy{background:#f3f8f5;border-color:#cfe0d7}
+.dogson-stage-guide-strategy .dogson-stage-guide-label{color:#2f6754}
+
 html[data-dogson-theme="dark"] .dogson-action-strip-v164 .quality{background:#202a26!important;border-color:#37463f!important;color:#c4d1cb!important}
 html[data-dogson-theme="dark"] .dogson-action-strip-v164 .dogson-portfolio-btn-v164{background:#1c2823!important;border-color:#3b594c!important;color:#9dd4bd!important}
+html[data-dogson-theme="dark"] .dogson-stage-guide-block{background:#202622;border-color:#38453f}
+html[data-dogson-theme="dark"] .dogson-stage-guide-label{color:#aabbb2}
+html[data-dogson-theme="dark"] .dogson-stage-guide-text,html[data-dogson-theme="dark"] .dogson-stage-guide-path{color:#e2e9e5}
+html[data-dogson-theme="dark"] .dogson-stage-guide-path b{color:#d7e1dc}
+html[data-dogson-theme="dark"] .dogson-stage-guide-strategy{background:#1d2a24;border-color:#345347}
 
 @media(max-width:620px){
   .card.dogson-v164-card{padding:12px!important}
@@ -60,6 +78,9 @@ html[data-dogson-theme="dark"] .dogson-action-strip-v164 .dogson-portfolio-btn-v
   .dogson-action-strip-v164 .dogson-portfolio-btn-v164{min-height:33px!important;min-width:60px!important;padding:7px 8px!important;font-size:10.3px!important}
   .card.dogson-v164-card .dogson-card-headline{font-size:12.7px!important}
   .card.dogson-v164-card .liveval{font-size:16px!important}
+  .dogson-stage-guide-block{padding:12px 13px;border-radius:14px}
+  .dogson-stage-guide-text{font-size:12.5px}
+  .dogson-stage-guide-path{font-size:12px}
 }
 
 @media(max-width:390px){
