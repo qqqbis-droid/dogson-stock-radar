@@ -1,11 +1,70 @@
 (()=>{
-  if(window.__DOGSON_ENTRY_DETAIL_V1679__) return;
-  window.__DOGSON_ENTRY_DETAIL_V1679__=1;
+  if(window.__DOGSON_ENTRY_DETAIL_V1680__) return;
+  window.__DOGSON_ENTRY_DETAIL_V1680__=1;
   const $=(s,r=document)=>r.querySelector(s);
   const $$=(s,r=document)=>[...r.querySelectorAll(s)];
   const clean=s=>String(s||'').replace(/^✓\s*/,'').replace(/^[🟢🟡🔴✅⚠️⛔]+\s*/,'').replace(/\s+/g,' ').trim();
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const uniq=a=>[...new Set(a.map(clean).filter(Boolean))];
+
+  function marketContext(mkt){
+    const mode=String(mkt?.market_mode||'—');
+    const raw=Number(mkt?.market_score);
+    const score=Number.isFinite(raw)?raw:0;
+    const scoreKnown=score>0;
+    const defensive=mode==='防守'||/偏弱|防守/.test(mode)||(scoreKnown&&score<6);
+    const systemic=/極弱|失效|空頭|系統性|全面防守|高風險/.test(mode)||(scoreKnown&&score<=2);
+    const scoreText=scoreKnown?` ${score.toFixed(1).replace(/\.0$/,'')}/15`:'';
+    return{
+      mode,score,defensive,systemic,
+      label:`大盤 ${mode}${scoreText}`,
+      advisory:defensive&&!systemic?`大盤 ${mode}${scoreText}｜個股條件可成立，但第一筆部位宜縮小，避免追價；優先等回踩承接。`:'',
+      brake:systemic?`大盤 ${mode}${scoreText} 已達系統性風險煞車門檻，暫緩新倉。`:''
+    };
+  }
+
+  // Market is a risk regulator, not a normal entry requirement.
+  // Keep the original 100-point stock score and original entry rules intact;
+  // only remove ordinary weak-market vetoes. A true systemic-risk state may still brake new entries.
+  if(typeof entryDecision==='function'&&!window.__DOGSON_MARKET_ADVISORY_V1680__){
+    window.__DOGSON_MARKET_ADVISORY_V1680__=1;
+    const baseEntryDecision=entryDecision;
+    entryDecision=function(r,mkt){
+      let actual=mkt;
+      if(actual===undefined){try{actual=typeof market!=='undefined'?market:undefined}catch{}}
+      const mc=marketContext(actual);
+      const neutral={...(actual||{}),market_mode:'中性',market_score:8};
+      const stockDecision=baseEntryDecision(r,neutral);
+
+      if(mc.systemic){
+        const block=uniq([...(stockDecision.block||[]),mc.brake]);
+        return{
+          ...stockDecision,
+          key:'red',icon:'🔴',label:'先不進',
+          headline:'個股條件之外，大盤已觸發系統性風險煞車',
+          wait:[],block,
+          marketMode:mc.mode,marketScore:mc.score,
+          marketBrake:true,marketAdvisory:''
+        };
+      }
+
+      const out={
+        ...stockDecision,
+        marketMode:mc.mode,marketScore:mc.score,
+        marketBrake:false,marketAdvisory:mc.advisory
+      };
+      if(mc.defensive&&stockDecision.key==='green'){
+        out.headline='個股條件成立；大盤偏弱，第一筆部位縮小';
+      }
+      return out;
+    };
+  }
+
+  function currentMarketContext(){
+    let m;
+    try{m=typeof market!=='undefined'?market:undefined}catch{}
+    return marketContext(m);
+  }
 
   function stockTitle(card){
     const n=$('.name',card);let name='個股';
@@ -39,6 +98,7 @@
 
   function topic(s){
     s=clean(s);
+    if(/^大盤\s|環境門檻|系統性風險/.test(s))return'market';
     if(/相對強弱/.test(s))return'relative';
     if(/多時框|多框|三框|60K|60分|20T|60T|日K/.test(s))return'mtf';
     if(/VWAP/.test(s))return'vwap';
@@ -61,13 +121,13 @@
     const label=clean(chip?.dataset?.v164Full||src?.textContent||chip?.textContent||'等確認').replace(/^動能\s*[：:]\s*/,'');
     const headline=clean($('.entryheadline',box)?.textContent||'');
     const good=uniq($$('.entrywhy span:not(.wait):not(.block)',box).map(x=>x.textContent));
-    const wait=uniq($$('.entrywhy span.wait',box).map(x=>x.textContent));
+    const wait=uniq($$('.entrywhy span.wait',box).map(x=>x.textContent)).filter(x=>topic(x)!=='market');
     const block=uniq($$('.entrywhy span.block',box).map(x=>x.textContent));
     const unresolved=new Set([...wait,...block].map(topic));
     const established=good.filter(x=>{const t=topic(x);return t.startsWith('misc:')||!unresolved.has(t)}).slice(0,5);
     const meta=uniq($$('.entrymeta span',box).map(x=>x.textContent));
-    const market=meta.find(x=>/^大盤\s/.test(x))||'';
-    return{key,label,headline,wait:wait.slice(0,5),block:block.slice(0,5),established,meta,market};
+    const mc=currentMarketContext();
+    return{key,label,headline,wait:wait.slice(0,5),block:block.slice(0,5),established,meta,market:mc};
   }
 
   function stage(card){
@@ -76,7 +136,9 @@
   }
 
   function riskText(card,d){
-    if(d.block.length)return d.block.slice(0,2).join('；');
+    const nonMarket=d.block.filter(x=>topic(x)!=='market');
+    if(nonMarket.length)return nonMarket.slice(0,2).join('；');
+    if(d.market.systemic)return d.market.brake;
     const s=stage(card);
     if(/回踩|承接/.test(s))return'跌破 VWAP／短線關鍵支撐，而且反抽站不回 → 暫停進場。';
     if(/剛啟動/.test(s))return'跌回突破區且無法站回 → 取消追價，等待重新整理。';
@@ -102,15 +164,22 @@
     return `<section class="dogson-entry-section dogson-entry-${kind}"><div class="dogson-entry-section-title">${esc(title)}</div>${rows}</section>`;
   }
 
+  function marketSection(mc){
+    if(mc.systemic)return'';
+    if(!mc.advisory)return'';
+    return `<section class="dogson-entry-section dogson-entry-market-advisory"><div class="dogson-entry-section-title">⚠️ 市場環境提醒</div><div class="dogson-entry-market-advisory-text">${esc(mc.advisory)}</div><div class="dogson-entry-market-advisory-note">大盤只調節部位與進場保守度，不列入一般「還差什麼」。</div></section>`;
+  }
+
   function render(card,chip){
     const d=entryData(card,chip),back=ensureSheet(),body=$('.dogson-entry-detail-body',back),title=$('.dogson-entry-detail-title',back);
     title.textContent=`${stockTitle(card)}｜${d.label}`;
-    const count=d.key==='red'?d.block.length:d.wait.length;
+    const count=d.key==='red'?d.block.filter(x=>topic(x)!=='market').length:d.wait.length;
     const statusText=d.key==='green'?`${d.label}`:d.key==='red'?`${d.label}${count?` · ${count} 個阻擋`:''}`:`${d.label}${count?` · 還差 ${count} 項`:''}`;
     const statusIcon=d.key==='green'?'🟢':d.key==='red'?'🔴':'🟡';
     const decision=d.headline|| (d.key==='green'?'條件同步，可列入小量試單觀察。':d.key==='red'?'目前有阻擋條件，先不進。':'方向未壞，但買點條件還沒完全到位。');
-    let html=`<section class="dogson-entry-hero dogson-entry-hero-${d.key}"><div class="dogson-entry-hero-label">現在能不能進</div><div class="dogson-entry-hero-status">${statusIcon} ${esc(statusText)}</div><div class="dogson-entry-hero-head">${esc(decision)}</div>${d.market?`<div class="dogson-entry-market">環境：${esc(d.market.replace(/^大盤\s*/,''))}</div>`:''}</section>`;
-    if(d.key==='red')html+=listSection('目前阻擋',d.block,'bad',d.headline||'目前條件不足，先不進。');
+    let html=`<section class="dogson-entry-hero dogson-entry-hero-${d.key}"><div class="dogson-entry-hero-label">現在能不能進</div><div class="dogson-entry-hero-status">${statusIcon} ${esc(statusText)}</div><div class="dogson-entry-hero-head">${esc(decision)}</div></section>`;
+    html+=marketSection(d.market);
+    if(d.key==='red')html+=listSection(d.market.systemic?'目前煞車':'目前阻擋',d.block,'bad',d.headline||'目前條件不足，先不進。');
     else if(d.key==='yellow')html+=listSection('還差什麼',d.wait,'wait','等待回踩或關鍵條件補齊。');
     else if(d.wait.length)html+=listSection('仍可留意',d.wait,'wait');
     html+=listSection('已經成立',d.established,'good');
@@ -133,4 +202,7 @@
     const card=chip.closest('.card');if(!card)return;
     e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();render(card,chip);
   },true);
+
+  // Re-render once so the main card light and summary counts use the adjusted market policy too.
+  setTimeout(()=>{try{if(typeof render==='function')render()}catch{}},80);
 })();
