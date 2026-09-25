@@ -1,9 +1,9 @@
 (()=>{
-  if(window.__DOGSON_UI_LOADER_V1710__) return;
-  window.__DOGSON_UI_LOADER_V1710__ = true;
+  if(window.__DOGSON_UI_LOADER_V1720__) return;
+  window.__DOGSON_UI_LOADER_V1720__ = true;
   const src=document.currentScript?.src||location.href;
   const base=new URL('.',src);
-  const version='1710';
+  const version='1720';
   let revealed=false;
 
   function reveal(){
@@ -14,20 +14,8 @@
   }
 
   const safetyTimer=setTimeout(reveal,4500);
-
-  function loadCss(name,id){
-    if(document.getElementById(id)) return;
-    const link=document.createElement('link');
-    link.id=id;link.rel='stylesheet';link.href=new URL(name,base).href+'?v='+version;
-    document.head.appendChild(link);
-  }
-  function loadScript(name,id){
-    return new Promise((resolve,reject)=>{
-      if(document.getElementById(id)) return resolve();
-      const s=document.createElement('script');s.id=id;s.src=new URL(name,base).href+'?v='+version;s.defer=true;
-      s.onload=resolve;s.onerror=reject;document.head.appendChild(s);
-    });
-  }
+  function loadCss(name,id){if(document.getElementById(id))return;const link=document.createElement('link');link.id=id;link.rel='stylesheet';link.href=new URL(name,base).href+'?v='+version;document.head.appendChild(link)}
+  function loadScript(name,id){return new Promise((resolve,reject)=>{if(document.getElementById(id))return resolve();const s=document.createElement('script');s.id=id;s.src=new URL(name,base).href+'?v='+version;s.defer=true;s.onload=resolve;s.onerror=reject;document.head.appendChild(s)})}
 
   loadCss('redesign-v160.css','dogson-dashboard-css');
   loadCss('redesign-v160-dark.css','dogson-dashboard-dark-css');
@@ -58,13 +46,6 @@
     .then(()=>loadScript('ui-market-ticker-v1686.js','dogson-ui-market-ticker-v1688'))
     .then(()=>loadScript('ui-page-architecture-v1701.js','dogson-ui-page-architecture-v1701'))
     .then(()=>loadScript('ui-accuracy-guard-v1702.js','dogson-ui-accuracy-guard-v1702'))
-    .then(()=>{
-      clearTimeout(safetyTimer);
-      requestAnimationFrame(()=>requestAnimationFrame(reveal));
-    })
-    .catch(err=>{
-      clearTimeout(safetyTimer);
-      reveal();
-      console.warn('Dogson UI module load failed',err);
-    });
+    .then(()=>{clearTimeout(safetyTimer);requestAnimationFrame(()=>requestAnimationFrame(reveal))})
+    .catch(err=>{clearTimeout(safetyTimer);reveal();console.warn('Dogson UI module load failed',err)});
 })();
