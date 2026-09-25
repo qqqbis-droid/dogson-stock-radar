@@ -1,6 +1,6 @@
 name: Radar - Close Update
 
-# Production refresh marker: keep the 60K lifecycle/entry-light deployment newer than installer workflows.
+# Production refresh marker: v1.6.8.7 freshness guard + latest valid trading day rebuild.
 on:
   workflow_dispatch:
   push:
