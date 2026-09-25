@@ -1,4 +1,4 @@
-name: Deploy Radar v1.6.8.8 UI
+name: Deploy Radar v1.6.9.0 UI
 
 on:
   push:
@@ -26,7 +26,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Verify UI assets
+
+      - name: Verify v1.6.9 UI assets
         run: |
           node --check docs/ui-filters.js
           node --check docs/ui-filters-core-v1531.js
@@ -38,98 +39,33 @@ jobs:
           node --check docs/ui-fold-v167.js
           node --check docs/ui-entry-v1679.js
           node --check docs/ui-freshness-v1688.js
+          node --check docs/ui-dual-decision-v1690.js
           node --check docs/ui-load-more-v1681.js
           node --check docs/ui-market-v1685.js
           node --check docs/ui-market-ticker-v1686.js
           node --check docs/realtime.js
+          node --check docs/realtime-config.js
           node --check docs/sw.js
-          test -s docs/contrast-v160.css
-          test -s docs/redesign-v162.css
-          test -s docs/redesign-v162-fix.css
-          test -s docs/redesign-v163.css
-          test -s docs/redesign-v164.css
-          test -s docs/redesign-v165.css
-          test -s docs/redesign-v166.css
-          test -s docs/redesign-v1679.css
-          test -s docs/redesign-v1685.css
-          test -s docs/redesign-v1686.css
-          grep -q "ui-filters.js?v=1688" docs/realtime-config.js
-          grep -q "dogson-free-v1688" docs/sw.js
-          grep -q "dogson-boot-v1688" docs/sw.js
-          grep -q "DOGSON_UI_LOADER_V1688" docs/ui-filters.js
-          grep -q "dogson-booting" docs/ui-filters.js
-          grep -q "dogsonUiReady" docs/ui-filters.js
-          grep -q "redesign-v1685.css" docs/ui-filters.js
-          grep -q "redesign-v1686.css" docs/ui-filters.js
-          grep -q "ui-freshness-v1688.js" docs/ui-filters.js
-          grep -q "ui-market-v1685.js" docs/ui-filters.js
-          grep -q "ui-market-ticker-v1686.js" docs/ui-filters.js
-          grep -q "ui-freshness-v1688.js?v=1688" docs/sw.js
-          grep -q "ui-market-ticker-v1686.js?v=1688" docs/sw.js
-          grep -q "redesign-v1686.css?v=1688" docs/sw.js
+
+          test -s docs/redesign-v1690.css
+          grep -q "ui-filters.js?v=1690" docs/realtime-config.js
+          grep -q "dogson-free-v1690" docs/sw.js
+          grep -q "UI_VERSION='1690'" docs/sw.js
+          grep -q "DOGSON_UI_LOADER_V1690" docs/ui-filters.js
+          grep -q "ui-dual-decision-v1690.js" docs/ui-filters.js
+          grep -q "redesign-v1690.css" docs/ui-filters.js
+          grep -q "DOGSON_DUAL_DECISION_V1690" docs/ui-dual-decision-v1690.js
+          grep -q "盤中波段雙軸" docs/ui-dual-decision-v1690.js
+          grep -q "當沖雙軸" docs/ui-dual-decision-v1690.js
+          grep -q "盤後波段雙軸" docs/ui-dual-decision-v1690.js
+          grep -q "波段結構" docs/ui-dual-decision-v1690.js
+          grep -q "現在位置" docs/ui-dual-decision-v1690.js
+          grep -q "波段與昨日法人只當背景" docs/ui-dual-decision-v1690.js
           grep -q "DOGSON_FRESHNESS_V1688" docs/ui-freshness-v1688.js
-          grep -q "DOGSON_INTRADAY_STALE" docs/ui-freshness-v1688.js
-          grep -q "DOGSON_EFFECTIVE_MARKET_SOURCE" docs/ui-freshness-v1688.js
-          grep -q "頁面仍維持找波段" docs/ui-freshness-v1688.js
           ! grep -q "mode='close'" docs/ui-freshness-v1688.js
-          grep -q "DOGSON_MARKET_TICKER_V1687" docs/ui-market-ticker-v1686.js
-          grep -q "9/" docs/ui-market-ticker-v1686.js || true
-          grep -q "加權" docs/ui-market-ticker-v1686.js
-          grep -q "櫃買" docs/ui-market-ticker-v1686.js
-          grep -q "setInterval(render,3000)" docs/ui-market-ticker-v1686.js
-          grep -q "dogson-market-ticker-v1686" docs/redesign-v1686.css
-          grep -q "DOGSON_MARKET_HOME_V1685" docs/ui-market-v1685.js
-          grep -q "市場環境" docs/ui-market-v1685.js
-          grep -q "市場分數" docs/ui-market-v1685.js
-          grep -q "加權指數" docs/ui-market-v1685.js
-          grep -q "櫃買指數" docs/ui-market-v1685.js
-          grep -q "交易日" docs/ui-market-v1685.js
-          grep -q "資金流向" docs/ui-market-v1685.js
-          grep -q "個股雷達" docs/ui-market-v1685.js
-          grep -q "查看市場細節" docs/ui-market-v1685.js
-          grep -q "查看完整資金流向" docs/ui-market-v1685.js
-          grep -q "defaultFocus:false" docs/ui-filters-core-v1531.js
-          grep -q "sort((a,b)=>scoreOf(b)-scoreOf(a))" docs/ui-filters-core-v1531.js
-          grep -q "目前顯示全部掃描結果" docs/ui-filters-core-v1531.js
-          grep -q "#dogsonQuickFilters \[data-all\]" docs/ui-filters-core-v1531.js
-          grep -q "dogson-card-brief>.dogson-card-badges" docs/redesign-v1679.css
-          grep -q "ui-load-more-v1681.js" docs/ui-filters.js
-          grep -q "ui-load-more-v1681.js?v=1688" docs/sw.js
-          grep -q "DOGSON_LOAD_MORE_V1681" docs/ui-load-more-v1681.js
-          grep -q "dogsonOriginalLoadMore" docs/ui-load-more-v1681.js
           ! grep -q "client.navigate" docs/sw.js
           grep -q "replaceAll('location.reload();','void 0;')" docs/sw.js
-          grep -q "DOGSON_MARKET_ADVISORY_V1680" docs/ui-entry-v1679.js
-          grep -q "市場環境提醒" docs/ui-entry-v1679.js
-          grep -q "系統性風險煞車" docs/ui-entry-v1679.js
-          grep -q "大盤只調節部位與進場保守度" docs/ui-entry-v1679.js
-          grep -q "dogson-entry-market-advisory" docs/redesign-v1679.css
-          grep -q "ui-entry-v1679.js" docs/ui-filters.js
-          grep -q "redesign-v1679.css" docs/ui-filters.js
-          grep -q "還差什麼" docs/ui-entry-v1679.js
-          grep -q "已經成立" docs/ui-entry-v1679.js
-          grep -q "失效警戒" docs/ui-entry-v1679.js
-          grep -q "查看技術細節" docs/ui-entry-v1679.js
-          grep -q "stageGuide" docs/ui-card-v164.js
-          grep -q "階段定位" docs/ui-card-v164.js
-          grep -q "進場燈號" docs/ui-card-v164.js
-          ! grep -q "目前策略" docs/ui-card-v164.js
-          grep -q "canonicalRow" docs/ui-card-v166.js
-          grep -q "canonicalSignalSpec" docs/ui-card-v166.js
-          grep -q "canonicalConclusion" docs/ui-card-v166.js
-          grep -q "normalizePortfolioButton" docs/ui-card-v166.js
-          grep -q "portfolioView" docs/ui-card-v166.js
-          grep -q "> .top .cat" docs/redesign-v166.css
-          grep -q "> .top .quality" docs/redesign-v166.css
-          grep -q "portfolio-mini.held" docs/redesign-v165.css
-          grep -q "dogson-signal-btn-v166" docs/redesign-v165.css
-          grep -q "portfolio-summary-item" docs/redesign-v166.css
-          grep -q "portfolio-modal" docs/redesign-v166.css
-          grep -q "dogson-card-details" docs/ui-fold-v167.js
-          grep -q "openState" docs/ui-fold-v167.js
-          ! grep -q "ui-interactions-v163.js" docs/ui-filters.js
-          grep -q "多時間框架" docs/ui-polish-v160.js
-          grep -q "最近一筆成交價" docs/realtime.js
+
       - name: Preserve newest published market data
         shell: bash
         run: |
@@ -147,6 +83,7 @@ jobs:
               echo "live $name unavailable; keeping repository copy"
             fi
           done
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
