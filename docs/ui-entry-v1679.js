@@ -170,7 +170,7 @@
     return `<section class="dogson-entry-section dogson-entry-market-advisory"><div class="dogson-entry-section-title">⚠️ 市場環境提醒</div><div class="dogson-entry-market-advisory-text">${esc(mc.advisory)}</div><div class="dogson-entry-market-advisory-note">大盤只調節部位與進場保守度，不列入一般「還差什麼」。</div></section>`;
   }
 
-  function render(card,chip){
+  function renderSheet(card,chip){
     const d=entryData(card,chip),back=ensureSheet(),body=$('.dogson-entry-detail-body',back),title=$('.dogson-entry-detail-title',back);
     title.textContent=`${stockTitle(card)}｜${d.label}`;
     const count=d.key==='red'?d.block.filter(x=>topic(x)!=='market').length:d.wait.length;
@@ -193,16 +193,16 @@
   window.addEventListener('click',e=>{
     const chip=e.target.closest?.('[data-dogson-quick="entry"]');if(!chip)return;
     const card=chip.closest('.card');if(!card)return;
-    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();render(card,chip);
+    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();renderSheet(card,chip);
   },true);
   window.addEventListener('keydown',e=>{
     if(e.key==='Escape'){closeSheet();return}
     if(!['Enter',' '].includes(e.key))return;
     const chip=e.target.closest?.('[data-dogson-quick="entry"]');if(!chip)return;
     const card=chip.closest('.card');if(!card)return;
-    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();render(card,chip);
+    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();renderSheet(card,chip);
   },true);
 
-  // Re-render once so the main card light and summary counts use the adjusted market policy too.
-  setTimeout(()=>{try{if(typeof render==='function')render()}catch{}},80);
+  // Re-render once so the main-card entry light and summary counts adopt the adjusted market policy immediately.
+  setTimeout(()=>{try{if(typeof window.render==='function')window.render()}catch{}},80);
 })();
