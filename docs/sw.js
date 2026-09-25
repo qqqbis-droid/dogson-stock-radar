@@ -1,5 +1,5 @@
-const CACHE='dogson-free-v1682';
-const UI_VERSION='1682';
+const CACHE='dogson-free-v1683';
+const UI_VERSION='1683';
 
 const UI_HEAD=`
 <link id="dogson-dashboard-css" rel="stylesheet" href="./redesign-v160.css?v=${UI_VERSION}">
@@ -12,7 +12,7 @@ const UI_HEAD=`
 <link id="dogson-dashboard-v165-css" rel="stylesheet" href="./redesign-v165.css?v=${UI_VERSION}">
 <link id="dogson-dashboard-v166-css" rel="stylesheet" href="./redesign-v166.css?v=${UI_VERSION}">
 <link id="dogson-dashboard-v1679-css" rel="stylesheet" href="./redesign-v1679.css?v=${UI_VERSION}">
-<style id="dogson-boot-v1682">
+<style id="dogson-boot-v1683">
 html.dogson-booting body{background:#f5f6f3!important;overflow:hidden!important}
 html.dogson-booting .wrap,html.dogson-booting .footer{opacity:0!important;pointer-events:none!important}
 html.dogson-booting body::before{content:'🐶 犬子老師・飆股雷達';position:fixed;z-index:99998;left:0;right:0;top:42%;transform:translateY(-50%);text-align:center;color:#234d40;font:900 20px/1.4 -apple-system,BlinkMacSystemFont,'PingFang TC',sans-serif;letter-spacing:.02em}
@@ -21,7 +21,7 @@ html.dogson-booting body::after{content:'正在載入最新介面…';position:f
 <script id="dogson-decision-filters" src="./ui-filters.js?v=${UI_VERSION}" defer></script>`;
 
 function transformHtml(html){
-  if(!html.includes('dogson-boot-v1682')){
+  if(!html.includes('dogson-boot-v1683')){
     html=html.replace('<html lang="zh-Hant">','<html lang="zh-Hant" class="dogson-booting">');
     html=html.replace('</head>',`${UI_HEAD}\n</head>`);
   }
@@ -55,27 +55,27 @@ self.addEventListener('install',event=>{
     await cache.addAll([
       './manifest.webmanifest',
       './hourly.js?v=1530',
-      './realtime-config.js?v=1682',
-      './realtime.js?v=1682',
-      './ui-filters.js?v=1682',
-      './redesign-v160.css?v=1682',
-      './redesign-v160-dark.css?v=1682',
-      './contrast-v160.css?v=1682',
-      './redesign-v162.css?v=1682',
-      './redesign-v162-fix.css?v=1682',
-      './redesign-v163.css?v=1682',
-      './redesign-v164.css?v=1682',
-      './redesign-v165.css?v=1682',
-      './redesign-v166.css?v=1682',
-      './redesign-v1679.css?v=1682',
-      './redesign-v160.js?v=1682',
-      './ui-polish-v160.js?v=1682',
-      './ui-layout-v162.js?v=1682',
-      './ui-card-v164.js?v=1682',
-      './ui-card-v166.js?v=1682',
-      './ui-fold-v167.js?v=1682',
-      './ui-entry-v1679.js?v=1682',
-      './ui-load-more-v1681.js?v=1682'
+      './realtime-config.js?v=1683',
+      './realtime.js?v=1683',
+      './ui-filters.js?v=1683',
+      './redesign-v160.css?v=1683',
+      './redesign-v160-dark.css?v=1683',
+      './contrast-v160.css?v=1683',
+      './redesign-v162.css?v=1683',
+      './redesign-v162-fix.css?v=1683',
+      './redesign-v163.css?v=1683',
+      './redesign-v164.css?v=1683',
+      './redesign-v165.css?v=1683',
+      './redesign-v166.css?v=1683',
+      './redesign-v1679.css?v=1683',
+      './redesign-v160.js?v=1683',
+      './ui-polish-v160.js?v=1683',
+      './ui-layout-v162.js?v=1683',
+      './ui-card-v164.js?v=1683',
+      './ui-card-v166.js?v=1683',
+      './ui-fold-v167.js?v=1683',
+      './ui-entry-v1679.js?v=1683',
+      './ui-load-more-v1681.js?v=1683'
     ]);
     try{
       const res=await fetch('./index.html',{cache:'no-store'});
