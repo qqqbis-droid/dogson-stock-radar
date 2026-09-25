@@ -8,12 +8,18 @@
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const pick=(o,keys)=>{for(const k of keys){const v=num(o?.[k]);if(v!==null)return v}return null};
   const signed=(v,d=2,suffix='')=>{const n=num(v);return n===null?'—':`${n>0?'+':''}${n.toFixed(d)}${suffix}`};
-  const fmtIndex=v=>{const n=num(v);return n===null?'—':n.toLocaleString('zh-TW',{minimumFractionDigits:n<1000?2:2,maximumFractionDigits:2})};
+  const fmtIndex=v=>{const n=num(v);return n===null?'—':n.toLocaleString('zh-TW',{minimumFractionDigits:2,maximumFractionDigits:2})};
   const tone=v=>{const n=num(v);return n===null?'flat':n>0?'up':n<0?'down':'flat'};
+  const staleIntraday=()=>!!window.DOGSON_INTRADAY_STALE;
+  const tradeDay=v=>{const m=String(v||'').match(/20\d{2}-(\d{2})-(\d{2})/);return m?`${Number(m[1])}/${Number(m[2])}`:''};
 
   function currentMode(){try{return mode||'intraday'}catch{return'intraday'}}
-  function currentMarket(){try{return market||{}}catch{return{}}}
-  function liveMarket(){try{return marketLive||{}}catch{return{}}}
+  function closeMarketData(){try{return closeMarket||{}}catch{return{}}}
+  function currentMarket(){
+    if(currentMode()!=='close'&&staleIntraday()) return closeMarketData();
+    try{return market||{}}catch{return{}}
+  }
+  function liveMarket(){if(staleIntraday())return{};try{return marketLive||{}}catch{return{}}}
   function rotation(){try{return Array.isArray(sectorRotation)?sectorRotation:[]}catch{return[]}}
   function funds(){try{return Array.isArray(sectorFunds)?sectorFunds:[]}catch{return[]}}
 
@@ -59,7 +65,7 @@
   }
 
   function marketData(){
-    const m=currentMarket(),intraday=(currentMode()!=='close')&&!!m.intraday_only;
+    const m=currentMarket(),intraday=(currentMode()!=='close')&&!!m.intraday_only&&!staleIntraday();
     const ta=intraday?(m.components?.taiex||{}):(m.taiex||{});
     const ot=intraday?(m.components?.otc||{}):(m.otc||{});
     return{m,ta,ot,tw:indexSnap('^TWII',ta),two:indexSnap('^TWOII',ot)};
@@ -88,6 +94,7 @@
     const score=num(m.market_score),scoreText=score===null?'—':`${score.toFixed(1)}/15`;
     const state=String(m.market_mode||'資料更新中');
     const updated=$('#updated')?.textContent?.trim()||'更新中';
+    const date=tradeDay(m?.trade_date||m?.taiex?.date||m?.otc?.date||window.DOGSON_EFFECTIVE_MARKET_DATE);
     const stateClass=state.includes('防守')?'defense':state.includes('偏多')?'bull':'neutral';
     const html=`
       <div class="dogson-layer-head-v1685">
@@ -107,7 +114,7 @@
         </div>
       </div>
       <div class="dogson-market-callout-v1685">${esc(marketSentence(m,tw,two))}</div>
-      <div class="dogson-market-updated-v1685">資料 ${esc(updated)}｜紅漲綠跌</div>
+      <div class="dogson-market-updated-v1685">交易日 ${esc(date||'—')}｜更新 ${esc(updated)}｜紅漲綠跌</div>
       <details class="dogson-inline-details-v1685"><summary>查看市場細節</summary><div class="dogson-inline-details-body-v1685">${originalMarketDetails()}</div></details>`;
     if(host.dataset.h!==html){host.innerHTML=html;host.dataset.h=html}
   }
@@ -146,12 +153,14 @@
   }
   function renderFlow(){
     const host=$('#dogsonFlowHomeV1685');if(!host)return;
-    const closeMode=currentMode()==='close';
+    const fallback=staleIntraday()&&currentMode()!=='close';
+    const closeMode=currentMode()==='close'||fallback;
     const {hot,cold}=closeMode?closeFlow():intradayFlow();
     const lead=hot.slice(0,3).map(x=>x.sector).filter(Boolean);
     const sentence=lead.length?`資金目前較集中在：${lead.join('、')}。`:'目前沒有明顯集中族群，先以個股相對強弱為主。';
+    const subtitle=fallback?'最新有效交易日法人族群資金':(closeMode?'盤後法人族群資金':'盤中成交資金輪動');
     const html=`
-      <div class="dogson-layer-head-v1685"><div><div class="dogson-layer-kicker-v1685">資金流向</div><div class="dogson-layer-sub-v1685">${closeMode?'盤後法人族群資金':'盤中成交資金輪動'}｜先看錢往哪裡走，再挑個股。</div></div></div>
+      <div class="dogson-layer-head-v1685"><div><div class="dogson-layer-kicker-v1685">資金流向</div><div class="dogson-layer-sub-v1685">${esc(subtitle)}｜先看錢往哪裡走，再挑個股。</div></div></div>
       <div class="dogson-flow-summary-v1685">${esc(sentence)}</div>
       <div class="dogson-flow-preview-v1685">
         <div><div class="dogson-flow-colhead-v1685">${closeMode?'🔴 流入 TOP 3':'🔥 吸金 TOP 3'}</div>${flowRows(hot,'in',closeMode,3)}</div>
@@ -177,6 +186,7 @@
     watchSource($('#marketbox'));watchSource($('#rotationbox'));watchSource($('#updated'));
     $$('.tab').forEach(b=>b.addEventListener('click',()=>setTimeout(render,80)));
     $('#dogsonViewNav')?.addEventListener('click',()=>setTimeout(render,100));
+    window.addEventListener('dogson:freshness',()=>setTimeout(render,0));
     setTimeout(render,250);setTimeout(render,900);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
