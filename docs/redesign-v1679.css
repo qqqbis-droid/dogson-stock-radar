@@ -1,0 +1,71 @@
+/* Dogson Radar v1.6.7.9 — focused entry decision sheet. */
+body.dogson-entry-sheet-open{overflow:hidden}
+.dogson-entry-detail-back{position:fixed;inset:0;z-index:650;display:flex;align-items:flex-end;justify-content:center;background:rgba(21,34,28,.28);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;transition:opacity .15s ease;pointer-events:none}
+.dogson-entry-detail-back.show{opacity:1;pointer-events:auto}
+.dogson-entry-detail{width:min(100%,780px);max-height:82vh;overflow:auto;overscroll-behavior:contain;background:#fff;border:1px solid #d9e5df;border-radius:24px 24px 0 0;box-shadow:0 -12px 34px rgba(30,45,38,.16);padding:10px 16px calc(24px + env(safe-area-inset-bottom));color:#26332e}
+.dogson-entry-detail-handle{width:44px;height:5px;border-radius:999px;background:#d1ddd7;margin:2px auto 12px}
+.dogson-entry-detail-top{position:sticky;top:-10px;z-index:2;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:0 -2px 12px;padding:10px 2px 12px;background:rgba(255,255,255,.96);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid #e1e8e4}
+.dogson-entry-detail-kicker{font-size:10.5px;font-weight:850;color:#6d8077;letter-spacing:.02em}
+.dogson-entry-detail-title{margin-top:3px;font-size:18px;font-weight:900;color:#20312a}
+.dogson-entry-detail-close{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;flex:0 0 44px;border:1px solid #d7e3dd;border-radius:14px;background:#f7faf8;color:#42554c;font-size:28px;line-height:1;cursor:pointer}
+.dogson-entry-detail-body{display:grid;gap:10px}
+.dogson-entry-hero,.dogson-entry-section,.dogson-entry-tech{border:1px solid #dce7e1;border-radius:16px;background:#fbfcfb;padding:13px 14px}
+.dogson-entry-hero{background:#f8fbf9}
+.dogson-entry-hero-green{border-color:#c4dfd1;background:#f3faf6}
+.dogson-entry-hero-yellow{border-color:#ead8a0;background:#fffaf0}
+.dogson-entry-hero-red{border-color:#e6c2c7;background:#fff6f7}
+.dogson-entry-hero-label,.dogson-entry-section-title{font-size:11px;font-weight:900;color:#50635a;letter-spacing:.01em}
+.dogson-entry-hero-status{margin-top:7px;font-size:17px;font-weight:900;color:#20312a}
+.dogson-entry-hero-head{margin-top:7px;font-size:13px;line-height:1.6;font-weight:780;color:#2b3a34}
+.dogson-entry-market{margin-top:9px;padding-top:8px;border-top:1px solid rgba(88,110,99,.14);font-size:10.5px;line-height:1.5;color:#6a7a73}
+.dogson-entry-section{display:grid;gap:8px}
+.dogson-entry-row{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;line-height:1.55;color:#34443d}
+.dogson-entry-row>span{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;flex:0 0 20px;border-radius:999px;font-size:11px;font-weight:900;margin-top:1px}
+.dogson-entry-good .dogson-entry-row>span{background:#e8f5ee;color:#28745a}
+.dogson-entry-wait .dogson-entry-row>span{background:#fff1cf;color:#9a6c12}
+.dogson-entry-bad .dogson-entry-row>span{background:#f9e8eb;color:#a54550}
+.dogson-entry-row-empty{color:#6c7a74}
+.dogson-entry-alert{background:#fff8f8;border-color:#e8cbcf}
+.dogson-entry-alert .dogson-entry-section-title{color:#9a4b53}
+.dogson-entry-alert-text{font-size:12.5px;line-height:1.6;color:#624047;font-weight:650}
+.dogson-entry-tech{padding:0;overflow:hidden;background:#fff}
+.dogson-entry-tech>summary{list-style:none;cursor:pointer;padding:13px 14px;border:0!important;color:#2f6754;font-size:12px;font-weight:900}
+.dogson-entry-tech>summary::-webkit-details-marker{display:none}
+.dogson-entry-tech>summary::after{content:'›';float:right;font-size:18px;line-height:.8;transition:transform .15s ease}
+.dogson-entry-tech[open]>summary::after{transform:rotate(90deg)}
+.dogson-entry-tech-slot{padding:0 13px 13px;border-top:1px solid #edf1ef}
+.dogson-entry-tech-body{display:grid;gap:10px;padding-top:11px}
+.dogson-entry-tech-chips{display:flex;gap:6px;flex-wrap:wrap}
+.dogson-entry-tech-chips span{padding:6px 8px;border:1px solid #dce5e0;border-radius:10px;background:#f7f9f8;color:#62736b;font-size:9.8px;line-height:1.35}
+.dogson-entry-tech-body .mtfbox{margin:0!important;background:#fbfcfb!important;border-color:#dce7e1!important;color:#26332e!important}
+.dogson-entry-tech-body .mtftitle{color:#586b62!important}
+.dogson-entry-tech-body .mtflabel{color:#2e6f5c!important}
+.dogson-entry-tech-body .mtfcell{background:#fff!important;border-color:#dce6e1!important}
+.dogson-entry-tech-body .mtfcellv{color:#26332e!important}
+.dogson-entry-tech-body .mtfcelll,.dogson-entry-tech-body .mtfnote{color:#74817b!important}
+.dogson-entry-detail-empty{font-size:11px;color:#78867f;padding:6px 0}
+
+html[data-dogson-theme="dark"] .dogson-entry-detail{background:#1b221f;border-color:#34433c;color:#e7eee9}
+html[data-dogson-theme="dark"] .dogson-entry-detail-top{background:rgba(27,34,31,.96);border-color:#34433c}
+html[data-dogson-theme="dark"] .dogson-entry-detail-kicker{color:#9fb0a7}
+html[data-dogson-theme="dark"] .dogson-entry-detail-title{color:#f0f4f1}
+html[data-dogson-theme="dark"] .dogson-entry-detail-close{background:#202925;border-color:#3b4b43;color:#dce6e1}
+html[data-dogson-theme="dark"] .dogson-entry-hero,html[data-dogson-theme="dark"] .dogson-entry-section,html[data-dogson-theme="dark"] .dogson-entry-tech{background:#202824;border-color:#38463f}
+html[data-dogson-theme="dark"] .dogson-entry-hero-label,html[data-dogson-theme="dark"] .dogson-entry-section-title{color:#aab9b1}
+html[data-dogson-theme="dark"] .dogson-entry-hero-status,html[data-dogson-theme="dark"] .dogson-entry-hero-head,html[data-dogson-theme="dark"] .dogson-entry-row{color:#e8eee9}
+html[data-dogson-theme="dark"] .dogson-entry-market{color:#9ba9a2;border-color:#34413b}
+html[data-dogson-theme="dark"] .dogson-entry-alert{background:#2a2022;border-color:#5b3a40}
+html[data-dogson-theme="dark"] .dogson-entry-alert-text{color:#e7c8cd}
+html[data-dogson-theme="dark"] .dogson-entry-tech>summary{color:#a9d7c3}
+html[data-dogson-theme="dark"] .dogson-entry-tech-slot{border-color:#34413b}
+html[data-dogson-theme="dark"] .dogson-entry-tech-chips span{background:#252e2a;border-color:#3b4942;color:#b5c2bb}
+html[data-dogson-theme="dark"] .dogson-entry-tech-body .mtfbox,html[data-dogson-theme="dark"] .dogson-entry-tech-body .mtfcell{background:#202824!important;border-color:#39473f!important}
+html[data-dogson-theme="dark"] .dogson-entry-tech-body .mtfcellv{color:#e8eee9!important}
+
+@media(max-width:620px){
+  .dogson-entry-detail{max-height:84vh;padding-left:14px;padding-right:14px}
+  .dogson-entry-detail-title{font-size:17px}
+  .dogson-entry-hero,.dogson-entry-section{padding:12px 13px;border-radius:14px}
+  .dogson-entry-hero-status{font-size:16px}
+  .dogson-entry-hero-head,.dogson-entry-row,.dogson-entry-alert-text{font-size:12px}
+}
