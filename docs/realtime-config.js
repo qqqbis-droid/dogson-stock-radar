@@ -1,4 +1,4 @@
-// v1.6.7.8 near-real-time quote backend + lifecycle/entry responsibility separation.
+// v1.6.7.9 near-real-time quote backend + focused entry decision sheet.
 window.DOGSON_REALTIME_API = window.DOGSON_REALTIME_API || "";
 
 // Keep optional modules separate from the core page so a data-source/UI issue
@@ -14,7 +14,7 @@ if (!document.getElementById('dogson-hourly-module')) {
 if (!document.getElementById('dogson-decision-filters')) {
   const s = document.createElement('script');
   s.id = 'dogson-decision-filters';
-  s.src = './ui-filters.js?v=1678';
+  s.src = './ui-filters.js?v=1679';
   s.async = true;
   document.head.appendChild(s);
 }
