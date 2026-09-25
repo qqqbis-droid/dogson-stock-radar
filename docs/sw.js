@@ -84,7 +84,8 @@ self.addEventListener('install',event=>{
       './ui-dual-decision-v1690.js?v=1700',
       './ui-load-more-v1681.js?v=1700',
       './ui-market-v1685.js?v=1700',
-      './ui-market-ticker-v1686.js?v=1700'
+      './ui-market-ticker-v1686.js?v=1700',
+      './ui-page-architecture-v1701.js?v=1700'
     ]);
     try{
       const res=await fetch('./index.html',{cache:'no-store'});
