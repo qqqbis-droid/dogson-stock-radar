@@ -40,6 +40,7 @@ jobs:
           node --check docs/ui-freshness-v1688.js
           node --check docs/ui-system-status-v1700.js
           node --check docs/ui-page-architecture-v1701.js
+          node --check docs/ui-accuracy-guard-v1702.js
           node --check docs/ui-dual-decision-v1690.js
           node --check docs/ui-load-more-v1681.js
           node --check docs/ui-market-v1685.js
@@ -54,16 +55,21 @@ jobs:
           grep -q "DOGSON_UI_LOADER_V1700" docs/ui-filters.js
           grep -q "ui-system-status-v1700.js" docs/ui-filters.js
           grep -q "ui-page-architecture-v1701.js" docs/ui-filters.js
+          grep -q "ui-accuracy-guard-v1702.js" docs/ui-filters.js
           grep -q "ui-system-status-v1700.js?v=1700" docs/sw.js
           grep -q "ui-page-architecture-v1701.js?v=1700" docs/sw.js
+          grep -q "ui-accuracy-guard-v1702.js?v=1700" docs/sw.js
           grep -q "DOGSON_SYSTEM_STATUS_V1700" docs/ui-system-status-v1700.js
           grep -q "DOGSON_PAGE_ARCH_V1701" docs/ui-page-architecture-v1701.js
+          grep -q "DOGSON_ACCURACY_GUARD_V1702" docs/ui-accuracy-guard-v1702.js
           grep -q "DOGSON_APP_VERSION='1.7.0'" docs/ui-system-status-v1700.js
           grep -q "資料狀態・v1.7.0" docs/ui-system-status-v1700.js
           grep -q "今日波段機會" docs/ui-page-architecture-v1701.js
           grep -q "庫存優先處理" docs/ui-page-architecture-v1701.js
           grep -q "明日波段候選" docs/ui-page-architecture-v1701.js
           grep -q "今日當沖候選" docs/ui-page-architecture-v1701.js
+          grep -q "當沖舊資料已停用" docs/ui-accuracy-guard-v1702.js
+          grep -q "找波段已啟用資料保護" docs/ui-accuracy-guard-v1702.js
           grep -q "DOGSON_DUAL_DECISION_V1690" docs/ui-dual-decision-v1690.js
           grep -q "DOGSON_FRESHNESS_V1688" docs/ui-freshness-v1688.js
           ! grep -q "mode='close'" docs/ui-freshness-v1688.js
