@@ -49,6 +49,7 @@
     .then(()=>loadScript('ui-runtime-safety-v1720.js','dogson-ui-runtime-safety-v1720'))
     .then(()=>loadScript('ui-filter-ux-v1721.js','dogson-ui-filter-ux-v1721'))
     .then(()=>loadScript('ui-filter-refine-v1722.js','dogson-ui-filter-refine-v1722'))
+    .then(()=>loadScript('ui-filter-integrity-v1723.js','dogson-ui-filter-integrity-v1723'))
     .then(()=>{clearTimeout(safetyTimer);requestAnimationFrame(()=>requestAnimationFrame(reveal))})
     .catch(err=>{clearTimeout(safetyTimer);reveal();console.warn('Dogson UI module load failed',err)});
 })();
