@@ -1,9 +1,9 @@
 (()=>{
-  if(window.__DOGSON_UI_LOADER_V1725__) return;
-  window.__DOGSON_UI_LOADER_V1725__ = true;
+  if(window.__DOGSON_UI_LOADER_V1730__) return;
+  window.__DOGSON_UI_LOADER_V1730__ = true;
   const src=document.currentScript?.src||location.href;
   const base=new URL('.',src);
-  const version='1725';
+  const version='1730';
   let revealed=false;
 
   function reveal(){
@@ -30,8 +30,8 @@
   loadCss('redesign-v1685.css','dogson-dashboard-v1685-css');
   loadCss('redesign-v1686.css','dogson-dashboard-v1686-css');
   loadCss('redesign-v1690.css','dogson-dashboard-v1690-css');
-  loadScript('ui-filters-core-v1531.js','dogson-filter-core-v1531')
-    .then(()=>loadScript('redesign-v160.js','dogson-redesign-v160'))
+
+  loadScript('redesign-v160.js','dogson-redesign-v160')
     .then(()=>loadScript('ui-polish-v160.js','dogson-ui-polish-v160'))
     .then(()=>loadScript('ui-layout-v162.js','dogson-ui-layout-v162'))
     .then(()=>loadScript('ui-card-v164.js','dogson-ui-card-v164'))
@@ -47,10 +47,7 @@
     .then(()=>loadScript('ui-page-architecture-v1701.js','dogson-ui-page-architecture-v1701'))
     .then(()=>loadScript('ui-accuracy-guard-v1702.js','dogson-ui-accuracy-guard-v1702'))
     .then(()=>loadScript('ui-runtime-safety-v1720.js','dogson-ui-runtime-safety-v1720'))
-    .then(()=>loadScript('ui-filter-ux-v1721.js','dogson-ui-filter-ux-v1721'))
-    .then(()=>loadScript('ui-filter-refine-v1722.js','dogson-ui-filter-refine-v1722'))
-    .then(()=>loadScript('ui-filter-integrity-v1723.js','dogson-ui-filter-integrity-v1723'))
-    .then(()=>loadScript('ui-stage-source-v1724.js','dogson-ui-stage-source-v1724'))
+    .then(()=>loadScript('ui-filter-v1730.js','dogson-ui-filter-v1730'))
     .then(()=>{clearTimeout(safetyTimer);requestAnimationFrame(()=>requestAnimationFrame(reveal))})
     .catch(err=>{clearTimeout(safetyTimer);reveal();console.warn('Dogson UI module load failed',err)});
 })();
