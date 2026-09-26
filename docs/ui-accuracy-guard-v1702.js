@@ -2,6 +2,8 @@
   if(window.__DOGSON_ACCURACY_GUARD_V1720__) return;
   window.__DOGSON_ACCURACY_GUARD_V1720__=true;
 
+  const QUOTE_MAX_AGE_MIN=12;
+  const STRUCTURE_MAX_AGE_MIN=20;
   const $=(s,r=document)=>r.querySelector(s);
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const modeNow=()=>{try{return mode||'intraday'}catch{return'intraday'}};
@@ -14,18 +16,34 @@
 
   function taipeiClock(){
     try{
-      const p={};new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date()).forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});
-      const today=`${p.year}-${p.month}-${p.day}`;const minute=Number(p.hour)*60+Number(p.minute);const weekday=['Mon','Tue','Wed','Thu','Fri'].includes(p.weekday);return{today,session:weekday&&minute>=535&&minute<=815};
-    }catch{return{today:'',session:false}}
+      const p={};new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',weekday:'short',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(new Date()).forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});
+      const minute=Number(p.hour)*60+Number(p.minute);
+      const today=`${p.year}-${p.month}-${p.day}`;
+      const weekday=['Mon','Tue','Wed','Thu','Fri'].includes(p.weekday);
+      return{today,minute,second:Number(p.second||0),session:weekday&&minute>=535&&minute<=815};
+    }catch{return{today:'',minute:0,second:0,session:false}}
+  }
+  function ageMinutes(value,c=taipeiClock()){
+    const m=String(value||'').match(/(?:^|\D)([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?/);
+    if(!m)return null;
+    const stamp=Number(m[1])*60+Number(m[2])+Number(m[3]||0)/60;
+    let age=c.minute+c.second/60-stamp;
+    if(age < -2)return null;
+    return Math.max(0,age);
   }
   function dates(){return{close:window.DOGSON_CLOSE_TRADE_DATE||window.DOGSON_DATA_TRUTH_V1700?.dates?.close||'',intraday:window.DOGSON_INTRADAY_TRADE_DATE||window.DOGSON_DATA_TRUTH_V1700?.dates?.intraday||'',daytrade:window.DOGSON_DAYTRADE_TRADE_DATE||window.DOGSON_DATA_TRUTH_V1700?.dates?.daytrade||''}}
   function quality(){return window.DOGSON_DATA_TRUTH_V1700?.system?.operational?.intraday_quality||{}}
+  function timing(){
+    const c=taipeiClock(),q=quality();
+    const quoteAge=ageMinutes(q.latest_quote_time,c);
+    const structureAge=ageMinutes(q.structure_latest_time,c);
+    return{c,q,quoteAge,structureAge,quoteFresh:quoteAge!==null&&quoteAge<=QUOTE_MAX_AGE_MIN,structureFresh:structureAge!==null&&structureAge<=STRUCTURE_MAX_AGE_MIN};
+  }
   function liveReady(){
-    if(window.DOGSON_INTRADAY_LIVE_READY===true)return true;
-    const c=taipeiClock(),d=dates(),q=quality();return !!(c.session&&d.intraday===c.today&&!staleIntra()&&Number(q.quote_coverage_pct||0)>=Number(q.coverage_min_pct||80)&&q.latest_quote_time);
+    const {c,q,quoteFresh,structureFresh}=timing(),d=dates();
+    return !!(c.session&&d.intraday===c.today&&!staleIntra()&&Number(q.quote_coverage_pct||0)>=Number(q.coverage_min_pct||80)&&q.latest_quote_time&&q.structure_latest_time&&quoteFresh&&structureFresh);
   }
   function dayActionable(){
-    if(window.DOGSON_DAYTRADE_ACTIONABLE===true)return true;
     const c=taipeiClock(),d=dates();return !!(liveReady()&&c.session&&d.daytrade===c.today&&!staleDay());
   }
 
@@ -37,7 +55,19 @@
     `;document.head.appendChild(s);
   }
 
-  function reason(){const c=taipeiClock(),q=quality();if(staleIntra())return'盤中行情日期落後最近完整交易日';if(!c.session)return'目前不是台股現貨盤中時段';if(Number(q.quote_coverage_pct||0)<Number(q.coverage_min_pct||80))return`TWSE MIS 個股覆蓋 ${Number(q.quote_coverage_pct||0).toFixed(1)}%，未達 ${Number(q.coverage_min_pct||80).toFixed(0)}% 安全門檻`;if(!q.latest_quote_time)return'TWSE MIS 尚未提供可驗證的最新快照時間';return'盤中即時層尚未通過完整性檢查'}
+  function reason(){
+    const {c,q,quoteAge,structureAge}=timing();
+    if(staleIntra())return'盤中行情日期落後最近完整交易日';
+    if(!c.session)return'目前不是台股現貨盤中時段';
+    if(Number(q.quote_coverage_pct||0)<Number(q.coverage_min_pct||80))return`TWSE MIS 個股覆蓋 ${Number(q.quote_coverage_pct||0).toFixed(1)}%，未達 ${Number(q.coverage_min_pct||80).toFixed(0)}% 安全門檻`;
+    if(!q.latest_quote_time)return'TWSE MIS 尚未提供可驗證的最新快照時間';
+    if(quoteAge===null)return'TWSE MIS 快照時間格式無法驗證';
+    if(quoteAge>QUOTE_MAX_AGE_MIN)return`TWSE MIS 快照已落後 ${Math.round(quoteAge)} 分鐘，超過 ${QUOTE_MAX_AGE_MIN} 分鐘安全門檻`;
+    if(!q.structure_latest_time)return'5分鐘雷達結構尚未提供可驗證的更新時間';
+    if(structureAge===null)return'5分鐘雷達結構時間格式無法驗證';
+    if(structureAge>STRUCTURE_MAX_AGE_MIN)return`5分鐘雷達結構已落後 ${Math.round(structureAge)} 分鐘，超過 ${STRUCTURE_MAX_AGE_MIN} 分鐘安全門檻`;
+    return'盤中即時層尚未通過完整性檢查';
+  }
   function noticeSpec(){
     const m=modeNow(),d=dates(),why=reason();
     if(m==='daytrade'&&!dayActionable())return{tone:staleDay()?'bad':'',title:staleDay()?'🎯 當沖舊資料已停用':'🎯 當沖目前不可執行',text:`${why}。系統不顯示「可執行／等回踩」清單；最近行情日 ${d.daytrade||d.intraday||'—'} 僅保留作歷史回顧，下一個合格盤中時段才重新啟用。`};
@@ -47,10 +77,13 @@
   }
 
   function renderNotice(){
-    installStyle();const lr=liveReady(),da=dayActionable();window.DOGSON_INTRADAY_LIVE_READY=lr;window.DOGSON_DAYTRADE_ACTIONABLE=da;document.documentElement.dataset.dogsonLiveIntraday=lr?'1':'0';document.documentElement.dataset.dogsonDaytradeActionable=da?'1':'0';
+    installStyle();const lr=liveReady(),da=dayActionable(),t=timing();
+    window.DOGSON_INTRADAY_LIVE_READY=lr;window.DOGSON_DAYTRADE_ACTIONABLE=da;
+    window.DOGSON_INTRADAY_QUOTE_AGE_MIN=t.quoteAge;window.DOGSON_INTRADAY_STRUCTURE_AGE_MIN=t.structureAge;
+    document.documentElement.dataset.dogsonLiveIntraday=lr?'1':'0';document.documentElement.dataset.dogsonDaytradeActionable=da?'1':'0';
     const anchor=$('#dogsonDataTruthV1700')||$('#dogsonMissionV1700')||$('#dogsonViewNav');if(!anchor)return;
     let box=$('#dogsonAccuracyGuardV1702');const x=noticeSpec();if(!x){box?.remove();return}if(!box){box=document.createElement('section');box.id='dogsonAccuracyGuardV1702';anchor.after(box)}box.className=`dogson-accuracy-v1702 ${x.tone||''}`;box.innerHTML=`<div class="dogson-accuracy-title-v1702">${esc(x.title)}</div><div class="dogson-accuracy-text-v1702">${esc(x.text)}</div>`;
-    try{window.dispatchEvent(new CustomEvent('dogson:actionability',{detail:{intradayLiveReady:lr,daytradeActionable:da}}))}catch(_){ }
+    try{window.dispatchEvent(new CustomEvent('dogson:actionability',{detail:{intradayLiveReady:lr,daytradeActionable:da,quoteAgeMinutes:t.quoteAge,structureAgeMinutes:t.structureAge}}))}catch(_){ }
   }
 
   function withAccurateRows(fn){
