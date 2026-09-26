@@ -5,7 +5,7 @@
   const $$=(s,r=document)=>[...r.querySelectorAll(s)];
   const txt=(s,r=document)=>$(s,r)?.textContent?.trim()||'';
   const clean=s=>String(s||'').replace(/^✓\s*/,'').replace(/^[🟢🟡🔴🌱🔥⚠️🚫🚂✨⭐💼🔵✅]+\s*/,'').replace(/\s+/g,' ').trim();
-  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const short=(s,n=58)=>{s=String(s||'').replace(/\s+/g,' ').trim().split(/[。；;]/)[0];return s.length>n?s.slice(0,n-1)+'…':s};
   let busy=false,timer=null;
 
@@ -30,8 +30,10 @@
     const code=codeOf(card);if(!code)return null;
     const s=viewState();let arr=[];
     try{
-      if(s.m==='daytrade'&&Array.isArray(daytradeRows))arr=daytradeRows;
+      if(Array.isArray(window.DOGSON_FILTERED_ROWS)&&window.DOGSON_FILTERED_ROWS.some(r=>String(r?.code)===code))arr=window.DOGSON_FILTERED_ROWS;
+      else if(s.m==='daytrade'&&Array.isArray(daytradeRows))arr=daytradeRows;
       else if(s.m==='close'&&Array.isArray(closeRows))arr=closeRows;
+      else if(s.m==='intraday'&&window.DOGSON_INTRADAY_LIVE_READY===false&&Array.isArray(closeRows))arr=closeRows;
       else if(Array.isArray(intraRows))arr=intraRows;
     }catch{}
     return arr.find(r=>String(r?.code)===code)||null;
@@ -46,7 +48,7 @@
     try{
       if(typeof entryDecision==='function'){
         let mkt;
-        try{mkt=typeof intraMarket!=='undefined'?intraMarket:undefined}catch{}
+        try{mkt=(window.DOGSON_INTRADAY_LIVE_READY===false&&typeof closeMarket!=='undefined')?closeMarket:(typeof intraMarket!=='undefined'?intraMarket:undefined)}catch{}
         return entryDecision(r,mkt);
       }
     }catch{}
@@ -76,7 +78,7 @@
     const wait=short((d.wait||[])[0]||'',42);
     const blk=short((d.block||[])[0]||'',42);
     if(/過熱/.test(st))return '結構仍強但短線偏熱，現在不適合追價'+(sr?'；'+sr:'');
-    if(/失效/.test(st))return '結構已失效，先不做新的進場'+(blk?'；'+blk:'');
+    if(/失效/.test(st))return '結構已失效，先不做新的進場'+(blk?'；'+blk:eh?'；'+eh:'');
     if(/轉弱/.test(st))return '短線轉弱，先等結構重新站穩'+(sr?'；'+sr:'');
     if(/不做|先不進/.test(en)||/🔴/.test(en))return '目前先不做'+(blk?'；'+blk:eh?'；'+eh:'');
     if(/可試|可觀察/.test(en)||/🟢/.test(en))return (/剛啟動/.test(st)?'剛啟動成立，條件同步':'條件同步，可列入觀察試單')+(eh?'；'+eh:'');
@@ -100,7 +102,7 @@
     const wait=short(txt('.entrywhy .wait',card),42);
     const blk=short(txt('.entrywhy .block',card),42);
     if(/過熱/.test(st))return '結構仍強但短線偏熱，現在不適合追價'+(sr?'；'+sr:'');
-    if(/失效/.test(st))return '結構已失效，先不做新的進場'+(blk?'；'+blk:'');
+    if(/失效/.test(st))return '結構已失效，先不做新的進場'+(blk?'；'+blk:eh?'；'+eh:'');
     if(/轉弱/.test(st))return '短線轉弱，先等結構重新站穩'+(sr?'；'+sr:'');
     if(/不做|先不進/.test(en)||/🔴/.test(en))return '目前先不做'+(blk?'；'+blk:eh?'；'+eh:'');
     if(/可試|可觀察/.test(en)||/🟢/.test(en))return (/剛啟動/.test(st)?'剛啟動成立，條件同步':'條件同步，可列入觀察試單')+(eh?'；'+eh:'');
