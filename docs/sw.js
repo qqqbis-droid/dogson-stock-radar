@@ -1,5 +1,5 @@
-const CACHE='dogson-free-v1725';
-const UI_VERSION='1725';
+const CACHE='dogson-free-v1730';
+const UI_VERSION='1730';
 
 const UI_HEAD=`
 <link id="dogson-dashboard-css" rel="stylesheet" href="./redesign-v160.css?v=${UI_VERSION}">
@@ -44,9 +44,9 @@ self.addEventListener('install',event=>{
   event.waitUntil((async()=>{
     const cache=await caches.open(CACHE);
     await cache.addAll([
-      './manifest.webmanifest','./hourly.js?v=1530','./realtime-config.js?v=1725','./realtime.js?v=1725','./ui-filters.js?v=1725',
-      './redesign-v160.css?v=1725','./redesign-v160-dark.css?v=1725','./contrast-v160.css?v=1725','./redesign-v162.css?v=1725','./redesign-v162-fix.css?v=1725','./redesign-v163.css?v=1725','./redesign-v164.css?v=1725','./redesign-v165.css?v=1725','./redesign-v166.css?v=1725','./redesign-v1679.css?v=1725','./redesign-v1685.css?v=1725','./redesign-v1686.css?v=1725',
-      './redesign-v160.js?v=1725','./ui-polish-v160.js?v=1725','./ui-layout-v162.js?v=1725','./ui-card-v164.js?v=1725','./ui-card-v166.js?v=1725','./ui-fold-v167.js?v=1725','./ui-entry-v1679.js?v=1725','./ui-freshness-v1688.js?v=1725','./ui-system-status-v1700.js?v=1725','./ui-dual-decision-v1690.js?v=1725','./ui-load-more-v1681.js?v=1725','./ui-market-v1685.js?v=1725','./ui-market-ticker-v1686.js?v=1725','./ui-page-architecture-v1701.js?v=1725','./ui-accuracy-guard-v1702.js?v=1725','./ui-runtime-safety-v1720.js?v=1725','./ui-filter-ux-v1721.js?v=1725','./ui-filter-refine-v1722.js?v=1725','./ui-filter-integrity-v1723.js?v=1725','./ui-stage-source-v1724.js?v=1725'
+      './manifest.webmanifest','./hourly.js?v=1530','./realtime-config.js?v=1730','./realtime.js?v=1730','./ui-filters.js?v=1730',
+      './redesign-v160.css?v=1730','./redesign-v160-dark.css?v=1730','./contrast-v160.css?v=1730','./redesign-v162.css?v=1730','./redesign-v162-fix.css?v=1730','./redesign-v163.css?v=1730','./redesign-v164.css?v=1730','./redesign-v165.css?v=1730','./redesign-v166.css?v=1730','./redesign-v1679.css?v=1730','./redesign-v1685.css?v=1730','./redesign-v1686.css?v=1730',
+      './redesign-v160.js?v=1730','./ui-polish-v160.js?v=1730','./ui-layout-v162.js?v=1730','./ui-card-v164.js?v=1730','./ui-card-v166.js?v=1730','./ui-fold-v167.js?v=1730','./ui-entry-v1679.js?v=1730','./ui-freshness-v1688.js?v=1730','./ui-system-status-v1700.js?v=1730','./ui-dual-decision-v1690.js?v=1730','./ui-load-more-v1681.js?v=1730','./ui-market-v1685.js?v=1730','./ui-market-ticker-v1686.js?v=1730','./ui-page-architecture-v1701.js?v=1730','./ui-accuracy-guard-v1702.js?v=1730','./ui-runtime-safety-v1720.js?v=1730','./ui-filter-v1730.js?v=1730'
     ]);
     try{const res=await fetch('./index.html',{cache:'no-store'});const out=await transformResponse(res);if(out.ok)await cache.put('./index.html',out.clone());}catch(_){ }
   })());
