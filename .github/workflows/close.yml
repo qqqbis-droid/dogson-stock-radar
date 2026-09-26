@@ -1,6 +1,6 @@
 name: Radar - Close Update
 
-# Production refresh marker: v1.7.1 canonical metadata + latest valid trading day rebuild.
+# Production refresh marker: canonical metadata + latest valid trading day rebuild.
 on:
   workflow_dispatch:
   push:
@@ -61,6 +61,8 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
+          from scripts.build_system_status import APP_VERSION
+
           p = Path('docs/data/close.json')
           obj = json.loads(p.read_text(encoding='utf-8'))
           rows = obj.get('rows') or []
@@ -78,8 +80,8 @@ jobs:
 
           s = json.loads(Path('docs/data/system_status.json').read_text(encoding='utf-8'))
           print('system status:', s)
-          if s.get('app_version') != '1.7.1':
-            raise SystemExit(f"canonical system status app_version mismatch: {s.get('app_version')}")
+          if s.get('app_version') != APP_VERSION:
+            raise SystemExit(f"canonical system status app_version mismatch: {s.get('app_version')} != {APP_VERSION}")
           if not s.get('latest_completed_trade_date'):
             raise SystemExit('latest_completed_trade_date missing')
           PY
