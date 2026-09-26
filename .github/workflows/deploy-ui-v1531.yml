@@ -58,18 +58,23 @@ jobs:
 
           python - <<'PY'
           from pathlib import Path
+          import re
           from scripts.build_system_status import APP_VERSION
 
-          token = APP_VERSION.replace('.', '') + '0'
           files = {
               'realtime': Path('docs/realtime-config.js').read_text(encoding='utf-8'),
               'loader': Path('docs/ui-filters.js').read_text(encoding='utf-8'),
               'sw': Path('docs/sw.js').read_text(encoding='utf-8'),
               'status_ui': Path('docs/ui-system-status-v1700.js').read_text(encoding='utf-8'),
           }
+          m = re.search(r"DOGSON_UI_ASSET_VERSION\s*=\s*['\"](\d+)['\"]", files['realtime'])
+          if not m:
+              raise SystemExit('DOGSON_UI_ASSET_VERSION missing in realtime-config.js')
+          token = m.group(1)
           checks = [
-              (f'ui-filters.js?v={token}', files['realtime']),
+              (f"DOGSON_UI_ASSET_VERSION = '{token}'", files['realtime']),
               (f'__DOGSON_UI_LOADER_V{token}__', files['loader']),
+              (f"const version='{token}'", files['loader']),
               (f"const CACHE='dogson-free-v{token}'", files['sw']),
               (f"const UI_VERSION='{token}'", files['sw']),
               (f"DOGSON_APP_VERSION='{APP_VERSION}'", files['status_ui']),
@@ -86,10 +91,10 @@ jobs:
           ]
           missing = [needle for needle, text in checks if needle not in text]
           if missing:
-              raise SystemExit(f'UI version contract mismatch for {APP_VERSION}: {missing}')
+              raise SystemExit(f'UI asset contract mismatch for app {APP_VERSION}, asset {token}: {missing}')
           if "client.navigate" in files['sw']:
               raise SystemExit('service worker must not force client navigation')
-          print('UI version contract ok:', APP_VERSION, token)
+          print('UI version contract ok: app=', APP_VERSION, 'asset=', token)
           PY
 
       - name: Preserve newest published market data without rollback
