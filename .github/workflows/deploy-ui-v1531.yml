@@ -46,6 +46,7 @@ jobs:
           node --check docs/ui-accuracy-guard-v1702.js
           node --check docs/ui-dual-decision-v1690.js
           node --check docs/ui-filter-ux-v1721.js
+          node --check docs/ui-filter-refine-v1722.js
           node --check docs/ui-load-more-v1681.js
           node --check docs/ui-market-v1685.js
           node --check docs/ui-market-ticker-v1686.js
@@ -75,6 +76,7 @@ jobs:
               ('ui-page-architecture-v1701.js', files['loader']),
               ('ui-accuracy-guard-v1702.js', files['loader']),
               ('ui-filter-ux-v1721.js', files['loader']),
+              ('ui-filter-refine-v1722.js', files['loader']),
           ]
           missing = [needle for needle, text in checks if needle not in text]
           if missing:
