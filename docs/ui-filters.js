@@ -32,6 +32,7 @@
   loadCss('redesign-v1690.css','dogson-dashboard-v1690-css');
 
   loadScript('redesign-v160.js','dogson-redesign-v160')
+    .then(()=>loadScript('ui-nav-v1740.js','dogson-nav-v1740'))
     .then(()=>loadScript('ui-polish-v160.js','dogson-ui-polish-v160'))
     .then(()=>loadScript('ui-layout-v162.js','dogson-ui-layout-v162'))
     .then(()=>loadScript('ui-card-v164.js','dogson-ui-card-v164'))
