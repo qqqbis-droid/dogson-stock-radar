@@ -70,6 +70,7 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
+          from scripts.build_system_status import APP_VERSION
 
           intra=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
           day=json.loads(Path('docs/data/daytrade.json').read_text(encoding='utf-8'))
@@ -82,13 +83,14 @@ jobs:
               raise SystemExit('daytrade isolation contract violated')
 
           status=json.loads(Path('docs/data/system_status.json').read_text(encoding='utf-8'))
-          if status.get('app_version') != '1.7.1':
-              raise SystemExit(f"canonical app_version mismatch: {status.get('app_version')}")
+          if status.get('app_version') != APP_VERSION:
+              raise SystemExit(f"canonical app_version mismatch: {status.get('app_version')} != {APP_VERSION}")
           freshness=status.get('freshness') or {}
           if freshness.get('intraday_stale') or freshness.get('daytrade_stale'):
               raise SystemExit(f'canonical status marks actionable data stale: {freshness}')
 
           print('publish contract ok', {
+              'app_version': APP_VERSION,
               'bridge_trade_date': bridge.get('trade_date'),
               'quote_time': bridge.get('latest_quote_time'),
               'structure_time': bridge.get('latest_structure_time'),
