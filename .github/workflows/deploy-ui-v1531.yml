@@ -1,4 +1,4 @@
-name: Deploy Radar v1.7.1 UI
+name: Deploy Radar v1.7.2 UI
 
 on:
   push:
@@ -14,8 +14,8 @@ permissions:
   pages: write
   id-token: write
 
-# Canonical production publisher queue. UI publishes wait for market-data
-# publishers to finish, and obsolete upgrade installers are no longer active.
+# One production publisher queue. UI publishes wait for market-data publishers
+# and never replace live data with an older repository snapshot.
 concurrency:
   group: dogson-pages
   cancel-in-progress: false
@@ -23,14 +23,14 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify v1.7.1 UI assets
+      - name: Verify canonical UI assets and version contract
         run: |
           node --check docs/ui-filters.js
           node --check docs/redesign-v160.js
@@ -52,59 +52,83 @@ jobs:
           node --check docs/realtime-config.js
           node --check docs/sw.js
 
-          grep -q "ui-filters.js?v=1710" docs/realtime-config.js
-          grep -q "dogson-free-v1710" docs/sw.js
-          grep -q "UI_VERSION='1710'" docs/sw.js
-          grep -q "DOGSON_UI_LOADER_V1710" docs/ui-filters.js
-          grep -q "ui-system-status-v1700.js" docs/ui-filters.js
-          grep -q "ui-page-architecture-v1701.js" docs/ui-filters.js
-          grep -q "ui-accuracy-guard-v1702.js" docs/ui-filters.js
-          grep -q "ui-system-status-v1700.js?v=1710" docs/sw.js
-          grep -q "ui-page-architecture-v1701.js?v=1710" docs/sw.js
-          grep -q "ui-accuracy-guard-v1702.js?v=1710" docs/sw.js
-          grep -q "DOGSON_SYSTEM_STATUS_V1710" docs/ui-system-status-v1700.js
-          grep -q "DOGSON_PAGE_ARCH_V1710" docs/ui-page-architecture-v1701.js
-          grep -q "DOGSON_ACCURACY_GUARD_V1710" docs/ui-accuracy-guard-v1702.js
-          grep -q "DOGSON_APP_VERSION='1.7.1'" docs/ui-system-status-v1700.js
-          grep -q "資料狀態・v1.7.1" docs/ui-system-status-v1700.js
-          grep -q "最近完整波段候選" docs/ui-page-architecture-v1701.js
-          grep -q "當沖資料暫停" docs/ui-page-architecture-v1701.js
-          grep -q "當沖舊資料已停用" docs/ui-accuracy-guard-v1702.js
-          grep -q "找波段已啟用資料保護" docs/ui-accuracy-guard-v1702.js
-          grep -q "DOGSON_DUAL_DECISION_V1690" docs/ui-dual-decision-v1690.js
-          grep -q "DOGSON_FRESHNESS_V1688" docs/ui-freshness-v1688.js
-          ! grep -q "client.navigate" docs/sw.js
-          grep -q "replaceAll('location.reload();','void 0;')" docs/sw.js
+          python - <<'PY'
+          from pathlib import Path
+          from scripts.build_system_status import APP_VERSION
 
-      - name: Preserve newest published market data
+          token = APP_VERSION.replace('.', '') + '0'
+          files = {
+              'realtime': Path('docs/realtime-config.js').read_text(encoding='utf-8'),
+              'loader': Path('docs/ui-filters.js').read_text(encoding='utf-8'),
+              'sw': Path('docs/sw.js').read_text(encoding='utf-8'),
+              'status_ui': Path('docs/ui-system-status-v1700.js').read_text(encoding='utf-8'),
+          }
+          checks = [
+              (f'ui-filters.js?v={token}', files['realtime']),
+              (f'__DOGSON_UI_LOADER_V{token}__', files['loader']),
+              (f"const CACHE='dogson-free-v{token}'", files['sw']),
+              (f"const UI_VERSION='{token}'", files['sw']),
+              (f"DOGSON_APP_VERSION='{APP_VERSION}'", files['status_ui']),
+              (f'資料狀態・v{APP_VERSION}', files['status_ui']),
+              ('ui-system-status-v1700.js', files['loader']),
+              ('ui-page-architecture-v1701.js', files['loader']),
+              ('ui-accuracy-guard-v1702.js', files['loader']),
+          ]
+          missing = [needle for needle, text in checks if needle not in text]
+          if missing:
+              raise SystemExit(f'UI version contract mismatch for {APP_VERSION}: {missing}')
+          if "client.navigate" in files['sw']:
+              raise SystemExit('service worker must not force client navigation')
+          print('UI version contract ok:', APP_VERSION, token)
+          PY
+
+      - name: Preserve newest published market data without rollback
         shell: bash
         run: |
-          set -u
+          set -euo pipefail
           base="https://qqqbis-droid.github.io/dogson-stock-radar/data"
-          files=(universe.json close.json market.json intraday.json hourly.json status.json system_status.json chip_history.json chip_status.json mis_snapshots.json validation_history.json validation.json daytrade.json decision_history.json)
+          critical=(close.json market.json intraday.json hourly.json daytrade.json system_status.json)
+          optional=(universe.json status.json chip_history.json chip_status.json mis_snapshots.json validation_history.json validation.json decision_history.json)
           mkdir -p docs/data
-          for name in "${files[@]}"; do
+
+          for name in "${critical[@]}"; do
             tmp="docs/data/${name}.live"
-            if curl -fsSL --retry 2 --max-time 20 -H 'Cache-Control: no-cache' "${base}/${name}?ts=$(date +%s%N)" -o "$tmp" && test -s "$tmp"; then
+            if ! curl -fsSL --retry 3 --retry-delay 2 --max-time 25 -H 'Cache-Control: no-cache' "${base}/${name}?ts=$(date +%s%N)" -o "$tmp" || ! test -s "$tmp"; then
+              rm -f "$tmp"
+              echo "ERROR: live critical data unavailable: $name; refusing UI deploy to avoid data rollback"
+              exit 1
+            fi
+            mv "$tmp" "docs/data/$name"
+            echo "preserved live critical $name"
+          done
+
+          for name in "${optional[@]}"; do
+            tmp="docs/data/${name}.live"
+            if curl -fsSL --retry 2 --retry-delay 1 --max-time 20 -H 'Cache-Control: no-cache' "${base}/${name}?ts=$(date +%s%N)" -o "$tmp" && test -s "$tmp"; then
               mv "$tmp" "docs/data/$name"
-              echo "preserved live $name"
+              echo "preserved live optional $name"
             else
               rm -f "$tmp"
-              echo "live $name unavailable; keeping repository copy"
+              echo "WARN: optional live data unavailable: $name; repository copy retained"
             fi
           done
 
-      - name: Rebuild canonical data truth from preserved live files
+      - name: Rebuild and verify canonical data truth
         run: |
           python scripts/build_system_status.py
           python - <<'PY'
           import json
           from pathlib import Path
+          from scripts.build_system_status import APP_VERSION
+
           s=json.loads(Path('docs/data/system_status.json').read_text(encoding='utf-8'))
-          if s.get('app_version') != '1.7.1':
-              raise SystemExit(f"wrong app_version: {s.get('app_version')}")
+          if s.get('app_version') != APP_VERSION:
+              raise SystemExit(f"wrong app_version: {s.get('app_version')} != {APP_VERSION}")
           if not s.get('latest_completed_trade_date'):
               raise SystemExit('latest_completed_trade_date missing')
+          for key in ('market','close','intraday','hourly','daytrade'):
+              if not (s.get('dates') or {}).get(key):
+                  raise SystemExit(f'critical trading date missing: {key}')
           print('canonical data truth=', json.dumps(s, ensure_ascii=False))
           PY
 
