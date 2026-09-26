@@ -37,10 +37,9 @@
 
   function enforceCards(allowedRows){
     const allowed=new Set((Array.isArray(allowedRows)?allowedRows:[]).map(r=>String(r?.code||'')));
-    if(!allowed.size) return;
     $$('#cards .card[data-code]').forEach(card=>{
       const code=String(card.dataset.code||'');
-      if(code&&!allowed.has(code)) card.remove();
+      if(!allowed.has(code)) card.remove();
     });
   }
 
