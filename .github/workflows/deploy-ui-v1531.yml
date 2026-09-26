@@ -48,6 +48,7 @@ jobs:
           node --check docs/ui-filter-ux-v1721.js
           node --check docs/ui-filter-refine-v1722.js
           node --check docs/ui-filter-integrity-v1723.js
+          node --check docs/ui-stage-source-v1724.js
           node --check docs/ui-load-more-v1681.js
           node --check docs/ui-market-v1685.js
           node --check docs/ui-market-ticker-v1686.js
@@ -80,6 +81,8 @@ jobs:
               ('ui-filter-refine-v1722.js', files['loader']),
               ('ui-filter-integrity-v1723.js', files['loader']),
               ('ui-filter-integrity-v1723.js', files['sw']),
+              ('ui-stage-source-v1724.js', files['loader']),
+              ('ui-stage-source-v1724.js', files['sw']),
           ]
           missing = [needle for needle, text in checks if needle not in text]
           if missing:
