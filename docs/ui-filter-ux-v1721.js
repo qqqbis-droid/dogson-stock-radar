@@ -5,7 +5,7 @@
   const $=(s,r=document)=>r.querySelector(s);
   const $$=(s,r=document)=>[...r.querySelectorAll(s)];
   const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
-  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const num=v=>{const n=Number(v);return Number.isFinite(n)?n:null};
   const ux={stage:null,decision:null};
   let baseRender=null,lastCount=0,syncTimer=null,busy=false;
@@ -88,14 +88,17 @@
         const out=baseRender();scheduleSync();return out;
       }
       forceLegacyStageAll();
-      let full=[];try{full=m==='close'?closeRows:intraRows}catch{}
+      let full=[],previousRows;
+      try{full=m==='close'?closeRows:intraRows}catch{}
+      try{previousRows=rows}catch{}
       const filtered=filterRows(full,m);lastCount=visibleCount(filtered);
       try{
         if(m==='close')closeRows=filtered;else intraRows=filtered;
+        try{rows=filtered}catch{}
         return baseRender();
       }finally{
         try{if(m==='close')closeRows=full;else intraRows=full}catch{}
-        try{rows=m==='close'?closeRows:intraRows}catch{}
+        try{rows=previousRows??(m==='close'?closeRows:intraRows)}catch{}
         scheduleSync();
       }
     };
