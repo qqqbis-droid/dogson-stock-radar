@@ -1,5 +1,5 @@
-const CACHE='dogson-free-v1720';
-const UI_VERSION='1720';
+const CACHE='dogson-free-v1725';
+const UI_VERSION='1725';
 
 const UI_HEAD=`
 <link id="dogson-dashboard-css" rel="stylesheet" href="./redesign-v160.css?v=${UI_VERSION}">
@@ -32,6 +32,7 @@ function transformHtml(html){
     .replaceAll('./sw.js?v=1530',`./sw.js?v=${UI_VERSION}`)
     .replaceAll('./realtime-config.js?v=151',`./realtime-config.js?v=${UI_VERSION}`)
     .replaceAll('./realtime.js?v=151',`./realtime.js?v=${UI_VERSION}`)
+    .replaceAll('dogsonSwReloaded1530',`dogsonSwReloaded${UI_VERSION}`)
     .replaceAll('location.reload();','void 0;');
 }
 
@@ -43,9 +44,9 @@ self.addEventListener('install',event=>{
   event.waitUntil((async()=>{
     const cache=await caches.open(CACHE);
     await cache.addAll([
-      './manifest.webmanifest','./hourly.js?v=1530','./realtime-config.js?v=1720','./realtime.js?v=1720','./ui-filters.js?v=1720',
-      './redesign-v160.css?v=1720','./redesign-v160-dark.css?v=1720','./contrast-v160.css?v=1720','./redesign-v162.css?v=1720','./redesign-v162-fix.css?v=1720','./redesign-v163.css?v=1720','./redesign-v164.css?v=1720','./redesign-v165.css?v=1720','./redesign-v166.css?v=1720','./redesign-v1679.css?v=1720','./redesign-v1685.css?v=1720','./redesign-v1686.css?v=1720',
-      './redesign-v160.js?v=1720','./ui-polish-v160.js?v=1720','./ui-layout-v162.js?v=1720','./ui-card-v164.js?v=1720','./ui-card-v166.js?v=1720','./ui-fold-v167.js?v=1720','./ui-entry-v1679.js?v=1720','./ui-freshness-v1688.js?v=1720','./ui-system-status-v1700.js?v=1720','./ui-dual-decision-v1690.js?v=1720','./ui-load-more-v1681.js?v=1720','./ui-market-v1685.js?v=1720','./ui-market-ticker-v1686.js?v=1720','./ui-page-architecture-v1701.js?v=1720','./ui-accuracy-guard-v1702.js?v=1720','./ui-filter-ux-v1721.js?v=1720','./ui-filter-refine-v1722.js?v=1720','./ui-filter-integrity-v1723.js?v=1720','./ui-stage-source-v1724.js?v=1720'
+      './manifest.webmanifest','./hourly.js?v=1530','./realtime-config.js?v=1725','./realtime.js?v=1725','./ui-filters.js?v=1725',
+      './redesign-v160.css?v=1725','./redesign-v160-dark.css?v=1725','./contrast-v160.css?v=1725','./redesign-v162.css?v=1725','./redesign-v162-fix.css?v=1725','./redesign-v163.css?v=1725','./redesign-v164.css?v=1725','./redesign-v165.css?v=1725','./redesign-v166.css?v=1725','./redesign-v1679.css?v=1725','./redesign-v1685.css?v=1725','./redesign-v1686.css?v=1725',
+      './redesign-v160.js?v=1725','./ui-polish-v160.js?v=1725','./ui-layout-v162.js?v=1725','./ui-card-v164.js?v=1725','./ui-card-v166.js?v=1725','./ui-fold-v167.js?v=1725','./ui-entry-v1679.js?v=1725','./ui-freshness-v1688.js?v=1725','./ui-system-status-v1700.js?v=1725','./ui-dual-decision-v1690.js?v=1725','./ui-load-more-v1681.js?v=1725','./ui-market-v1685.js?v=1725','./ui-market-ticker-v1686.js?v=1725','./ui-page-architecture-v1701.js?v=1725','./ui-accuracy-guard-v1702.js?v=1725','./ui-runtime-safety-v1720.js?v=1725','./ui-filter-ux-v1721.js?v=1725','./ui-filter-refine-v1722.js?v=1725','./ui-filter-integrity-v1723.js?v=1725','./ui-stage-source-v1724.js?v=1725'
     ]);
     try{const res=await fetch('./index.html',{cache:'no-store'});const out=await transformResponse(res);if(out.ok)await cache.put('./index.html',out.clone());}catch(_){ }
   })());
