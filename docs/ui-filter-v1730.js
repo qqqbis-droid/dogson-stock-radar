@@ -146,6 +146,10 @@
         scheduleSync();
       }
     };
+    // Keep safety-wrapper markers on the outer function. Without this,
+    // an already-installed accuracy wrapper may think it disappeared and
+    // wrap render again, creating a recursive wrapper chain.
+    Object.keys(innerRender).forEach(k=>{try{wrapped[k]=innerRender[k]}catch{}});
     wrapped.__dogsonFilterV1730=true;
     wrapped.__dogsonFilterInner=innerRender;
     render=wrapped;
