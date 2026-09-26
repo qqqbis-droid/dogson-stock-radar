@@ -21,6 +21,11 @@
     document.head.appendChild(s);
   }
 
+  function setButton(btn,label,title){
+    if(btn.textContent!==label) btn.textContent=label;
+    if(btn.title!==title) btn.title=title;
+  }
+
   function patchNav(){
     installStyle();
     const main=document.querySelector('#dogsonViewNav .dogson-view-main');
@@ -32,17 +37,17 @@
     const daytrade=main.querySelector('[data-v="daytrade"]');
     if(!intraday||!close||!portfolio||!daytrade) return false;
 
-    intraday.textContent='盤中';
-    intraday.title='盤中波段';
-    close.textContent='盤後';
-    close.title='盤後波段';
-    portfolio.textContent='庫存';
-    portfolio.title='我的庫存';
-    daytrade.textContent='當沖';
-    daytrade.title='當沖模式';
+    setButton(intraday,'盤中','盤中波段');
+    setButton(close,'盤後','盤後波段');
+    setButton(portfolio,'庫存','我的庫存');
+    setButton(daytrade,'當沖','當沖模式');
 
-    [intraday,close,portfolio,daytrade].forEach(btn=>main.appendChild(btn));
-    main.dataset.navVersion='1740';
+    const desired=[intraday,close,portfolio,daytrade];
+    const current=[...main.querySelectorAll(':scope > button[data-v]')];
+    const ordered=current.length===desired.length&&desired.every((btn,i)=>current[i]===btn);
+    if(!ordered) desired.forEach(btn=>main.appendChild(btn));
+
+    if(main.dataset.navVersion!=='1740') main.dataset.navVersion='1740';
     return true;
   }
 
