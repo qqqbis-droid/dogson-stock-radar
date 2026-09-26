@@ -30,7 +30,10 @@
   function stageOf(r){try{return clean(stageKey(r?.category))}catch{return clean(r?.category||'')}}
   function stageMatch(r,key){if(!key)return true;const d=stageDefs[key];return d?d.match.test(stageOf(r)):true}
 
-  function marketFor(m){try{return m==='close'?closeMarket:intraMarket}catch{return undefined}}
+  const liveIntra=()=>window.DOGSON_INTRADAY_LIVE_READY===true;
+  function useCloseFallback(m){try{return m==='intraday'&&!liveIntra()&&Array.isArray(closeRows)}catch{return false}}
+  function sourceRows(m){try{if(m==='close')return Array.isArray(closeRows)?closeRows:[];if(useCloseFallback(m))return Array.isArray(closeRows)?closeRows:[];return Array.isArray(intraRows)?intraRows:[]}catch{return[]}}
+  function marketFor(m){try{return (m==='close'||useCloseFallback(m))?closeMarket:intraMarket}catch{return undefined}}
   function intradayDecision(r,m){
     try{const d=entryDecision(r,marketFor(m));if(['green','yellow','red'].includes(d?.key))return d.key}catch{}
     const s=num(r?.intraday_score??r?.score)??0;
@@ -88,17 +91,24 @@
         const out=baseRender();scheduleSync();return out;
       }
       forceLegacyStageAll();
-      let full=[],previousRows;
-      try{full=m==='close'?closeRows:intraRows}catch{}
+      const fallback=useCloseFallback(m);
+      let full=sourceRows(m),previousRows,previousIntra,previousClose;
       try{previousRows=rows}catch{}
+      try{previousIntra=intraRows}catch{}
+      try{previousClose=closeRows}catch{}
       const filtered=filterRows(full,m);lastCount=visibleCount(filtered);
+      window.DOGSON_FILTER_EFFECTIVE_SOURCE=fallback?'close':m;
+      window.DOGSON_FILTERED_ROWS=filtered;
       try{
-        if(m==='close')closeRows=filtered;else intraRows=filtered;
+        if(m==='close')closeRows=filtered;
+        else if(fallback){closeRows=filtered;intraRows=filtered;}
+        else intraRows=filtered;
         try{rows=filtered}catch{}
         return baseRender();
       }finally{
-        try{if(m==='close')closeRows=full;else intraRows=full}catch{}
-        try{rows=previousRows??(m==='close'?closeRows:intraRows)}catch{}
+        try{intraRows=previousIntra}catch{}
+        try{closeRows=previousClose}catch{}
+        try{rows=previousRows??sourceRows(m)}catch{}
         scheduleSync();
       }
     };
