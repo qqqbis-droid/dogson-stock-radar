@@ -1,6 +1,6 @@
 // v1.7.2 live-actionability guard; keeps existing radar scoring isolated.
 window.DOGSON_REALTIME_API = window.DOGSON_REALTIME_API || "";
-window.DOGSON_UI_ASSET_VERSION = '1725';
+window.DOGSON_UI_ASSET_VERSION = '1730';
 
 // Keep optional modules separate from the core page so a data-source/UI issue
 // cannot break the existing intraday / close radar rendering.
