@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Fail closed when intraday/daytrade data is stale, empty or date-mismatched."""
+"""Fail closed when intraday/daytrade data is stale, empty or date/time mismatched."""
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from datetime import datetime, time
 from pathlib import Path
@@ -14,6 +15,8 @@ DATA = ROOT / "docs" / "data"
 TW = ZoneInfo("Asia/Taipei")
 MIN_ROWS = 300
 MIN_BRIDGED_ROWS = 200
+MAX_QUOTE_AGE_MIN = 12
+MAX_STRUCTURE_AGE_MIN = 20
 
 
 def load(name: str) -> dict:
@@ -62,6 +65,20 @@ def completed_date(close: dict, market: dict) -> str:
     return max((d for d in ds if d), default="")
 
 
+def age_minutes(value, now: datetime):
+    """Return age of an HH:MM[:SS] market clock on today's Taipei date."""
+    m = re.search(r"(?<!\d)([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?", str(value or ""))
+    if not m:
+        return None
+    hh, mm, ss = int(m.group(1)), int(m.group(2)), int(m.group(3) or 0)
+    stamp = now.replace(hour=hh, minute=mm, second=ss, microsecond=0)
+    age = (now - stamp).total_seconds() / 60.0
+    # Small clock skew is harmless; a large future timestamp is invalid.
+    if age < -2:
+        return None
+    return max(0.0, age)
+
+
 def main() -> None:
     intra = load("intraday.json")
     day = load("daytrade.json")
@@ -75,7 +92,10 @@ def main() -> None:
     cdate = completed_date(close, market)
 
     now = datetime.now(TW)
-    session = now.weekday() < 5 and time(8, 55) <= now.time() <= time(14, 10)
+    # Scheduled builds may continue shortly after the close, but minute-level
+    # actionability is only enforced while the cash market can still be traded.
+    publish_session = now.weekday() < 5 and time(8, 55) <= now.time() <= time(14, 10)
+    actionable_session = now.weekday() < 5 and time(9, 5) <= now.time() <= time(13, 35)
     today = now.date().isoformat()
     errors = []
 
@@ -94,9 +114,14 @@ def main() -> None:
 
     bdate = ymd(bridge.get("trade_date"))
     bridged = int(bridge.get("bridged_rows") or 0)
+    quote_time = bridge.get("latest_quote_time")
+    structure_time = bridge.get("latest_structure_time")
+    quote_age = age_minutes(quote_time, now)
+    structure_age = age_minutes(structure_time, now)
+
     if bdate and idate and bdate != idate:
         errors.append(f"MIS bridge date {bdate} != intraday date {idate}")
-    if session:
+    if publish_session:
         if idate != today:
             errors.append(f"active-session intraday date must be today {today}, got {idate or 'missing'}")
         if bdate != today:
@@ -104,9 +129,20 @@ def main() -> None:
         if bridged < MIN_BRIDGED_ROWS:
             errors.append(f"MIS bridged rows too small: {bridged} < {MIN_BRIDGED_ROWS}")
 
+    if actionable_session:
+        if quote_age is None:
+            errors.append("MIS latest quote clock missing or invalid")
+        elif quote_age > MAX_QUOTE_AGE_MIN:
+            errors.append(f"MIS quote too old: {quote_age:.1f}m > {MAX_QUOTE_AGE_MIN}m")
+        if structure_age is None:
+            errors.append("5-minute structure clock missing or invalid")
+        elif structure_age > MAX_STRUCTURE_AGE_MIN:
+            errors.append(f"5-minute structure too old: {structure_age:.1f}m > {MAX_STRUCTURE_AGE_MIN}m")
+
     report = {
         "checked_at": now.isoformat(timespec="seconds"),
-        "session_guard_active": session,
+        "publish_session_guard_active": publish_session,
+        "actionability_time_guard_active": actionable_session,
         "today": today,
         "intraday_date": idate or None,
         "daytrade_date": ddate or None,
@@ -115,6 +151,12 @@ def main() -> None:
         "daytrade_rows": len(drows),
         "bridge_date": bdate or None,
         "bridged_rows": bridged,
+        "latest_quote_time": quote_time,
+        "latest_structure_time": structure_time,
+        "quote_age_minutes": round(quote_age, 2) if quote_age is not None else None,
+        "structure_age_minutes": round(structure_age, 2) if structure_age is not None else None,
+        "max_quote_age_minutes": MAX_QUOTE_AGE_MIN,
+        "max_structure_age_minutes": MAX_STRUCTURE_AGE_MIN,
         "publishable": not errors,
         "errors": errors,
     }
