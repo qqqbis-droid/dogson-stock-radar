@@ -46,7 +46,7 @@
     .then(()=>loadScript('ui-market-v1685.js','dogson-ui-market-v1685','1750peer1'))
     .then(()=>loadScript('ui-market-ticker-v1686.js','dogson-ui-market-ticker-v1688'))
     .then(()=>loadScript('ui-page-architecture-v1701.js','dogson-ui-page-architecture-v1701','1750'))
-    .then(()=>loadScript('ui-accuracy-guard-v1702.js','dogson-ui-accuracy-guard-v1702','1750momentum1'))
+    .then(()=>loadScript('ui-accuracy-guard-v1702.js','dogson-ui-accuracy-guard-v1702','1750peer2'))
     .then(()=>loadScript('ui-runtime-safety-v1720.js','dogson-ui-runtime-safety-v1720'))
     .then(()=>loadScript('ui-filter-v1730.js','dogson-ui-filter-v1730'))
     .then(()=>{clearTimeout(safetyTimer);requestAnimationFrame(()=>requestAnimationFrame(reveal))})
