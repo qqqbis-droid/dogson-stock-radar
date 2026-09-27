@@ -51,7 +51,7 @@
     if($('#dogsonAccuracyGuardStyle1702'))return;
     const s=document.createElement('style');s.id='dogsonAccuracyGuardStyle1702';s.textContent=`
       .dogson-accuracy-v1702{margin:8px 0 10px;padding:11px 12px;border-radius:14px;border:1px solid #ead9a9;background:#fff8e8;color:#6f5718}.dogson-accuracy-v1702.bad{border-color:#efc5ca;background:#fff0f2;color:#8e303a}.dogson-accuracy-v1702.good{border-color:#cfe4d6;background:#f0f8f3;color:#2d6748}.dogson-accuracy-title-v1702{font-size:12px;font-weight:950}.dogson-accuracy-text-v1702{font-size:10px;line-height:1.6;margin-top:4px}html[data-dogson-theme="dark"] .dogson-accuracy-v1702{background:#332c1b;border-color:#5a4b25;color:#f0d98e}html[data-dogson-theme="dark"] .dogson-accuracy-v1702.bad{background:#352126;border-color:#63343b;color:#ffb8c0}
-      html[data-dogson-live-intraday="0"][data-dogson-page="intraday"] #changebox,html[data-dogson-live-intraday="0"][data-dogson-page="intraday"] #dogsonFlowHomeV1685,html[data-dogson-daytrade-actionable="0"][data-dogson-page="daytrade"] #changebox,html[data-dogson-daytrade-actionable="0"][data-dogson-page="daytrade"] #dogsonFlowHomeV1685{display:none!important}
+      html[data-dogson-live-intraday="0"][data-dogson-page="intraday"] #changebox,html[data-dogson-daytrade-actionable="0"][data-dogson-page="daytrade"] #changebox{display:none!important}
     `;document.head.appendChild(s);
   }
 
@@ -70,8 +70,8 @@
   }
   function noticeSpec(){
     const m=modeNow(),d=dates(),why=reason();
-    if(m==='daytrade'&&!dayActionable())return{tone:staleDay()?'bad':'',title:staleDay()?'🎯 當沖舊資料已停用':'🎯 當沖目前不可執行',text:`${why}。系統不顯示「可執行／等回踩」清單；最近行情日 ${d.daytrade||d.intraday||'—'} 僅保留作歷史回顧，下一個合格盤中時段才重新啟用。`};
-    if(m==='intraday'&&!portfolioView()&&!liveReady())return{tone:'',title:'🛡️ 找波段使用最近完整盤後資料',text:`${why}。個股卡片改用 ${d.close||'最近完整交易日'} 的盤後波段資料；5分鐘變化、盤中資金輪動與即時進場判斷暫停。`};
+    if(m==='daytrade'&&!dayActionable())return{tone:staleDay()?'bad':'',title:staleDay()?'🎯 當沖舊資料已停用':'🎯 當沖目前不可執行',text:`${why}。系統不顯示「可執行／等回踩」清單；最近完整資金背景仍可參考，但不作當沖執行依據。`};
+    if(m==='intraday'&&!portfolioView()&&!liveReady())return{tone:'',title:'🛡️ 找波段使用最近完整盤後資料',text:`${why}。個股卡片改用 ${d.close||'最近完整交易日'} 的盤後波段資料；5分鐘變化與即時進場判斷暫停，資金流向改顯示最近完整盤後背景。`};
     if(m==='intraday'&&portfolioView()&&!liveReady())return{tone:'',title:'🛡️ 庫存使用最近完整資料',text:`${why}。庫存判讀改用 ${d.close||'最近完整交易日'} 盤後結構，不把非即時盤中轉折當成現在訊號。`};
     return null;
   }
