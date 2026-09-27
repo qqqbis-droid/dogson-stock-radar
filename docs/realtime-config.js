@@ -47,7 +47,7 @@ if (!document.getElementById('dogson-stability-v1744')) {
 if (!document.getElementById('dogson-stable-notice-v1745')) {
   const s = document.createElement('script');
   s.id = 'dogson-stable-notice-v1745';
-  s.src = './ui-stable-notice-v1745.js?v=1747';
+  s.src = './ui-stable-notice-v1745.js?v=1748';
   s.defer = true;
   document.head.appendChild(s);
 }
