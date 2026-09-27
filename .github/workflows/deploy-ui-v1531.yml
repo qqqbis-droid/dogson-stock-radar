@@ -34,6 +34,8 @@ jobs:
       - name: Verify canonical UI assets and version contract
         run: |
           node --check docs/ui-filters.js
+          node --check docs/ui-data-bootstrap-v1751.js
+          node --check docs/ui-shell-v1751.js
           node --check docs/redesign-v160.js
           node --check docs/ui-polish-v160.js
           node --check docs/ui-layout-v162.js
@@ -77,6 +79,8 @@ jobs:
               (f"const UI_VERSION='{token}'", files['sw']),
               (f"DOGSON_APP_VERSION='{APP_VERSION}'", files['status_ui']),
               (f'資料狀態・v{APP_VERSION}', files['status_ui']),
+              ('ui-data-bootstrap-v1751.js', files['loader']),
+              ('ui-shell-v1751.js', files['loader']),
               ('ui-system-status-v1700.js', files['loader']),
               ('ui-page-architecture-v1701.js', files['loader']),
               ('ui-accuracy-guard-v1702.js', files['loader']),
