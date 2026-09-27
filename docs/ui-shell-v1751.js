@@ -3,6 +3,8 @@
   window.__DOGSON_SHELL_V1751__=true;
 
   const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+  const detailState=new Map();
   const ymd=v=>{const m=String(v||'').match(/(20\d{2})-(\d{2})-(\d{2})/);return m?`${m[1]}-${m[2]}-${m[3]}`:''};
   const shortDate=v=>{const d=ymd(v);if(!d)return'';const [,m,day]=d.split('-');return `${Number(m)}/${Number(day)}`};
   const firstRowDate=rows=>{for(const r of (Array.isArray(rows)?rows.slice(0,30):[])){const d=ymd(r?.quote_date)||ymd(r?.trade_date)||ymd(r?.date);if(d)return d}return''};
@@ -28,6 +30,8 @@
       #dogsonMissionV1700{margin:14px 2px 8px!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
       #dogsonMissionV1700 .dogson-mission-title-v1700{font-size:15px!important;font-weight:950!important;color:#25312c!important}
       #dogsonMissionV1700 .dogson-mission-text-v1700{margin-top:3px!important;font-size:10.5px!important;line-height:1.5!important;color:#7a8580!important}
+      #dogsonMarketHomeV1685 details>summary,#dogsonFlowHomeV1685 details>summary{cursor:pointer!important;touch-action:manipulation!important;-webkit-tap-highlight-color:transparent!important;user-select:none!important;-webkit-user-select:none!important}
+      #dogsonMarketHomeV1685 .dogson-inline-details-v1685>summary,#dogsonFlowHomeV1685 .dogson-inline-details-v1685>summary{min-height:44px!important;box-sizing:border-box!important;display:flex!important;align-items:center!important}
       html[data-dogson-theme="dark"] #dogsonViewNav .dogson-view-main{background:#252b28!important;border-color:#39423d!important}
       html[data-dogson-theme="dark"] #dogsonViewNav .dogson-view-main>button{color:#aeb9b3!important}
       html[data-dogson-theme="dark"] #dogsonViewNav .dogson-view-main>button.active{background:#3a806d!important;color:#fff!important}
@@ -105,9 +109,58 @@
     title.textContent=t;text.textContent=x;
   }
 
-  function render(){installStyle();setupNav();renderStatus();renderMission()}
+  function detailKey(d){
+    if(!d)return'';
+    const view=activeView();
+    if(d.closest('#dogsonMarketHomeV1685'))return`market:${view}:${d.dataset.flowKey||'main'}`;
+    if(d.closest('#dogsonFlowHomeV1685')){
+      const label=d.dataset.flowKey||$('summary',d)?.textContent?.trim()?.slice(0,80)||'detail';
+      return`flow:${view}:${label}`;
+    }
+    return'';
+  }
+
+  function restoreDetails(root=document){
+    $$('#dogsonMarketHomeV1685 details,#dogsonFlowHomeV1685 details',root).forEach(d=>{
+      const key=detailKey(d);if(!key||!detailState.has(key))return;
+      const open=detailState.get(key)===true;
+      if(d.open!==open)d.open=open;
+      $('summary',d)?.setAttribute('aria-expanded',open?'true':'false');
+    });
+  }
+
+  function watchDetailsHost(id){
+    const host=document.getElementById(id);if(!host||host.__dogsonDetailWatch1751)return;
+    host.__dogsonDetailWatch1751=true;
+    let raf=0;
+    new MutationObserver(()=>{
+      cancelAnimationFrame(raf);
+      raf=requestAnimationFrame(()=>restoreDetails(host));
+    }).observe(host,{childList:true,subtree:true});
+  }
+
+  function setupDetailController(){
+    watchDetailsHost('dogsonMarketHomeV1685');
+    watchDetailsHost('dogsonFlowHomeV1685');
+    restoreDetails();
+  }
+
+  function handleDetailClick(e){
+    const summary=e.target?.closest?.('#dogsonMarketHomeV1685 details>summary,#dogsonFlowHomeV1685 details>summary');
+    if(!summary)return;
+    const d=summary.parentElement;if(!d||d.tagName!=='DETAILS')return;
+    const key=detailKey(d);if(!key)return;
+    e.preventDefault();
+    const next=!d.open;
+    detailState.set(key,next);
+    d.open=next;
+    summary.setAttribute('aria-expanded',next?'true':'false');
+  }
+
+  function render(){installStyle();setupNav();renderStatus();renderMission();setupDetailController()}
   function boot(){
     render();[120,450,1000,2200].forEach(ms=>setTimeout(render,ms));
+    document.addEventListener('click',handleDetailClick,true);
     ['dogson:data-truth','dogson:data-ready','dogson:actionability','dogson:freshness'].forEach(name=>window.addEventListener(name,()=>setTimeout(render,0)));
     document.addEventListener('click',e=>{if(e.target?.closest?.('#dogsonViewNav,.tab,#portfolioOnly')){setTimeout(render,0);setTimeout(render,100)}},true);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
