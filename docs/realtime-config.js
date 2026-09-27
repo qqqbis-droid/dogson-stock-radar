@@ -16,7 +16,7 @@ if (!document.getElementById('dogson-decision-filters')) {
   s.id = 'dogson-decision-filters';
   // Keep the canonical 1730 contract, but use a separate loader revision so
   // iOS/PWA caches receive the latest market-flow UI immediately.
-  s.src = './ui-filters.js?v=1750';
+  s.src = './ui-filters.js?v=1750e';
   s.async = true;
   document.head.appendChild(s);
 }
