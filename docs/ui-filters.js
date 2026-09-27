@@ -5,6 +5,8 @@
   const base=new URL('.',src);
   const version='1730';
   let revealed=false;
+  let modulesReady=false;
+  let readyWaitStarted=0;
 
   function ensureBoot(){
     document.documentElement.classList.add('dogson-booting');
@@ -13,20 +15,45 @@
       html.dogson-booting body{background:#f5f6f3!important;overflow:hidden!important}
       html.dogson-booting .wrap,html.dogson-booting .footer{opacity:0!important;pointer-events:none!important}
       html.dogson-booting body::before{content:'🐶 犬子老師・飆股雷達';position:fixed;z-index:99998;left:0;right:0;top:42%;transform:translateY(-50%);text-align:center;color:#234d40;font:900 20px/1.4 -apple-system,BlinkMacSystemFont,'PingFang TC',sans-serif;letter-spacing:.02em}
-      html.dogson-booting body::after{content:'正在載入穩定版介面…';position:fixed;z-index:99999;left:0;right:0;top:calc(42% + 42px);text-align:center;color:#718078;font:700 13px/1.4 -apple-system,BlinkMacSystemFont,'PingFang TC',sans-serif}
+      html.dogson-booting body::after{content:'正在載入介面與資料…';position:fixed;z-index:99999;left:0;right:0;top:calc(42% + 42px);text-align:center;color:#718078;font:700 13px/1.4 -apple-system,BlinkMacSystemFont,'PingFang TC',sans-serif}
     `;document.head.appendChild(s);
   }
   ensureBoot();
+
+  function dataReady(){
+    try{
+      if(Array.isArray(closeRows)&&closeRows.length>0)return true;
+      if(Array.isArray(intraRows)&&intraRows.length>0)return true;
+    }catch{}
+    const st=window.DOGSON_DATA_BOOTSTRAP_STATE||{};
+    return st.close===true||st.intraday===true;
+  }
 
   function reveal(){
     if(revealed) return;
     revealed=true;
     document.documentElement.classList.remove('dogson-booting');
     document.documentElement.dataset.dogsonUiReady=version;
-    try{window.dispatchEvent(new CustomEvent('dogson:ui-ready',{detail:{version}}))}catch{}
+    document.documentElement.dataset.dogsonDataReady=dataReady()?'1':'0';
+    try{window.dispatchEvent(new CustomEvent('dogson:ui-ready',{detail:{version,dataReady:dataReady()}}))}catch{}
   }
 
-  const safetyTimer=setTimeout(reveal,8000);
+  function waitForStableReveal(){
+    if(revealed||!modulesReady)return;
+    if(!readyWaitStarted)readyWaitStarted=Date.now();
+    if(dataReady()){
+      requestAnimationFrame(()=>requestAnimationFrame(reveal));
+      return;
+    }
+    const elapsed=Date.now()-readyWaitStarted;
+    if(elapsed>=22000){
+      document.documentElement.dataset.dogsonDataSlow='1';
+      reveal();
+      return;
+    }
+    setTimeout(waitForStableReveal,150);
+  }
+
   function loadCss(name,id){if(document.getElementById(id))return;const link=document.createElement('link');link.id=id;link.rel='stylesheet';link.href=new URL(name,base).href+'?v='+version;document.head.appendChild(link)}
   function preloadScript(name,assetVersion=version){const href=new URL(name,base).href+'?v='+assetVersion;if(document.querySelector(`link[data-dogson-preload="${href}"]`))return;const l=document.createElement('link');l.rel='preload';l.as='script';l.href=href;l.dataset.dogsonPreload=href;document.head.appendChild(l)}
   function loadScript(name,id,assetVersion=version){return new Promise((resolve,reject)=>{if(document.getElementById(id))return resolve();const s=document.createElement('script');s.id=id;s.src=new URL(name,base).href+'?v='+assetVersion;s.async=false;s.onload=resolve;s.onerror=reject;document.head.appendChild(s)})}
@@ -46,7 +73,7 @@
   loadCss('redesign-v1690.css','dogson-dashboard-v1690-css');
 
   const plan=[
-    ['ui-data-bootstrap-v1751.js','dogson-data-bootstrap-v1751','1751data2'],
+    ['ui-data-bootstrap-v1751.js','dogson-data-bootstrap-v1751','1751data3'],
     ['redesign-v160.js','dogson-redesign-v160',version],
     ['ui-polish-v160.js','dogson-ui-polish-v160',version],
     ['ui-layout-v162.js','dogson-ui-layout-v162',version],
@@ -67,8 +94,9 @@
     ['ui-shell-v1751.js','dogson-shell-v1751','1751shell1']
   ];
 
+  window.addEventListener('dogson:data-ready',()=>{if(modulesReady)waitForStableReveal()});
   plan.forEach(([name,,assetVersion])=>preloadScript(name,assetVersion));
   plan.reduce((p,[name,id,assetVersion])=>p.then(()=>loadScript(name,id,assetVersion)),Promise.resolve())
-    .then(()=>{clearTimeout(safetyTimer);requestAnimationFrame(()=>requestAnimationFrame(reveal))})
-    .catch(err=>{clearTimeout(safetyTimer);reveal();console.warn('Dogson UI module load failed',err)});
+    .then(()=>{modulesReady=true;waitForStableReveal()})
+    .catch(err=>{modulesReady=true;console.warn('Dogson UI module load failed',err);waitForStableReveal()});
 })();
