@@ -2,14 +2,16 @@
   if(window.__DOGSON_DATA_BOOTSTRAP_V1751__) return;
   window.__DOGSON_DATA_BOOTSTRAP_V1751__=true;
 
-  const REV='1751data1';
+  const REV='1751data2';
   const startedAt=Date.now();
-  const loaded={close:false,intraday:false,daytrade:false,universe:false};
   const loading=new Map();
-
   const hasRows=v=>Array.isArray(v)&&v.length>0;
-  const get=(name,fallback)=>{try{return globalThis[name]??fallback}catch{return fallback}};
-  const set=(name,value)=>{try{globalThis[name]=value}catch{}};
+
+  const modeNow=()=>{try{return mode||'intraday'}catch{return'intraday'}};
+  const closeList=()=>{try{return Array.isArray(closeRows)?closeRows:[]}catch{return[]}};
+  const intraList=()=>{try{return Array.isArray(intraRows)?intraRows:[]}catch{return[]}};
+  const dayList=()=>{try{return Array.isArray(daytradeRows)?daytradeRows:[]}catch{return[]}};
+  const universeList=()=>{try{return Array.isArray(universe)?universe:[]}catch{return[]}};
 
   function taipeiSession(){
     try{
@@ -28,7 +30,7 @@
   }
 
   function emit(source){
-    window.DOGSON_DATA_BOOTSTRAP_STATE={source,at:Date.now(),close:hasRows(get('closeRows',[])),intraday:hasRows(get('intraRows',[])),daytrade:hasRows(get('daytradeRows',[]))};
+    window.DOGSON_DATA_BOOTSTRAP_STATE={source,at:Date.now(),close:hasRows(closeList()),intraday:hasRows(intraList()),daytrade:hasRows(dayList())};
     try{window.dispatchEvent(new CustomEvent('dogson:data-ready',{detail:window.DOGSON_DATA_BOOTSTRAP_STATE}))}catch{}
   }
 
@@ -43,12 +45,13 @@
 
   function applyMarket(m){
     if(!m||typeof m!=='object')return;
-    set('closeMarket',m);
-    const im=get('intraMarket',{});if(!im||!Object.keys(im).length)set('intraMarket',m);
-    const dm=get('daytradeMarket',{});if(!dm||!Object.keys(dm).length)set('daytradeMarket',m);
-    const mode=get('mode','intraday');
-    if(mode==='close')set('market',m);
-    else if(!get('market',null)||!Object.keys(get('market',{})).length)set('market',get('intraMarket',m)||m);
+    try{
+      closeMarket=m;
+      if(!intraMarket||!Object.keys(intraMarket).length)intraMarket=m;
+      if(!daytradeMarket||!Object.keys(daytradeMarket).length)daytradeMarket=m;
+      if(modeNow()==='close')market=m;
+      else if(!market||!Object.keys(market).length)market=intraMarket||m;
+    }catch{}
   }
 
   async function loadSmall(){
@@ -63,41 +66,38 @@
   }
 
   async function loadUniverse(){
-    if(loaded.universe||hasRows(get('universe',[])))return;
-    try{const u=await json('universe','recover');if(Array.isArray(u)){set('universe',u);loaded.universe=true}}catch{}
+    if(hasRows(universeList()))return;
+    try{const u=await json('universe','recover');if(Array.isArray(u))universe=u}catch{}
   }
 
   async function loadSource(name){
     if(loading.has(name))return loading.get(name);
-    if(name==='close'&&hasRows(get('closeRows',[])))return;
-    if(name==='intraday'&&hasRows(get('intraRows',[])))return;
-    if(name==='daytrade'&&hasRows(get('daytradeRows',[])))return;
+    if(name==='close'&&hasRows(closeList()))return;
+    if(name==='intraday'&&hasRows(intraList()))return;
+    if(name==='daytrade'&&hasRows(dayList()))return;
 
     const p=(async()=>{
       try{
         const j=await json(name,'recover');
         if(name==='close'){
-          set('closeRows',Array.isArray(j?.rows)?j.rows:[]);
-          set('sectorFunds',Array.isArray(j?.sector_funds)?j.sector_funds:[]);
-          loaded.close=hasRows(get('closeRows',[]));
-          if(get('mode','intraday')==='close')set('market',get('closeMarket',{}));
+          closeRows=Array.isArray(j?.rows)?j.rows:[];
+          sectorFunds=Array.isArray(j?.sector_funds)?j.sector_funds:[];
+          if(modeNow()==='close')market=closeMarket||{};
         }else if(name==='intraday'){
-          set('intraRows',Array.isArray(j?.rows)?j.rows:[]);
-          set('intraMarket',j?.market||get('closeMarket',{}));
-          set('marketLive',j?.market_intraday||{});
-          set('sectorRotation',Array.isArray(j?.sector_rotation)?j.sector_rotation:[]);
-          set('changeRadar',j?.change_radar||{});
-          loaded.intraday=hasRows(get('intraRows',[]));
-          if(get('mode','intraday')==='intraday')set('market',get('intraMarket',get('closeMarket',{})));
+          intraRows=Array.isArray(j?.rows)?j.rows:[];
+          intraMarket=j?.market||closeMarket||{};
+          marketLive=j?.market_intraday||{};
+          sectorRotation=Array.isArray(j?.sector_rotation)?j.sector_rotation:[];
+          changeRadar=j?.change_radar||{};
+          if(modeNow()==='intraday')market=intraMarket||closeMarket||{};
         }else if(name==='daytrade'){
-          set('daytradeReport',j||{});
-          set('daytradeRows',Array.isArray(j?.rows)?j.rows:[]);
-          set('daytradeMarket',j?.market||get('intraMarket',get('closeMarket',{})));
-          loaded.daytrade=hasRows(get('daytradeRows',[]));
-          if(get('mode','intraday')==='daytrade')set('market',get('daytradeMarket',{}));
+          daytradeReport=j||{};
+          daytradeRows=Array.isArray(j?.rows)?j.rows:[];
+          daytradeMarket=j?.market||intraMarket||closeMarket||{};
+          if(modeNow()==='daytrade')market=daytradeMarket||{};
         }
         paint();emit(name);
-        [350,1200,3000].forEach(ms=>setTimeout(paint,ms));
+        [300,900,2200].forEach(ms=>setTimeout(paint,ms));
       }catch(e){
         window.DOGSON_DATA_BOOTSTRAP_ERROR=`${name}: ${e?.message||e}`;
       }finally{loading.delete(name)}
@@ -106,28 +106,30 @@
   }
 
   async function recover(){
-    if(hasRows(get('closeRows',[]))||hasRows(get('intraRows',[]))){emit('legacy-ready');return}
+    if(hasRows(closeList())||hasRows(intraList())){emit('legacy-ready');return}
     const first=taipeiSession()?'intraday':'close';
     const second=first==='intraday'?'close':'intraday';
     await loadSource(first);
     await loadUniverse();
-    if(!hasRows(get(second==='close'?'closeRows':'intraRows',[])))await loadSource(second);
-    try{const v=await json('validation','recover');set('validationReport',v||{});paint()}catch{}
+    if(second==='close'&&!hasRows(closeList()))await loadSource('close');
+    if(second==='intraday'&&!hasRows(intraList()))await loadSource('intraday');
+    try{validationReport=await json('validation','recover');paint()}catch{}
   }
 
   function ensureForView(){
-    const m=get('mode','intraday');
+    const m=modeNow();
     if(m==='daytrade')loadSource('daytrade');
     else if(m==='close')loadSource('close');
-    else if(!hasRows(get('intraRows',[]))&&!hasRows(get('closeRows',[])))recover();
+    else if(!hasRows(intraList())&&!hasRows(closeList()))recover();
   }
 
   function boot(){
     loadSmall();
-    setTimeout(recover,8000);
+    // Give the legacy first request a short head start; recover independently if it stalls/fails.
+    setTimeout(recover,4500);
     document.addEventListener('click',e=>{if(e.target?.closest?.('#dogsonViewNav,.tab'))setTimeout(ensureForView,80)},true);
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-startedAt>3000)ensureForView()});
-    let n=0;const heal=setInterval(()=>{n++;if(hasRows(get('closeRows',[]))||hasRows(get('intraRows',[])))paint();if(n>=30)clearInterval(heal)},1000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-startedAt>2500)ensureForView()});
+    let n=0;const heal=setInterval(()=>{n++;if(hasRows(closeList())||hasRows(intraList()))paint();if(n>=24)clearInterval(heal)},1000);
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
