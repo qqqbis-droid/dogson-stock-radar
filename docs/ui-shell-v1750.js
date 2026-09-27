@@ -4,6 +4,7 @@
 
   const $=(s,r=document)=>r.querySelector(s);
   const cache={system:null,close:null,intraday:null,daytrade:null};
+  const detailState={market:false,flow:false};
 
   const ymd=v=>{const m=String(v||'').match(/(20\d{2})-(\d{2})-(\d{2})/);return m?`${m[1]}-${m[2]}-${m[3]}`:''};
   const shortDate=v=>{const d=ymd(v);if(!d)return'';const [,m,day]=d.split('-');return `${Number(m)}/${Number(day)}`};
@@ -46,6 +47,22 @@
       #dogsonViewNav .dogson-view-main>button{appearance:none!important;-webkit-appearance:none!important;min-width:0!important;min-height:48px!important;margin:0!important;padding:0 6px!important;border:0!important;border-radius:16px!important;background:transparent!important;color:#56665f!important;box-shadow:none!important;font-size:14px!important;font-weight:800!important;line-height:1!important;white-space:nowrap!important;}
       #dogsonViewNav .dogson-view-main>button.active{background:#2f7865!important;color:#fff!important;box-shadow:0 2px 8px rgba(34,86,71,.20)!important;}
       #dogsonViewNav .dogson-theme-toggle{width:48px!important;height:56px!important;min-width:48px!important;margin:0!important;padding:0!important;display:grid!important;place-items:center!important;border:1px solid #dfe6e1!important;border-radius:18px!important;background:#fff!important;color:#52665e!important;font-size:20px!important;}
+
+      /* Make inline detail rows feel immediate on touch devices. */
+      #dogsonMarketHomeV1685 .dogson-inline-details-v1685>summary,
+      #dogsonFlowHomeV1685 .dogson-inline-details-v1685>summary{
+        min-height:44px!important;
+        box-sizing:border-box!important;
+        cursor:pointer!important;
+        touch-action:manipulation!important;
+        -webkit-tap-highlight-color:transparent!important;
+        user-select:none!important;
+        -webkit-user-select:none!important;
+      }
+      #dogsonMarketHomeV1685 .dogson-inline-details-v1685>summary:active,
+      #dogsonFlowHomeV1685 .dogson-inline-details-v1685>summary:active{
+        transform:scale(.995);
+      }
 
       #dogsonMissionV1700{margin:14px 2px 8px!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;}
       #dogsonMissionV1700 .dogson-mission-title-v1700{font-size:15px!important;font-weight:950!important;color:#25312c!important;}
@@ -209,7 +226,23 @@
     title.textContent=t;text.textContent=x;
   }
 
-  function render(){installStyle();setupNav();renderStatus();renderMission()}
+  function syncInlineDetail(hostSelector,key){
+    const details=$(`${hostSelector} .dogson-inline-details-v1685`);
+    if(details&&details.open!==detailState[key]) details.open=detailState[key];
+  }
+
+  function setupInlineDetailStability(){
+    const pairs=[['#dogsonMarketHomeV1685','market'],['#dogsonFlowHomeV1685','flow']];
+    for(const [selector,key] of pairs){
+      const host=$(selector);
+      if(!host||host.__dogsonDetailStable1750) continue;
+      host.__dogsonDetailStable1750=true;
+      new MutationObserver(()=>requestAnimationFrame(()=>syncInlineDetail(selector,key))).observe(host,{childList:true,subtree:false});
+      syncInlineDetail(selector,key);
+    }
+  }
+
+  function render(){installStyle();setupNav();renderStatus();renderMission();setupInlineDetailStability()}
 
   async function refreshData(){
     const [system,close,intraday,daytrade]=await Promise.all([json('system_status'),json('close'),json('intraday'),json('daytrade')]);
@@ -221,6 +254,12 @@
     render();
     refreshData();
     [200,700,1500,3000].forEach(ms=>setTimeout(render,ms));
+    document.addEventListener('toggle',e=>{
+      const d=e.target;
+      if(!(d instanceof HTMLDetailsElement)) return;
+      if(d.matches('#dogsonMarketHomeV1685 .dogson-inline-details-v1685')) detailState.market=d.open;
+      else if(d.matches('#dogsonFlowHomeV1685 .dogson-inline-details-v1685')) detailState.flow=d.open;
+    },true);
     window.addEventListener('dogson:data-truth',()=>setTimeout(render,0));
     window.addEventListener('dogson:actionability',()=>setTimeout(render,0));
     window.addEventListener('dogson:freshness',()=>setTimeout(render,0));
