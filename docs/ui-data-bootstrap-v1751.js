@@ -2,11 +2,12 @@
   if(window.__DOGSON_DATA_BOOTSTRAP_V1751__) return;
   window.__DOGSON_DATA_BOOTSTRAP_V1751__=true;
 
-  const REV='1751data3';
+  const REV='1751data4';
   const startedAt=Date.now();
   const loading=new Map();
   const hasRows=v=>Array.isArray(v)&&v.length>0;
   const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  let paintTimer=0;
 
   const modeNow=()=>{try{return mode||'intraday'}catch{return'intraday'}};
   const closeList=()=>{try{return Array.isArray(closeRows)?closeRows:[]}catch{return[]}};
@@ -50,8 +51,15 @@
   }
 
   function clearError(){window.DOGSON_DATA_BOOTSTRAP_ERROR=''}
+  function interactionLocked(){return Number(window.DOGSON_INTERACTION_LOCK_UNTIL||0)>Date.now()}
 
   function paint(){
+    if(interactionLocked()){
+      clearTimeout(paintTimer);
+      const wait=Math.max(60,Number(window.DOGSON_INTERACTION_LOCK_UNTIL||0)-Date.now()+30);
+      paintTimer=setTimeout(paint,wait);
+      return;
+    }
     try{if(typeof syncModeFilters==='function')syncModeFilters()}catch{}
     try{if(typeof marketHTML==='function'){const x=document.getElementById('marketbox');if(x)x.innerHTML=marketHTML()}}catch{}
     try{if(typeof validationHTML==='function'){const x=document.getElementById('validationbox');if(x)x.innerHTML=validationHTML()}}catch{}
@@ -123,7 +131,6 @@
         }
         if(!loaded)throw new Error(`${name} rows empty`);
         clearError();paint();emit(name);
-        [250,800,1800].forEach(ms=>setTimeout(paint,ms));
         return true;
       }catch(e){
         reportError(name,e);emit(`${name}-error`);return false;
@@ -172,9 +179,13 @@
     setTimeout(()=>{if(!hasRows(closeList())&&!hasRows(intraList()))recover()},20000);
     setTimeout(()=>{if(!hasRows(closeList())&&!hasRows(intraList()))recover()},35000);
 
+    document.addEventListener('pointerdown',e=>{
+      if(e.target?.closest?.('#dogsonMarketHomeV1685 details>summary,#dogsonFlowHomeV1685 details>summary')){
+        window.DOGSON_INTERACTION_LOCK_UNTIL=Date.now()+700;
+      }
+    },true);
     document.addEventListener('click',e=>{if(e.target?.closest?.('#dogsonViewNav,.tab'))setTimeout(ensureForView,80)},true);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-startedAt>2500)ensureForView()});
-    let n=0;const heal=setInterval(()=>{n++;if(hasRows(closeList())||hasRows(intraList())){paint();emit('heal')}if(n>=45)clearInterval(heal)},1000);
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
