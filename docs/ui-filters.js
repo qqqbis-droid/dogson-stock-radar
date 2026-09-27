@@ -15,7 +15,7 @@
 
   const safetyTimer=setTimeout(reveal,4500);
   function loadCss(name,id){if(document.getElementById(id))return;const link=document.createElement('link');link.id=id;link.rel='stylesheet';link.href=new URL(name,base).href+'?v='+version;document.head.appendChild(link)}
-  function loadScript(name,id){return new Promise((resolve,reject)=>{if(document.getElementById(id))return resolve();const s=document.createElement('script');s.id=id;s.src=new URL(name,base).href+'?v='+version;s.defer=true;s.onload=resolve;s.onerror=reject;document.head.appendChild(s)})}
+  function loadScript(name,id,assetVersion=version){return new Promise((resolve,reject)=>{if(document.getElementById(id))return resolve();const s=document.createElement('script');s.id=id;s.src=new URL(name,base).href+'?v='+assetVersion;s.defer=true;s.onload=resolve;s.onerror=reject;document.head.appendChild(s)})}
 
   loadCss('redesign-v160.css','dogson-dashboard-css');
   loadCss('redesign-v160-dark.css','dogson-dashboard-dark-css');
@@ -43,9 +43,9 @@
     .then(()=>loadScript('ui-system-status-v1700.js','dogson-ui-system-status-v1700'))
     .then(()=>loadScript('ui-dual-decision-v1690.js','dogson-ui-dual-decision-v1690'))
     .then(()=>loadScript('ui-load-more-v1681.js','dogson-ui-load-more-v1681'))
-    .then(()=>loadScript('ui-market-v1685.js','dogson-ui-market-v1685'))
+    .then(()=>loadScript('ui-market-v1750.js','dogson-ui-market-v1750','1750'))
     .then(()=>loadScript('ui-market-ticker-v1686.js','dogson-ui-market-ticker-v1688'))
-    .then(()=>loadScript('ui-page-architecture-v1701.js','dogson-ui-page-architecture-v1701'))
+    .then(()=>loadScript('ui-page-architecture-v1701.js','dogson-ui-page-architecture-v1701','1750'))
     .then(()=>loadScript('ui-accuracy-guard-v1702.js','dogson-ui-accuracy-guard-v1702'))
     .then(()=>loadScript('ui-runtime-safety-v1720.js','dogson-ui-runtime-safety-v1720'))
     .then(()=>loadScript('ui-filter-v1730.js','dogson-ui-filter-v1730'))
