@@ -91,7 +91,7 @@
     ['ui-accuracy-guard-v1702.js','dogson-ui-accuracy-guard-v1702','1750peer2'],
     ['ui-runtime-safety-v1720.js','dogson-ui-runtime-safety-v1720',version],
     ['ui-filter-v1730.js','dogson-ui-filter-v1730',version],
-    ['ui-shell-v1751.js','dogson-shell-v1751','1751shell1']
+    ['ui-shell-v1751.js','dogson-shell-v1751','1751shell2']
   ];
 
   window.addEventListener('dogson:data-ready',()=>{if(modulesReady)waitForStableReveal()});
