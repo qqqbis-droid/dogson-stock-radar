@@ -1,6 +1,6 @@
 const CACHE='dogson-free-v1730';
 const UI_VERSION='1730';
-const MARKET_UI_REV='1751stable1';
+const MARKET_UI_REV='1751stable2';
 
 const UI_HEAD=`
 <link id="dogson-dashboard-css" rel="stylesheet" href="./redesign-v160.css?v=${UI_VERSION}">
@@ -31,7 +31,7 @@ function transformHtml(html){
   return html
     .replace('<meta name="theme-color" content="#0b0d12">','<meta name="theme-color" content="#f5f6f3">')
     .replaceAll('./sw.js?v=1530',`./sw.js?v=${UI_VERSION}`)
-    .replaceAll('./realtime-config.js?v=151','./realtime-config.js?v=1751stable1')
+    .replaceAll('./realtime-config.js?v=151','./realtime-config.js?v=1751stable2')
     .replaceAll('./realtime.js?v=151',`./realtime.js?v=${UI_VERSION}`)
     .replaceAll('dogsonSwReloaded1530',`dogsonSwReloaded${UI_VERSION}`)
     .replaceAll('location.reload();','void 0;');
@@ -41,9 +41,9 @@ function htmlResponse(html,res){const headers=new Headers(res.headers);headers.d
 async function transformResponse(res){const type=res.headers.get('content-type')||'';if(!res.ok||!type.includes('text/html'))return res;const html=transformHtml(await res.text());return htmlResponse(html,res);}
 
 const STATIC_ASSETS=[
-  './manifest.webmanifest','./hourly.js?v=1530','./realtime-config.js?v=1751stable1','./realtime.js?v=1730',`./ui-filters.js?v=${MARKET_UI_REV}`,
+  './manifest.webmanifest','./hourly.js?v=1530','./realtime-config.js?v=1751stable2','./realtime.js?v=1730',`./ui-filters.js?v=${MARKET_UI_REV}`,
   './redesign-v160.css?v=1730','./redesign-v160-dark.css?v=1730','./contrast-v160.css?v=1730','./redesign-v162.css?v=1730','./redesign-v162-fix.css?v=1730','./redesign-v163.css?v=1730','./redesign-v164.css?v=1730','./redesign-v165.css?v=1730','./redesign-v166.css?v=1730','./redesign-v1679.css?v=1730','./redesign-v1685.css?v=1730','./redesign-v1686.css?v=1730','./redesign-v1690.css?v=1730',
-  './ui-data-bootstrap-v1751.js?v=1751data1','./redesign-v160.js?v=1730','./ui-polish-v160.js?v=1730','./ui-layout-v162.js?v=1730','./ui-card-v164.js?v=1730','./ui-card-v166.js?v=1730','./ui-fold-v167.js?v=1730','./ui-entry-v1679.js?v=1730','./ui-freshness-v1688.js?v=1730','./ui-system-status-v1700.js?v=1751light1','./ui-dual-decision-v1690.js?v=1730','./ui-load-more-v1681.js?v=1730','./ui-market-v1685.js?v=1750peer1','./ui-market-ticker-v1686.js?v=1730','./ui-page-architecture-v1701.js?v=1750','./ui-accuracy-guard-v1702.js?v=1750peer2','./ui-runtime-safety-v1720.js?v=1730','./ui-filter-v1730.js?v=1730','./ui-shell-v1751.js?v=1751shell1'
+  './ui-data-bootstrap-v1751.js?v=1751data2','./redesign-v160.js?v=1730','./ui-polish-v160.js?v=1730','./ui-layout-v162.js?v=1730','./ui-card-v164.js?v=1730','./ui-card-v166.js?v=1730','./ui-fold-v167.js?v=1730','./ui-entry-v1679.js?v=1730','./ui-freshness-v1688.js?v=1730','./ui-system-status-v1700.js?v=1751light1','./ui-dual-decision-v1690.js?v=1730','./ui-load-more-v1681.js?v=1730','./ui-market-v1685.js?v=1750peer1','./ui-market-ticker-v1686.js?v=1730','./ui-page-architecture-v1701.js?v=1750','./ui-accuracy-guard-v1702.js?v=1750peer2','./ui-runtime-safety-v1720.js?v=1730','./ui-filter-v1730.js?v=1730','./ui-shell-v1751.js?v=1751shell1'
 ];
 
 self.addEventListener('install',event=>{
