@@ -70,8 +70,8 @@
   }
   function noticeSpec(){
     const m=modeNow(),d=dates(),why=reason();
-    if(m==='daytrade'&&!dayActionable())return{tone:staleDay()?'bad':'',title:staleDay()?'🎯 當沖舊資料已停用':'🎯 當沖目前不可執行',text:`${why}。系統不顯示「可執行／等回踩」清單；最近完整資金背景仍可參考，但不作當沖執行依據。`};
-    if(m==='intraday'&&!portfolioView()&&!liveReady())return{tone:'',title:'🛡️ 找波段使用最近完整盤後資料',text:`${why}。個股卡片改用 ${d.close||'最近完整交易日'} 的盤後波段資料；5分鐘變化與即時進場判斷暫停，資金流向改顯示最近完整盤後背景。`};
+    if(m==='daytrade'&&!dayActionable())return{tone:staleDay()?'bad':'',title:staleDay()?'🎯 當沖舊資料已停用':'🎯 當沖目前不可執行',text:`${why}。系統不顯示「可執行／等回踩」清單；當日最後資金動能快照仍保留供復盤，但不可作當沖執行依據。`};
+    if(m==='intraday'&&!portfolioView()&&!liveReady())return{tone:'',title:'🛡️ 找波段使用最近完整盤後資料',text:`${why}。個股卡片改用 ${d.close||'最近完整交易日'} 的盤後波段資料；5分鐘即時變化與即時進場判斷暫停，資金動能保留當日最後快照供復盤。`};
     if(m==='intraday'&&portfolioView()&&!liveReady())return{tone:'',title:'🛡️ 庫存使用最近完整資料',text:`${why}。庫存判讀改用 ${d.close||'最近完整交易日'} 盤後結構，不把非即時盤中轉折當成現在訊號。`};
     return null;
   }
@@ -89,7 +89,7 @@
   function withAccurateRows(fn){
     const m=modeNow();
     if(m==='intraday'&&!liveReady()){
-      let savedRows,savedMarket,savedChange,savedRotation;try{savedRows=intraRows;savedMarket=intraMarket;savedChange=changeRadar;savedRotation=sectorRotation;intraRows=Array.isArray(closeRows)?closeRows:[];intraMarket=(typeof closeMarket!=='undefined'&&closeMarket)||savedMarket;changeRadar={ready:false,counts:{},today:{},events:[],_disabled_reason:'not_live'};sectorRotation=[];window.DOGSON_EFFECTIVE_STOCK_SOURCE='close';return fn()}catch(e){return fn()}finally{try{intraRows=savedRows;intraMarket=savedMarket;changeRadar=savedChange;sectorRotation=savedRotation}catch(_){ }}
+      let savedRows,savedMarket,savedChange;try{savedRows=intraRows;savedMarket=intraMarket;savedChange=changeRadar;intraRows=Array.isArray(closeRows)?closeRows:[];intraMarket=(typeof closeMarket!=='undefined'&&closeMarket)||savedMarket;changeRadar={ready:false,counts:{},today:{},events:[],_disabled_reason:'not_live'};window.DOGSON_EFFECTIVE_STOCK_SOURCE='close';return fn()}catch(e){return fn()}finally{try{intraRows=savedRows;intraMarket=savedMarket;changeRadar=savedChange}catch(_){ }}
     }
     if(m==='daytrade'&&!dayActionable()){
       let savedRows,savedMarket;try{savedRows=daytradeRows;savedMarket=daytradeMarket;daytradeRows=[];daytradeMarket=(typeof closeMarket!=='undefined'&&closeMarket)||savedMarket;window.DOGSON_EFFECTIVE_STOCK_SOURCE='disabled_not_actionable';return fn()}catch(e){return fn()}finally{try{daytradeRows=savedRows;daytradeMarket=savedMarket}catch(_){ }}
