@@ -90,6 +90,32 @@
       html[data-dogson-theme="dark"] #dogsonFlowHomeV1685 .dogson-flow-stock-v1685>.dogson-flow-stock-name-v1685{color:#dce8e1!important}
       html[data-dogson-theme="dark"] #dogsonFlowHomeV1685 .dogson-flow-stock-v1685>small{color:#9da8a2}
       html[data-dogson-theme="dark"] #dogsonFlowHomeV1685 .dogson-flow-disabled-v1685{background:#252b27;border-color:#3a433e;color:#b8c2bc}
+
+      #peerPeekBack.dogson-flow-peer-light-back-v1685{background:rgba(32,43,38,.42)!important;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+      #peerPeekBack .peerpeek.dogson-peer-light-v1685{background:#f8faf7!important;color:#26332d!important;border:1px solid #d8e2dc!important;box-shadow:0 18px 48px rgba(39,61,51,.22)!important}
+      #peerPeekBack .dogson-peer-light-v1685 .peerpeekname{color:#26332d!important}
+      #peerPeekBack .dogson-peer-light-v1685 .code,
+      #peerPeekBack .dogson-peer-light-v1685 .sub,
+      #peerPeekBack .dogson-peer-light-v1685 .peerpeekl,
+      #peerPeekBack .dogson-peer-light-v1685 .stagehint{color:#7a8781!important}
+      #peerPeekBack .dogson-peer-light-v1685 .peerpeekitem{background:#fff!important;border:1px solid #dbe4df!important;color:#26332d!important;box-shadow:none!important}
+      #peerPeekBack .dogson-peer-light-v1685 .peerpeekv{color:#26332d!important}
+      #peerPeekBack .dogson-peer-light-v1685 .stagebox{background:#fff!important;border:1px solid #dbe4df!important;color:#26332d!important}
+      #peerPeekBack .dogson-peer-light-v1685 .stagetitle{color:#5f7168!important}
+      #peerPeekBack .dogson-peer-light-v1685 .stagereason{color:#26332d!important}
+      #peerPeekBack .dogson-peer-light-v1685 .stagechip{background:#eef7f2!important;border:1px solid #cfe4d8!important;color:#2f6d56!important}
+      #peerPeekBack .dogson-peer-light-v1685 .stagechip.risk{background:#fff1ef!important;border-color:#efcfca!important;color:#a44d46!important}
+      #peerPeekBack .dogson-peer-light-v1685 .peerpeekbtn{background:#eaf3ee!important;border:1px solid #cfe0d6!important;color:#315f52!important;box-shadow:none!important}
+      #peerPeekBack .dogson-peer-light-v1685 .peerpeekbtn.secondary{background:#fff!important;border-color:#d8e1dc!important;color:#607169!important}
+      #peerPeekBack .dogson-peer-light-v1685 .cat{background:#edf2ef!important;color:#53665d!important;border:1px solid #d7e0db!important}
+      #peerPeekBack .dogson-peer-light-v1685 .cat[data-flow-tone="start"]{background:#e5f5eb!important;color:#28734f!important;border-color:#c8e5d4!important}
+      #peerPeekBack .dogson-peer-light-v1685 .cat[data-flow-tone="setup"]{background:#f2f4df!important;color:#68742e!important;border-color:#dfe5bd!important}
+      #peerPeekBack .dogson-peer-light-v1685 .cat[data-flow-tone="trend"]{background:#e8f2f5!important;color:#356a78!important;border-color:#cde1e7!important}
+      #peerPeekBack .dogson-peer-light-v1685 .cat[data-flow-tone="pull"]{background:#fff5df!important;color:#8a6420!important;border-color:#ead9ad!important}
+      #peerPeekBack .dogson-peer-light-v1685 .cat[data-flow-tone="hot"]{background:#f7eaf5!important;color:#87517f!important;border-color:#e8cee4!important}
+      #peerPeekBack .dogson-peer-light-v1685 .cat[data-flow-tone="risk"]{background:#fff0ee!important;color:#9f4a43!important;border-color:#efcdc8!important}
+      #peerPeekBack .dogson-peer-light-v1685 .cat[data-flow-tone="watch"]{background:#eef2ef!important;color:#53665d!important;border-color:#d7e0db!important}
+
       @media(max-width:520px){
         #dogsonFlowHomeV1685 .dogson-flow-member-grid-v1685{grid-template-columns:1fr}
         #dogsonFlowHomeV1685 .dogson-flow-stock-v1685{min-width:0}
@@ -231,7 +257,42 @@
     const score=memberScore(r,view);
     const scoreText=score===null?'—':`${Math.round(score)}分`;
     const stage=stageLabel(r,view);
-    return `<button type="button" class="dogson-flow-stock-v1685 peerlink" data-code="${esc(r?.code||'')}"><span class="dogson-flow-stock-name-v1685">${esc(r?.code||'')} ${esc(r?.name||'')}</span><small>${esc(scoreText)} · ${esc(stage)}</small></button>`;
+    return `<button type="button" class="dogson-flow-stock-v1685 peerlink" data-code="${esc(r?.code||'')}" data-flow-view="${esc(view||'intraday')}" data-flow-stage="${esc(stage)}"><span class="dogson-flow-stock-name-v1685">${esc(r?.code||'')} ${esc(r?.name||'')}</span><small>${esc(scoreText)} · ${esc(stage)}</small></button>`;
+  }
+  function flowStageTone(stage){
+    const s=String(stage||'');
+    if(s.includes('過熱')||s.includes('不追'))return'hot';
+    if(s.includes('趨勢')||s.includes('持有'))return'trend';
+    if(s.includes('剛啟動')||s.includes('啟動'))return'start';
+    if(s.includes('蓄勢'))return'setup';
+    if(s.includes('回踩'))return'pull';
+    if(s.includes('轉弱')||s.includes('失效'))return'risk';
+    return'watch';
+  }
+  function openFlowPeer(btn,e){
+    const code=String(btn?.dataset?.code||'');
+    const view=String(btn?.dataset?.flowView||'intraday');
+    const stage=String(btn?.dataset?.flowStage||'觀察');
+    let source=[];
+    try{source=view==='close'?(Array.isArray(closeRows)?closeRows:[]):sourceRows(view,false)}catch{}
+    const row=source.find(r=>String(r?.code||'')===code);
+    if(!row||typeof showPeerPeek!=='function')return false;
+    e?.preventDefault?.();e?.stopImmediatePropagation?.();
+    let savedRows,changed=false;
+    try{
+      if(typeof rows!=='undefined'){savedRows=rows;rows=[row];changed=true}
+      showPeerPeek(code);
+    }catch(err){console.warn('Dogson flow peer open failed',err);return false}
+    finally{if(changed)try{rows=savedRows}catch{}}
+    const back=$('#peerPeekBack');
+    const modal=$('.peerpeek',back);
+    if(back)back.classList.add('dogson-flow-peer-light-back-v1685');
+    if(modal){
+      modal.classList.add('dogson-peer-light-v1685');
+      const toneKey=flowStageTone(stage);
+      $$('.cat',modal).slice(0,2).forEach(b=>{b.textContent=stage;b.dataset.flowTone=toneKey});
+    }
+    return true;
   }
   function membersHTML(x,view,closeMode){
     const members=membersForSector(x?.sector,view,closeMode);
@@ -328,6 +389,10 @@
   function boot(){
     render();
     watchSource($('#marketbox'));watchSource($('#rotationbox'));watchSource($('#updated'));
+    document.addEventListener('click',e=>{
+      const btn=e.target?.closest?.('#dogsonFlowHomeV1685 .dogson-flow-stock-v1685');
+      if(btn)openFlowPeer(btn,e);
+    },true);
     $$('.tab').forEach(b=>b.addEventListener('click',()=>setTimeout(render,80)));
     $('#dogsonViewNav')?.addEventListener('click',()=>setTimeout(render,100));
     window.addEventListener('dogson:freshness',()=>setTimeout(render,0));
