@@ -1,6 +1,6 @@
 (()=>{
-  if(window.__DOGSON_HEADER_ONLY_STATUS_V1747__) return;
-  window.__DOGSON_HEADER_ONLY_STATUS_V1747__=true;
+  if(window.__DOGSON_HEADER_ONLY_STATUS_V1748__) return;
+  window.__DOGSON_HEADER_ONLY_STATUS_V1748__=true;
 
   const $=(s,r=document)=>r.querySelector(s);
   const shortDate=v=>{
@@ -9,6 +9,7 @@
   };
   const modeNow=()=>{try{return mode||'intraday'}catch{return document.documentElement.dataset.dogsonPage||'intraday'}};
   let systemCache=null;
+  let rendering=false;
 
   function taipeiClock(){
     try{
@@ -32,47 +33,67 @@
   }
 
   function installStyle(){
-    if($('#dogson-header-only-status-style-v1747')) return;
+    if($('#dogson-header-only-status-style-v1748')) return;
     $('#dogson-header-only-status-style-v1746')?.remove();
+    $('#dogson-header-only-status-style-v1747')?.remove();
     const s=document.createElement('style');
-    s.id='dogson-header-only-status-style-v1747';
+    s.id='dogson-header-only-status-style-v1748';
     s.textContent=`
       #dogsonAccuracyGuardV1702,
-      #dogsonStableNoticeV1745{display:none!important;}
+      #dogsonStableNoticeV1745{display:none!important;visibility:hidden!important;height:0!important;min-height:0!important;max-height:0!important;margin:0!important;padding:0!important;border:0!important;overflow:hidden!important;}
 
-      .wrap>header #status.dogson-status-owner-v1747{
+      .wrap>header #status.dogson-status-owner-v1748{
         display:flex!important;
         flex-direction:column!important;
         justify-content:center!important;
         gap:2px!important;
       }
-      .wrap>header #status.dogson-status-owner-v1747 .dogson-status-line{
+      .wrap>header #status.dogson-status-owner-v1748 .dogson-status-line{
         display:block!important;
         width:100%!important;
         white-space:nowrap!important;
         overflow:hidden!important;
         text-overflow:clip!important;
       }
-      .wrap>header #status.dogson-status-owner-v1747.dogson-status-live-v1747{
+      .wrap>header #status.dogson-status-owner-v1748.dogson-status-live-v1748{
         align-items:flex-start!important;
         text-align:left!important;
       }
-      .wrap>header #status.dogson-status-owner-v1747.dogson-status-close-v1747{
+      .wrap>header #status.dogson-status-owner-v1748.dogson-status-close-v1748{
         align-items:center!important;
         text-align:center!important;
       }
-      .wrap>header #status.dogson-status-alert-v1747{
+      .wrap>header #status.dogson-status-alert-v1748{
         background:#fff8e8!important;
         border-color:#ead9a9!important;
         color:#6f5718!important;
       }
-      html[data-dogson-theme="dark"] .wrap>header #status.dogson-status-alert-v1747{
+      html[data-dogson-theme="dark"] .wrap>header #status.dogson-status-alert-v1748{
         background:#332c1b!important;
         border-color:#5a4b25!important;
         color:#f0d98e!important;
       }
     `;
     document.head.appendChild(s);
+  }
+
+  function hideLegacyNotice(){
+    const guard=$('#dogsonAccuracyGuardV1702');
+    if(guard){
+      guard.style.setProperty('display','none','important');
+      guard.style.setProperty('visibility','hidden','important');
+      guard.style.setProperty('height','0','important');
+      guard.style.setProperty('min-height','0','important');
+      guard.style.setProperty('max-height','0','important');
+      guard.style.setProperty('margin','0','important');
+      guard.style.setProperty('padding','0','important');
+      guard.setAttribute('aria-hidden','true');
+    }
+    const stable=$('#dogsonStableNoticeV1745');
+    if(stable){
+      stable.style.setProperty('display','none','important');
+      stable.setAttribute('aria-hidden','true');
+    }
   }
 
   function datePool(){
@@ -128,50 +149,73 @@
 
   function renderStatus(){
     const status=$('#status');
-    if(!status) return;
-    const x=spec();
-    const raw=x.lines.join('｜');
+    if(!status||rendering) return;
+    rendering=true;
+    try{
+      const x=spec();
+      const raw=x.lines.join('｜');
 
-    status.classList.add('dogson-status-owner-v1747');
-    status.classList.toggle('dogson-status-live-v1747',x.kind==='live');
-    status.classList.toggle('dogson-status-close-v1747',x.kind!=='live');
-    status.classList.toggle('dogson-status-alert-v1747',!!x.abnormal);
-    status.classList.remove('dogson-status-alert-v1746');
+      status.classList.remove('dogson-status-owner-v1747','dogson-status-live-v1747','dogson-status-close-v1747','dogson-status-alert-v1747','dogson-status-alert-v1746');
+      status.classList.add('dogson-status-owner-v1748');
+      status.classList.toggle('dogson-status-live-v1748',x.kind==='live');
+      status.classList.toggle('dogson-status-close-v1748',x.kind!=='live');
+      status.classList.toggle('dogson-status-alert-v1748',!!x.abnormal);
 
-    // Feed the legacy formatter the SAME dated value so it cannot revert the
-    // badge to the old undated MIS/5m text when its observer fires.
-    status.dataset.dogsonStatusRaw=raw;
-    status.dataset.dogsonStatusDisplay=raw;
-    status.dataset.dogsonHeaderOwner='1747';
+      // Keep the legacy formatter's raw cache dated as well. If another old
+      // module changes #status, the observer below restores this authoritative value.
+      status.dataset.dogsonStatusRaw=raw;
+      status.dataset.dogsonStatusDisplay=raw;
+      status.dataset.dogsonHeaderOwner='1748';
 
-    const current=[...status.querySelectorAll(':scope > .dogson-status-line')].map(n=>n.textContent||'');
-    if(current.length!==2||current[0]!==x.lines[0]||current[1]!==x.lines[1]){
-      status.innerHTML='';
-      x.lines.forEach(line=>{
-        const span=document.createElement('span');
-        span.className='dogson-status-line dogson-clean-status-line';
-        span.textContent=line;
-        status.appendChild(span);
-      });
+      const current=[...status.querySelectorAll(':scope > .dogson-status-line')].map(n=>n.textContent||'');
+      if(current.length!==2||current[0]!==x.lines[0]||current[1]!==x.lines[1]){
+        status.innerHTML='';
+        x.lines.forEach(line=>{
+          const span=document.createElement('span');
+          span.className='dogson-status-line dogson-clean-status-line';
+          span.textContent=line;
+          status.appendChild(span);
+        });
+      }
+    }finally{
+      rendering=false;
     }
   }
 
   function sync(){
     installStyle();
-    $('#dogsonStableNoticeV1745')?.remove();
+    hideLegacyNotice();
     renderStatus();
   }
 
   function boot(){
     sync();
     loadSystemStatus();
-    window.addEventListener('dogson:data-truth',()=>setTimeout(sync,30));
-    window.addEventListener('dogson:actionability',()=>setTimeout(sync,30));
-    window.addEventListener('dogson:freshness',()=>setTimeout(sync,30));
-    document.addEventListener('click',e=>{if(e.target?.closest?.('#dogsonViewNav,.tab,#portfolioOnly'))setTimeout(sync,70)});
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden){setTimeout(sync,30);loadSystemStatus()}});
-    setTimeout(sync,350);
-    setTimeout(sync,1100);
+
+    // Legacy safety/status modules may redraw after navigation or data refresh.
+    // Observe those changes and immediately restore the single authoritative UI.
+    const root=document.querySelector('.wrap')||document.body;
+    if(root){
+      new MutationObserver(()=>{
+        if(rendering) return;
+        hideLegacyNotice();
+        renderStatus();
+      }).observe(root,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class','style']});
+    }
+
+    window.addEventListener('dogson:data-truth',()=>setTimeout(sync,0));
+    window.addEventListener('dogson:actionability',()=>setTimeout(sync,0));
+    window.addEventListener('dogson:freshness',()=>setTimeout(sync,0));
+    document.addEventListener('click',e=>{
+      if(e.target?.closest?.('#dogsonViewNav,.tab,#portfolioOnly')){
+        setTimeout(sync,0);
+        setTimeout(sync,45);
+        setTimeout(sync,120);
+      }
+    },true);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden){setTimeout(sync,0);loadSystemStatus()}});
+    setTimeout(sync,250);
+    setTimeout(sync,800);
     setInterval(()=>{if(!document.hidden)sync()},15000);
   }
 
