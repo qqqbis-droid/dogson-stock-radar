@@ -1,124 +1,78 @@
 (()=>{
-  if(window.__DOGSON_STABLE_NOTICE_V1745__) return;
-  window.__DOGSON_STABLE_NOTICE_V1745__=true;
+  if(window.__DOGSON_HEADER_ONLY_STATUS_V1746__) return;
+  window.__DOGSON_HEADER_ONLY_STATUS_V1746__=true;
 
   const $=(s,r=document)=>r.querySelector(s);
-  const shortDate=v=>{
-    const m=String(v||'').match(/20\d{2}-(\d{2})-(\d{2})/);
-    return m?`${Number(m[1])}/${Number(m[2])}`:'';
-  };
-  const modeNow=()=>{try{return mode||'intraday'}catch{return document.documentElement.dataset.dogsonPage||'intraday'}};
-  const portfolioView=()=>{try{return !!portfolioOnly}catch{return document.documentElement.dataset.dogsonPage==='portfolio'}};
+
+  function taipeiClock(){
+    try{
+      const p={};
+      new Intl.DateTimeFormat('en-CA',{
+        timeZone:'Asia/Taipei',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'
+      }).formatToParts(new Date()).forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});
+      const minute=Number(p.hour)*60+Number(p.minute);
+      const weekday=['Mon','Tue','Wed','Thu','Fri'].includes(p.weekday);
+      return {session:weekday&&minute>=535&&minute<=815};
+    }catch{return {session:false}}
+  }
 
   function installStyle(){
-    if($('#dogson-stable-notice-style-v1745')) return;
+    if($('#dogson-header-only-status-style-v1746')) return;
     const s=document.createElement('style');
-    s.id='dogson-stable-notice-style-v1745';
+    s.id='dogson-header-only-status-style-v1746';
     s.textContent=`
-      /* Legacy safety notice keeps calculating state, but no longer owns visible UI. */
-      #dogsonAccuracyGuardV1702{display:none!important}
+      /* Data status has one visual owner: the header badge. */
+      #dogsonAccuracyGuardV1702,
       #dogsonStableNoticeV1745{
-        margin:4px 0 10px!important;
-        padding:0 10px!important;
-        height:30px!important;
-        min-height:30px!important;
-        max-height:30px!important;
-        box-sizing:border-box!important;
-        border:1px solid #ead9a9!important;
-        border-radius:10px!important;
+        display:none!important;
+      }
+
+      .wrap>header #status.dogson-status-alert-v1746{
         background:#fff8e8!important;
+        border-color:#ead9a9!important;
         color:#6f5718!important;
-        display:flex!important;
-        align-items:center!important;
-        overflow:hidden!important;
-        white-space:nowrap!important;
-        box-shadow:none!important;
-        font-size:10px!important;
-        font-weight:850!important;
-        line-height:1!important;
       }
-      #dogsonStableNoticeV1745.bad{
-        border-color:#efc5ca!important;
-        background:#fff0f2!important;
-        color:#8e303a!important;
-      }
-      #dogsonStableNoticeV1745 .dogson-stable-notice-text{
-        display:block!important;
-        width:100%!important;
-        min-width:0!important;
-        overflow:hidden!important;
-        text-overflow:ellipsis!important;
-        white-space:nowrap!important;
-      }
-      html[data-dogson-theme="dark"] #dogsonStableNoticeV1745{
+      html[data-dogson-theme="dark"] .wrap>header #status.dogson-status-alert-v1746{
         background:#332c1b!important;
         border-color:#5a4b25!important;
         color:#f0d98e!important;
-      }
-      html[data-dogson-theme="dark"] #dogsonStableNoticeV1745.bad{
-        background:#352126!important;
-        border-color:#63343b!important;
-        color:#ffb8c0!important;
       }
     `;
     document.head.appendChild(s);
   }
 
-  function spec(){
-    const snap=window.DOGSON_DATA_TRUTH_V1700;
-    if(!snap) return null;
-    const dates=snap.dates||{};
-    const m=modeNow(),p=portfolioView();
-    const live=window.DOGSON_INTRADAY_LIVE_READY===true||snap.operational?.liveReady===true;
-    const actionable=window.DOGSON_DAYTRADE_ACTIONABLE===true||snap.operational?.dayActionable===true;
-
-    if(m==='intraday'&&!p&&!live){
-      const d=shortDate(dates.close||dates.market||snap.latest);
-      return {tone:'warn',text:`🛡 非即時盤中｜候選股使用 ${d||'最近交易日'} 完整盤後資料`};
-    }
-    if(m==='intraday'&&p&&!live){
-      const d=shortDate(dates.close||dates.market||snap.latest);
-      return {tone:'warn',text:`🛡 非即時庫存｜使用 ${d||'最近交易日'} 完整盤後結構`};
-    }
-    if(m==='daytrade'&&!actionable){
-      return {tone:'bad',text:'🎯 當沖目前不可執行｜即時條件未通過，歷史資料僅供回顧'};
-    }
-    return null;
-  }
-
-  function render(){
+  function sync(){
     installStyle();
-    const x=spec();
-    let el=$('#dogsonStableNoticeV1745');
-    if(!x){el?.remove();return}
 
-    const anchor=$('#dogsonMissionV1700')||$('#dogsonViewNav');
-    if(!anchor) return;
-    if(!el){
-      el=document.createElement('aside');
-      el.id='dogsonStableNoticeV1745';
-      el.innerHTML='<span class="dogson-stable-notice-text"></span>';
-      anchor.insertAdjacentElement('afterend',el);
-    }else if(el.previousElementSibling!==anchor){
-      anchor.insertAdjacentElement('afterend',el);
-    }
+    // Remove the newer compact notice entirely. The legacy guard may recreate
+    // its own node because it still owns safety logic, but CSS keeps it hidden.
+    $('#dogsonStableNoticeV1745')?.remove();
 
-    el.classList.toggle('bad',x.tone==='bad');
-    const text=$('.dogson-stable-notice-text',el);
-    if(text&&text.textContent!==x.text) text.textContent=x.text;
+    const status=$('#status');
+    if(!status) return;
+
+    const m=(()=>{try{return mode||'intraday'}catch{return document.documentElement.dataset.dogsonPage||'intraday'}})();
+    const inSession=taipeiClock().session;
+    const live=window.DOGSON_INTRADAY_LIVE_READY===true;
+    const dayActionable=window.DOGSON_DAYTRADE_ACTIONABLE===true;
+
+    // Off-hours / weekends using the latest complete close data is normal,
+    // not an error. Highlight only when the market should be live but the
+    // corresponding real-time layer is unavailable.
+    const abnormal=(m==='intraday'&&inSession&&!live)||(m==='daytrade'&&inSession&&!dayActionable);
+    status.classList.toggle('dogson-status-alert-v1746',abnormal);
   }
 
   function boot(){
-    installStyle();
-    render();
-    window.addEventListener('dogson:data-truth',()=>setTimeout(render,10));
-    window.addEventListener('dogson:actionability',()=>setTimeout(render,10));
-    window.addEventListener('dogson:freshness',()=>setTimeout(render,10));
-    document.addEventListener('click',e=>{if(e.target?.closest?.('#dogsonViewNav,.tab,#portfolioOnly'))setTimeout(render,40)});
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(render,20)});
-    setTimeout(render,250);
-    setTimeout(render,900);
-    setInterval(()=>{if(!document.hidden)render()},60000);
+    sync();
+    window.addEventListener('dogson:data-truth',()=>setTimeout(sync,10));
+    window.addEventListener('dogson:actionability',()=>setTimeout(sync,10));
+    window.addEventListener('dogson:freshness',()=>setTimeout(sync,10));
+    document.addEventListener('click',e=>{if(e.target?.closest?.('#dogsonViewNav,.tab,#portfolioOnly'))setTimeout(sync,40)});
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(sync,20)});
+    setTimeout(sync,250);
+    setTimeout(sync,900);
+    setInterval(()=>{if(!document.hidden)sync()},60000);
   }
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true});
