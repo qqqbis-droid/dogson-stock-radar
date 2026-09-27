@@ -14,11 +14,12 @@ permissions:
   pages: write
   id-token: write
 
-# One production publisher queue. UI publishes wait for market-data publishers
-# and never replace live data with an older repository snapshot.
+# UI changes must not sit behind a stale/blocked market-data publisher.
+# The UI deploy preserves the newest live market data before publishing, so it is
+# safe for a fresh UI run to replace an older Pages publisher in the same group.
 concurrency:
   group: dogson-pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
