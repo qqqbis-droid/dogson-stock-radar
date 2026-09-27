@@ -46,7 +46,7 @@
   loadCss('redesign-v1690.css','dogson-dashboard-v1690-css');
 
   const plan=[
-    ['ui-data-bootstrap-v1751.js','dogson-data-bootstrap-v1751','1751data1'],
+    ['ui-data-bootstrap-v1751.js','dogson-data-bootstrap-v1751','1751data2'],
     ['redesign-v160.js','dogson-redesign-v160',version],
     ['ui-polish-v160.js','dogson-ui-polish-v160',version],
     ['ui-layout-v162.js','dogson-ui-layout-v162',version],
