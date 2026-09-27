@@ -29,12 +29,13 @@
       #dogsonStableNoticeV1745,
       #dogsonDataTruthV1700{display:none!important;visibility:hidden!important;height:0!important;min-height:0!important;max-height:0!important;margin:0!important;padding:0!important;border:0!important;overflow:hidden!important;}
 
-      .wrap>header{display:grid!important;grid-template-columns:minmax(0,1fr) 122px!important;column-gap:10px!important;align-items:stretch!important;margin:4px 2px 10px!important;}
+      /* Header position is explicit instead of relying on legacy grid child order. */
+      .wrap>header{position:relative!important;display:block!important;min-height:58px!important;padding-right:132px!important;margin:4px 2px 10px!important;}
       .wrap>header>div:first-child{min-width:0!important;display:flex!important;flex-direction:column!important;justify-content:center!important;}
       .wrap>header h1{margin:0!important;white-space:nowrap!important;line-height:1.18!important;}
       .wrap>header .sub{margin-top:4px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}
 
-      #dogsonHeaderStatusV1750{width:122px;height:58px;min-width:122px;box-sizing:border-box;margin:0;padding:8px 10px;border-radius:14px;display:flex;flex-direction:column;justify-content:center;gap:3px;font-size:10.5px;font-weight:850;line-height:1.25;overflow:hidden;}
+      #dogsonHeaderStatusV1750{position:absolute!important;top:0!important;right:0!important;width:122px;height:58px;min-width:122px;box-sizing:border-box;margin:0!important;padding:8px 10px;border-radius:14px;display:flex;flex-direction:column;justify-content:center;gap:3px;font-size:10.5px;font-weight:850;line-height:1.25;overflow:hidden;}
       #dogsonHeaderStatusV1750.center{align-items:center;text-align:center;}
       #dogsonHeaderStatusV1750.left{align-items:flex-start;text-align:left;}
       #dogsonHeaderStatusV1750.alert{background:#fff8e8!important;border-color:#ead9a9!important;color:#6f5718!important;}
@@ -59,14 +60,14 @@
       html[data-dogson-theme="dark"] #dogsonMissionV1700 .dogson-mission-text-v1700{color:#9da8a2!important;}
 
       @media(max-width:720px){
-        .wrap>header{grid-template-columns:minmax(0,1fr) 116px!important;column-gap:8px!important;}
+        .wrap>header{min-height:56px!important;padding-right:124px!important;}
         #dogsonHeaderStatusV1750{width:116px;min-width:116px;height:56px;padding:7px 9px;font-size:10px;}
         #dogsonViewNav.dogson-v1750-nav{grid-template-columns:minmax(0,1fr) 46px!important;gap:8px!important;}
         #dogsonViewNav .dogson-view-main>button{min-height:46px!important;padding:0 3px!important;font-size:13px!important;}
         #dogsonViewNav .dogson-theme-toggle{width:46px!important;height:54px!important;min-width:46px!important;font-size:19px!important;}
       }
       @media(max-width:360px){
-        .wrap>header{grid-template-columns:minmax(0,1fr) 110px!important;column-gap:6px!important;}
+        .wrap>header{padding-right:116px!important;}
         #dogsonHeaderStatusV1750{width:110px;min-width:110px;padding-left:7px;padding-right:7px;font-size:9.5px;}
       }
     `;
