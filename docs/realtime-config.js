@@ -1,4 +1,4 @@
-// v1.7.4 navigation labels; keeps existing radar scoring isolated.
+// v1.7.4 navigation labels + stable two-line header status; keeps existing radar scoring isolated.
 window.DOGSON_REALTIME_API = window.DOGSON_REALTIME_API || "";
 window.DOGSON_UI_ASSET_VERSION = '1730';
 
@@ -23,7 +23,7 @@ if (!document.getElementById('dogson-decision-filters')) {
 if (!document.getElementById('dogson-nav-v1740')) {
   const s = document.createElement('script');
   s.id = 'dogson-nav-v1740';
-  s.src = './ui-nav-v1740.js?v=1740';
+  s.src = './ui-nav-v1740.js?v=1742';
   s.defer = true;
   document.head.appendChild(s);
 }
