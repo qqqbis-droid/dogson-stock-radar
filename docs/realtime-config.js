@@ -1,9 +1,8 @@
-// v1.7.4 navigation + single-owner dated status; keeps radar scoring isolated.
+// v1.7.5 clean shell: one navigation owner + one dated status owner.
 window.DOGSON_REALTIME_API = window.DOGSON_REALTIME_API || "";
 window.DOGSON_UI_ASSET_VERSION = '1730';
 
-// Keep optional modules separate from the core page so a data-source/UI issue
-// cannot break the existing intraday / close radar rendering.
+// Data / scoring modules stay unchanged.
 if (!document.getElementById('dogson-hourly-module')) {
   const s = document.createElement('script');
   s.id = 'dogson-hourly-module';
@@ -20,21 +19,12 @@ if (!document.getElementById('dogson-decision-filters')) {
   document.head.appendChild(s);
 }
 
-if (!document.getElementById('dogson-nav-v1740')) {
+// UI reset: do not load the legacy nav / clean / stability / notice / status patch stack.
+// v1750 creates a new visible header-status element instead of reusing legacy #status.
+if (!document.getElementById('dogson-shell-v1750')) {
   const s = document.createElement('script');
-  s.id = 'dogson-nav-v1740';
-  s.src = './ui-nav-v1740.js?v=1742';
-  s.defer = true;
-  document.head.appendChild(s);
-}
-
-// v1749 replaces the older clean/stability/notice patch stack.
-// It does not observe DOM/style mutations; it only refreshes on data events,
-// navigation, app visibility, and a low-frequency timer.
-if (!document.getElementById('dogson-status-v1749')) {
-  const s = document.createElement('script');
-  s.id = 'dogson-status-v1749';
-  s.src = './ui-status-v1749.js?v=1749';
+  s.id = 'dogson-shell-v1750';
+  s.src = './ui-shell-v1750.js?v=1750';
   s.defer = true;
   document.head.appendChild(s);
 }
