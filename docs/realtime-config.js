@@ -21,7 +21,7 @@ if (!document.getElementById('dogson-boot-v1688')) {
 if (!document.getElementById('dogson-decision-filters') && !window.__DOGSON_UI_LOADER_V1730__) {
   const s = document.createElement('script');
   s.id = 'dogson-decision-filters';
-  s.src = './ui-filters.js?v=1751stable3';
+  s.src = './ui-filters.js?v=1751stable4';
   s.async = false;
   document.head.appendChild(s);
 }
