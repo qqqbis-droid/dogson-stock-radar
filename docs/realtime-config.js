@@ -1,4 +1,5 @@
 // v1.7.4 navigation + dated data status + simplified top hierarchy; keeps radar scoring isolated.
+// v1748: header is the single visible data-status owner; legacy notice UI stays hidden.
 window.DOGSON_REALTIME_API = window.DOGSON_REALTIME_API || "";
 window.DOGSON_UI_ASSET_VERSION = '1730';
 
