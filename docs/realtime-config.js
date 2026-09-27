@@ -15,8 +15,8 @@ if (!document.getElementById('dogson-decision-filters')) {
   const s = document.createElement('script');
   s.id = 'dogson-decision-filters';
   // Keep the canonical 1730 contract, but use a separate loader revision so
-  // iOS/PWA caches receive the latest market-flow UI immediately.
-  s.src = './ui-filters.js?v=1750h';
+  // iOS/PWA caches receive the stabilized startup loader immediately.
+  s.src = './ui-filters.js?v=1750boot1';
   s.async = true;
   document.head.appendChild(s);
 }
@@ -26,7 +26,7 @@ if (!document.getElementById('dogson-decision-filters')) {
 if (!document.getElementById('dogson-shell-v1750')) {
   const s = document.createElement('script');
   s.id = 'dogson-shell-v1750';
-  s.src = './ui-shell-v1750.js?v=1750d';
+  s.src = './ui-shell-v1750.js?v=1750e';
   s.defer = true;
   document.head.appendChild(s);
 }
