@@ -177,6 +177,12 @@
     const cold=[...arr].filter(x=>num(x.today_amount_100m)<0).sort((a,b)=>num(a.today_amount_100m)-num(b.today_amount_100m));
     return{hot,cold};
   }
+  function momentumStamp(){
+    let latest='';
+    try{for(const r of (Array.isArray(intraRows)?intraRows:[])){const t=String(r?.structure_time||r?.time||'').match(/(?:^|\D)([01]?\d|2[0-3]):([0-5]\d)/);if(t){const x=`${String(t[1]).padStart(2,'0')}:${t[2]}`;if(x>latest)latest=x}}}catch{}
+    const d=tradeDay(window.DOGSON_INTRADAY_TRADE_DATE||window.DOGSON_DATA_TRUTH_V1700?.dates?.intraday||'');
+    return[d,latest].filter(Boolean).join(' ');
+  }
   function flowValue(x,closeMode){
     if(closeMode)return`${signed(x.today_amount_100m,1,'億')}`;
     return`熱度 ${signed(x.heat,1)}`;
@@ -191,7 +197,10 @@
   function sourceRows(view,closeMode){
     try{
       if(closeMode)return Array.isArray(closeRows)?closeRows:[];
-      if(view==='daytrade')return Array.isArray(daytradeRows)?daytradeRows:[];
+      if(view==='daytrade'){
+        if(Array.isArray(daytradeRows)&&daytradeRows.length)return daytradeRows;
+        return Array.isArray(intraRows)?intraRows:[];
+      }
       return Array.isArray(intraRows)?intraRows:[];
     }catch{return[]}
   }
@@ -243,6 +252,7 @@
     const f=closeFlow();
     return{view,memberView:'close',closeMode:true,disabled:false,referenceOnly:view==='daytrade',subtitle,...f};
   }
+  function momentumUnavailable(view,subtitle){return{view,memberView:view==='daytrade'?'daytrade':'intraday',closeMode:false,disabled:true,subtitle,message:'目前沒有可保留的盤中資金動能快照。',hot:[],cold:[]}}
   function flowSpec(){
     const view=currentView();
     if(view==='close')return closeBackground(view,'盤後法人族群資金');
@@ -253,18 +263,20 @@
       }
       return closeBackground(view,'庫存｜最近完整盤後法人資金背景');
     }
+    const f=intradayFlow();
+    const stamp=momentumStamp();
     if(view==='daytrade'){
-      if(dayActionable()){
-        const f=intradayFlow();
-        if(hasFlow(f))return{view,memberView:'daytrade',closeMode:false,disabled:false,subtitle:'當沖｜盤中族群動能',...f};
+      if(hasFlow(f)){
+        if(dayActionable())return{view,memberView:'daytrade',closeMode:false,disabled:false,frozen:false,subtitle:'當沖｜盤中即時資金動能',...f};
+        return{view,memberView:'daytrade',closeMode:false,disabled:false,frozen:true,subtitle:`當沖｜${stamp?stamp+' ':''}收盤定格資金動能（不可執行）`,...f};
       }
-      return closeBackground(view,'當沖｜最近完整資金背景（僅參考，不納入執行）');
+      return momentumUnavailable(view,'當沖｜資金動能');
     }
-    if(liveIntraday()){
-      const f=intradayFlow();
-      if(hasFlow(f))return{view,memberView:'intraday',closeMode:false,disabled:false,subtitle:'盤中族群動能／熱度',...f};
+    if(hasFlow(f)){
+      if(liveIntraday())return{view,memberView:'intraday',closeMode:false,disabled:false,frozen:false,subtitle:'盤中｜即時資金動能',...f};
+      return{view,memberView:'intraday',closeMode:false,disabled:false,frozen:true,subtitle:`盤中｜${stamp?stamp+' ':''}收盤定格資金動能`,...f};
     }
-    return closeBackground(view,'盤中｜最近完整盤後法人資金背景');
+    return momentumUnavailable(view,'盤中｜資金動能');
   }
   function openFlowKeys(host){
     return new Set($$('details[open][data-flow-key]',host).map(x=>x.dataset.flowKey).filter(Boolean));
@@ -276,22 +288,24 @@
     const host=$('#dogsonFlowHomeV1685');if(!host)return;
     installFlowStyle();
     const spec=flowSpec();
+    const title=spec.closeMode?'資金流向':spec.view==='portfolio'?'資金背景':'資金動能';
     if(spec.disabled){
-      const html=`<div class="dogson-layer-head-v1685"><div><div class="dogson-layer-kicker-v1685">資金流向</div><div class="dogson-layer-sub-v1685">${esc(spec.subtitle)}</div></div></div><div class="dogson-flow-disabled-v1685">${esc(spec.message)}</div>`;
+      const html=`<div class="dogson-layer-head-v1685"><div><div class="dogson-layer-kicker-v1685">${esc(title)}</div><div class="dogson-layer-sub-v1685">${esc(spec.subtitle)}</div></div></div><div class="dogson-flow-disabled-v1685">${esc(spec.message)}</div>`;
       if(host.dataset.h!==html){host.innerHTML=html;host.dataset.h=html}
       return;
     }
     const lead=spec.hot.slice(0,3).map(x=>x.sector).filter(Boolean);
-    const sentence=lead.length?(spec.closeMode?`最近完整資金較集中在：${lead.join('、')}。`:`盤中動能目前較集中在：${lead.join('、')}。`):'目前沒有明顯集中族群，先以個股相對強弱為主。';
+    const sentence=lead.length?(spec.closeMode?`最近完整資金較集中在：${lead.join('、')}。`:spec.frozen?`收盤前最後動能較集中在：${lead.join('、')}。`:`盤中動能目前較集中在：${lead.join('、')}。`):'目前沒有明顯集中族群，先以個股相對強弱為主。';
     const openKeys=openFlowKeys(host);
+    const fullLabel=spec.closeMode?'查看完整資金流向':spec.view==='portfolio'?'查看完整資金背景':'查看完整資金動能';
     const html=`
-      <div class="dogson-layer-head-v1685"><div><div class="dogson-layer-kicker-v1685">資金流向</div><div class="dogson-layer-sub-v1685">${esc(spec.subtitle)}｜先看族群，點開後再看個股。</div></div></div>
+      <div class="dogson-layer-head-v1685"><div><div class="dogson-layer-kicker-v1685">${esc(title)}</div><div class="dogson-layer-sub-v1685">${esc(spec.subtitle)}｜先看族群，點開後再看個股。</div></div></div>
       <div class="dogson-flow-summary-v1685">${esc(sentence)}</div>
       <div class="dogson-flow-preview-v1685">
         <div><div class="dogson-flow-colhead-v1685">${spec.closeMode?'🔴 流入 TOP 3':'🔥 吸金 TOP 3'}</div>${flowRows(spec.hot,'in',spec,3)}</div>
         <div><div class="dogson-flow-colhead-v1685">${spec.closeMode?'🟢 流出 TOP 3':'🧊 降溫 TOP 3'}</div>${flowRows(spec.cold,'out',spec,3)}</div>
       </div>
-      <details class="dogson-inline-details-v1685" data-flow-key="main"><summary>查看完整資金流向</summary><div class="dogson-inline-details-body-v1685"><div class="dogson-flow-detail-grid-v1685"><div><div class="dogson-flow-colhead-v1685">${spec.closeMode?'主要流入':'主要吸金'}</div>${flowRows(spec.hot,'in',spec,5)}</div><div><div class="dogson-flow-colhead-v1685">${spec.closeMode?'主要流出':'主要降溫'}</div>${flowRows(spec.cold,'out',spec,5)}</div></div></div></details>`;
+      <details class="dogson-inline-details-v1685" data-flow-key="main"><summary>${esc(fullLabel)}</summary><div class="dogson-inline-details-body-v1685"><div class="dogson-flow-detail-grid-v1685"><div><div class="dogson-flow-colhead-v1685">${spec.closeMode?'主要流入':'主要吸金'}</div>${flowRows(spec.hot,'in',spec,5)}</div><div><div class="dogson-flow-colhead-v1685">${spec.closeMode?'主要流出':'主要降溫'}</div>${flowRows(spec.cold,'out',spec,5)}</div></div></div></details>`;
     if(host.dataset.h!==html){
       host.innerHTML=html;
       host.dataset.h=html;
