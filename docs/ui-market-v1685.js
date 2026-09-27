@@ -11,9 +11,17 @@
   const fmtIndex=v=>{const n=num(v);return n===null?'—':n.toLocaleString('zh-TW',{minimumFractionDigits:2,maximumFractionDigits:2})};
   const tone=v=>{const n=num(v);return n===null?'flat':n>0?'up':n<0?'down':'flat'};
   const staleIntraday=()=>!!window.DOGSON_INTRADAY_STALE;
+  const liveIntraday=()=>window.DOGSON_INTRADAY_LIVE_READY===true&&!staleIntraday();
+  const dayActionable=()=>window.DOGSON_DAYTRADE_ACTIONABLE===true&&liveIntraday();
   const tradeDay=v=>{const m=String(v||'').match(/20\d{2}-(\d{2})-(\d{2})/);return m?`${Number(m[1])}/${Number(m[2])}`:''};
 
   function currentMode(){try{return mode||'intraday'}catch{return'intraday'}}
+  function portfolioView(){try{return !!portfolioOnly}catch{return false}}
+  function currentView(){
+    if(portfolioView())return'portfolio';
+    const m=currentMode();
+    return m==='close'?'close':m==='daytrade'?'daytrade':'intraday';
+  }
   function closeMarketData(){try{return closeMarket||{}}catch{return{}}}
   function currentMarket(){
     if(currentMode()!=='close'&&staleIntraday()) return closeMarketData();
@@ -50,6 +58,41 @@
       if(n!==stock&&body)body.appendChild(n);
     });
     return true;
+  }
+
+  function installFlowStyle(){
+    if($('#dogson-flow-member-style-v1685'))return;
+    const s=document.createElement('style');
+    s.id='dogson-flow-member-style-v1685';
+    s.textContent=`
+      #dogsonFlowHomeV1685{display:block!important}
+      #dogsonFlowHomeV1685 .dogson-flow-row-v1685{display:block!important}
+      #dogsonFlowHomeV1685 .dogson-flow-row-top-v1685{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+      #dogsonFlowHomeV1685 .dogson-flow-row-copy-v1685{min-width:0}
+      #dogsonFlowHomeV1685 .dogson-flow-row-copy-v1685>b{display:block;font-size:11px;color:#2b3731;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      #dogsonFlowHomeV1685 .dogson-flow-row-copy-v1685>span{display:block;font-size:9px;color:#7b8781;line-height:1.45;margin-top:3px;white-space:normal;overflow:visible}
+      #dogsonFlowHomeV1685 .dogson-flow-row-top-v1685>strong{font-size:10px;white-space:nowrap;font-variant-numeric:tabular-nums}
+      #dogsonFlowHomeV1685 .dogson-flow-stocks-v1685{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+      #dogsonFlowHomeV1685 .dogson-flow-stock-v1685{appearance:none;-webkit-appearance:none;display:flex;flex-direction:column;align-items:flex-start;gap:2px;max-width:100%;min-height:36px;padding:6px 8px;border:1px solid #dce5df;border-radius:10px;background:#fff;color:#315f52;text-align:left;cursor:pointer;touch-action:manipulation}
+      #dogsonFlowHomeV1685 .dogson-flow-stock-v1685:active{transform:scale(.985);background:#f1f6f3}
+      #dogsonFlowHomeV1685 .dogson-flow-stock-v1685>.dogson-flow-stock-name-v1685{display:block!important;font-size:10px!important;line-height:1.2!important;font-weight:900!important;color:#315f52!important;margin:0!important;white-space:nowrap!important}
+      #dogsonFlowHomeV1685 .dogson-flow-stock-v1685>small{display:block;font-size:8.5px;color:#7b8781;line-height:1.2;white-space:nowrap}
+      #dogsonFlowHomeV1685 .dogson-flow-members-v1685{margin-top:7px!important;padding-top:0!important;border-top:0!important}
+      #dogsonFlowHomeV1685 .dogson-flow-members-v1685>summary{font-size:9.5px;color:#54776c;cursor:pointer;list-style:none}
+      #dogsonFlowHomeV1685 .dogson-flow-members-v1685>summary::-webkit-details-marker{display:none}
+      #dogsonFlowHomeV1685 .dogson-flow-member-grid-v1685{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:7px}
+      #dogsonFlowHomeV1685 .dogson-flow-disabled-v1685{margin-top:10px;padding:12px;border:1px dashed #d8dfdb;border-radius:12px;background:#f7f9f7;color:#67736d;font-size:11px;line-height:1.6}
+      html[data-dogson-theme="dark"] #dogsonFlowHomeV1685 .dogson-flow-row-copy-v1685>b{color:#eef2ef}
+      html[data-dogson-theme="dark"] #dogsonFlowHomeV1685 .dogson-flow-stock-v1685{background:#252b27;border-color:#3a433e;color:#dce8e1}
+      html[data-dogson-theme="dark"] #dogsonFlowHomeV1685 .dogson-flow-stock-v1685>.dogson-flow-stock-name-v1685{color:#dce8e1!important}
+      html[data-dogson-theme="dark"] #dogsonFlowHomeV1685 .dogson-flow-stock-v1685>small{color:#9da8a2}
+      html[data-dogson-theme="dark"] #dogsonFlowHomeV1685 .dogson-flow-disabled-v1685{background:#252b27;border-color:#3a433e;color:#b8c2bc}
+      @media(max-width:520px){
+        #dogsonFlowHomeV1685 .dogson-flow-member-grid-v1685{grid-template-columns:1fr}
+        #dogsonFlowHomeV1685 .dogson-flow-stock-v1685{min-width:0}
+      }
+    `;
+    document.head.appendChild(s);
   }
 
   function indexSnap(symbol,component){
@@ -119,10 +162,6 @@
     if(host.dataset.h!==html){host.innerHTML=html;host.dataset.h=html}
   }
 
-  function leaderText(x){
-    const arr=Array.isArray(x?.leaders)?x.leaders:[];
-    return arr.slice(0,2).map(v=>v?.name||v?.code).filter(Boolean).join('、');
-  }
   function intradayFlow(){
     const arr=rotation().filter(x=>num(x?.heat)!==null);
     const hot=[...arr].filter(x=>num(x.heat)>0).sort((a,b)=>num(b.heat)-num(a.heat));
@@ -144,33 +183,118 @@
     const parts=[];
     if(num(x.change_pct)!==null)parts.push(`族群 ${signed(x.change_pct,1,'%')}`);
     if(num(x.turnover_share_pct)!==null)parts.push(`成交占比 ${num(x.turnover_share_pct).toFixed(1)}%`);
-    const l=leaderText(x);if(l)parts.push(l);
     return parts.join('｜')||'族群輪動資料';
   }
-  function flowRows(arr,kind,closeMode,limit=3){
+  function sourceRows(view,closeMode){
+    try{
+      if(closeMode)return Array.isArray(closeRows)?closeRows:[];
+      if(view==='daytrade')return Array.isArray(daytradeRows)?daytradeRows:[];
+      return Array.isArray(intraRows)?intraRows:[];
+    }catch{return[]}
+  }
+  function sectorKey(r){return String(r?.sector_group||r?.sector||'').trim()}
+  function memberScore(r,view){
+    if(view==='daytrade')return num(r?.daytrade_score)??num(r?.intraday_score)??num(r?.score);
+    return num(r?.intraday_score)??num(r?.swing_quality_score)??num(r?.score);
+  }
+  function stageLabel(r,view){
+    if(view==='daytrade'&&r?.daytrade_state)return String(r.daytrade_state);
+    try{if(typeof stageKey==='function')return stageKey(r?.category)||String(r?.category||'觀察')}catch{}
+    return String(r?.category||'觀察');
+  }
+  function membersForSector(sector,view,closeMode){
+    const key=String(sector||'').trim();
+    if(closeMode){
+      try{
+        if(typeof closeSectorMembers==='function'){
+          const a=closeSectorMembers(key);
+          if(Array.isArray(a)&&a.length)return a;
+        }
+      }catch{}
+    }
+    const arr=sourceRows(view,closeMode).filter(r=>sectorKey(r)===key);
+    return arr.sort((a,b)=>(memberScore(b,view)??-999)-(memberScore(a,view)??-999)||(num(b?.day_change)??-999)-(num(a?.day_change)??-999));
+  }
+  function memberButton(r,view){
+    const score=memberScore(r,view);
+    const scoreText=score===null?'—':`${Math.round(score)}分`;
+    const stage=stageLabel(r,view);
+    return `<button type="button" class="dogson-flow-stock-v1685 peerlink" data-code="${esc(r?.code||'')}"><span class="dogson-flow-stock-name-v1685">${esc(r?.code||'')} ${esc(r?.name||'')}</span><small>${esc(scoreText)} · ${esc(stage)}</small></button>`;
+  }
+  function membersHTML(x,view,closeMode,full){
+    const members=membersForSector(x?.sector,view,closeMode);
+    if(!members.length)return'<div class="dogson-flow-stocks-v1685"><span class="dogson-empty-v1685">目前沒有可用個股</span></div>';
+    const visible=members.slice(0,full?3:2).map(r=>memberButton(r,view)).join('');
+    if(!full||members.length<=3)return`<div class="dogson-flow-stocks-v1685">${visible}</div>`;
+    const rest=members.slice(3,30).map(r=>memberButton(r,view)).join('');
+    return `<div class="dogson-flow-stocks-v1685">${visible}</div><details class="dogson-flow-members-v1685" data-flow-key="members:${esc(x?.sector||'')}"><summary>查看全部 ${members.length} 檔 ▾</summary><div class="dogson-flow-member-grid-v1685">${rest}</div></details>`;
+  }
+  function flowRows(arr,kind,spec,limit=3,full=false){
     if(!arr.length)return`<div class="dogson-empty-v1685">目前沒有明顯${kind==='in'?'流入／吸金':'流出／降溫'}族群</div>`;
-    return arr.slice(0,limit).map(x=>`<div class="dogson-flow-row-v1685"><div><b>${esc(x.sector||'未分類')}</b><span>${esc(flowMeta(x,closeMode))}</span></div><strong class="${kind==='in'?'up':'down'}">${esc(flowValue(x,closeMode))}</strong></div>`).join('');
+    return arr.slice(0,limit).map(x=>`<div class="dogson-flow-row-v1685" data-flow-sector="${esc(x?.sector||'')}"><div class="dogson-flow-row-top-v1685"><div class="dogson-flow-row-copy-v1685"><b>${esc(x?.sector||'未分類')}</b><span>${esc(flowMeta(x,spec.closeMode))}</span></div><strong class="${kind==='in'?'up':'down'}">${esc(flowValue(x,spec.closeMode))}</strong></div>${membersHTML(x,spec.memberView,spec.closeMode,full)}</div>`).join('');
+  }
+  function flowSpec(){
+    const view=currentView();
+    if(view==='close'){
+      const f=closeFlow();
+      return{view,memberView:'close',closeMode:true,disabled:false,subtitle:'盤後法人族群資金',...f};
+    }
+    if(view==='daytrade'){
+      if(!dayActionable())return{view,memberView:'daytrade',closeMode:false,disabled:true,subtitle:'當沖即時資金狀態',message:'目前不是可驗證的即時盤中狀態，資金動能暫停；歷史資金不作當沖執行依據。',hot:[],cold:[]};
+      const f=intradayFlow();
+      return{view,memberView:'daytrade',closeMode:false,disabled:false,subtitle:'當沖｜盤中族群動能',...f};
+    }
+    if(view==='portfolio'){
+      if(liveIntraday()){
+        const f=intradayFlow();
+        return{view,memberView:'intraday',closeMode:false,disabled:false,subtitle:'庫存｜盤中族群資金背景',...f};
+      }
+      const f=closeFlow();
+      return{view,memberView:'close',closeMode:true,disabled:false,subtitle:'庫存｜最近完整盤後法人資金背景',...f};
+    }
+    if(liveIntraday()){
+      const f=intradayFlow();
+      return{view,memberView:'intraday',closeMode:false,disabled:false,subtitle:'盤中族群動能／熱度',...f};
+    }
+    const f=closeFlow();
+    return{view,memberView:'close',closeMode:true,disabled:false,subtitle:'最近完整盤後法人資金背景',...f};
+  }
+  function openFlowKeys(host){
+    return new Set($$('details[open][data-flow-key]',host).map(x=>x.dataset.flowKey).filter(Boolean));
+  }
+  function restoreFlowKeys(host,keys){
+    $$('details[data-flow-key]',host).forEach(x=>{if(keys.has(x.dataset.flowKey))x.open=true});
   }
   function renderFlow(){
     const host=$('#dogsonFlowHomeV1685');if(!host)return;
-    const closeMode=currentMode()==='close';
-    const {hot,cold}=closeMode?closeFlow():intradayFlow();
-    const lead=hot.slice(0,3).map(x=>x.sector).filter(Boolean);
-    const sentence=lead.length?(closeMode?`資金目前較集中在：${lead.join('、')}。`:`盤中動能目前較集中在：${lead.join('、')}。`):'目前沒有明顯集中族群，先以個股相對強弱為主。';
-    const subtitle=closeMode?'盤後法人族群資金':'盤中族群動能／熱度';
+    installFlowStyle();
+    const spec=flowSpec();
+    if(spec.disabled){
+      const html=`<div class="dogson-layer-head-v1685"><div><div class="dogson-layer-kicker-v1685">資金流向</div><div class="dogson-layer-sub-v1685">${esc(spec.subtitle)}</div></div></div><div class="dogson-flow-disabled-v1685">${esc(spec.message)}</div>`;
+      if(host.dataset.h!==html){host.innerHTML=html;host.dataset.h=html}
+      return;
+    }
+    const lead=spec.hot.slice(0,3).map(x=>x.sector).filter(Boolean);
+    const sentence=lead.length?(spec.closeMode?`最近完整資金較集中在：${lead.join('、')}。`:`盤中動能目前較集中在：${lead.join('、')}。`):'目前沒有明顯集中族群，先以個股相對強弱為主。';
+    const openKeys=openFlowKeys(host);
     const html=`
-      <div class="dogson-layer-head-v1685"><div><div class="dogson-layer-kicker-v1685">資金流向</div><div class="dogson-layer-sub-v1685">${esc(subtitle)}｜先看錢往哪裡走，再挑個股。</div></div></div>
+      <div class="dogson-layer-head-v1685"><div><div class="dogson-layer-kicker-v1685">資金流向</div><div class="dogson-layer-sub-v1685">${esc(spec.subtitle)}｜族群下方可直接點個股查看小卡。</div></div></div>
       <div class="dogson-flow-summary-v1685">${esc(sentence)}</div>
       <div class="dogson-flow-preview-v1685">
-        <div><div class="dogson-flow-colhead-v1685">${closeMode?'🔴 流入 TOP 3':'🔥 吸金 TOP 3'}</div>${flowRows(hot,'in',closeMode,3)}</div>
-        <div><div class="dogson-flow-colhead-v1685">${closeMode?'🟢 流出 TOP 3':'🧊 降溫 TOP 3'}</div>${flowRows(cold,'out',closeMode,3)}</div>
+        <div><div class="dogson-flow-colhead-v1685">${spec.closeMode?'🔴 流入 TOP 3':'🔥 吸金 TOP 3'}</div>${flowRows(spec.hot,'in',spec,3,false)}</div>
+        <div><div class="dogson-flow-colhead-v1685">${spec.closeMode?'🟢 流出 TOP 3':'🧊 降溫 TOP 3'}</div>${flowRows(spec.cold,'out',spec,3,false)}</div>
       </div>
-      <details class="dogson-inline-details-v1685"><summary>查看完整資金流向</summary><div class="dogson-inline-details-body-v1685"><div class="dogson-flow-detail-grid-v1685"><div><div class="dogson-flow-colhead-v1685">${closeMode?'主要流入':'主要吸金'}</div>${flowRows(hot,'in',closeMode,5)}</div><div><div class="dogson-flow-colhead-v1685">${closeMode?'主要流出':'主要降溫'}</div>${flowRows(cold,'out',closeMode,5)}</div></div></div></details>`;
-    if(host.dataset.h!==html){host.innerHTML=html;host.dataset.h=html}
+      <details class="dogson-inline-details-v1685" data-flow-key="main"><summary>查看完整資金流向</summary><div class="dogson-inline-details-body-v1685"><div class="dogson-flow-detail-grid-v1685"><div><div class="dogson-flow-colhead-v1685">${spec.closeMode?'主要流入':'主要吸金'}</div>${flowRows(spec.hot,'in',spec,5,true)}</div><div><div class="dogson-flow-colhead-v1685">${spec.closeMode?'主要流出':'主要降溫'}</div>${flowRows(spec.cold,'out',spec,5,true)}</div></div></div></details>`;
+    if(host.dataset.h!==html){
+      host.innerHTML=html;
+      host.dataset.h=html;
+      restoreFlowKeys(host,openKeys);
+    }
   }
 
   function render(){
     if(!ensureLayout())return;
+    installFlowStyle();
     renderMarket();renderFlow();
   }
 
@@ -186,6 +310,8 @@
     $$('.tab').forEach(b=>b.addEventListener('click',()=>setTimeout(render,80)));
     $('#dogsonViewNav')?.addEventListener('click',()=>setTimeout(render,100));
     window.addEventListener('dogson:freshness',()=>setTimeout(render,0));
+    window.addEventListener('dogson:data-truth',()=>setTimeout(render,0));
+    window.addEventListener('dogson:actionability',()=>setTimeout(render,0));
     setTimeout(render,250);setTimeout(render,900);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
