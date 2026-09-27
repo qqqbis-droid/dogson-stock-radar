@@ -7,7 +7,7 @@ window.DOGSON_UI_ASSET_VERSION = '1730';
 if ('serviceWorker' in navigator && !window.__DOGSON_SW_BOOT_RELOAD_1751__) {
   window.__DOGSON_SW_BOOT_RELOAD_1751__ = true;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    const key = 'dogson-sw-boot-reload-1751stable1';
+    const key = 'dogson-sw-boot-reload-1751stable2';
     if (sessionStorage.getItem(key) === '1') return;
     sessionStorage.setItem(key, '1');
     location.reload();
@@ -33,7 +33,7 @@ if (!document.getElementById('dogson-boot-v1688')) {
 if (!document.getElementById('dogson-decision-filters') && !window.__DOGSON_UI_LOADER_V1730__) {
   const s = document.createElement('script');
   s.id = 'dogson-decision-filters';
-  s.src = './ui-filters.js?v=1751stable1';
+  s.src = './ui-filters.js?v=1751stable2';
   s.async = false;
   document.head.appendChild(s);
 }
