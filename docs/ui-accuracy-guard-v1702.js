@@ -86,10 +86,37 @@
     try{window.dispatchEvent(new CustomEvent('dogson:actionability',{detail:{intradayLiveReady:lr,daytradeActionable:da,quoteAgeMinutes:t.quoteAge,structureAgeMinutes:t.structureAge}}))}catch(_){ }
   }
 
+  function frozenIntradayFocus(){
+    const code=String($('#q')?.value||'').trim();
+    if(!code)return null;
+    try{return (Array.isArray(intraRows)?intraRows:[]).find(r=>String(r?.code||'')===code)||null}catch{return null}
+  }
+
   function withAccurateRows(fn){
     const m=modeNow();
     if(m==='intraday'&&!liveReady()){
-      let savedRows,savedMarket,savedChange;try{savedRows=intraRows;savedMarket=intraMarket;savedChange=changeRadar;intraRows=Array.isArray(closeRows)?closeRows:[];intraMarket=(typeof closeMarket!=='undefined'&&closeMarket)||savedMarket;changeRadar={ready:false,counts:{},today:{},events:[],_disabled_reason:'not_live'};window.DOGSON_EFFECTIVE_STOCK_SOURCE='close';return fn()}catch(e){return fn()}finally{try{intraRows=savedRows;intraMarket=savedMarket;changeRadar=savedChange}catch(_){ }}
+      const frozen=frozenIntradayFocus();
+      if(frozen){
+        let savedRows,savedChange;
+        try{
+          savedRows=intraRows;savedChange=changeRadar;
+          intraRows=[frozen];
+          changeRadar={ready:false,counts:{},today:{},events:[],_disabled_reason:'frozen_review'};
+          window.DOGSON_EFFECTIVE_STOCK_SOURCE='intraday_frozen_review';
+          return fn();
+        }catch(e){return fn()}
+        finally{try{intraRows=savedRows;changeRadar=savedChange}catch(_){ }}
+      }
+      let savedRows,savedMarket,savedChange;
+      try{
+        savedRows=intraRows;savedMarket=intraMarket;savedChange=changeRadar;
+        intraRows=Array.isArray(closeRows)?closeRows:[];
+        intraMarket=(typeof closeMarket!=='undefined'&&closeMarket)||savedMarket;
+        changeRadar={ready:false,counts:{},today:{},events:[],_disabled_reason:'not_live'};
+        window.DOGSON_EFFECTIVE_STOCK_SOURCE='close';
+        return fn();
+      }catch(e){return fn()}
+      finally{try{intraRows=savedRows;intraMarket=savedMarket;changeRadar=savedChange}catch(_){ }}
     }
     if(m==='daytrade'&&!dayActionable()){
       let savedRows,savedMarket;try{savedRows=daytradeRows;savedMarket=daytradeMarket;daytradeRows=[];daytradeMarket=(typeof closeMarket!=='undefined'&&closeMarket)||savedMarket;window.DOGSON_EFFECTIVE_STOCK_SOURCE='disabled_not_actionable';return fn()}catch(e){return fn()}finally{try{daytradeRows=savedRows;daytradeMarket=savedMarket}catch(_){ }}
