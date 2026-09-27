@@ -1,5 +1,5 @@
 // v1.7.4 navigation + dated data status + simplified top hierarchy; keeps radar scoring isolated.
-// v1748: header is the single visible data-status owner; legacy notice UI stays hidden.
+// Emergency rollback: v1748 observer disabled to keep the site responsive.
 window.DOGSON_REALTIME_API = window.DOGSON_REALTIME_API || "";
 window.DOGSON_UI_ASSET_VERSION = '1730';
 
@@ -41,14 +41,6 @@ if (!document.getElementById('dogson-stability-v1744')) {
   const s = document.createElement('script');
   s.id = 'dogson-stability-v1744';
   s.src = './ui-stability-v1744.js?v=1744';
-  s.defer = true;
-  document.head.appendChild(s);
-}
-
-if (!document.getElementById('dogson-stable-notice-v1745')) {
-  const s = document.createElement('script');
-  s.id = 'dogson-stable-notice-v1745';
-  s.src = './ui-stable-notice-v1745.js?v=1748';
   s.defer = true;
   document.head.appendChild(s);
 }
