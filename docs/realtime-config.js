@@ -2,6 +2,19 @@
 window.DOGSON_REALTIME_API = window.DOGSON_REALTIME_API || "";
 window.DOGSON_UI_ASSET_VERSION = '1730';
 
+// If an older service worker opened this page, reload exactly once after the
+// stabilized worker takes control so the current session also gets the new
+// cache/data policy instead of requiring a second manual launch.
+if ('serviceWorker' in navigator && !window.__DOGSON_SW_BOOT_RELOAD_1750__) {
+  window.__DOGSON_SW_BOOT_RELOAD_1750__ = true;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    const key = 'dogson-sw-boot-reload-1750boot1';
+    if (sessionStorage.getItem(key) === '1') return;
+    sessionStorage.setItem(key, '1');
+    location.reload();
+  });
+}
+
 // Data / scoring modules stay unchanged.
 if (!document.getElementById('dogson-hourly-module')) {
   const s = document.createElement('script');
