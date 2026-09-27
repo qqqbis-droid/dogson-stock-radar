@@ -124,6 +124,10 @@
     }catch{return false}
   }
 
+  function liveLines(d,quote,structure){
+    return [`${d||'—'} 盤中即時`,`報價 ${quote||'—'}｜5K ${structure||'—'}`];
+  }
+
   function spec(){
     const view=activeView();
     const ds=dates();
@@ -144,14 +148,14 @@
     if(view==='daytrade'){
       if(actionable){
         const d=shortDate(ds.daytrade||ds.intraday||ds.latest);
-        return {align:'left',alert:false,lines:[`${d||'—'} MIS${quote?` ${quote}`:''}`,`5分K${structure?` ${structure}`:''}`]};
+        return {align:'center',alert:false,lines:liveLines(d,quote,structure)};
       }
       const d=shortDate(ds.daytrade||ds.intraday||ds.close||ds.latest);
       return {align:'center',alert:taipeiSession(),lines:[`${d||'—'} 歷史`,'當沖停用']};
     }
     if(live){
       const d=shortDate(ds.intraday||ds.latest);
-      return {align:'left',alert:false,lines:[`${d||'—'} MIS${quote?` ${quote}`:''}`,`5分K${structure?` ${structure}`:''}`]};
+      return {align:'center',alert:false,lines:liveLines(d,quote,structure)};
     }
     const d=shortDate(ds.close||ds.market||ds.latest);
     return {align:'center',alert:taipeiSession(),lines:[`${d||'—'} 盤後`,'完整資料']};
