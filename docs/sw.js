@@ -1,5 +1,6 @@
 const CACHE='dogson-free-v1730';
 const UI_VERSION='1730';
+const MARKET_UI_REV='1750';
 
 const UI_HEAD=`
 <link id="dogson-dashboard-css" rel="stylesheet" href="./redesign-v160.css?v=${UI_VERSION}">
@@ -20,7 +21,7 @@ html.dogson-booting .wrap,html.dogson-booting .footer{opacity:0!important;pointe
 html.dogson-booting body::before{content:'🐶 犬子老師・飆股雷達';position:fixed;z-index:99998;left:0;right:0;top:42%;transform:translateY(-50%);text-align:center;color:#234d40;font:900 20px/1.4 -apple-system,BlinkMacSystemFont,'PingFang TC',sans-serif;letter-spacing:.02em}
 html.dogson-booting body::after{content:'正在載入最新介面…';position:fixed;z-index:99999;left:0;right:0;top:calc(42% + 42px);text-align:center;color:#718078;font:700 13px/1.4 -apple-system,BlinkMacSystemFont,'PingFang TC',sans-serif}
 </style>
-<script id="dogson-decision-filters" src="./ui-filters.js?v=${UI_VERSION}" defer></script>`;
+<script id="dogson-decision-filters" src="./ui-filters.js?v=${MARKET_UI_REV}" defer></script>`;
 
 function transformHtml(html){
   if(!html.includes('dogson-boot-v1688')){
@@ -44,9 +45,9 @@ self.addEventListener('install',event=>{
   event.waitUntil((async()=>{
     const cache=await caches.open(CACHE);
     await cache.addAll([
-      './manifest.webmanifest','./hourly.js?v=1530','./realtime-config.js?v=1730','./realtime.js?v=1730','./ui-filters.js?v=1730',
+      './manifest.webmanifest','./hourly.js?v=1530','./realtime-config.js?v=1730','./realtime.js?v=1730','./ui-filters.js?v=1750',
       './redesign-v160.css?v=1730','./redesign-v160-dark.css?v=1730','./contrast-v160.css?v=1730','./redesign-v162.css?v=1730','./redesign-v162-fix.css?v=1730','./redesign-v163.css?v=1730','./redesign-v164.css?v=1730','./redesign-v165.css?v=1730','./redesign-v166.css?v=1730','./redesign-v1679.css?v=1730','./redesign-v1685.css?v=1730','./redesign-v1686.css?v=1730',
-      './redesign-v160.js?v=1730','./ui-polish-v160.js?v=1730','./ui-layout-v162.js?v=1730','./ui-card-v164.js?v=1730','./ui-card-v166.js?v=1730','./ui-fold-v167.js?v=1730','./ui-entry-v1679.js?v=1730','./ui-freshness-v1688.js?v=1730','./ui-system-status-v1700.js?v=1730','./ui-dual-decision-v1690.js?v=1730','./ui-load-more-v1681.js?v=1730','./ui-market-v1685.js?v=1730','./ui-market-ticker-v1686.js?v=1730','./ui-page-architecture-v1701.js?v=1730','./ui-accuracy-guard-v1702.js?v=1730','./ui-runtime-safety-v1720.js?v=1730','./ui-filter-v1730.js?v=1730'
+      './redesign-v160.js?v=1730','./ui-polish-v160.js?v=1730','./ui-layout-v162.js?v=1730','./ui-card-v164.js?v=1730','./ui-card-v166.js?v=1730','./ui-fold-v167.js?v=1730','./ui-entry-v1679.js?v=1730','./ui-freshness-v1688.js?v=1730','./ui-system-status-v1700.js?v=1730','./ui-dual-decision-v1690.js?v=1730','./ui-load-more-v1681.js?v=1730','./ui-market-v1750.js?v=1750','./ui-market-ticker-v1686.js?v=1730','./ui-page-architecture-v1701.js?v=1750','./ui-accuracy-guard-v1702.js?v=1730','./ui-runtime-safety-v1720.js?v=1730','./ui-filter-v1730.js?v=1730'
     ]);
     try{const res=await fetch('./index.html',{cache:'no-store'});const out=await transformResponse(res);if(out.ok)await cache.put('./index.html',out.clone());}catch(_){ }
   })());
