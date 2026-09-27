@@ -43,7 +43,7 @@
     .then(()=>loadScript('ui-system-status-v1700.js','dogson-ui-system-status-v1700'))
     .then(()=>loadScript('ui-dual-decision-v1690.js','dogson-ui-dual-decision-v1690'))
     .then(()=>loadScript('ui-load-more-v1681.js','dogson-ui-load-more-v1681'))
-    .then(()=>loadScript('ui-market-v1750.js','dogson-ui-market-v1750','1750'))
+    .then(()=>loadScript('ui-market-v1685.js','dogson-ui-market-v1685','1750c'))
     .then(()=>loadScript('ui-market-ticker-v1686.js','dogson-ui-market-ticker-v1688'))
     .then(()=>loadScript('ui-page-architecture-v1701.js','dogson-ui-page-architecture-v1701','1750'))
     .then(()=>loadScript('ui-accuracy-guard-v1702.js','dogson-ui-accuracy-guard-v1702'))
