@@ -227,15 +227,15 @@
   function membersHTML(x,view,closeMode){
     const members=membersForSector(x?.sector,view,closeMode);
     if(!members.length)return'<div class="dogson-flow-member-grid-v1685"><span class="dogson-empty-v1685">目前沒有可用個股</span></div>';
-    return \`<div class="dogson-flow-member-grid-v1685">\${members.slice(0,30).map(r=>memberButton(r,view)).join('')}</div>\`;
+    return `<div class="dogson-flow-member-grid-v1685">${members.slice(0,30).map(r=>memberButton(r,view)).join('')}</div>`;
   }
   function flowRows(arr,kind,spec,limit=3){
-    if(!arr.length)return\`<div class="dogson-empty-v1685">目前沒有明顯\${kind==='in'?'流入／吸金':'流出／降溫'}族群</div>\`;
+    if(!arr.length)return`<div class="dogson-empty-v1685">目前沒有明顯${kind==='in'?'流入／吸金':'流出／降溫'}族群</div>`;
     return arr.slice(0,limit).map(x=>{
       const members=membersForSector(x?.sector,spec.memberView,spec.closeMode);
       const count=members.length;
       const key='sector:'+kind+':'+String(x?.sector||'');
-      return \`<details class="dogson-flow-row-v1685 dogson-flow-sector-v1685" data-flow-key="\${esc(key)}"><summary class="dogson-flow-row-top-v1685"><div class="dogson-flow-row-copy-v1685"><b>\${esc(x?.sector||'未分類')}</b><span>\${esc(flowMeta(x,spec.closeMode))}</span></div><div class="dogson-flow-row-side-v1685"><strong class="\${kind==='in'?'up':'down'}">\${esc(flowValue(x,spec.closeMode))}</strong><small>\${count?'查看 '+count+' 檔':'查看個股'} ▾</small></div></summary><div class="dogson-flow-members-v1685">\${membersHTML(x,spec.memberView,spec.closeMode)}</div></details>\`;
+      return `<details class="dogson-flow-row-v1685 dogson-flow-sector-v1685" data-flow-key="${esc(key)}"><summary class="dogson-flow-row-top-v1685"><div class="dogson-flow-row-copy-v1685"><b>${esc(x?.sector||'未分類')}</b><span>${esc(flowMeta(x,spec.closeMode))}</span></div><div class="dogson-flow-row-side-v1685"><strong class="${kind==='in'?'up':'down'}">${esc(flowValue(x,spec.closeMode))}</strong><small>${count?'查看 '+count+' 檔':'查看個股'} ▾</small></div></summary><div class="dogson-flow-members-v1685">${membersHTML(x,spec.memberView,spec.closeMode)}</div></details>`;
     }).join('');
   }
   function hasFlow(f){return !!(f&&(f.hot?.length||f.cold?.length))}
