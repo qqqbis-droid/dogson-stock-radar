@@ -14,7 +14,9 @@ if (!document.getElementById('dogson-hourly-module')) {
 if (!document.getElementById('dogson-decision-filters')) {
   const s = document.createElement('script');
   s.id = 'dogson-decision-filters';
-  s.src = `./ui-filters.js?v=${window.DOGSON_UI_ASSET_VERSION}`;
+  // Keep the canonical 1730 contract, but use a separate loader revision so
+  // iOS/PWA caches receive the latest market-flow UI immediately.
+  s.src = './ui-filters.js?v=1750';
   s.async = true;
   document.head.appendChild(s);
 }
