@@ -35,3 +35,11 @@ if (!document.getElementById('dogson-clean-v1743')) {
   s.defer = true;
   document.head.appendChild(s);
 }
+
+if (!document.getElementById('dogson-stability-v1744')) {
+  const s = document.createElement('script');
+  s.id = 'dogson-stability-v1744';
+  s.src = './ui-stability-v1744.js?v=1744';
+  s.defer = true;
+  document.head.appendChild(s);
+}
