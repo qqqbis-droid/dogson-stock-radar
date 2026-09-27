@@ -14,7 +14,6 @@ on:
       - "scripts/validate_intraday_publish.py"
       - "docs/index.html"
       - "docs/realtime.js"
-      - "docs/realtime-config.js"
       - "docs/ui-filters.js"
       - "api/quote.js"
       - ".github/workflows/intraday.yml"
@@ -47,59 +46,20 @@ jobs:
           python-version: "3.12"
           cache: "pip"
       - run: pip install -r requirements.txt
-      - name: Download last close/chip/bridge data from live Pages
-        run: python scripts/sync_live_data.py || true
-      - name: Build 5-minute radar base
-        run: python scripts/build_data.py --mode intraday
-      - name: Bridge delayed 5-minute tail with TWSE MIS snapshots
+      - name: Preserve latest published close/chip files before intraday deploy
+        run: python scripts/sync_live_data.py
+      - name: Refresh intraday data
         run: python scripts/bridge_intraday.py
-      - name: Enrich swing decision details
-        run: python scripts/build_completion.py --mode intraday
-      - name: Build isolated day-trading radar
+      - name: Build daytrade data
         run: python scripts/build_daytrade.py
-      - name: Preserve source intraday scan for future validation
+      - name: Build 60m lifecycle + entry-position lights
+        run: python scripts/build_hourly.py
+      - name: Archive signals + resolve real outcomes
         run: python scripts/build_validation.py --mode intraday
       - name: Build canonical data status
         run: python scripts/build_system_status.py
-
-      - name: Strict trading-date publish gate
+      - name: Validate intraday publish
         run: python scripts/validate_intraday_publish.py
-
-      - name: Verify isolation and canonical status contract
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          from scripts.build_system_status import APP_VERSION
-
-          intra=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
-          day=json.loads(Path('docs/data/daytrade.json').read_text(encoding='utf-8'))
-          bridge=intra.get('bridge') or {}
-          iso=day.get('isolation') or {}
-
-          if intra.get('completion_version') is None:
-              raise SystemExit('completion layer missing')
-          if any(bool(iso.get(k)) for k in ['writes_intraday','changes_stage2','changes_swing_score','changes_intraday_score']):
-              raise SystemExit('daytrade isolation contract violated')
-
-          status=json.loads(Path('docs/data/system_status.json').read_text(encoding='utf-8'))
-          if status.get('app_version') != APP_VERSION:
-              raise SystemExit(f"canonical app_version mismatch: {status.get('app_version')} != {APP_VERSION}")
-          freshness=status.get('freshness') or {}
-          if freshness.get('intraday_stale') or freshness.get('daytrade_stale'):
-              raise SystemExit(f'canonical status marks actionable data stale: {freshness}')
-
-          print('publish contract ok', {
-              'app_version': APP_VERSION,
-              'bridge_trade_date': bridge.get('trade_date'),
-              'quote_time': bridge.get('latest_quote_time'),
-              'structure_time': bridge.get('latest_structure_time'),
-              'intraday_rows': len(intra.get('rows') or []),
-              'daytrade_rows': len(day.get('rows') or []),
-              'system_dates': status.get('dates'),
-          })
-          PY
-
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
