@@ -1,5 +1,4 @@
-// v1.7.4 navigation + dated data status + simplified top hierarchy; keeps radar scoring isolated.
-// Emergency rollback: v1748 observer disabled to keep the site responsive.
+// v1.7.4 navigation + single-owner dated status; keeps radar scoring isolated.
 window.DOGSON_REALTIME_API = window.DOGSON_REALTIME_API || "";
 window.DOGSON_UI_ASSET_VERSION = '1730';
 
@@ -29,18 +28,13 @@ if (!document.getElementById('dogson-nav-v1740')) {
   document.head.appendChild(s);
 }
 
-if (!document.getElementById('dogson-clean-v1743')) {
+// v1749 replaces the older clean/stability/notice patch stack.
+// It does not observe DOM/style mutations; it only refreshes on data events,
+// navigation, app visibility, and a low-frequency timer.
+if (!document.getElementById('dogson-status-v1749')) {
   const s = document.createElement('script');
-  s.id = 'dogson-clean-v1743';
-  s.src = './ui-clean-v1743.js?v=1743';
-  s.defer = true;
-  document.head.appendChild(s);
-}
-
-if (!document.getElementById('dogson-stability-v1744')) {
-  const s = document.createElement('script');
-  s.id = 'dogson-stability-v1744';
-  s.src = './ui-stability-v1744.js?v=1744';
+  s.id = 'dogson-status-v1749';
+  s.src = './ui-status-v1749.js?v=1749';
   s.defer = true;
   document.head.appendChild(s);
 }
