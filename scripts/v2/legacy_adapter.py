@@ -11,6 +11,21 @@ def num(v, default=None):
     except Exception:
         return default
 
+def first_num(row, keys):
+    for key in keys:
+        value = num(row.get(key))
+        if value is not None:
+            return value
+    return None
+
+def infer_volume_unit(row):
+    raw = str(row.get("volume_unit") or "").strip().upper()
+    if raw in {"SHARE", "SHARES", "股"}:
+        return "SHARES"
+    if raw in {"LOT", "LOTS", "張"}:
+        return "LOTS"
+    return "UNKNOWN"
+
 def infer_freshness(row, session_phase):
     if session_phase == "LIVE": return "LIVE"
     if session_phase == "CLOSE_FREEZE": return "FROZEN"
@@ -27,14 +42,30 @@ def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, mar
     score = num(row.get("swing_quality_score", row.get("score")))
     intraday = num(row.get("intraday_score", row.get("intraday_momentum_score")))
     daytrade = num(row.get("daytrade_score"))
-    missing=[]
-    for name,value in [("swing_quality_score",score),("entry_position_score",entry)]:
-        if value is None: missing.append(name)
-    coverage=max(0,100-20*len(missing)); confidence=num(row.get("data_confidence"),coverage)
     code=str(row.get("code") or "").strip(); now=datetime.now(TW).isoformat(timespec="seconds")
-    as_of=row.get("updated_at") or row.get("time") or now
+    as_of=row.get("quote_time") or row.get("updated_at") or row.get("time") or now
     if isinstance(as_of,str) and "T" not in as_of:
         as_of=f"{trade_date}T{as_of}:00+08:00" if ":" in as_of else now
+
+    price = first_num(row, ("current_price", "price", "close", "last_price", "last"))
+    day_change_pct = first_num(row, ("day_change", "day_change_pct", "change_pct", "pct_change"))
+    volume = first_num(row, ("current_volume", "volume", "total_volume"))
+    relative_volume = first_num(row, ("vol_x", "relative_volume", "volume_ratio"))
+    turnover_value_twd = first_num(row, ("current_turnover", "turnover_value_twd"))
+    quote = {
+        "price": price,
+        "day_change_pct": day_change_pct,
+        "volume": volume,
+        "volume_unit": infer_volume_unit(row),
+        "relative_volume": relative_volume,
+        "turnover_value_twd": turnover_value_twd,
+        "quote_time": as_of,
+    }
+
+    missing=[]
+    for name,value in [("swing_quality_score",score),("entry_position_score",entry),("quote.price",price)]:
+        if value is None: missing.append(name)
+    coverage=max(0,100-20*sum(1 for x in missing if x in {"swing_quality_score","entry_position_score"})-10*sum(1 for x in missing if x=="quote.price")); confidence=num(row.get("data_confidence"),coverage)
     why=list(row.get("stage_signals") or row.get("reasons") or [])
     blockers=[]
     if not actionable:
@@ -45,6 +76,7 @@ def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, mar
         "schema_version":"2.0.0","build_id":build_id,"dataset":"decision","trade_date":trade_date,"session_phase":session_phase,"as_of":as_of,"known_at":now,"generated_at":now,"freshness":freshness,"complete":len(missing)==0,"confidence":confidence,
         "source_status":{"sources":["legacy-v1-adapter"],"fallback":False,"fallback_source":None,"fallback_build_id":None,"fallback_reason":None,"last_success_at":now},
         "decision_context_id":f"{build_id}:{mission}:{code}","code":code,"name":str(row.get("name") or code),"market":str(row.get("market") or "UNKNOWN"),"industry":row.get("industry_name") or row.get("industry"),"primary_group":row.get("sector_group"),"secondary_groups":[],"theme_tags":[],
+        "quote":quote,
         "scores":{"swing_quality_score":score,"intraday_momentum_score":intraday,"daytrade_score":daytrade,"entry_position_score":entry,"market_score":market_score},
         "lifecycle_stage":stage,"previous_stage":previous_stage,"stage_changed_at":None,"stage_age":None,"stage_confidence":None,"action_state":action,"actionable":bool(actionable),"no_chase":action=="DO_NOT_CHASE","risk_overlays":overlays,"opportunity_bucket":bucket,"opportunity_rank":None,
         "why_now":why[:3],"blockers":blockers[:3],"upgrade_conditions":["等待下一個合法 Trigger / 結構確認"] if not actionable else [],"risk_flags":list(row.get("stage_risks") or []),"data_confidence":confidence,"component_coverage":coverage,"missing_fields":missing,
