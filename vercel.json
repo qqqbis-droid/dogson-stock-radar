@@ -1,18 +1,29 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
+  "redirects": [
+    { "source": "/v2", "destination": "/v2/", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/", "destination": "/docs/index.html" },
     { "source": "/manifest.webmanifest", "destination": "/docs/manifest.webmanifest" },
     { "source": "/sw.js", "destination": "/docs/sw.js" },
     { "source": "/realtime.js", "destination": "/docs/realtime.js" },
-    { "source": "/data/:path*", "destination": "/docs/data/:path*" }
+    { "source": "/data/:path*", "destination": "/docs/data/:path*" },
+    { "source": "/v2/", "destination": "/docs/v2/index.html" },
+    { "source": "/v2/:path*", "destination": "/docs/v2/:path*" }
   ],
   "headers": [
     {
       "source": "/api/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate, max-age=0" }
+      ]
+    },
+    {
+      "source": "/v2/data/current_manifest.json",
+      "headers": [
         { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate, max-age=0" }
       ]
     }
