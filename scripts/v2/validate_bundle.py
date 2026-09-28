@@ -28,6 +28,18 @@ def resolve(root, url):
     return root / raw.lstrip("./")
 
 
+def plan_zone_refs(plan):
+    refs = []
+    for key in ("entry_zone", "invalidation", "no_chase_zone"):
+        obj = plan.get(key)
+        if isinstance(obj, dict) and obj.get("zone_id"):
+            refs.append(str(obj["zone_id"]))
+    for target in plan.get("targets") or []:
+        if isinstance(target, dict) and target.get("zone_id"):
+            refs.append(str(target["zone_id"]))
+    return refs
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=str(ROOT / "docs" / "v2" / "data"))
@@ -41,15 +53,16 @@ def main():
         ok = False
 
     zone_ids = set()
+    plan_ids = set()
     for key, meta in manifest["datasets"].items():
-        if not key.startswith("zone_"):
-            continue
         path = resolve(root, meta["url"])
         if not path.exists():
             continue
         obj = load(path)
-        if isinstance(obj, list):
+        if key.startswith("zone_") and isinstance(obj, list):
             zone_ids.update(str(row.get("zone_id")) for row in obj if isinstance(row, dict) and row.get("zone_id"))
+        if key.startswith("tradeplan_") and isinstance(obj, list):
+            plan_ids.update(str(row.get("plan_id")) for row in obj if isinstance(row, dict) and row.get("plan_id"))
 
     for key, meta in manifest["datasets"].items():
         path = resolve(root, meta["url"])
@@ -69,6 +82,16 @@ def main():
                 if row.get("build_id") != active:
                     print("ERROR zone build_id mismatch", row.get("zone_id"))
                     ok = False
+        elif key.startswith("tradeplan_"):
+            for row in obj:
+                ok = validate("trade-plan.schema.json", row) and ok
+                if row.get("build_id") != active:
+                    print("ERROR tradeplan build_id mismatch", row.get("plan_id"))
+                    ok = False
+                missing = [ref for ref in plan_zone_refs(row) if ref not in zone_ids]
+                if missing:
+                    print("ERROR unresolved tradeplan zone refs", row.get("plan_id"), missing)
+                    ok = False
         elif key.startswith("decision_") and key.endswith("_summary"):
             for row in obj:
                 ok = validate("stock-decision.schema.json", row) and ok
@@ -85,9 +108,13 @@ def main():
                     if missing:
                         print("ERROR unresolved zone refs", row.get("code"), missing)
                         ok = False
+                    plan_id = row.get("trade_plan_id")
+                    if plan_id and plan_id not in plan_ids:
+                        print("ERROR unresolved tradeplan ref", row.get("code"), plan_id)
+                        ok = False
     if not ok:
         raise SystemExit(1)
-    print("bundle validation OK", active, "zones", len(zone_ids))
+    print("bundle validation OK", active, "zones", len(zone_ids), "tradeplans", len(plan_ids))
 
 
 if __name__ == "__main__":
