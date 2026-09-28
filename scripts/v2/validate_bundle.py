@@ -39,6 +39,18 @@ def main():
     if any(dataset.get("build_id") != active for dataset in manifest["datasets"].values()):
         print("ERROR mixed build_id in manifest")
         ok = False
+
+    zone_ids = set()
+    for key, meta in manifest["datasets"].items():
+        if not key.startswith("zone_"):
+            continue
+        path = resolve(root, meta["url"])
+        if not path.exists():
+            continue
+        obj = load(path)
+        if isinstance(obj, list):
+            zone_ids.update(str(row.get("zone_id")) for row in obj if isinstance(row, dict) and row.get("zone_id"))
+
     for key, meta in manifest["datasets"].items():
         path = resolve(root, meta["url"])
         if not path.exists():
@@ -51,13 +63,16 @@ def main():
         elif key.startswith("sector_"):
             for row in obj:
                 ok = validate("sector-state.schema.json", row) and ok
+        elif key.startswith("zone_"):
+            for row in obj:
+                ok = validate("structural-zone.schema.json", row) and ok
+                if row.get("build_id") != active:
+                    print("ERROR zone build_id mismatch", row.get("zone_id"))
+                    ok = False
         elif key.startswith("decision_") and key.endswith("_summary"):
             for row in obj:
                 ok = validate("stock-decision.schema.json", row) and ok
         elif key.startswith("decision_") and key.endswith("_detail"):
-            # Real 2.0 detail maps contain full StockDecision objects. The deterministic
-            # Phase-3 demo uses a lightweight detail fixture; validate it only when it
-            # advertises the canonical decision dataset rather than guessing fields.
             values = list((obj.get("items") or {}).values()) if isinstance(obj, dict) else []
             for row in values:
                 if isinstance(row, dict) and row.get("dataset") == "decision":
@@ -65,9 +80,14 @@ def main():
                     if row.get("build_id") != active:
                         print("ERROR detail build_id mismatch", row.get("code"))
                         ok = False
+                    refs = list(row.get("support_zone_ids") or []) + list(row.get("resistance_zone_ids") or [])
+                    missing = [ref for ref in refs if ref not in zone_ids]
+                    if missing:
+                        print("ERROR unresolved zone refs", row.get("code"), missing)
+                        ok = False
     if not ok:
         raise SystemExit(1)
-    print("bundle validation OK", active)
+    print("bundle validation OK", active, "zones", len(zone_ids))
 
 
 if __name__ == "__main__":
