@@ -1,0 +1,18 @@
+{
+  "schema_version": "2.0.0",
+  "app_contract_version": "2.0.0",
+  "active_build_id": "cb2-demo-20260928-postclose-v1",
+  "previous_good_build_id": null,
+  "trade_date": "2026-09-28",
+  "session_phase": "POST_CLOSE",
+  "generated_at": "2026-09-28T19:09:21+08:00",
+  "datasets": {
+    "market_summary": {"url":"./data/builds/cb2-demo-20260928-postclose-v1/market-summary.json","hash":"sha256:167239e2962337304a48e25e35fca486da9c6c4d5e23eb1de1b7affedc330090","bytes":776,"complete":true,"as_of":"2026-09-28T19:09:21+08:00","known_at":"2026-09-28T19:09:21+08:00","build_id":"cb2-demo-20260928-postclose-v1"},
+    "sector_summary": {"url":"./data/builds/cb2-demo-20260928-postclose-v1/sector-summary.json","hash":"sha256:c7f434aac5e1230bc3f1738767638876829132ab28e6793c01e7ece57c84f1b3","bytes":7924,"complete":true,"as_of":"2026-09-28T19:09:21+08:00","known_at":"2026-09-28T19:09:21+08:00","build_id":"cb2-demo-20260928-postclose-v1"},
+    "decision_summary": {"url":"./data/builds/cb2-demo-20260928-postclose-v1/decision-summary.json","hash":"sha256:601723fa2391933907928a57a2f9b159f89d328e8a2c25952abc9dec23919086","bytes":17896,"complete":true,"as_of":"2026-09-28T19:09:21+08:00","known_at":"2026-09-28T19:09:21+08:00","build_id":"cb2-demo-20260928-postclose-v1"},
+    "decision_detail": {"url":"./data/builds/cb2-demo-20260928-postclose-v1/decision-detail.json","hash":"sha256:c4aa118d417f26594ca86b762b1a0d598d940477c0535c74f2d5ae5c2b4a6c00","bytes":5912,"complete":true,"as_of":"2026-09-28T19:09:21+08:00","known_at":"2026-09-28T19:09:21+08:00","build_id":"cb2-demo-20260928-postclose-v1"},
+    "portfolio_summary": {"url":"./data/builds/cb2-demo-20260928-postclose-v1/portfolio-summary.json","hash":"sha256:ae18d46cb17c5b614afae6f1a51647d45126dc26a9631686175183c5d69c2c98","bytes":467,"complete":true,"as_of":"2026-09-28T19:09:21+08:00","known_at":"2026-09-28T19:09:21+08:00","build_id":"cb2-demo-20260928-postclose-v1"},
+    "health": {"url":"./data/builds/cb2-demo-20260928-postclose-v1/health.json","hash":"sha256:9b9f672da0ee3ae93c33a2dfaef189fb111e92b1f3a4eb056bf77fbfe08fd614","bytes":153,"complete":true,"as_of":"2026-09-28T19:09:21+08:00","known_at":"2026-09-28T19:09:21+08:00","build_id":"cb2-demo-20260928-postclose-v1"}
+  },
+  "health": {"validation_passed": true,"warnings":["DEMO DATA ONLY"],"errors":[],"fallback_reason":null}
+}
