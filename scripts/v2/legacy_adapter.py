@@ -18,6 +18,60 @@ def first_num(row, keys):
             return value
     return None
 
+def canonical_datetime(value, trade_date):
+    """Normalize legacy timestamps without changing their represented clock time.
+
+    Accepted examples:
+      13:30            -> YYYY-MM-DDT13:30:00+08:00
+      13:30:00         -> YYYY-MM-DDT13:30:00+08:00
+      YYYY-MM-DD HH:MM:SS -> YYYY-MM-DDTHH:MM:SS+08:00
+      ISO-8601 with timezone -> preserved as an offset-aware ISO timestamp
+
+    Unknown / malformed inputs return None rather than inventing a timestamp.
+    """
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=TW)
+        return dt.isoformat(timespec="seconds")
+
+    raw = str(value).strip()
+    if not raw:
+        return None
+
+    # Time-only legacy values are common in intraday snapshots.
+    for fmt in ("%H:%M:%S", "%H:%M"):
+        try:
+            parsed = datetime.strptime(raw, fmt).time()
+            dt = datetime.strptime(str(trade_date), "%Y-%m-%d").replace(
+                hour=parsed.hour,
+                minute=parsed.minute,
+                second=parsed.second,
+                microsecond=0,
+                tzinfo=TW,
+            )
+            return dt.isoformat(timespec="seconds")
+        except (TypeError, ValueError):
+            pass
+
+    # Accept common full datetime forms. Naive values are Taiwan-local source time.
+    candidates = [raw]
+    if raw.endswith("Z"):
+        candidates.insert(0, raw[:-1] + "+00:00")
+    if " " in raw and "T" not in raw:
+        candidates.insert(0, raw.replace(" ", "T", 1))
+    for candidate in candidates:
+        try:
+            dt = datetime.fromisoformat(candidate)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=TW)
+            return dt.isoformat(timespec="seconds")
+        except ValueError:
+            pass
+    return None
+
 def infer_volume_unit(row):
     raw = str(row.get("volume_unit") or "").strip().upper()
     if raw in {"SHARE", "SHARES", "股"}:
@@ -42,10 +96,10 @@ def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, mar
     score = num(row.get("swing_quality_score", row.get("score")))
     intraday = num(row.get("intraday_score", row.get("intraday_momentum_score")))
     daytrade = num(row.get("daytrade_score"))
-    code=str(row.get("code") or "").strip(); now=datetime.now(TW).isoformat(timespec="seconds")
-    as_of=row.get("quote_time") or row.get("updated_at") or row.get("time") or now
-    if isinstance(as_of,str) and "T" not in as_of:
-        as_of=f"{trade_date}T{as_of}:00+08:00" if ":" in as_of else now
+    code = str(row.get("code") or "").strip()
+    now = datetime.now(TW).isoformat(timespec="seconds")
+    raw_as_of = row.get("quote_time") or row.get("updated_at") or row.get("time")
+    as_of = canonical_datetime(raw_as_of, trade_date)
 
     price = first_num(row, ("current_price", "price", "close", "last_price", "last"))
     day_change_pct = first_num(row, ("day_change", "day_change_pct", "change_pct", "pct_change"))
