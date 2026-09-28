@@ -40,10 +40,11 @@ jobs:
         with:
           node-version: '22'
       - run: pip install -r requirements-contract.txt
-      - name: Contract + engine tests
+      - name: Contract + engine + case tests
         run: |
           python -m unittest discover -s contracts/contract-tests -p 'test_*.py' -v
           python -m unittest scripts.v2.test_engine -v
+          python -m unittest scripts.v2.test_tradecases -v
       - name: Build canonical bundle from public legacy datasets
         run: python scripts/v2/build_legacy_bundle.py --legacy-root docs/data --output docs/v2/data
       - name: Copy canonical quote snapshot into lightweight indexes
@@ -52,6 +53,8 @@ jobs:
         run: python scripts/v2/enrich_zones.py --legacy-root docs/data --output docs/v2/data
       - name: Build canonical TradePlan datasets
         run: python scripts/v2/enrich_tradeplans.py --output docs/v2/data
+      - name: Build canonical TradeCase and DecisionDelta datasets
+        run: python scripts/v2/enrich_tradecases.py --output docs/v2/data
       - name: Validate canonical atomic bundle
         run: python scripts/v2/validate_bundle.py --root docs/v2/data
       - name: Syntax check UI modules
