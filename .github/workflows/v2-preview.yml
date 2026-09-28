@@ -31,6 +31,8 @@ jobs:
         run: python -m unittest discover -s contracts/contract-tests -p 'test_*.py' -v
       - name: Engine structural tests
         run: python -m unittest scripts.v2.test_engine -v
+      - name: TradeCase structural tests
+        run: python -m unittest scripts.v2.test_tradecases -v
       - name: Build deterministic v2 demo bundle
         run: python scripts/v2/build_bundle.py --demo
       - name: Validate atomic bundle
@@ -41,6 +43,7 @@ jobs:
           node --check docs/v2/quote-ui.js
           node --check docs/v2/components-ui.js
           node --check docs/v2/tradeplan-ui.js
+          node --check docs/v2/case-ui.js
       - name: Upload preview artifact
         uses: actions/upload-artifact@v4
         with:
