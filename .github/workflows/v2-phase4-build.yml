@@ -18,6 +18,8 @@ on:
       - 'docs/v2/components.css'
       - 'docs/v2/tradeplan-ui.js'
       - 'docs/v2/tradeplan.css'
+      - 'docs/v2/case-ui.js'
+      - 'docs/v2/case.css'
 
 permissions:
   contents: write
@@ -63,6 +65,7 @@ jobs:
           node --check docs/v2/quote-ui.js
           node --check docs/v2/components-ui.js
           if [ -f docs/v2/tradeplan-ui.js ]; then node --check docs/v2/tradeplan-ui.js; fi
+          if [ -f docs/v2/case-ui.js ]; then node --check docs/v2/case-ui.js; fi
       - name: Commit validated preview bundle
         run: |
           git config user.name "github-actions[bot]"
