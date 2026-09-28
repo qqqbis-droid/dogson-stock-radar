@@ -7,19 +7,9 @@ on:
     paths:
       - 'scripts/v2/**'
       - 'contracts/**'
+      - 'docs/data/**'
+      - 'requirements-contract.txt'
       - '.github/workflows/v2-phase4-build.yml'
-      - 'docs/v2/app.js'
-      - 'docs/v2/index.html'
-      - 'docs/v2/app.css'
-      - 'docs/v2/zones.css'
-      - 'docs/v2/quote-ui.js'
-      - 'docs/v2/quote.css'
-      - 'docs/v2/components-ui.js'
-      - 'docs/v2/components.css'
-      - 'docs/v2/tradeplan-ui.js'
-      - 'docs/v2/tradeplan.css'
-      - 'docs/v2/case-ui.js'
-      - 'docs/v2/case.css'
 
 permissions:
   contents: write
@@ -49,6 +39,8 @@ jobs:
           python -m unittest scripts.v2.test_tradecases -v
       - name: Build canonical bundle from public legacy datasets
         run: python scripts/v2/build_legacy_bundle.py --legacy-root docs/data --output docs/v2/data
+      - name: Assign immutable Atomic Build identity
+        run: python scripts/v2/rekey_build.py --legacy-root docs/data --output docs/v2/data
       - name: Copy canonical quote snapshot into lightweight indexes
         run: python scripts/v2/enrich_quote_index.py --output docs/v2/data
       - name: Migrate structural support / resistance zones
@@ -59,30 +51,78 @@ jobs:
         run: python scripts/v2/enrich_tradecases.py --output docs/v2/data
       - name: Validate canonical atomic bundle
         run: python scripts/v2/validate_bundle.py --root docs/v2/data
-      - name: Syntax check UI modules
+      - name: Syntax check current UI modules
         run: |
           node --check docs/v2/app.js
           node --check docs/v2/quote-ui.js
           node --check docs/v2/components-ui.js
           if [ -f docs/v2/tradeplan-ui.js ]; then node --check docs/v2/tradeplan-ui.js; fi
           if [ -f docs/v2/case-ui.js ]; then node --check docs/v2/case-ui.js; fi
-      - name: Commit validated preview bundle
+      - name: Publish validated bundle without branch races
+        env:
+          START_SHA: ${{ github.sha }}
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/v2/data
-          if git diff --cached --quiet; then
-            echo "No bundle changes"
-          else
-            git commit -m "chore(v2): refresh canonical real-data preview [skip ci]"
-            for attempt in 1 2 3; do
-              git fetch origin clean-build-v2
-              git rebase origin/clean-build-v2
-              if git push origin HEAD:clean-build-v2; then
+
+          SNAPSHOT_DIR="$(mktemp -d)"
+          cp -a docs/v2/data "$SNAPSHOT_DIR/data"
+          CANDIDATE_ID="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json"))["active_build_id"])')"
+          echo "Validated candidate: $CANDIDATE_ID"
+
+          for attempt in 1 2 3; do
+            git fetch origin clean-build-v2
+            REMOTE_SHA="$(git rev-parse origin/clean-build-v2)"
+
+            if [ "$REMOTE_SHA" != "$START_SHA" ]; then
+              CRITICAL_CHANGES="$(git diff --name-only "$START_SHA" "$REMOTE_SHA" -- scripts/v2 contracts docs/data requirements-contract.txt .github/workflows/v2-phase4-build.yml || true)"
+              if [ -n "$CRITICAL_CHANGES" ]; then
+                echo "Critical build inputs advanced while this run was executing; a newer run owns publication."
+                echo "$CRITICAL_CHANGES"
                 exit 0
               fi
-              echo "Push raced with a newer branch commit; retrying ($attempt/3)"
-            done
-            echo "Unable to publish validated preview bundle after 3 attempts"
-            exit 1
-          fi
+            fi
+
+            git reset --hard "$REMOTE_SHA"
+            OLD_ID="$(python - <<'PY'
+import json, pathlib
+p=pathlib.Path('docs/v2/data/current_manifest.json')
+print(json.loads(p.read_text(encoding='utf-8')).get('active_build_id','') if p.exists() else '')
+PY
+)"
+
+            if [ "$OLD_ID" = "$CANDIDATE_ID" ]; then
+              echo "Atomic Build $CANDIDATE_ID is already published; keep the existing immutable snapshot."
+              exit 0
+            fi
+
+            mkdir -p docs/v2/data/builds
+            rm -rf "docs/v2/data/builds/$CANDIDATE_ID"
+            cp -a "$SNAPSHOT_DIR/data/builds/$CANDIDATE_ID" "docs/v2/data/builds/$CANDIDATE_ID"
+            cp "$SNAPSHOT_DIR/data/current_manifest.json" docs/v2/data/current_manifest.json
+
+            OLD_ID="$OLD_ID" python - <<'PY'
+import json, os, pathlib
+p=pathlib.Path('docs/v2/data/current_manifest.json')
+m=json.loads(p.read_text(encoding='utf-8'))
+old=os.environ.get('OLD_ID') or None
+m['previous_good_build_id']=old if old and old != m.get('active_build_id') else m.get('previous_good_build_id')
+p.write_text(json.dumps(m, ensure_ascii=False, separators=(',',':'))+'\n', encoding='utf-8')
+PY
+
+            git add docs/v2/data
+            if git diff --cached --quiet; then
+              echo "No publishable bundle changes"
+              exit 0
+            fi
+            git commit -m "chore(v2): publish immutable canonical bundle [skip ci]"
+            if git push origin HEAD:clean-build-v2; then
+              echo "Published $CANDIDATE_ID; previous good: ${OLD_ID:-none}"
+              exit 0
+            fi
+            echo "Branch advanced during publish; retrying safely ($attempt/3)"
+          done
+
+          echo "Unable to publish validated preview bundle after 3 safe attempts"
+          exit 1
