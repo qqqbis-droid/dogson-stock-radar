@@ -66,6 +66,7 @@ jobs:
         run: |
           python scripts/v2/validate_bundle.py --root docs/v2/data
           node --check docs/v2/app.js
+          node --check docs/v2/quote-ui.js
 
       - name: Publish validated Shadow bundle to clean-build-v2
         run: |
