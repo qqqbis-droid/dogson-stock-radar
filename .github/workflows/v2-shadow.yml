@@ -49,11 +49,11 @@ jobs:
           python -m unittest scripts.v2.test_engine -v
           python -m unittest scripts.v2.test_shadow_summary -v
       - name: Build validated Shadow cycle from production public data
-        run: python scripts/v2/shadow_cycle.py --legacy-root /tmp/dogson-main-data --output docs/v2/data --reports shadow/reports
+        run: python -m scripts.v2.shadow_cycle --legacy-root /tmp/dogson-main-data --output docs/v2/data --reports shadow/reports
       - name: Refresh distinct-day Shadow summary
-        run: python scripts/v2/shadow_summary.py --reports shadow/reports --output shadow/summary.json
+        run: python -m scripts.v2.shadow_summary --reports shadow/reports --output shadow/summary.json
       - name: Validate active atomic bundle
-        run: python scripts/v2/validate_bundle.py --root docs/v2/data
+        run: python -m scripts.v2.validate_bundle --root docs/v2/data
       - name: Syntax check UI modules
         run: |
           node --check docs/v2/app.js
