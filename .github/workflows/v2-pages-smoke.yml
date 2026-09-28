@@ -1,0 +1,42 @@
+name: Clean Build 2.0 Pages Public Smoke Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ clean-build-v2 ]
+    paths:
+      - '.github/workflows/v2-pages-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify public Shadow page and canonical data
+        shell: bash
+        run: |
+          set -euo pipefail
+          PAGE_URL="https://qqqbis-droid.github.io/dogson-stock-radar/v2/"
+          MANIFEST_URL="https://raw.githubusercontent.com/qqqbis-droid/dogson-stock-radar/clean-build-v2/docs/v2/data/current_manifest.json"
+
+          for attempt in 1 2 3 4 5 6; do
+            if curl -fsSL --retry 2 --connect-timeout 10 "$PAGE_URL" -o /tmp/v2.html; then
+              break
+            fi
+            sleep 5
+          done
+
+          grep -q 'Clean Build 2.0' /tmp/v2.html
+          grep -q 'data-source.js' /tmp/v2.html
+          curl -fsSL --retry 3 --connect-timeout 10 "$MANIFEST_URL" -o /tmp/manifest.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('/tmp/manifest.json').read_text())
+          assert m.get('schema_version') == '2.0.0'
+          assert m.get('health',{}).get('validation_passed') is True
+          print('Public Shadow smoke PASS:', m.get('trade_date'), m.get('active_build_id'))
+          PY
