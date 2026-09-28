@@ -1,0 +1,20 @@
+name: Clean Build 2.0 Phase 4 Legacy Shape Inspect
+
+on:
+  push:
+    branches: [ clean-build-v2 ]
+    paths:
+      - 'scripts/v2/inspect_legacy.py'
+      - '.github/workflows/v2-phase4-inspect.yml'
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Inspect public legacy data shapes
+        run: python scripts/v2/inspect_legacy.py
