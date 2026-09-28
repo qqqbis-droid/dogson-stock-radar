@@ -1,4 +1,0 @@
-[
-  {"code":"9003","name":"示例丙","reason_status":"VALID","action":"HOLD","core_entry_reason":["示例：原始結構仍成立"],"quantity":1,"avg_cost":null,"market_value":null},
-  {"code":"9004","name":"示例丁","reason_status":"VALID","action":"HOLD","core_entry_reason":["示例：原始結構仍成立"],"quantity":1,"avg_cost":null,"market_value":null}
-]
