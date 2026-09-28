@@ -14,6 +14,8 @@ on:
       - 'docs/v2/zones.css'
       - 'docs/v2/quote-ui.js'
       - 'docs/v2/quote.css'
+      - 'docs/v2/components-ui.js'
+      - 'docs/v2/components.css'
 
 permissions:
   contents: write
@@ -52,6 +54,7 @@ jobs:
         run: |
           node --check docs/v2/app.js
           node --check docs/v2/quote-ui.js
+          node --check docs/v2/components-ui.js
       - name: Commit validated preview bundle
         run: |
           git config user.name "github-actions[bot]"
