@@ -1,0 +1,56 @@
+name: Clean Build 2.0 Phase 4 Real Data Preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ clean-build-v2 ]
+    paths:
+      - 'scripts/v2/**'
+      - 'contracts/**'
+      - '.github/workflows/v2-phase4-build.yml'
+      - 'docs/v2/app.js'
+      - 'docs/v2/index.html'
+      - 'docs/v2/app.css'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: clean-build-v2-real-preview
+  cancel-in-progress: true
+
+jobs:
+  build-real-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install -r requirements-contract.txt
+      - name: Contract + engine tests
+        run: |
+          python -m unittest discover -s contracts/contract-tests -p 'test_*.py' -v
+          python -m unittest scripts.v2.test_engine -v
+      - name: Build canonical bundle from public legacy datasets
+        run: python scripts/v2/build_legacy_bundle.py --legacy-root docs/data --output docs/v2/data
+      - name: Validate canonical atomic bundle
+        run: python scripts/v2/validate_bundle.py --root docs/v2/data
+      - name: Syntax check UI
+        run: node --check docs/v2/app.js
+      - name: Commit validated preview bundle
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/v2/data
+          if git diff --cached --quiet; then
+            echo "No bundle changes"
+          else
+            git commit -m "chore(v2): refresh canonical real-data preview [skip ci]"
+            git push origin HEAD:clean-build-v2
+          fi
