@@ -2,6 +2,11 @@ name: Clean Build 2.0 Phase 5 Shadow
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - clean-build-v2
+    paths:
+      - '.github/triggers/v2-shadow.trigger'
   schedule:
     # 16:45 Asia/Taipei, Monday–Friday. Trading-calendar validity is still
     # determined from the source datasets; duplicate trade dates do not create
@@ -42,12 +47,20 @@ jobs:
         run: |
           python -m unittest discover -s contracts/contract-tests -p 'test_*.py' -v
           python -m unittest scripts.v2.test_engine -v
+          python -m unittest scripts.v2.test_shadow_summary -v
       - name: Build validated Shadow cycle from production public data
         run: python scripts/v2/shadow_cycle.py --legacy-root /tmp/dogson-main-data --output docs/v2/data --reports shadow/reports
+      - name: Refresh distinct-day Shadow summary
+        run: python scripts/v2/shadow_summary.py --reports shadow/reports --output shadow/summary.json
       - name: Validate active atomic bundle
         run: python scripts/v2/validate_bundle.py --root docs/v2/data
-      - name: Syntax check UI
-        run: node --check docs/v2/app.js
+      - name: Syntax check UI modules
+        run: |
+          node --check docs/v2/app.js
+          node --check docs/v2/components-ui.js
+          node --check docs/v2/quote-ui.js
+          node --check docs/v2/tradeplan-ui.js
+          node --check docs/v2/case-ui.js
       - name: Commit new trading-day Shadow snapshot
         run: |
           git config user.name "github-actions[bot]"
