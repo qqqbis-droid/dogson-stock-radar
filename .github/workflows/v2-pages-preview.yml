@@ -1,0 +1,68 @@
+name: Clean Build 2.0 GitHub Pages Shadow Preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ clean-build-v2 ]
+    paths:
+      - 'docs/v2/**'
+      - 'vercel.json'
+      - '.github/workflows/v2-pages-preview.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}v2/
+    steps:
+      - name: Checkout Clean Build 2.0 shell
+        uses: actions/checkout@v4
+        with:
+          ref: clean-build-v2
+          path: v2src
+      - name: Checkout production main shell
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: mainsrc
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate V2 browser modules
+        run: |
+          node --check v2src/docs/v2/data-source.js
+          node --check v2src/docs/v2/app.js
+          node --check v2src/docs/v2/quote-ui.js
+          node --check v2src/docs/v2/components-ui.js
+          node --check v2src/docs/v2/tradeplan-ui.js
+          node --check v2src/docs/v2/case-ui.js
+      - name: Compose Pages artifact without replacing production root
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp -a mainsrc/docs/. _site/
+          rm -rf _site/v2
+          mkdir -p _site/v2
+          rsync -a --exclude 'data/' v2src/docs/v2/ _site/v2/
+          test -f _site/index.html
+          test -f _site/v2/index.html
+          test -f _site/v2/data-source.js
+          echo 'Production root source: main/docs'
+          echo 'Shadow preview source: clean-build-v2/docs/v2 (data loaded remotely)'
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
