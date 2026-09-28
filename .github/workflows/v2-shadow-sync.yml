@@ -2,6 +2,10 @@ name: Clean Build 2.0 Shadow Sync
 
 on:
   workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/v2-shadow-sync.yml"
   workflow_run:
     workflows:
       - "Radar - Intraday Update"
@@ -17,7 +21,7 @@ concurrency:
 
 jobs:
   sync-v2-shadow:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
