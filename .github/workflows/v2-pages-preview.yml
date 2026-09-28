@@ -22,9 +22,6 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}v2/
     steps:
       - name: Checkout Clean Build 2.0 shell
         uses: actions/checkout@v4
