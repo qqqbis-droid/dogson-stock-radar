@@ -4,6 +4,27 @@ from .engine import canonical_stage, risk_overlays, synthesize_action, bucket_fo
 
 TW = timezone(timedelta(hours=8))
 
+SWING_COMPONENTS = {
+    "technical": ("技術", 50.0),
+    "chip": ("籌碼", 25.0),
+    "sector": ("族群", 15.0),
+    "liquidity": ("流動性", 10.0),
+}
+INTRADAY_COMPONENTS = {
+    "price_structure": ("價格結構", 30.0),
+    "flow_volume": ("量價動能", 25.0),
+    "relative_strength": ("相對強弱", 15.0),
+    "sector": ("族群", 20.0),
+    "liquidity_risk": ("流動性／追價風險", 10.0),
+}
+DAYTRADE_COMPONENTS = {
+    "execution_structure": ("執行結構", 30.0),
+    "flow_volume": ("量價推進", 25.0),
+    "relative_sector": ("相對強弱／族群", 20.0),
+    "timing_volatility": ("時機／波動效率", 15.0),
+    "liquidity_risk": ("流動性／追價風險", 10.0),
+}
+
 def num(v, default=None):
     try:
         x = float(v)
@@ -19,16 +40,7 @@ def first_num(row, keys):
     return None
 
 def canonical_datetime(value, trade_date):
-    """Normalize legacy timestamps without changing their represented clock time.
-
-    Accepted examples:
-      13:30            -> YYYY-MM-DDT13:30:00+08:00
-      13:30:00         -> YYYY-MM-DDT13:30:00+08:00
-      YYYY-MM-DD HH:MM:SS -> YYYY-MM-DDTHH:MM:SS+08:00
-      ISO-8601 with timezone -> preserved as an offset-aware ISO timestamp
-
-    Unknown / malformed inputs return None rather than inventing a timestamp.
-    """
+    """Normalize legacy timestamps without changing their represented clock time."""
     if value is None:
         return None
     if isinstance(value, datetime):
@@ -36,27 +48,19 @@ def canonical_datetime(value, trade_date):
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=TW)
         return dt.isoformat(timespec="seconds")
-
     raw = str(value).strip()
     if not raw:
         return None
-
-    # Time-only legacy values are common in intraday snapshots.
     for fmt in ("%H:%M:%S", "%H:%M"):
         try:
             parsed = datetime.strptime(raw, fmt).time()
             dt = datetime.strptime(str(trade_date), "%Y-%m-%d").replace(
-                hour=parsed.hour,
-                minute=parsed.minute,
-                second=parsed.second,
-                microsecond=0,
-                tzinfo=TW,
+                hour=parsed.hour, minute=parsed.minute, second=parsed.second,
+                microsecond=0, tzinfo=TW,
             )
             return dt.isoformat(timespec="seconds")
         except (TypeError, ValueError):
             pass
-
-    # Accept common full datetime forms. Naive values are Taiwan-local source time.
     candidates = [raw]
     if raw.endswith("Z"):
         candidates.insert(0, raw[:-1] + "+00:00")
@@ -85,6 +89,71 @@ def infer_freshness(row, session_phase):
     if session_phase == "CLOSE_FREEZE": return "FROZEN"
     return "FRESH"
 
+def _component_model(*, model, source, total_score, raw, spec, contribution=None, contribution_max=None, note=None):
+    raw = raw if isinstance(raw, dict) else {}
+    contribution = contribution if isinstance(contribution, dict) else raw
+    contribution_max = contribution_max if isinstance(contribution_max, dict) else {}
+    items = []
+    for key, (label, raw_max) in spec.items():
+        raw_score = num(raw.get(key))
+        actual = num(contribution.get(key))
+        if raw_score is None and actual is None:
+            continue
+        if actual is None:
+            actual = raw_score
+        max_actual = num(contribution_max.get(key), raw_max)
+        items.append({
+            "key": key,
+            "label": label,
+            "raw_score": raw_score,
+            "raw_max": raw_max,
+            "contribution": actual,
+            "contribution_max": max_actual,
+        })
+    if not items:
+        return None
+    return {
+        "model": model,
+        "model_status": "MIGRATED_SHADOW",
+        "source": str(source or "legacy-v1"),
+        "total_score": num(total_score),
+        "items": items,
+        "note": note,
+    }
+
+def build_component_models(row, swing_score, intraday_score, daytrade_score):
+    swing_raw = row.get("swing_components")
+    swing_contrib = row.get("swing_weighted_components")
+    swing_weights = row.get("swing_weights")
+    swing = _component_model(
+        model="swing_quality",
+        source=row.get("swing_weight_source") or "baseline",
+        total_score=swing_score,
+        raw=swing_raw,
+        spec=SWING_COMPONENTS,
+        contribution=swing_contrib,
+        contribution_max=swing_weights,
+        note="原始 component 保留 50/25/15/10 尺度；若有歷史校準，實際貢獻顯示校準後權重。",
+    )
+    intraday_raw = row.get("intraday_components") or row.get("source_intraday_components")
+    intraday = _component_model(
+        model="intraday_momentum",
+        source="intraday_execution_30_25_15_20_10",
+        total_score=intraday_score,
+        raw=intraday_raw,
+        spec=INTRADAY_COMPONENTS,
+        note="盤中籌碼只作最近盤後背景，不灌入即時動能分。",
+    )
+    daytrade = _component_model(
+        model="daytrade_execution",
+        source="daytrade_30_25_20_15_10",
+        total_score=daytrade_score,
+        raw=row.get("daytrade_components"),
+        spec=DAYTRADE_COMPONENTS,
+        note="當沖分為獨立執行模型，不覆蓋波段分、盤中分或 Lifecycle。",
+    )
+    return {"swing": swing, "intraday": intraday, "daytrade": daytrade}
+
 def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, market_score=None, previous_stage=None, has_position=False):
     freshness = infer_freshness(row, session_phase)
     stage = canonical_stage(row.get("category"), previous_stage=previous_stage)
@@ -96,6 +165,7 @@ def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, mar
     score = num(row.get("swing_quality_score", row.get("score")))
     intraday = num(row.get("intraday_score", row.get("intraday_momentum_score")))
     daytrade = num(row.get("daytrade_score"))
+    components = build_component_models(row, score, intraday, daytrade)
     code = str(row.get("code") or "").strip()
     now = datetime.now(TW).isoformat(timespec="seconds")
     raw_as_of = row.get("quote_time") or row.get("updated_at") or row.get("time")
@@ -132,6 +202,7 @@ def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, mar
         "decision_context_id":f"{build_id}:{mission}:{code}","code":code,"name":str(row.get("name") or code),"market":str(row.get("market") or "UNKNOWN"),"industry":row.get("industry_name") or row.get("industry"),"primary_group":row.get("sector_group"),"secondary_groups":[],"theme_tags":[],
         "quote":quote,
         "scores":{"swing_quality_score":score,"intraday_momentum_score":intraday,"daytrade_score":daytrade,"entry_position_score":entry,"market_score":market_score},
+        "components":components,
         "lifecycle_stage":stage,"previous_stage":previous_stage,"stage_changed_at":None,"stage_age":None,"stage_confidence":None,"action_state":action,"actionable":bool(actionable),"no_chase":action=="DO_NOT_CHASE","risk_overlays":overlays,"opportunity_bucket":bucket,"opportunity_rank":None,
         "why_now":why[:3],"blockers":blockers[:3],"upgrade_conditions":["等待下一個合法 Trigger / 結構確認"] if not actionable else [],"risk_flags":list(row.get("stage_risks") or []),"data_confidence":confidence,"component_coverage":coverage,"missing_fields":missing,
         "trade_plan_id":None,"case_id":None,"support_zone_ids":[],"resistance_zone_ids":[],"evidence_ids":[]
