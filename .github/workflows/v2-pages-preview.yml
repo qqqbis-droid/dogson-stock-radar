@@ -5,8 +5,12 @@ on:
   push:
     branches: [ clean-build-v2 ]
     paths:
-      - 'docs/v2/**'
-      - '!docs/v2/data/**'
+      - 'docs/v2/*.html'
+      - 'docs/v2/*.js'
+      - 'docs/v2/*.css'
+      - 'docs/v2/data/current_manifest.json'
+      - 'docs/v2/data/market-detail.json'
+      - 'docs/v2/data/sector-members.json'
       - 'vercel.json'
       - '.github/workflows/v2-pages-preview.yml'
 
@@ -54,12 +58,32 @@ jobs:
           rm -rf _site/v2
           mkdir -p _site/v2
           rsync -a --exclude 'data/' v2src/docs/v2/ _site/v2/
+
+          # Ship the active validated V2 bundle on the same origin. This avoids
+          # iOS/Safari depending on raw.githubusercontent.com for normal boot.
+          mkdir -p _site/v2/data/builds
+          cp v2src/docs/v2/data/current_manifest.json _site/v2/data/current_manifest.json
+          test -f v2src/docs/v2/data/market-detail.json && cp v2src/docs/v2/data/market-detail.json _site/v2/data/market-detail.json
+          test -f v2src/docs/v2/data/sector-members.json && cp v2src/docs/v2/data/sector-members.json _site/v2/data/sector-members.json
+          ACTIVE_BUILD=$(python - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('v2src/docs/v2/data/current_manifest.json').read_text(encoding='utf-8'))
+          print(m['active_build_id'])
+          PY
+          )
+          test -d "v2src/docs/v2/data/builds/$ACTIVE_BUILD"
+          cp -a "v2src/docs/v2/data/builds/$ACTIVE_BUILD" "_site/v2/data/builds/$ACTIVE_BUILD"
+
           test -f _site/index.html
           test -f _site/v2/index.html
           test -f _site/v2/data-source.js
           test -f _site/v2/ux-detail.js
-          echo 'Production root source: main/docs'
-          echo 'Shadow preview source: clean-build-v2/docs/v2 (data loaded remotely)'
+          test -f _site/v2/data/current_manifest.json
+          test -f "_site/v2/data/builds/$ACTIVE_BUILD/market-summary.json"
+          echo "Production root source: main/docs"
+          echo "V2 shell: clean-build-v2/docs/v2"
+          echo "V2 same-origin active data: $ACTIVE_BUILD"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
