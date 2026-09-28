@@ -54,6 +54,9 @@ def main():
 
     zone_ids = set()
     plan_ids = set()
+    case_ids = set()
+    delta_ids = set()
+    decision_ids = set()
     for key, meta in manifest["datasets"].items():
         path = resolve(root, meta["url"])
         if not path.exists():
@@ -63,6 +66,14 @@ def main():
             zone_ids.update(str(row.get("zone_id")) for row in obj if isinstance(row, dict) and row.get("zone_id"))
         if key.startswith("tradeplan_") and isinstance(obj, list):
             plan_ids.update(str(row.get("plan_id")) for row in obj if isinstance(row, dict) and row.get("plan_id"))
+        if key.startswith("tradecase_") and isinstance(obj, list):
+            case_ids.update(str(row.get("case_id")) for row in obj if isinstance(row, dict) and row.get("case_id"))
+        if key.startswith("delta_") and isinstance(obj, list):
+            delta_ids.update(str(row.get("delta_id")) for row in obj if isinstance(row, dict) and row.get("delta_id"))
+        if key.startswith("decision_") and key.endswith("_detail") and isinstance(obj, dict):
+            for row in (obj.get("items") or {}).values():
+                if isinstance(row, dict) and row.get("decision_context_id"):
+                    decision_ids.add(str(row["decision_context_id"]))
 
     for key, meta in manifest["datasets"].items():
         path = resolve(root, meta["url"])
@@ -92,9 +103,42 @@ def main():
                 if missing:
                     print("ERROR unresolved tradeplan zone refs", row.get("plan_id"), missing)
                     ok = False
+        elif key.startswith("tradecase_"):
+            for row in obj:
+                ok = validate("trade-case.schema.json", row) and ok
+                if row.get("build_id") != active:
+                    print("ERROR tradecase build_id mismatch", row.get("case_id"))
+                    ok = False
+                missing_events = [ref for ref in row.get("timeline_event_ids") or [] if ref not in delta_ids]
+                if missing_events:
+                    print("ERROR unresolved tradecase timeline refs", row.get("case_id"), missing_events)
+                    ok = False
+                missing_decisions = [ref for ref in row.get("source_decision_ids") or [] if ref not in decision_ids]
+                if missing_decisions:
+                    print("ERROR unresolved tradecase decision refs", row.get("case_id"), missing_decisions)
+                    ok = False
+        elif key.startswith("delta_"):
+            for row in obj:
+                ok = validate("decision-delta.schema.json", row) and ok
+                if row.get("build_id") != active:
+                    print("ERROR delta build_id mismatch", row.get("delta_id"))
+                    ok = False
+                case_id = row.get("case_id")
+                if case_id and case_id not in case_ids:
+                    print("ERROR unresolved delta case ref", row.get("delta_id"), case_id)
+                    ok = False
+                for ref_key in ("from_context_id", "to_context_id"):
+                    ref = row.get(ref_key)
+                    if ref and ref not in decision_ids:
+                        print("ERROR unresolved delta decision ref", row.get("delta_id"), ref_key, ref)
+                        ok = False
         elif key.startswith("decision_") and key.endswith("_summary"):
             for row in obj:
                 ok = validate("stock-decision.schema.json", row) and ok
+                case_id = row.get("case_id")
+                if case_id and case_id not in case_ids:
+                    print("ERROR unresolved summary case ref", row.get("code"), case_id)
+                    ok = False
         elif key.startswith("decision_") and key.endswith("_detail"):
             values = list((obj.get("items") or {}).values()) if isinstance(obj, dict) else []
             for row in values:
@@ -112,9 +156,20 @@ def main():
                     if plan_id and plan_id not in plan_ids:
                         print("ERROR unresolved tradeplan ref", row.get("code"), plan_id)
                         ok = False
+                    case_id = row.get("case_id")
+                    if case_id and case_id not in case_ids:
+                        print("ERROR unresolved tradecase ref", row.get("code"), case_id)
+                        ok = False
     if not ok:
         raise SystemExit(1)
-    print("bundle validation OK", active, "zones", len(zone_ids), "tradeplans", len(plan_ids))
+    print(
+        "bundle validation OK",
+        active,
+        "zones", len(zone_ids),
+        "tradeplans", len(plan_ids),
+        "tradecases", len(case_ids),
+        "deltas", len(delta_ids),
+    )
 
 
 if __name__ == "__main__":
