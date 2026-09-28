@@ -1,3 +1,4 @@
+import copy
 import json
 import pathlib
 import unittest
@@ -41,6 +42,24 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(validate("bundle-manifest.schema.json", data), [])
         active = data["active_build_id"]
         self.assertTrue(all(d["build_id"] == active for d in data["datasets"].values()))
+
+    def test_manifest_accepts_declared_build_identity(self):
+        data = copy.deepcopy(load(FIXTURES / "valid" / "bundle-manifest.json"))
+        data["health"]["build_identity"] = {
+            "source_fingerprint": "0123456789",
+            "implementation_fingerprint": "abcdef0123",
+            "identity_rule": "source-content + production-v2-implementation-contract",
+        }
+        self.assertEqual(validate("bundle-manifest.schema.json", data), [])
+
+    def test_manifest_rejects_malformed_build_identity(self):
+        data = copy.deepcopy(load(FIXTURES / "valid" / "bundle-manifest.json"))
+        data["health"]["build_identity"] = {
+            "source_fingerprint": "too-short",
+            "implementation_fingerprint": "abcdef0123",
+            "identity_rule": "source-content + production-v2-implementation-contract",
+        }
+        self.assertTrue(validate("bundle-manifest.schema.json", data))
 
     def test_unknown_enum_fails_closed(self):
         data = load(FIXTURES / "invalid" / "stock-decision-unknown-enum.json")
