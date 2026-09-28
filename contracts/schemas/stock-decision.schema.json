@@ -2,14 +2,43 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dogson-stock-radar/contracts/stock-decision.schema.json",
   "title": "StockDecision",
+  "$defs": {
+    "scoreComponentItem": {
+      "type": "object",
+      "required": ["key","label","raw_score","raw_max","contribution","contribution_max"],
+      "properties": {
+        "key": {"type":"string","minLength":1},
+        "label": {"type":"string","minLength":1},
+        "raw_score": {"type":["number","null"],"minimum":0},
+        "raw_max": {"type":"number","exclusiveMinimum":0},
+        "contribution": {"type":["number","null"],"minimum":0},
+        "contribution_max": {"type":"number","exclusiveMinimum":0}
+      },
+      "additionalProperties": false
+    },
+    "scoreComponentModel": {
+      "type": "object",
+      "required": ["model","model_status","source","total_score","items","note"],
+      "properties": {
+        "model": {"type":"string","minLength":1},
+        "model_status": {"enum":["ACTIVE","SHADOW","MIGRATED_SHADOW"]},
+        "source": {"type":"string","minLength":1},
+        "total_score": {"type":["number","null"],"minimum":0,"maximum":100},
+        "items": {"type":"array","items":{"$ref":"#/$defs/scoreComponentItem"}},
+        "note": {"type":["string","null"]}
+      },
+      "additionalProperties": false
+    }
+  },
   "type": "object",
-  "required": ["schema_version","build_id","dataset","trade_date","session_phase","as_of","known_at","generated_at","freshness","complete","source_status","decision_context_id","code","name","market","quote","lifecycle_stage","action_state","actionable","scores","data_confidence","component_coverage","missing_fields","why_now","blockers","upgrade_conditions","risk_flags","risk_overlays"],
+  "required": ["schema_version","build_id","dataset","trade_date","session_phase","as_of","known_at","generated_at","freshness","complete","source_status","decision_context_id","code","name","market","quote","scores","components","lifecycle_stage","action_state","actionable","data_confidence","component_coverage","missing_fields","why_now","blockers","upgrade_conditions","risk_flags","risk_overlays"],
   "properties": {
     "schema_version":{"const":"2.0.0"},"build_id":{"type":"string","minLength":1},"dataset":{"const":"decision"},"trade_date":{"type":["string","null"],"format":"date"},"session_phase":{"enum":["PRE_OPEN","LIVE","CLOSE_FREEZE","POST_CLOSE","NEXT_DAY"]},"as_of":{"type":["string","null"],"format":"date-time"},"known_at":{"type":["string","null"],"format":"date-time"},"generated_at":{"type":"string","format":"date-time"},"freshness":{"enum":["LIVE","FRESH","FROZEN","STALE","UNKNOWN"]},"complete":{"type":"boolean"},"confidence":{"type":["number","null"],"minimum":0,"maximum":100},
     "source_status":{"type":"object","required":["sources","fallback"],"properties":{"sources":{"type":"array","items":{"type":"string"}},"fallback":{"type":"boolean"},"fallback_source":{"type":["string","null"]},"fallback_build_id":{"type":["string","null"]},"fallback_reason":{"type":["string","null"]},"last_success_at":{"type":["string","null"],"format":"date-time"}},"additionalProperties":false},
     "decision_context_id":{"type":"string","minLength":1},"code":{"type":"string","pattern":"^[0-9A-Z-]{2,12}$"},"name":{"type":"string","minLength":1},"market":{"type":"string","minLength":1},"industry":{"type":["string","null"]},"primary_group":{"type":["string","null"]},"secondary_groups":{"type":"array","items":{"type":"string"}},"theme_tags":{"type":"array","items":{"type":"string"}},
     "quote":{"type":"object","required":["price","day_change_pct","volume","volume_unit","relative_volume","turnover_value_twd","quote_time"],"properties":{"price":{"type":["number","null"],"minimum":0},"day_change_pct":{"type":["number","null"]},"volume":{"type":["number","null"],"minimum":0},"volume_unit":{"enum":["SHARES","LOTS","UNKNOWN"]},"relative_volume":{"type":["number","null"],"minimum":0},"turnover_value_twd":{"type":["number","null"],"minimum":0},"quote_time":{"type":["string","null"],"format":"date-time"}},"additionalProperties":false},
     "scores":{"type":"object","required":["swing_quality_score","intraday_momentum_score","daytrade_score","entry_position_score","market_score"],"properties":{"swing_quality_score":{"type":["number","null"],"minimum":0,"maximum":100},"intraday_momentum_score":{"type":["number","null"],"minimum":0,"maximum":100},"daytrade_score":{"type":["number","null"],"minimum":0,"maximum":100},"entry_position_score":{"type":["number","null"],"minimum":0,"maximum":100},"market_score":{"type":["number","null"],"minimum":0,"maximum":15}},"additionalProperties":false},
+    "components":{"type":"object","required":["swing","intraday","daytrade"],"properties":{"swing":{"anyOf":[{"$ref":"#/$defs/scoreComponentModel"},{"type":"null"}]},"intraday":{"anyOf":[{"$ref":"#/$defs/scoreComponentModel"},{"type":"null"}]},"daytrade":{"anyOf":[{"$ref":"#/$defs/scoreComponentModel"},{"type":"null"}]}},"additionalProperties":false},
     "lifecycle_stage":{"enum":["OBSERVE","SETUP","LAUNCH","TREND","PULLBACK_TEST","PULLBACK_CONFIRMED","WEAKENING","FAILED"]},"previous_stage":{"anyOf":[{"enum":["OBSERVE","SETUP","LAUNCH","TREND","PULLBACK_TEST","PULLBACK_CONFIRMED","WEAKENING","FAILED"]},{"type":"null"}]},"stage_changed_at":{"type":["string","null"],"format":"date-time"},"stage_age":{"type":["number","null"],"minimum":0},"stage_confidence":{"type":["number","null"],"minimum":0,"maximum":100},
     "action_state":{"enum":["WATCH","WAIT_TRIGGER","SMALL_TEST","WAIT_PULLBACK","HOLD","ADD_ON_CONFIRM","DO_NOT_CHASE","REDUCE_WATCH","EXIT_PRIORITY","DATA_STALE"]},"actionable":{"type":"boolean"},"no_chase":{"type":"boolean"},"risk_overlays":{"type":"array","uniqueItems":true,"items":{"enum":["OVERHEAT","EVENT_RISK","LIQUIDITY_RISK","MARKET_RISK","TRADING_RESTRICTION","DATA_QUALITY_RISK"]}},"opportunity_bucket":{"type":["string","null"]},"opportunity_rank":{"type":["integer","null"],"minimum":1},
     "why_now":{"type":"array","items":{"type":"string"}},"blockers":{"type":"array","items":{"type":"string"}},"upgrade_conditions":{"type":"array","items":{"type":"string"}},"risk_flags":{"type":"array","items":{"type":"string"}},"data_confidence":{"type":["number","null"],"minimum":0,"maximum":100},"component_coverage":{"type":["number","null"],"minimum":0,"maximum":100},"missing_fields":{"type":"array","uniqueItems":true,"items":{"type":"string"}},"trade_plan_id":{"type":["string","null"]},"case_id":{"type":["string","null"]},"support_zone_ids":{"type":"array","items":{"type":"string"}},"resistance_zone_ids":{"type":"array","items":{"type":"string"}},"evidence_ids":{"type":"array","items":{"type":"string"}}
