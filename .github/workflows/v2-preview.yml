@@ -40,6 +40,7 @@ jobs:
           node --check docs/v2/app.js
           node --check docs/v2/quote-ui.js
           node --check docs/v2/components-ui.js
+          node --check docs/v2/tradeplan-ui.js
       - name: Upload preview artifact
         uses: actions/upload-artifact@v4
         with:
