@@ -56,6 +56,9 @@ jobs:
       - name: Build 2.0 canonical atomic bundle
         run: python scripts/v2/build_legacy_bundle.py --legacy-root .shadow-main-data --output docs/v2/data
 
+      - name: Migrate structural support / resistance zones
+        run: python scripts/v2/enrich_zones.py --legacy-root .shadow-main-data --output docs/v2/data
+
       - name: Validate contract and UI syntax
         run: |
           python scripts/v2/validate_bundle.py --root docs/v2/data
