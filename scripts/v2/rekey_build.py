@@ -51,12 +51,18 @@ def replace_build_id(value, old_id: str, new_id: str):
 
 def implementation_paths(root: pathlib.Path) -> list[pathlib.Path]:
     paths = []
-    paths.extend((root / "scripts" / "v2").glob("*.py"))
+    # Atomic Build identity follows production transformation logic, including
+    # this identity algorithm itself. Unit-test-only edits must not create a
+    # new market-data snapshot identity.
+    paths.extend(
+        p for p in (root / "scripts" / "v2").glob("*.py")
+        if not p.name.startswith("test_")
+    )
     paths.extend((root / "contracts").rglob("*.json"))
     req = root / "requirements-contract.txt"
     if req.exists():
         paths.append(req)
-    return [p for p in paths if p.is_file() and p.name != "rekey_build.py"]
+    return [p for p in paths if p.is_file()]
 
 
 def source_paths(legacy_root: pathlib.Path) -> list[pathlib.Path]:
@@ -88,7 +94,7 @@ def rekey(*, output_root: pathlib.Path, legacy_root: pathlib.Path, root: pathlib
     manifest.setdefault("health", {})["build_identity"] = {
         "source_fingerprint": source_fp,
         "implementation_fingerprint": impl_fp,
-        "identity_rule": "source-content + v2-implementation-contract",
+        "identity_rule": "source-content + production-v2-implementation-contract",
     }
 
     for key, meta in manifest.get("datasets", {}).items():
