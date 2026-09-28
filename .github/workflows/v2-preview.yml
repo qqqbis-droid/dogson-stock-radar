@@ -35,8 +35,10 @@ jobs:
         run: python scripts/v2/build_bundle.py --demo
       - name: Validate atomic bundle
         run: python scripts/v2/validate_bundle.py
-      - name: Syntax check UI
-        run: node --check docs/v2/app.js
+      - name: Syntax check UI modules
+        run: |
+          node --check docs/v2/app.js
+          node --check docs/v2/quote-ui.js
       - name: Upload preview artifact
         uses: actions/upload-artifact@v4
         with:
