@@ -39,6 +39,8 @@ jobs:
           python -m unittest scripts.v2.test_engine -v
       - name: Build canonical bundle from public legacy datasets
         run: python scripts/v2/build_legacy_bundle.py --legacy-root docs/data --output docs/v2/data
+      - name: Migrate structural support / resistance zones
+        run: python scripts/v2/enrich_zones.py --legacy-root docs/data --output docs/v2/data
       - name: Validate canonical atomic bundle
         run: python scripts/v2/validate_bundle.py --root docs/v2/data
       - name: Syntax check UI
