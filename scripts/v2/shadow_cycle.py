@@ -14,6 +14,19 @@ from scripts.v2.build_legacy_bundle import build as build_legacy_bundle
 TW = timezone(timedelta(hours=8))
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
+STARTUP_KEYS = {
+    "intraday": ("market_summary", "sector_intraday", "decision_intraday_summary"),
+    "close": ("market_summary", "sector_close", "decision_close_summary"),
+    "portfolio": ("market_summary", "sector_close"),
+    "daytrade": ("market_summary", "sector_intraday", "decision_daytrade_summary"),
+}
+LAZY_KEYS = {
+    "intraday": ("decision_intraday_index", "decision_intraday_detail", "zone_intraday", "tradeplan_intraday", "tradecase_swing"),
+    "close": ("decision_close_index", "decision_close_detail", "zone_close", "tradeplan_close", "tradecase_swing"),
+    "portfolio": ("portfolio_summary",),
+    "daytrade": ("decision_daytrade_index", "decision_daytrade_detail", "zone_daytrade", "tradeplan_daytrade", "tradecase_daytrade"),
+}
+
 
 def load(path: pathlib.Path):
     return json.loads(path.read_text(encoding="utf-8"))
@@ -37,6 +50,31 @@ def legacy_count(path: pathlib.Path) -> int:
 
 def dist(rows, key):
     return dict(sorted(collections.Counter(str(r.get(key) or "NULL") for r in rows).items()))
+
+
+def dataset_bytes(manifest, keys):
+    datasets = manifest.get("datasets") or {}
+    return sum(int((datasets.get(key) or {}).get("bytes") or 0) for key in keys)
+
+
+def payload_profile(manifest):
+    manifest_bytes = len((json.dumps(manifest, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8"))
+    views = {}
+    for view, startup_keys in STARTUP_KEYS.items():
+        lazy_keys = LAZY_KEYS[view]
+        startup_dataset_bytes = dataset_bytes(manifest, startup_keys)
+        views[view] = {
+            "startup_dataset_keys": list(startup_keys),
+            "startup_dataset_bytes": startup_dataset_bytes,
+            "initial_bytes": manifest_bytes + startup_dataset_bytes,
+            "lazy_dataset_keys": list(lazy_keys),
+            "lazy_dataset_bytes": dataset_bytes(manifest, lazy_keys),
+        }
+    return {
+        "manifest_bytes": manifest_bytes,
+        "views": views,
+        "policy": "Summary/sector/market are startup payload; index/detail/zone/plan/case remain lazy and are excluded from initial bytes.",
+    }
 
 
 def safety_audit(datasets):
@@ -84,7 +122,7 @@ def build_report(*, manifest, legacy_root, new_root, previous_build_id):
 
     status = "FAIL" if violations or any((ratio is not None and ratio < 0.90) for ratio in coverage.values()) else ("WARN" if warnings else "PASS")
     return {
-        "shadow_schema_version": "1.0.0",
+        "shadow_schema_version": "1.1.0",
         "captured_at": datetime.now(TW).isoformat(timespec="seconds"),
         "trade_date": manifest.get("trade_date"),
         "build_id": active,
@@ -96,6 +134,7 @@ def build_report(*, manifest, legacy_root, new_root, previous_build_id):
         "coverage_ratio": coverage,
         "safety_violations": violations,
         "warnings": warnings,
+        "payload_profile": payload_profile(manifest),
         "distributions": {
             key: {
                 "lifecycle_stage": dist(rows, "lifecycle_stage"),
