@@ -11,6 +11,7 @@ on:
       - 'docs/v2/app.js'
       - 'docs/v2/index.html'
       - 'docs/v2/app.css'
+      - 'docs/v2/zones.css'
 
 permissions:
   contents: write
@@ -39,6 +40,8 @@ jobs:
           python -m unittest scripts.v2.test_engine -v
       - name: Build canonical bundle from public legacy datasets
         run: python scripts/v2/build_legacy_bundle.py --legacy-root docs/data --output docs/v2/data
+      - name: Copy canonical quote snapshot into lightweight indexes
+        run: python scripts/v2/enrich_quote_index.py --output docs/v2/data
       - name: Migrate structural support / resistance zones
         run: python scripts/v2/enrich_zones.py --legacy-root docs/data --output docs/v2/data
       - name: Validate canonical atomic bundle
