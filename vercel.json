@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
+  "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" != \"clean-build-v2\" ]; then exit 1; fi; git diff --quiet HEAD^ HEAD -- vercel.json docs/v2 ':(exclude)docs/v2/data/**'",
   "redirects": [
     { "source": "/v2", "destination": "/v2/", "permanent": false }
   ],
