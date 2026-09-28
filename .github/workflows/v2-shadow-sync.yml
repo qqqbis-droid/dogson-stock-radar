@@ -56,6 +56,9 @@ jobs:
       - name: Build 2.0 canonical atomic bundle
         run: python scripts/v2/build_legacy_bundle.py --legacy-root .shadow-main-data --output docs/v2/data
 
+      - name: Copy canonical quote snapshot into lightweight indexes
+        run: python scripts/v2/enrich_quote_index.py --output docs/v2/data
+
       - name: Migrate structural support / resistance zones
         run: python scripts/v2/enrich_zones.py --legacy-root .shadow-main-data --output docs/v2/data
 
