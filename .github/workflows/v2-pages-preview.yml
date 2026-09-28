@@ -6,6 +6,7 @@ on:
     branches: [ clean-build-v2 ]
     paths:
       - 'docs/v2/**'
+      - '!docs/v2/data/**'
       - 'vercel.json'
       - '.github/workflows/v2-pages-preview.yml'
 
@@ -44,6 +45,7 @@ jobs:
           node --check v2src/docs/v2/components-ui.js
           node --check v2src/docs/v2/tradeplan-ui.js
           node --check v2src/docs/v2/case-ui.js
+          node --check v2src/docs/v2/ux-detail.js
       - name: Compose Pages artifact without replacing production root
         run: |
           set -euo pipefail
@@ -55,6 +57,7 @@ jobs:
           test -f _site/index.html
           test -f _site/v2/index.html
           test -f _site/v2/data-source.js
+          test -f _site/v2/ux-detail.js
           echo 'Production root source: main/docs'
           echo 'Shadow preview source: clean-build-v2/docs/v2 (data loaded remotely)'
       - uses: actions/configure-pages@v5
