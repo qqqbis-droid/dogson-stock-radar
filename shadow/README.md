@@ -2,6 +2,13 @@
 
 This directory stores **public-system** Shadow validation reports only. It must never contain the user's private portfolio, executions, account information, or other private data.
 
+## Files
+- `latest.json`: most recent detailed Shadow report.
+- `summary.json`: distinct-trading-day progress, safety/coverage summary, and startup payload observability.
+- `reports/`: immutable per-build historical reports used to form the distinct-day sample window.
+
+Repeated runs from the same trading date do not increase the promotion sample count; `summary.json` keeps the newest captured report for each date when calculating progress.
+
 ## Promotion rule
 A predictive rule/weight may not move from `shadow` to `active` merely because the code runs. Promotion requires:
 
@@ -12,3 +19,5 @@ A predictive rule/weight may not move from `shadow` to `active` merely because t
 - a versioned validation report linked from `threshold_registry.json`.
 
 Structural safety rules can remain Active while predictive thresholds/weights continue in Shadow.
+
+Static startup payload bytes are tracked to expose Summary/Detail split regressions, but browser first-interactive and click/open latency require separate runtime measurement before Phase 6 cutover.
