@@ -1,0 +1,9 @@
+{
+  "app_contract_version": "2.0.0",
+  "schema_version": "2.0.0",
+  "engine_version": "2.0.0-alpha.1",
+  "enum_registry_version": "2.0.0",
+  "threshold_registry_version": "2.0.0",
+  "taxonomy_version": "2.0.0",
+  "compatibility": {"supported_schema_major": [2], "legacy_v1_direct_ui_import": false, "migration_adapter_required": true}
+}

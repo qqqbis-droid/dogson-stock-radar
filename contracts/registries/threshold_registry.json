@@ -1,0 +1,14 @@
+{
+  "registry_version": "2.0.0",
+  "active_from": "2026-09-28",
+  "entries": {
+    "structural_gates": {"status": "active", "reason": "Safety/data correctness rules do not require predictive calibration.", "rules": {"unknown_is_actionable": false, "fallback_can_raise_actionability": false, "failed_allows_new_entry": false, "actual_execution_only_changes_position": true, "stale_action_state": "DATA_STALE"}},
+    "intraday_stage_hysteresis": {"status": "active", "reason": "Anti-chatter structural rule.", "rules": {"default_confirmation_scans": 2}},
+    "stage_confidence": {"status": "shadow", "validation_report_id": null, "reason": "Needs historical validation before promotion.", "rules": {"coverage_weight": 40, "agreement_weight": 35, "persistence_weight": 25}},
+    "stage_expiry": {"status": "shadow", "validation_report_id": null, "reason": "Per-stage expiry days are not historically validated.", "rules": {"SETUP_days": null, "LAUNCH_days": null, "PULLBACK_TEST_days": null}},
+    "opportunity_ranking_intraday": {"status": "shadow", "validation_report_id": null, "rules": {"entry_trigger": 25, "lifecycle": 20, "sector_timing": 20, "relative_strength": 15, "flow_acceleration": 10, "confidence": 10}},
+    "opportunity_ranking_close": {"status": "shadow", "validation_report_id": null, "rules": {"entry_position": 30, "lifecycle": 20, "core_quality_ex_sector": 15, "sector_quality": 15, "confirmation_relative": 10, "confidence": 10}},
+    "quality_weights_close": {"status": "candidate", "reason": "Baseline structure retained; auto-calibration may later adjust relative weights.", "rules": {"technical": 50, "chip": 25, "sector": 15, "liquidity": 10}},
+    "dynamic_cluster_core_score": {"status": "shadow", "validation_report_id": null, "reason": "Concentration/dynamic cluster is overlay-only until validated.", "rules": {"eligible_for_core_score": false}}
+  }
+}

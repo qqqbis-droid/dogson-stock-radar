@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dogson-stock-radar/contracts/common-envelope.schema.json",
+  "title": "Dogson Common Envelope",
+  "type": "object",
+  "$defs": {
+    "schema_version": {"type": "string", "pattern": "^2\\.\\d+\\.\\d+$"},
+    "build_id": {"type": "string", "minLength": 1},
+    "dataset": {"enum": ["market", "sector", "decision", "tradeplan", "tradecase", "portfolio", "evidence", "zone", "delta", "health", "manifest"]},
+    "trade_date": {"type": ["string", "null"], "format": "date"},
+    "session_phase": {"enum": ["PRE_OPEN", "LIVE", "CLOSE_FREEZE", "POST_CLOSE", "NEXT_DAY"]},
+    "datetime_nullable": {"type": ["string", "null"], "format": "date-time"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "freshness": {"enum": ["LIVE", "FRESH", "FROZEN", "STALE", "UNKNOWN"]},
+    "complete": {"type": "boolean"},
+    "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 100},
+    "source_status": {"type": "object", "required": ["sources", "fallback"], "properties": {"sources": {"type": "array", "items": {"type": "string"}}, "fallback": {"type": "boolean"}, "fallback_source": {"type": ["string", "null"]}, "fallback_build_id": {"type": ["string", "null"]}, "fallback_reason": {"type": ["string", "null"]}, "last_success_at": {"type": ["string", "null"], "format": "date-time"}}, "additionalProperties": false}
+  }
+}
