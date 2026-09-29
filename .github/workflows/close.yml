@@ -51,7 +51,7 @@ jobs:
       - name: Build full close + chips + market with latest-session guard
         run: python scripts/build_close_fresh.py
 
-      - name: Ensure intraday/daytrade snapshot is not older than latest close
+      - name: Try to refresh lagging intraday/daytrade snapshot
         shell: bash
         run: |
           set -euo pipefail
@@ -84,8 +84,8 @@ jobs:
           PY
           )"
           if [[ "$need_refresh" == "1" ]]; then
-            echo "Latest close is newer than intraday/daytrade; rebuilding final MIS snapshot."
-            python scripts/bridge_intraday.py
+            echo "Latest close is newer than root intraday/daytrade; attempting final MIS snapshot."
+            python scripts/bridge_intraday.py || true
             python - <<'PY'
           import json
           from pathlib import Path
@@ -100,21 +100,21 @@ jobs:
           for r in rows:
               s=str(r.get('quote_date') or r.get('market_trade_date') or r.get('date') or '')[:10]
               if len(s)==10: dates.append(s)
-          if not dates: raise SystemExit('intraday effective trade date missing after close refresh')
-          effective=max(dates)
-          clocks=[]
-          for v in (bridge.get('latest_quote_time'), qlayer.get('latest_time'), bridge.get('latest_trade_time'), qlayer.get('latest_trade_time')):
-              s=str(v or '').strip()
-              if ':' in s: clocks.append(s[:8] if len(s)>=8 else s[:5]+':00')
-          for r in rows:
-              if str(r.get('quote_date') or '')[:10] != effective: continue
-              for k in ('quote_snapshot_time','quote_time','structure_time'):
-                  s=str(r.get(k) or '').strip()
+          if dates:
+              effective=max(dates)
+              clocks=[]
+              for v in (bridge.get('latest_quote_time'), qlayer.get('latest_time'), bridge.get('latest_trade_time'), qlayer.get('latest_trade_time')):
+                  s=str(v or '').strip()
                   if ':' in s: clocks.append(s[:8] if len(s)>=8 else s[:5]+':00')
-          latest=max(clocks) if clocks else '13:30:00'; as_of=f'{effective}T{latest}+08:00'
-          obj['trade_date']=effective; obj['source_trade_date']=effective; obj['as_of']=as_of; obj['source_updated_at']=as_of
-          p.write_text(json.dumps(obj,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
-          print('close refresh intraday normalized:', effective, as_of, 'rows=',len(rows))
+              for r in rows:
+                  if str(r.get('quote_date') or '')[:10] != effective: continue
+                  for k in ('quote_snapshot_time','quote_time','structure_time'):
+                      s=str(r.get(k) or '').strip()
+                      if ':' in s: clocks.append(s[:8] if len(s)>=8 else s[:5]+':00')
+              latest=max(clocks) if clocks else '13:30:00'; as_of=f'{effective}T{latest}+08:00'
+              obj['trade_date']=effective; obj['source_trade_date']=effective; obj['as_of']=as_of; obj['source_updated_at']=as_of
+              p.write_text(json.dumps(obj,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+              print('close refresh intraday normalized:', effective, as_of, 'rows=',len(rows))
           PY
             python scripts/build_daytrade.py
             python - <<'PY'
@@ -123,13 +123,13 @@ jobs:
           ip=Path('docs/data/intraday.json'); dp=Path('docs/data/daytrade.json')
           intra=json.loads(ip.read_text(encoding='utf-8')); day=json.loads(dp.read_text(encoding='utf-8'))
           td=str(intra.get('trade_date') or '')[:10]; asof=str(intra.get('as_of') or '')
-          if len(td)!=10 or not asof.startswith(td): raise SystemExit(f'invalid refreshed intraday metadata: {td} / {asof}')
-          day['trade_date']=td; day['source_trade_date']=td; day['as_of']=asof; day['source_updated_at']=asof
-          dp.write_text(json.dumps(day,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
-          print('close refresh daytrade normalized:', td, asof)
+          if len(td)==10 and asof.startswith(td):
+              day['trade_date']=td; day['source_trade_date']=td; day['as_of']=asof; day['source_updated_at']=asof
+              dp.write_text(json.dumps(day,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+              print('close refresh daytrade normalized:', td, asof)
           PY
           else
-            echo "Intraday/daytrade are already aligned with latest close."
+            echo "Root intraday/daytrade are already aligned with latest close."
           fi
 
       - name: Build 60m lifecycle + entry-position lights
@@ -171,7 +171,11 @@ jobs:
           intraday_date=str(dates.get('intraday') or '')[:10]
           daytrade_date=str(dates.get('daytrade') or '')[:10]
           if close_date and (intraday_date < close_date or daytrade_date < close_date):
-            raise SystemExit(f'latest-session regression: close={close_date} intraday={intraday_date} daytrade={daytrade_date}')
+            # After-hours MIS may no longer expose the just-finished session.
+            # Do not mutate dates.  The V2 overlay gate will either preserve an
+            # already-validated same-day canonical bundle or fail closed if no
+            # such bundle exists.
+            print(f'warning: root intraday/daytrade lag close after hours: close={close_date} intraday={intraday_date} daytrade={daytrade_date}')
           PY
       - name: Include Clean Build 2.0 in Pages artifact
         run: |
