@@ -101,6 +101,9 @@ jobs:
       - name: Migrate structural support / resistance zones
         run: python scripts/v2/enrich_zones.py --legacy-root .shadow-main-data --output docs/v2/data
 
+      - name: Enrich mission-specific stock detail evidence
+        run: python scripts/v2/enrich_stock_detail_context.py --legacy-root .shadow-main-data --root docs/v2/data
+
       - name: Restore mission-specific market and capital contexts
         run: |
           python scripts/v2/restore_market_capital_context.py --legacy-root .shadow-main-data --root docs/v2/data
@@ -122,11 +125,18 @@ jobs:
           missing=[k for k in required if not m.get(k)]
           if missing:
               raise SystemExit(f'Shadow Version Registry binding missing: {missing}')
+          datasets=m.get('datasets') or {}
+          required_ds=('zone_intraday','zone_close','zone_daytrade','stock_detail_intraday','stock_detail_close','stock_detail_daytrade')
+          missing_ds=[k for k in required_ds if k not in datasets]
+          if missing_ds:
+              raise SystemExit(f'Shadow detail datasets missing: {missing_ds}')
           print('Shadow version binding:', {k:m[k] for k in required})
+          print('Shadow detail bundle:', {k:datasets[k].get('bytes') for k in required_ds})
           PY
           node --check docs/v2/app.js
           node --check docs/v2/market-capital-ui.js
           node --check docs/v2/quote-ui.js
+          node --check docs/v2/stock-detail-bridge.js
 
       - name: Publish validated Shadow bundle to clean-build-v2
         run: |
