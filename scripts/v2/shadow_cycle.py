@@ -168,6 +168,16 @@ def main():
     with tempfile.TemporaryDirectory(prefix="dogson-v2-shadow-") as td:
         temp_root = pathlib.Path(td) / "data"
         manifest = build_legacy_bundle(legacy_root, temp_root)
+        previous_date = str((previous_manifest or {}).get("trade_date") or "")
+        candidate_date = str(manifest.get("trade_date") or "")
+        if previous_date and candidate_date and candidate_date < previous_date:
+            print(
+                "Refusing canonical trade-date regression:",
+                candidate_date,
+                "<",
+                previous_date,
+            )
+            return
         active = manifest["active_build_id"]
         report = build_report(
             manifest=manifest,
