@@ -12,6 +12,8 @@ git archive FETCH_HEAD docs/v2 scripts/v2 contracts requirements-contract.txt | 
 test -f docs/v2/index.html
 test -f scripts/v2/shadow_cycle.py
 test -f scripts/v2/live_publish_patch.py
+test -f scripts/v2/enrich_zones.py
+test -f scripts/v2/enrich_stock_detail_context.py
 test -f scripts/v2/restore_market_capital_context.py
 test -f scripts/v2/validate_market_capital_context.py
 test -f scripts/v2/stamp_version_contract.py
@@ -28,10 +30,15 @@ python -m scripts.v2.shadow_cycle \
   --output docs/v2/data \
   --reports /tmp/dogson-pages-v2-shadow/reports
 python scripts/v2/live_publish_patch.py --legacy-root docs/data --root docs/v2/data
+# A fresh shadow_cycle rebuild replaces the active build directory. Re-run all
+# enrichers that create decision-linked datasets inside that exact Atomic Build.
+python scripts/v2/enrich_zones.py --legacy-root docs/data --output docs/v2/data
+python scripts/v2/enrich_stock_detail_context.py --legacy-root docs/data --root docs/v2/data
 python scripts/v2/restore_market_capital_context.py --legacy-root docs/data --root docs/v2/data
 python scripts/v2/stamp_version_contract.py --root docs/v2/data
 python scripts/v2/validate_bundle.py --root docs/v2/data
 python scripts/v2/validate_market_capital_context.py --root docs/v2/data
+node --check docs/v2/stock-detail-bridge.js
 
 test -f docs/v2/data/current_manifest.json
 
@@ -57,7 +64,14 @@ def effective_date(obj):
             if len(s)==10: dates.append(s)
     return max(dates) if dates else ''
 
-m=load('docs/v2/data/current_manifest.json')
+def resolve(root, url):
+    raw=str(url or '')
+    if raw.startswith('./data/'):
+        return root / raw[len('./data/'):]
+    return root / raw.lstrip('./')
+
+root=Path('docs/v2/data')
+m=load(root/'current_manifest.json')
 intra=load('docs/data/intraday.json')
 day=load('docs/data/daytrade.json')
 close=load('docs/data/close.json')
@@ -76,10 +90,29 @@ missing=[k for k in required_versions if not m.get(k)]
 if missing:
     raise SystemExit(f'V2 version binding missing: {missing}')
 required_contexts=('market_intraday_context','market_close_context','capital_intraday_context','capital_close_context')
-missing_contexts=[k for k in required_contexts if k not in (m.get('datasets') or {})]
-if missing_contexts:
-    raise SystemExit(f'V2 context datasets missing: {missing_contexts}')
-print('V2 source lock:', {'build':m.get('active_build_id'),'close':vc,'intraday':vi,'daytrade':vd,'version_set':m.get('version_set_id'),'market_capital':'split'})
+required_details=('zone_intraday','zone_close','zone_daytrade','stock_detail_intraday','stock_detail_close','stock_detail_daytrade')
+required=required_contexts+required_details
+missing_ds=[k for k in required if k not in (m.get('datasets') or {})]
+if missing_ds:
+    raise SystemExit(f'V2 required datasets missing: {missing_ds}')
+missing_files=[]
+for key in required_details:
+    meta=m['datasets'][key]
+    p=resolve(root,meta.get('url'))
+    if not p.is_file() or p.stat().st_size==0:
+        missing_files.append(f'{key}:{p}')
+if missing_files:
+    raise SystemExit(f'V2 detail files missing from active build: {missing_files}')
+# Zone linking must be physically resolvable for at least some decisions; an
+# empty active-build zone set is a deployment regression, not harmless null data.
+zone_counts={}
+for ctx in ('intraday','close','daytrade'):
+    zp=resolve(root,m['datasets'][f'zone_{ctx}']['url'])
+    zones=load(zp)
+    zone_counts[ctx]=len(zones) if isinstance(zones,list) else 0
+    if zone_counts[ctx] <= 0:
+        raise SystemExit(f'V2 zone_{ctx} is empty after enrichment')
+print('V2 source lock:', {'build':m.get('active_build_id'),'close':vc,'intraday':vi,'daytrade':vd,'version_set':m.get('version_set_id'),'market_capital':'split','zones':zone_counts,'stock_detail':'mission-split'})
 PY
 
 # The legacy service worker owns the repository root. Let /v2/ bypass it so iOS
