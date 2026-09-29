@@ -93,3 +93,5 @@ jobs:
             exit 1
           fi
           echo 'Browser render PASS'
+
+# manual verification refresh: 2026-09-29T09:02+08:00
