@@ -55,6 +55,24 @@ jobs:
           set -euo pipefail
           mkdir -p _site
           cp -a mainsrc/docs/. _site/
+
+          # The legacy production worker owns the whole repository scope. Without
+          # this guard it also intercepts /v2/ navigations, transforms V2 HTML as
+          # legacy HTML and may fall back to the old cached index. Keep legacy
+          # behavior for production root, but let every /v2/ request bypass it.
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('_site/sw.js')
+          s = p.read_text(encoding='utf-8')
+          needle = "  const url=new URL(req.url);\n  if(url.pathname.includes('/data/'))"
+          replacement = "  const url=new URL(req.url);\n  if(url.pathname.includes('/v2/'))return;\n  if(url.pathname.includes('/data/'))"
+          if needle not in s:
+              raise SystemExit('legacy sw fetch handler shape changed; refusing unsafe patch')
+          s = s.replace(needle, replacement, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+          grep -q "url.pathname.includes('/v2/')" _site/sw.js
+
           rm -rf _site/v2
           mkdir -p _site/v2
           rsync -a --exclude 'data/' v2src/docs/v2/ _site/v2/
@@ -82,6 +100,7 @@ jobs:
           test -f _site/v2/data/current_manifest.json
           test -f "_site/v2/data/builds/$ACTIVE_BUILD/market-summary.json"
           echo "Production root source: main/docs"
+          echo "Legacy SW: V2 bypass enabled"
           echo "V2 shell: clean-build-v2/docs/v2"
           echo "V2 same-origin active data: $ACTIVE_BUILD"
       - uses: actions/configure-pages@v5
