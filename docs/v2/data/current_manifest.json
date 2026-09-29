@@ -1,1 +1,147 @@
-{"schema_version":"2.0.0","app_contract_version":"2.0.0","active_build_id":"cb2-real-20260923-see17b88582-i77c3945510","previous_good_build_id":"cb2-legacy-20260923-194b7f28d8","trade_date":"2026-09-23","session_phase":"POST_CLOSE","generated_at":"2026-09-29T08:49:57+08:00","datasets":{"market_summary":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/market-summary.json","hash":"sha256:6046bbe578183b6a800573f2b6239ed8b0bcbc233f226128a6dab18fafa40f7f","bytes":657,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"sector_close":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/sector-close.json","hash":"sha256:2c99729b2d9ddb7312791b6ec77261147b0dda6c5fe9a93d5d193142afaf9fc1","bytes":56833,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"sector_intraday":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/sector-intraday.json","hash":"sha256:3207b34ba19775db4636961a2c58a122afe6cf1693ea111d439b7bd66e3e5b59","bytes":56946,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"decision_close_summary":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/decision-close-summary.json","hash":"sha256:1ab7901234e02fd1f36114d346c6372affcec0c258dd7cec5572e7eaa7fda98c","bytes":39901,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"decision_close_index":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/decision-close-index.json","hash":"sha256:a183f61e98ad7709b47aa4bab90acd53534951152b46f7733a499282db8fa139","bytes":721114,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"decision_close_detail":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/decision-close-detail.json","hash":"sha256:a85926852677111e3d55aa1803f8572fc36fbb1beba4d82c5afea19379a1e744","bytes":1935761,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"decision_intraday_summary":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/decision-intraday-summary.json","hash":"sha256:40a6c6e8f21cd76b74ab30a12d5b015bbab6a21448b0f48b2438e1acfb10ca3a","bytes":42677,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"decision_intraday_index":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/decision-intraday-index.json","hash":"sha256:6a9b5af1a2446f38e6c3be4c805c9105cf4b92cb04c8afcce8355e9ef40dc1cb","bytes":707789,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"decision_intraday_detail":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/decision-intraday-detail.json","hash":"sha256:acddd100b819d9ae7740fa8d8533c8490608bb7faefb0bee8e57aefb0d7b6406","bytes":2044603,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"decision_daytrade_summary":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/decision-daytrade-summary.json","hash":"sha256:fd566fdaa784222f6c2a4dcbd29320873fa18cdc1674e5bc48f0e8565c17fb5b","bytes":56963,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"decision_daytrade_index":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/decision-daytrade-index.json","hash":"sha256:3919afdbf87cb8169597c97937f782a50012f99e808b59b945f19c56fcb03dd8","bytes":772880,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"decision_daytrade_detail":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/decision-daytrade-detail.json","hash":"sha256:48d3993dafe98815fc1bc3fe78f4189022fc8faa5d3ab022d78118356b124711","bytes":2745424,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"portfolio_summary":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/portfolio-summary.json","hash":"sha256:37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570","bytes":3,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"health":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/health.json","hash":"sha256:c6714a9bf64587caa831df5e041cc41eb4b84c71f73c663032463e4b8df61157","bytes":342,"complete":true,"as_of":"2026-09-29T08:49:57+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"zone_close":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/zone-close.json","hash":"sha256:fb06d9d92c1c2cc2041665b2b54ee35f17176c0e007053dc46e4bc40425a938d","bytes":1217738,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"zone_intraday":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/zone-intraday.json","hash":"sha256:9a5a0b18c1d2d99415bc901c390fdabca5b6776e20205cada7e1b38a02019efb","bytes":1204520,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"zone_daytrade":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/zone-daytrade.json","hash":"sha256:70cc9e8b54d7946ea9715a0bc55e3bbad2c4d376d41e2b6b4b7974344fd186fa","bytes":1210312,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"tradeplan_close":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/tradeplan-close.json","hash":"sha256:ba1d07713a092f075c442f99f13c8ed2475bd3469385df6c5d57733477928226","bytes":1065338,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"tradeplan_intraday":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/tradeplan-intraday.json","hash":"sha256:22f3635c3bfef645be481910bfaa88abccbf79ea0756f80c2f4e966c0cbd7aa0","bytes":1071715,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"tradeplan_daytrade":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/tradeplan-daytrade.json","hash":"sha256:ce519bc9657762bc66e85066d8522159d093f3a93293cef1a5b64190281fd54e","bytes":1177765,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"tradecase_swing":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/tradecase-swing.json","hash":"sha256:545fcf4c9a19f838a5c95c2f3e6484b5a53e4e660498035e4614277672a3132d","bytes":2139409,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"tradecase_daytrade":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/tradecase-daytrade.json","hash":"sha256:5ded0bac2480f07e09efef8d2324be1035a010549ab15d58a638059f49b37f38","bytes":1892442,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"},"delta_intraday_close":{"url":"./data/builds/cb2-real-20260923-see17b88582-i77c3945510/delta-intraday-close.json","hash":"sha256:470706982f9e43084707af363b95b8467d895b38c7fbebd77ec949ee14483f76","bytes":1042949,"complete":true,"as_of":"2026-09-23T13:30:00+08:00","known_at":"2026-09-29T08:49:57+08:00","build_id":"cb2-real-20260923-see17b88582-i77c3945510"}},"health":{"validation_passed":true,"warnings":["Phase 4 Migration Adapter：沿用 v1.x 公開市場資料，未升級的預測門檻仍為 Shadow。","公開 Preview 不包含私人庫存資料。","Phase 4：行情快照已進入 StockDecision.quote；未知成交量單位保留 UNKNOWN，不自行換算。","Phase 4：支撐／壓力區間由 v1.x 已計算結構遷移為 StructuralZone；Zone 本身不是買進訊號。","Phase 4：TradePlan 只引用已驗證結構區與 Engine 條件；reward/risk 未有可信來源時維持 null，不製造假精準。","Phase 4/5 Shadow：TradeCase 已建立同日盤中→盤後生命線；跨日 Carry 僅在下一交易日資料實際存在後才驗證，不由單日快照推測。"],"errors":[],"fallback_reason":null,"build_identity":{"source_fingerprint":"ee17b88582","implementation_fingerprint":"77c3945510","identity_rule":"source-content + production-v2-implementation-contract"}}}
+{
+  "schema_version": "2.0.0",
+  "app_contract_version": "2.0.0",
+  "active_build_id": "cb2-legacy-20260924-ee840f2713",
+  "previous_good_build_id": "cb2-real-20260923-see17b88582-i77c3945510",
+  "trade_date": "2026-09-24",
+  "session_phase": "POST_CLOSE",
+  "generated_at": "2026-09-29T01:12:02+08:00",
+  "datasets": {
+    "market_summary": {
+      "url": "./data/builds/cb2-legacy-20260924-ee840f2713/market-summary.json",
+      "hash": "sha256:14144d5265ea751acc5f24d8c17d55ffa4f7aabefb0c088575d126187d3a5710",
+      "bytes": 645,
+      "complete": true,
+      "as_of": "2026-09-24T13:30:00+08:00",
+      "known_at": "2026-09-29T01:12:02+08:00",
+      "build_id": "cb2-legacy-20260924-ee840f2713"
+    },
+    "sector_close": {
+      "url": "./data/builds/cb2-legacy-20260924-ee840f2713/sector-close.json",
+      "hash": "sha256:4682b673a2c64a3d19069241a41228cf9f91f18e83e959429b420204e6135a97",
+      "bytes": 56227,
+      "complete": true,
+      "as_of": "2026-09-24T13:30:00+08:00",
+      "known_at": "2026-09-29T01:12:02+08:00",
+      "build_id": "cb2-legacy-20260924-ee840f2713"
+    },
+    "sector_intraday": {
+      "url": "./data/builds/cb2-legacy-20260924-ee840f2713/sector-intraday.json",
+      "hash": "sha256:5183fb0595767849c2dc88f722422b50f82426526654cb36859a81af8bbe51b3",
+      "bytes": 56352,
+      "complete": true,
+      "as_of": "2026-09-23T13:30:00+08:00",
+      "known_at": "2026-09-29T01:12:02+08:00",
+      "build_id": "cb2-legacy-20260924-ee840f2713"
+    },
+    "decision_close_summary": {
+      "url": "./data/builds/cb2-legacy-20260924-ee840f2713/decision-close-summary.json",
+      "hash": "sha256:3b6694ccd04695f9bca84c103dbc669c82f737ba7e4e7088da74ba71682bd3c9",
+      "bytes": 35865,
+      "complete": true,
+      "as_of": "2026-09-24T13:30:00+08:00",
+      "known_at": "2026-09-29T01:12:02+08:00",
+      "build_id": "cb2-legacy-20260924-ee840f2713"
+    },
+    "decision_close_index": {
+      "url": "./data/builds/cb2-legacy-20260924-ee840f2713/decision-close-index.json",
+      "hash": "sha256:68e11b5646a03315c3b7e8d79386d7c857053e22df87d010622771a89d94221d",
+      "bytes": 484191,
+      "complete": true,
+      "as_of": "2026-09-24T13:30:00+08:00",
+      "known_at": "2026-09-29T01:12:02+08:00",
+      "build_id": "cb2-legacy-20260924-ee840f2713"
+    },
+    "decision_close_detail": {
+      "url": "./data/builds/cb2-legacy-20260924-ee840f2713/decision-close-detail.json",
+      "hash": "sha256:0d8874c4b653d613519c78c0633bcf94d24f6b3c15cb664d236f19ccc46e744d",
+      "bytes": 1741403,
+      "complete": true,
+      "as_of": "2026-09-24T13:30:00+08:00",
+      "known_at": "2026-09-29T01:12:02+08:00",
+      "build_id": "cb2-legacy-20260924-ee840f2713"
+    },
+    "decision_intraday_summary": {
+      "url": "./data/builds/cb2-legacy-20260924-ee840f2713/decision-intraday-summary.json",
+      "hash": "sha256:4dd7fa09e27b7eb6bd6dd39701d028fc7b8f40125f0533df3049e4da7ef949d7",
+      "bytes": 38897,
+      "complete": true,
+      "as_of": "2026-09-23T13:30:00+08:00",
+      "known_at": "2026-09-29T01:12:02+08:00",
+      "build_id": "cb2-legacy-20260924-ee840f2713"
+    },
+    "decision_intraday_index": {
+      "url": "./data/builds/cb2-legacy-20260924-ee840f2713/decision-intraday-index.json",
+      "hash": "sha256:0c066e30ed0b0af824567ff5abb3899a22176bd440bad2b1bc274f591e29baca",
+      "bytes": 473264,
+      "complete": true,
+      "as_of": "2026-09-23T13:30:00+08:00",
+      "known_at": "2026-09-29T01:12:02+08:00",
+      "build_id": "cb2-legacy-20260924-ee840f2713"
+    },
+    "decision_intraday_detail": {
+      "url": "./data/builds/cb2-legacy-20260924-ee840f2713/decision-intraday-detail.json",
+      "hash": "sha256:755b1dcd89fade7d83fb1d79894555ba23193e96ffc66fdbb6d29bd6457ef09e",
+      "bytes": 1862144,
+      "complete": true,
+      "as_of": "2026-09-23T13:30:00+08:00",
+      "known_at": "2026-09-29T01:12:02+08:00",
+      "build_id": "cb2-legacy-20260924-ee840f2713"
+    },
+    "decision_daytrade_summary": {
+      "url": "./data/builds/cb2-legacy-20260924-ee840f2713/decision-daytrade-summary.json",
+      "hash": "sha256:ab0c49b4b5309f51582909f82f8d932c6740ea337a4cfdf1865e08688306462a",
+      "bytes": 52958,
+      "complete": true,
+      "as_of": "2026-09-23T13:30:00+08:00",
+      "known_at": "2026-09-29T01:12:02+08:00",
+      "build_id": "cb2-legacy-20260924-ee840f2713"
+    },
+    "decision_daytrade_index": {
+      "url": "./data/builds/cb2-legacy-20260924-ee840f2713/decision-daytrade-index.json",
+      "hash": "sha256:48c1f8040db3ed19c1aeaba5e5acb1aa74acb14b577beb9ed5d5a44e63a19077",
+      "bytes": 533287,
+      "complete": true,
+      "as_of": "2026-09-23T13:30:00+08:00",
+      "known_at": "2026-09-29T01:12:02+08:00",
+      "build_id": "cb2-legacy-20260924-ee840f2713"
+    },
+    "decision_daytrade_detail": {
+      "url": "./data/builds/cb2-legacy-20260924-ee840f2713/decision-daytrade-detail.json",
+      "hash": "sha256:21be1f740eb16fcd271b35837edc0fb2c6a999678f947511ee6d1bf0a87149d5",
+      "bytes": 2552105,
+      "complete": true,
+      "as_of": "2026-09-23T13:30:00+08:00",
+      "known_at": "2026-09-29T01:12:02+08:00",
+      "build_id": "cb2-legacy-20260924-ee840f2713"
+    },
+    "portfolio_summary": {
+      "url": "./data/builds/cb2-legacy-20260924-ee840f2713/portfolio-summary.json",
+      "hash": "sha256:37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "bytes": 3,
+      "complete": true,
+      "as_of": "2026-09-23T13:30:00+08:00",
+      "known_at": "2026-09-29T01:12:02+08:00",
+      "build_id": "cb2-legacy-20260924-ee840f2713"
+    },
+    "health": {
+      "url": "./data/builds/cb2-legacy-20260924-ee840f2713/health.json",
+      "hash": "sha256:ca839c550bf7e040bdd10b9664c9424d2edc8c1fc06e6509fed4d7d9081000d4",
+      "bytes": 454,
+      "complete": true,
+      "as_of": "2026-09-29T01:12:02+08:00",
+      "known_at": "2026-09-29T01:12:02+08:00",
+      "build_id": "cb2-legacy-20260924-ee840f2713"
+    }
+  },
+  "health": {
+    "validation_passed": true,
+    "warnings": [
+      "Phase 4 Migration Adapter：沿用 v1.x 公開市場資料，未升級的預測門檻仍為 Shadow。",
+      "公開 Preview 不包含私人庫存資料。",
+      "來源交易日不完全一致；各物件保留自己的 trade_date，禁止跨日合成可執行訊號。"
+    ],
+    "errors": [],
+    "fallback_reason": null
+  }
+}
