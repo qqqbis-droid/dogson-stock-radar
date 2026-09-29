@@ -13,7 +13,7 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Verify public V2 page and same-origin canonical data
         shell: bash
@@ -59,3 +59,28 @@ jobs:
           assert x.get('build_id')
           print('Public active market dataset PASS:', x.get('trade_date'), x.get('market_score'))
           PY
+
+      - name: Verify browser can actually render V2 content
+        shell: bash
+        run: |
+          set -euo pipefail
+          PAGE_URL="https://qqqbis-droid.github.io/dogson-stock-radar/v2/?smoke=$(date +%s)"
+          CHROME=$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)
+          if [ -z "$CHROME" ]; then
+            echo "Chrome/Chromium not found on runner"
+            exit 1
+          fi
+          "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage \
+            --virtual-time-budget=20000 --dump-dom "$PAGE_URL" > /tmp/rendered.html 2>/tmp/chrome.log || {
+              cat /tmp/chrome.log
+              exit 1
+            }
+          grep -q 'Contract ✓' /tmp/rendered.html
+          grep -q '市場環境' /tmp/rendered.html
+          grep -q '盤中優先' /tmp/rendered.html
+          grep -q '2026-09-24' /tmp/rendered.html
+          if grep -q '>載入中<' /tmp/rendered.html; then
+            echo 'Browser render is still stuck at loading state'
+            exit 1
+          fi
+          echo 'Browser render PASS'
