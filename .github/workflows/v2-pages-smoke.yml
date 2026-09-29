@@ -13,7 +13,7 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 3
     steps:
       - name: Verify public V2 page, recovery route and same-origin canonical data
         shell: bash
@@ -35,7 +35,7 @@ jobs:
           done
 
           grep -q 'Clean Build 2.0' /tmp/v2.html
-          grep -q 'data-source.js?v=20260929a' /tmp/v2.html
+          grep -q 'data-source.js?v=20260929c' /tmp/v2.html
           grep -q 'V2 修復入口' /tmp/reset.html
           grep -q "url.pathname.includes('/v2/')" /tmp/sw.js
           if grep -q 'Clean Build 2.0 · Shadow' /tmp/v2.html; then
@@ -78,11 +78,12 @@ jobs:
             echo "Chrome/Chromium not found on runner"
             exit 1
           fi
-          "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage \
-            --virtual-time-budget=20000 --dump-dom "$PAGE_URL" > /tmp/rendered.html 2>/tmp/chrome.log || {
-              cat /tmp/chrome.log
-              exit 1
-            }
+          if ! timeout 45s "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage \
+            --virtual-time-budget=15000 --dump-dom "$PAGE_URL" > /tmp/rendered.html 2>/tmp/chrome.log; then
+            echo 'Browser render timed out or failed'
+            cat /tmp/chrome.log || true
+            exit 1
+          fi
           grep -q 'Contract ✓' /tmp/rendered.html
           grep -q '市場環境' /tmp/rendered.html
           grep -q '盤中優先' /tmp/rendered.html
