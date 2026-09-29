@@ -156,6 +156,11 @@ jobs:
           print('canonical data truth=', json.dumps(s, ensure_ascii=False))
           PY
 
+      - name: Include Clean Build 2.0 in Pages artifact
+        run: |
+          bash scripts/include_v2_pages.sh
+          node --check docs/sw.js
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
