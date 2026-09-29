@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: clean-build-v2-shadow-sync
@@ -42,16 +43,54 @@ jobs:
       - name: Install contract validator
         run: pip install -r requirements-contract.txt
 
-      - name: Pull latest production public datasets from main
+      - name: Download exact production Pages artifact
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: .shadow-pages-artifact
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Pull production public datasets
+        shell: bash
         run: |
-          rm -rf .shadow-main-data
+          set -euo pipefail
+          rm -rf .shadow-main-data .shadow-pages
           mkdir -p .shadow-main-data
-          git fetch origin main --depth=1
-          git archive origin/main docs/data | tar -x -C .shadow-main-data --strip-components=2
+
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            mkdir -p .shadow-pages
+            test -s .shadow-pages-artifact/artifact.tar
+            tar -xf .shadow-pages-artifact/artifact.tar -C .shadow-pages
+            cp .shadow-pages/data/close.json .shadow-main-data/close.json
+            cp .shadow-pages/data/intraday.json .shadow-main-data/intraday.json
+            cp .shadow-pages/data/daytrade.json .shadow-main-data/daytrade.json
+            cp .shadow-pages/data/market.json .shadow-main-data/market.json
+            echo "Shadow source: exact Pages artifact from upstream run ${{ github.event.workflow_run.id }}"
+          else
+            base="https://qqqbis-droid.github.io/dogson-stock-radar/data"
+            for name in close intraday daytrade market; do
+              curl -fsSL --retry 3 -H 'Cache-Control: no-cache' \
+                "${base}/${name}.json?shadow_run=${GITHUB_RUN_ID}" \
+                -o ".shadow-main-data/${name}.json"
+            done
+            echo "Shadow source: currently deployed GitHub Pages"
+          fi
+
           test -s .shadow-main-data/close.json
           test -s .shadow-main-data/intraday.json
           test -s .shadow-main-data/daytrade.json
           test -s .shadow-main-data/market.json
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for name in ('close','intraday','daytrade','market'):
+              obj=json.loads(Path(f'.shadow-main-data/{name}.json').read_text(encoding='utf-8'))
+              print(name, obj.get('trade_date') or obj.get('source_trade_date') or obj.get('date'))
+          PY
 
       - name: Build 2.0 canonical atomic bundle
         run: python scripts/v2/build_legacy_bundle.py --legacy-root .shadow-main-data --output docs/v2/data
