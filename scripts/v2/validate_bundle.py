@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse, json, pathlib
 from jsonschema import Draft202012Validator, FormatChecker
 
+from scripts.v2.stamp_version_contract import stamp as stamp_version_contract
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCHEMA_ROOT = ROOT / "contracts" / "schemas"
 
@@ -45,6 +47,10 @@ def main():
     ap.add_argument("--root", default=str(ROOT / "docs" / "v2" / "data"))
     args = ap.parse_args()
     root = pathlib.Path(args.root)
+
+    # Phase 0D: bind the Atomic Bundle to the single active Version Registry
+    # tuple before schema validation. Existing conflicting values fail closed.
+    stamp_version_contract(root)
     manifest = load(root / "current_manifest.json")
     ok = validate("bundle-manifest.schema.json", manifest)
     active = manifest["active_build_id"]
@@ -165,6 +171,7 @@ def main():
     print(
         "bundle validation OK",
         active,
+        "version_set", manifest.get("version_set_id"),
         "zones", len(zone_ids),
         "tradeplans", len(plan_ids),
         "tradecases", len(case_ids),
