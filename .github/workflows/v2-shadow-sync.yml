@@ -104,6 +104,20 @@ jobs:
       - name: Validate contract and UI syntax
         run: |
           python scripts/v2/validate_bundle.py --root docs/v2/data
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('docs/v2/data/current_manifest.json').read_text(encoding='utf-8'))
+          required=(
+              'version_registry_version','version_set_id','schema_version',
+              'app_contract_version','engine_version','enum_registry_version',
+              'threshold_registry_version','taxonomy_version',
+          )
+          missing=[k for k in required if not m.get(k)]
+          if missing:
+              raise SystemExit(f'Shadow Version Registry binding missing: {missing}')
+          print('Shadow version binding:', {k:m[k] for k in required})
+          PY
           node --check docs/v2/app.js
           node --check docs/v2/quote-ui.js
 
