@@ -60,6 +60,14 @@ jobs:
         run: python scripts/build_system_status.py
       - name: Validate intraday publish
         run: python scripts/validate_intraday_publish.py
+      - name: Preserve Clean Build 2.0 preview in the Pages artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin clean-build-v2 --depth=1
+          git restore --source=FETCH_HEAD -- docs/v2
+          test -f docs/v2/index.html
+          test -f docs/v2/data/current_manifest.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
