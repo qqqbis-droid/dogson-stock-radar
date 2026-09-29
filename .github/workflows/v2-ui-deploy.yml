@@ -48,9 +48,9 @@ jobs:
           run_id="$(gh api \
             -H 'Accept: application/vnd.github+json' \
             "/repos/${GITHUB_REPOSITORY}/actions/runs?status=success&per_page=100" \
-            --jq '.workflow_runs[] | select(.name == "Radar - Close Update" or .name == "Radar - Intraday Update" or .name == "Clean Build 2.0 UI-only Deploy") | .id' \
-            | head -n 1)"
+            --jq '[.workflow_runs[] | select(.name == "Radar - Close Update" or .name == "Radar - Intraday Update" or .name == "Clean Build 2.0 UI-only Deploy")] | first | .id')"
           test -n "$run_id"
+          test "$run_id" != "null"
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
           echo "Using last successful production Pages run: $run_id"
 
