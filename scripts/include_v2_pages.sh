@@ -13,6 +13,12 @@ test -f docs/v2/index.html
 test -f scripts/v2/shadow_cycle.py
 test -f scripts/v2/live_publish_patch.py
 test -f scripts/v2/stamp_version_contract.py
+test -f requirements-contract.txt
+
+# V2 contract validation intentionally keeps its dependency set separate from
+# the legacy runtime. Install that small validator set whenever V2 is overlaid
+# into a Pages artifact so every publisher enforces the same fail-closed gate.
+python -m pip install --disable-pip-version-check -r requirements-contract.txt
 
 rm -rf /tmp/dogson-pages-v2-shadow
 python -m scripts.v2.shadow_cycle \
