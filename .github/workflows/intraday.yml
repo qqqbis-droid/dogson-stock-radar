@@ -12,6 +12,7 @@ on:
       - "scripts/build_completion.py"
       - "scripts/build_system_status.py"
       - "scripts/validate_intraday_publish.py"
+      - "scripts/include_v2_pages.sh"
       - "docs/index.html"
       - "docs/realtime.js"
       - "docs/ui-filters.js"
@@ -117,34 +118,9 @@ jobs:
       - name: Contract freshness gate - never publish stale intraday as current
         run: python scripts/validate_intraday_publish.py
 
-      - name: Fetch Clean Build 2.0 runtime
+      - name: Build and validate Clean Build 2.0 Atomic Bundle
         shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin clean-build-v2 --depth=1
-          git archive FETCH_HEAD docs/v2 scripts/v2 contracts requirements-contract.txt | tar -xf -
-          test -f docs/v2/index.html
-          test -f scripts/v2/shadow_cycle.py
-          test -f scripts/v2/live_publish_patch.py
-          test -f scripts/v2/restore_market_capital_context.py
-          test -f scripts/v2/validate_market_capital_context.py
-          test -f scripts/v2/stamp_version_contract.py
-          test -f requirements-contract.txt
-
-      - name: Install V2 contract validator
-        run: pip install -r requirements-contract.txt
-
-      - name: Build V2 canonical bundle from newest available MIS snapshot
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf /tmp/dogson-shadow
-          python -m scripts.v2.shadow_cycle --legacy-root docs/data --output docs/v2/data --reports /tmp/dogson-shadow/reports
-          python scripts/v2/live_publish_patch.py --legacy-root docs/data --root docs/v2/data
-          python scripts/v2/restore_market_capital_context.py --legacy-root docs/data --root docs/v2/data
-          python scripts/v2/stamp_version_contract.py --root docs/v2/data
-          python -m scripts.v2.validate_bundle --root docs/v2/data
-          python scripts/v2/validate_market_capital_context.py --root docs/v2/data
+        run: bash scripts/include_v2_pages.sh
 
       - name: Publish V2 UI companions for this Atomic Build
         run: |
@@ -187,22 +163,29 @@ jobs:
           print('V2 companions:', manifest['active_build_id'], manifest['trade_date'], manifest['session_phase'], members['intraday']['trade_date'])
           PY
 
-      - name: Verify V2 source date and Atomic Bundle truthfulness
+      - name: Verify V2 source date, zones and detail evidence
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
           def load(p): return json.loads(Path(p).read_text(encoding='utf-8'))
-          src=load('docs/data/intraday.json'); day=load('docs/data/daytrade.json'); close=load('docs/data/close.json'); m=load('docs/v2/data/current_manifest.json')
+          def resolve(root,url):
+              raw=str(url or '')
+              return root/raw[len('./data/'):] if raw.startswith('./data/') else root/raw.lstrip('./')
+          src=load('docs/data/intraday.json'); day=load('docs/data/daytrade.json'); close=load('docs/data/close.json'); root=Path('docs/v2/data'); m=load(root/'current_manifest.json')
           src_date=str(src.get('trade_date') or '')[:10]; day_date=str(day.get('trade_date') or day.get('source_trade_date') or '')[:10]; close_date=str(close.get('trade_date') or '')[:10]
           intra=m['datasets']['decision_intraday_summary']; daymeta=m['datasets']['decision_daytrade_summary']; v2_i=str(intra.get('as_of') or '')[:10]; v2_d=str(daymeta.get('as_of') or '')[:10]
           print('source intraday:', src_date, src.get('as_of')); print('source daytrade:', day_date, day.get('as_of')); print('source close:', close_date); print('V2 active:', m['active_build_id']); print('V2 phase/date:', m['session_phase'], m['trade_date']); print('V2 intraday as_of:', intra.get('as_of')); print('V2 daytrade as_of:', daymeta.get('as_of'))
           if not src_date or src_date != day_date: raise SystemExit('source intraday/daytrade dates disagree')
           if v2_i != src_date or v2_d != src_date: raise SystemExit(f'V2 source-date mismatch: source={src_date} intraday={v2_i} daytrade={v2_d}')
           if close_date and src_date < close_date: raise SystemExit(f'intraday {src_date} older than latest completed close {close_date}')
-          required=('market_intraday_context','market_close_context','capital_intraday_context','capital_close_context')
+          required=('market_intraday_context','market_close_context','capital_intraday_context','capital_close_context','zone_intraday','zone_close','zone_daytrade','stock_detail_intraday','stock_detail_close','stock_detail_daytrade')
           missing=[k for k in required if k not in m.get('datasets',{})]
-          if missing: raise SystemExit(f'missing mission contexts: {missing}')
+          if missing: raise SystemExit(f'missing mission datasets: {missing}')
+          for key in ('zone_intraday','zone_close','zone_daytrade','stock_detail_intraday','stock_detail_close','stock_detail_daytrade'):
+              p=resolve(root,m['datasets'][key]['url'])
+              if not p.is_file() or p.stat().st_size==0: raise SystemExit(f'{key} missing from active build: {p}')
+          print('V2 stock detail bundle verified')
           PY
 
       - uses: actions/configure-pages@v5
