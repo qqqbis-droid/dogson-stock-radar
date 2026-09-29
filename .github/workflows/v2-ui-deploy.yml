@@ -1,0 +1,123 @@
+name: Clean Build 2.0 UI-only Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/v2-ui-deploy.yml"
+  workflow_run:
+    workflows:
+      - "Clean Build 2.0 Preview Gate"
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  pages: write
+  id-token: write
+
+# UI-only deploys are allowed to supersede slow data rebuilds because they start
+# from the last successful production Pages artifact and never mutate canonical
+# market data.  This prevents a CSS/JS/detail-card change from waiting on a full
+# universe refresh or after-hours MIS availability.
+concurrency:
+  group: dogson-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy-v2-ui:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Find latest successful production Pages artifact
+        id: source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          run_id="$(gh api \
+            -H 'Accept: application/vnd.github+json' \
+            "/repos/${GITHUB_REPOSITORY}/actions/runs?status=success&per_page=100" \
+            --jq '.workflow_runs[] | select(.name == "Radar - Close Update" or .name == "Radar - Intraday Update" or .name == "Clean Build 2.0 UI-only Deploy") | .id' \
+            | head -n 1)"
+          test -n "$run_id"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "Using last successful production Pages run: $run_id"
+
+      - name: Download exact current production Pages artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: .production-pages-artifact
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.source.outputs.run_id }}
+
+      - name: Restore production artifact and overlay validated V2 UI only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s .production-pages-artifact/artifact.tar
+          rm -rf .production-pages docs
+          mkdir -p .production-pages
+          tar -xf .production-pages-artifact/artifact.tar -C .production-pages
+          mv .production-pages docs
+
+          test -s docs/v2/data/current_manifest.json
+          before_hash="$(sha256sum docs/v2/data/current_manifest.json | awk '{print $1}')"
+          before_build="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json")).get("active_build_id", ""))')"
+          before_date="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json")).get("trade_date", ""))')"
+          test -n "$before_build"
+          test -n "$before_date"
+
+          rm -rf /tmp/v2-production-data /tmp/v2-ui
+          mkdir -p /tmp/v2-production-data /tmp/v2-ui
+          cp -a docs/v2/data/. /tmp/v2-production-data/
+
+          git fetch origin clean-build-v2 --depth=1
+          git archive FETCH_HEAD docs/v2 | tar -xf - -C /tmp/v2-ui
+          rm -rf docs/v2
+          mv /tmp/v2-ui/docs/v2 docs/v2
+          rm -rf docs/v2/data
+          mkdir -p docs/v2/data
+          cp -a /tmp/v2-production-data/. docs/v2/data/
+
+          after_hash="$(sha256sum docs/v2/data/current_manifest.json | awk '{print $1}')"
+          after_build="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json")).get("active_build_id", ""))')"
+          after_date="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json")).get("trade_date", ""))')"
+          if [[ "$before_hash" != "$after_hash" || "$before_build" != "$after_build" || "$before_date" != "$after_date" ]]; then
+            echo "UI-only deploy mutated canonical V2 data; refusing publish" >&2
+            exit 1
+          fi
+          test -s docs/v2/detail-context-v2.js
+          grep -q 'detail-context-v2.js' docs/v2/index.html
+          echo "UI-only source lock: build=$after_build trade_date=$after_date manifest_sha256=$after_hash"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate V2 UI without touching data
+        run: |
+          node --check docs/v2/app.js
+          node --check docs/v2/stock-detail-bridge.js
+          node --check docs/v2/detail-context-v2.js
+          node --check docs/v2/market-capital-ui.js
+          node --check docs/sw.js
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
