@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse, json, pathlib
+import argparse, json, pathlib, sys
 from jsonschema import Draft202012Validator, FormatChecker
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from scripts.v2.stamp_version_contract import stamp as stamp_version_contract
 
-ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCHEMA_ROOT = ROOT / "contracts" / "schemas"
 
 
