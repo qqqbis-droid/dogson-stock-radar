@@ -64,12 +64,13 @@ jobs:
           from pathlib import Path
           p = Path('_site/sw.js')
           s = p.read_text(encoding='utf-8')
+          guarded = "  const url=new URL(req.url);\n  if(url.pathname.includes('/v2/'))return;\n  if(url.pathname.includes('/data/'))"
           needle = "  const url=new URL(req.url);\n  if(url.pathname.includes('/data/'))"
-          replacement = "  const url=new URL(req.url);\n  if(url.pathname.includes('/v2/'))return;\n  if(url.pathname.includes('/data/'))"
-          if needle not in s:
-              raise SystemExit('legacy sw fetch handler shape changed; refusing unsafe patch')
-          s = s.replace(needle, replacement, 1)
-          p.write_text(s, encoding='utf-8')
+          if guarded not in s:
+              if needle not in s:
+                  raise SystemExit('legacy sw fetch handler shape changed; refusing unsafe patch')
+              s = s.replace(needle, guarded, 1)
+              p.write_text(s, encoding='utf-8')
           PY
           grep -q "url.pathname.includes('/v2/')" _site/sw.js
 
