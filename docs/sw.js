@@ -100,6 +100,7 @@ async function staticAsset(req){
 self.addEventListener('fetch',event=>{
   const req=event.request;if(req.method!=='GET')return;
   const url=new URL(req.url);
+  if(url.pathname.includes('/v2/'))return;
   if(url.pathname.includes('/data/')){event.respondWith(fetchData(req,url));return}
   if(req.mode==='navigate'||req.destination==='document'){event.respondWith(freshDocument(req).catch(async()=>await caches.match('./index.html')||Response.error()));return}
   if(req.destination==='script'||req.destination==='style'||req.destination==='manifest'||/\.(?:js|css|webmanifest)$/.test(url.pathname)){event.respondWith(staticAsset(req));return}
