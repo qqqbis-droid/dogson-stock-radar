@@ -15,28 +15,47 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Verify public Shadow page and canonical data
+      - name: Verify public V2 page and same-origin canonical data
         shell: bash
         run: |
           set -euo pipefail
           PAGE_URL="https://qqqbis-droid.github.io/dogson-stock-radar/v2/"
-          MANIFEST_URL="https://raw.githubusercontent.com/qqqbis-droid/dogson-stock-radar/clean-build-v2/docs/v2/data/current_manifest.json"
+          MANIFEST_URL="https://qqqbis-droid.github.io/dogson-stock-radar/v2/data/current_manifest.json"
 
           for attempt in 1 2 3 4 5 6; do
-            if curl -fsSL --retry 2 --connect-timeout 10 "$PAGE_URL" -o /tmp/v2.html; then
+            if curl -fsSL --retry 2 --connect-timeout 10 "$PAGE_URL" -o /tmp/v2.html \
+              && curl -fsSL --retry 2 --connect-timeout 10 "$MANIFEST_URL" -o /tmp/manifest.json; then
               break
             fi
             sleep 5
           done
 
           grep -q 'Clean Build 2.0' /tmp/v2.html
-          grep -q 'data-source.js' /tmp/v2.html
-          curl -fsSL --retry 3 --connect-timeout 10 "$MANIFEST_URL" -o /tmp/manifest.json
+          grep -q 'data-source.js?v=20260929a' /tmp/v2.html
+          if grep -q 'Clean Build 2.0 · Shadow' /tmp/v2.html; then
+            echo 'Old Shadow subtitle is still public'
+            exit 1
+          fi
+
           python - <<'PY'
           import json
           from pathlib import Path
           m=json.loads(Path('/tmp/manifest.json').read_text())
           assert m.get('schema_version') == '2.0.0'
           assert m.get('health',{}).get('validation_passed') is True
-          print('Public Shadow smoke PASS:', m.get('trade_date'), m.get('active_build_id'))
+          assert m.get('trade_date') == '2026-09-24', m.get('trade_date')
+          active=m.get('active_build_id')
+          assert active
+          print('Public same-origin manifest PASS:', m.get('trade_date'), active)
+          Path('/tmp/active.txt').write_text(active)
+          PY
+
+          ACTIVE_BUILD=$(cat /tmp/active.txt)
+          curl -fsSL --retry 3 --connect-timeout 10 "$PAGE_URL/data/builds/$ACTIVE_BUILD/market-summary.json" -o /tmp/market.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('/tmp/market.json').read_text())
+          assert x.get('build_id')
+          print('Public active market dataset PASS:', x.get('trade_date'), x.get('market_score'))
           PY
