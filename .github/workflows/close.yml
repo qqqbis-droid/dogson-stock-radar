@@ -83,6 +83,10 @@ jobs:
           if not s.get('latest_completed_trade_date'):
             raise SystemExit('latest_completed_trade_date missing')
           PY
+      - name: Include Clean Build 2.0 in Pages artifact
+        run: |
+          bash scripts/include_v2_pages.sh
+          node --check docs/sw.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
