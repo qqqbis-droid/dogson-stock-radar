@@ -37,6 +37,20 @@ def write(path: pathlib.Path, obj):
     path.write_text(json.dumps(obj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def latest_report_trade_date(reports_root: pathlib.Path) -> str:
+    dates = []
+    if not reports_root.exists():
+        return ""
+    for path in reports_root.glob("*.json"):
+        try:
+            value = str((load(path) or {}).get("trade_date") or "")[:10]
+        except Exception:
+            continue
+        if len(value) == 10:
+            dates.append(value)
+    return max(dates) if dates else ""
+
+
 def legacy_count(path: pathlib.Path) -> int:
     payload = load(path)
     if isinstance(payload, list):
@@ -168,14 +182,17 @@ def main():
     with tempfile.TemporaryDirectory(prefix="dogson-v2-shadow-") as td:
         temp_root = pathlib.Path(td) / "data"
         manifest = build_legacy_bundle(legacy_root, temp_root)
-        previous_date = str((previous_manifest or {}).get("trade_date") or "")
-        candidate_date = str(manifest.get("trade_date") or "")
-        if previous_date and candidate_date and candidate_date < previous_date:
+        previous_date = str((previous_manifest or {}).get("trade_date") or "")[:10]
+        report_date = latest_report_trade_date(reports_root)
+        floor_date = max(previous_date, report_date)
+        candidate_date = str(manifest.get("trade_date") or "")[:10]
+        if floor_date and candidate_date and candidate_date < floor_date:
             print(
                 "Refusing canonical trade-date regression:",
                 candidate_date,
                 "<",
-                previous_date,
+                floor_date,
+                f"(manifest={previous_date or 'none'}, shadow_history={report_date or 'none'})",
             )
             return
         active = manifest["active_build_id"]
