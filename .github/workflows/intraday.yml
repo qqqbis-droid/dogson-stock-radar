@@ -60,14 +60,88 @@ jobs:
         run: python scripts/build_system_status.py
       - name: Validate intraday publish
         run: python scripts/validate_intraday_publish.py
-      - name: Preserve Clean Build 2.0 preview in the Pages artifact
+      - name: Fetch Clean Build 2.0 runtime
         shell: bash
         run: |
           set -euo pipefail
           git fetch origin clean-build-v2 --depth=1
-          git restore --source=FETCH_HEAD -- docs/v2
+          git archive FETCH_HEAD docs/v2 scripts/v2 contracts requirements-contract.txt | tar -xf -
           test -f docs/v2/index.html
-          test -f docs/v2/data/current_manifest.json
+          test -f scripts/v2/shadow_cycle.py
+          test -f scripts/v2/live_publish_patch.py
+          test -f requirements-contract.txt
+      - name: Install V2 contract validator
+        run: pip install -r requirements-contract.txt
+      - name: Build V2 LIVE Canonical Bundle from current MIS cycle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/dogson-shadow
+          python -m scripts.v2.shadow_cycle --legacy-root docs/data --output docs/v2/data --reports /tmp/dogson-shadow/reports
+          python scripts/v2/live_publish_patch.py --legacy-root docs/data --root docs/v2/data
+          python -m scripts.v2.validate_bundle --root docs/v2/data
+      - name: Publish V2 UI companions for this Atomic Build
+        run: |
+          python - <<'PY'
+          import json
+          from collections import defaultdict
+          from pathlib import Path
+
+          def load(p): return json.loads(Path(p).read_text(encoding='utf-8'))
+          def rows_of(x):
+              if isinstance(x,list): return x
+              if isinstance(x,dict):
+                  for k in ('rows','items','data','stocks','results'):
+                      if isinstance(x.get(k),list): return x[k]
+              return []
+          def date_of(x, rows):
+              if isinstance(x,dict):
+                  for k in ('trade_date','date'):
+                      v=x.get(k)
+                      if isinstance(v,str) and len(v)>=10: return v[:10]
+              vals=[str(r.get('quote_date') or r.get('market_trade_date') or r.get('date') or '')[:10] for r in rows]
+              vals=[v for v in vals if len(v)==10]
+              return max(vals) if vals else None
+          def group_of(r):
+              return str(r.get('sector_group') or r.get('industry_name') or r.get('industry') or '未分類').strip() or '未分類'
+          def member_map(payload):
+              rows=rows_of(payload); groups=defaultdict(list); seen=defaultdict(set)
+              for r in rows:
+                  code=str(r.get('code') or '').strip()
+                  if not code: continue
+                  g=group_of(r)
+                  if code in seen[g]: continue
+                  seen[g].add(code)
+                  groups[g].append({'code':code,'name':str(r.get('name') or '').strip()})
+              for g in groups: groups[g].sort(key=lambda x:x['code'])
+              return {'trade_date':date_of(payload,rows),'groups':dict(groups)}
+
+          root=Path('docs/v2/data')
+          manifest=load(root/'current_manifest.json')
+          market=load('docs/data/market.json')
+          close=load('docs/data/close.json')
+          intraday=load('docs/data/intraday.json')
+          (root/'market-detail.json').write_text(json.dumps({'schema_version':'1.0.0','build_id':manifest['active_build_id'],'trade_date':market.get('trade_date'),'payload':market},ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8')
+          members={'schema_version':'1.0.0','build_id':manifest['active_build_id'],'close':member_map(close),'intraday':member_map(intraday)}
+          (root/'sector-members.json').write_text(json.dumps(members,ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8')
+          print('V2 companions:', manifest['active_build_id'], manifest['trade_date'], manifest['session_phase'], members['intraday']['trade_date'])
+          PY
+      - name: Verify V2 LIVE truthfulness
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('docs/v2/data/current_manifest.json').read_text(encoding='utf-8'))
+          intra=m['datasets']['decision_intraday_summary']
+          day=m['datasets']['decision_daytrade_summary']
+          print('V2 active:', m['active_build_id'])
+          print('V2 phase/date:', m['session_phase'], m['trade_date'])
+          print('V2 intraday as_of:', intra.get('as_of'))
+          print('V2 daytrade as_of:', day.get('as_of'))
+          if m['session_phase']=='LIVE':
+              if not str(intra.get('as_of') or '').startswith(m['trade_date']):
+                  raise SystemExit('LIVE manifest points to a non-current intraday as_of')
+          PY
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
