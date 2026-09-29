@@ -12,6 +12,7 @@ git archive FETCH_HEAD docs/v2 scripts/v2 contracts requirements-contract.txt | 
 test -f docs/v2/index.html
 test -f scripts/v2/shadow_cycle.py
 test -f scripts/v2/live_publish_patch.py
+test -f scripts/v2/stamp_version_contract.py
 
 rm -rf /tmp/dogson-pages-v2-shadow
 python -m scripts.v2.shadow_cycle \
@@ -19,6 +20,8 @@ python -m scripts.v2.shadow_cycle \
   --output docs/v2/data \
   --reports /tmp/dogson-pages-v2-shadow/reports
 python scripts/v2/live_publish_patch.py --legacy-root docs/data --root docs/v2/data
+python scripts/v2/stamp_version_contract.py --root docs/v2/data
+python scripts/v2/validate_bundle.py --root docs/v2/data
 
 test -f docs/v2/data/current_manifest.json
 
@@ -58,7 +61,11 @@ if dde and vd != dde:
     raise SystemExit(f'V2 daytrade regression: source={dde} v2={vd}')
 if cde and vc != cde:
     raise SystemExit(f'V2 close regression: source={cde} v2={vc}')
-print('V2 source lock:', {'build':m.get('active_build_id'),'close':vc,'intraday':vi,'daytrade':vd})
+required_versions=('version_registry_version','version_set_id','schema_version','app_contract_version','engine_version','enum_registry_version','threshold_registry_version','taxonomy_version')
+missing=[k for k in required_versions if not m.get(k)]
+if missing:
+    raise SystemExit(f'V2 version binding missing: {missing}')
+print('V2 source lock:', {'build':m.get('active_build_id'),'close':vc,'intraday':vi,'daytrade':vd,'version_set':m.get('version_set_id')})
 PY
 
 # The legacy service worker owns the repository root. Let /v2/ bypass it so iOS
