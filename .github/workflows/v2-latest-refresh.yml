@@ -1,0 +1,170 @@
+name: Clean Build 2.0 Latest Completed Session Refresh
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ clean-build-v2 ]
+    paths:
+      - '.github/workflows/v2-latest-refresh.yml'
+      - '.github/triggers/v2-latest-refresh.trigger'
+  schedule:
+    # 15:10 Asia/Taipei, Monday–Friday once this workflow is present on the
+    # default branch. This intentionally runs after the production close build.
+    - cron: '10 7 * * 1-5'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: clean-build-v2-latest-refresh
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: clean-build-v2
+          fetch-depth: 0
+      - name: Seed current public production datasets
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          git checkout origin/main -- docs/data
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install builders and contract validator
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-contract.txt
+      - name: Rebuild latest completed close from public sources
+        run: |
+          python scripts/sync_live_data.py || true
+          python scripts/build_close_fresh.py
+      - name: Confirm completed-session source is internally consistent
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          market=json.loads(Path('docs/data/market.json').read_text(encoding='utf-8'))
+          close=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          rows=close.get('rows') or []
+          dates=sorted({str(r.get('date') or '')[:10] for r in rows if r.get('date')})
+          candidate=str(market.get('trade_date') or '')[:10]
+          current_path=Path('docs/v2/data/current_manifest.json')
+          current=json.loads(current_path.read_text(encoding='utf-8')) if current_path.exists() else {}
+          current_date=str(current.get('trade_date') or '')[:10]
+          print('current canonical trade_date:', current_date)
+          print('candidate market trade_date:', candidate)
+          print('candidate close dates:', dates[-3:])
+          if not candidate:
+              raise SystemExit('Candidate market trade_date is missing')
+          if not rows or dates != [candidate]:
+              raise SystemExit(f'Close dataset is not cleanly locked to candidate trade_date: market={candidate}, close={dates}')
+          if current_date and candidate < current_date:
+              raise SystemExit(f'Refusing source regression from {current_date} to {candidate}')
+          PY
+      - name: Build validated canonical Shadow cycle
+        run: |
+          python -m scripts.v2.shadow_cycle --legacy-root docs/data --output docs/v2/data --reports shadow/reports
+          python -m scripts.v2.shadow_summary --reports shadow/reports --output shadow/summary.json
+          python -m scripts.v2.validate_bundle --root docs/v2/data
+      - name: Publish UI detail companions bound to Atomic Build
+        run: |
+          python - <<'PY'
+          import json
+          from collections import defaultdict
+          from pathlib import Path
+
+          def load(p): return json.loads(Path(p).read_text(encoding='utf-8'))
+          def rows_of(x):
+              if isinstance(x,list): return x
+              if isinstance(x,dict):
+                  for k in ('rows','items','data','stocks','results'):
+                      if isinstance(x.get(k),list): return x[k]
+              return []
+          def date_of(x, rows):
+              if isinstance(x,dict):
+                  for k in ('trade_date','date'):
+                      v=x.get(k)
+                      if isinstance(v,str) and len(v)>=10: return v[:10]
+              vals=[str(r.get('date') or r.get('quote_date') or r.get('market_trade_date') or '')[:10] for r in rows]
+              vals=[v for v in vals if len(v)==10]
+              return max(vals) if vals else None
+          def group_of(r):
+              return str(r.get('sector_group') or r.get('industry_name') or r.get('industry') or '未分類').strip() or '未分類'
+          def member_map(payload):
+              rows=rows_of(payload); groups=defaultdict(list); seen=defaultdict(set)
+              for r in rows:
+                  code=str(r.get('code') or '').strip()
+                  if not code: continue
+                  g=group_of(r)
+                  if code in seen[g]: continue
+                  seen[g].add(code)
+                  groups[g].append({'code':code,'name':str(r.get('name') or '').strip()})
+              for g in groups: groups[g].sort(key=lambda x:x['code'])
+              return {'trade_date':date_of(payload,rows),'groups':dict(groups)}
+
+          root=Path('docs/v2/data')
+          manifest=load(root/'current_manifest.json')
+          market=load('docs/data/market.json')
+          close=load('docs/data/close.json')
+          intraday=load('docs/data/intraday.json')
+          (root/'market-detail.json').write_text(json.dumps({'schema_version':'1.0.0','build_id':manifest['active_build_id'],'trade_date':market.get('trade_date'),'payload':market},ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8')
+          members={'schema_version':'1.0.0','build_id':manifest['active_build_id'],'close':member_map(close),'intraday':member_map(intraday)}
+          (root/'sector-members.json').write_text(json.dumps(members,ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8')
+          print('companions:', manifest['active_build_id'], members['close']['trade_date'], members['intraday']['trade_date'])
+          PY
+      - name: Verify UI modules
+        run: |
+          node --check docs/v2/data-source.js
+          node --check docs/v2/app.js
+          node --check docs/v2/ux-detail.js
+      - name: Publish latest validated Shadow data safely
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          SNAP="$(mktemp -d)"
+          cp -a docs/v2/data "$SNAP/data"
+          cp -a shadow "$SNAP/shadow"
+          CANDIDATE_DATE="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json")).get("trade_date") or "")')"
+          CANDIDATE_ID="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json")).get("active_build_id") or "")')"
+          echo "Candidate latest session: $CANDIDATE_DATE / $CANDIDATE_ID"
+
+          for attempt in 1 2 3; do
+            git fetch origin clean-build-v2
+            REMOTE="$(git rev-parse origin/clean-build-v2)"
+            git reset --hard "$REMOTE"
+            REMOTE_DATE="$(python -c 'import json,pathlib; p=pathlib.Path("docs/v2/data/current_manifest.json"); print(json.loads(p.read_text()).get("trade_date","") if p.exists() else "")')"
+
+            if [ -n "$REMOTE_DATE" ] && [ -n "$CANDIDATE_DATE" ] && [[ "$CANDIDATE_DATE" < "$REMOTE_DATE" ]]; then
+              echo "Remote already has newer session $REMOTE_DATE; refusing regression from $CANDIDATE_DATE"
+              exit 0
+            fi
+
+            mkdir -p docs/v2/data shadow
+            rsync -a "$SNAP/data/" docs/v2/data/
+            rsync -a "$SNAP/shadow/" shadow/
+            git add docs/v2/data shadow
+            if git diff --cached --quiet; then
+              echo 'Latest validated Shadow data already published'
+              exit 0
+            fi
+            git commit -m "chore(v2): refresh latest completed Shadow session [skip ci]"
+            if git push origin HEAD:clean-build-v2; then
+              echo "Published latest session $CANDIDATE_DATE / $CANDIDATE_ID"
+              exit 0
+            fi
+            echo "Branch advanced during latest-session publish; retrying ($attempt/3)"
+          done
+          echo 'Unable to publish latest validated Shadow data after 3 attempts'
+          exit 1
