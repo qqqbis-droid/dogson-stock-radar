@@ -13,6 +13,8 @@ on:
       - "scripts/build_completion.py"
       - "scripts/build_close_fresh.py"
       - "scripts/build_system_status.py"
+      - "scripts/include_v2_pages.sh"
+      - ".github/workflows/close.yml"
       - "docs/hourly.js"
   schedule:
     # 台灣時間：14:25 先出盤後版；20:30 / 23:40 補晚公布籌碼；次日 08:15 再做一次最終補齊。
