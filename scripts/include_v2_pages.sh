@@ -13,12 +13,15 @@ git archive FETCH_HEAD docs/v2 scripts/v2 contracts requirements-contract.txt | 
 
 test -f docs/v2/index.html
 test -f docs/v2/detail-context-v2.js
+test -f docs/v2/detail-context-v3.js
+test -f docs/v2/card-display-v3.js
 test -f scripts/v2/shadow_cycle.py
 test -f scripts/v2/live_publish_patch.py
 test -f scripts/v2/enrich_zones.py
 test -f scripts/v2/enrich_stock_detail_context.py
 test -f scripts/v2/restore_market_capital_context.py
 test -f scripts/v2/validate_market_capital_context.py
+test -f scripts/v2/normalize_close_snapshot.py
 test -f scripts/v2/stamp_version_contract.py
 test -f requirements-contract.txt
 
@@ -84,6 +87,9 @@ case "$mode" in
     ;;
   PRESERVE_SAME_DAY|PRESERVE_NEWER_CANONICAL)
     echo "Preserving verified canonical V2 data; deploying UI without rebuilding from stale after-hours MIS."
+    # Crossing midnight does not make the latest completed close session stale.
+    # Repair that semantic before validation while leaving intraday/daytrade frozen.
+    python scripts/v2/normalize_close_snapshot.py --root docs/v2/data
     python scripts/v2/stamp_version_contract.py --root docs/v2/data
     python scripts/v2/validate_bundle.py --root docs/v2/data
     python scripts/v2/validate_market_capital_context.py --root docs/v2/data
@@ -100,6 +106,7 @@ case "$mode" in
     python scripts/v2/enrich_zones.py --legacy-root docs/data --output docs/v2/data
     python scripts/v2/enrich_stock_detail_context.py --legacy-root docs/data --root docs/v2/data
     python scripts/v2/restore_market_capital_context.py --legacy-root docs/data --root docs/v2/data
+    python scripts/v2/normalize_close_snapshot.py --root docs/v2/data
     python scripts/v2/stamp_version_contract.py --root docs/v2/data
     python scripts/v2/validate_bundle.py --root docs/v2/data
     python scripts/v2/validate_market_capital_context.py --root docs/v2/data
@@ -112,6 +119,8 @@ esac
 
 node --check docs/v2/stock-detail-bridge.js
 node --check docs/v2/detail-context-v2.js
+node --check docs/v2/detail-context-v3.js
+node --check docs/v2/card-display-v3.js
 
 test -f docs/v2/data/current_manifest.json
 
@@ -196,7 +205,16 @@ for ctx in ('intraday','close','daytrade'):
     zone_counts[ctx]=len(zones) if isinstance(zones,list) else 0
     if zone_counts[ctx] <= 0:
         raise SystemExit(f'V2 zone_{ctx} is empty after overlay')
-print('V2 source lock:', {'mode':mode,'build':m.get('active_build_id'),'close':vc,'intraday':vi,'daytrade':vd,'root_intraday':ide,'root_daytrade':dde,'version_set':m.get('version_set_id'),'market_capital':'split','zones':zone_counts,'stock_detail':'mission-split-v2'})
+
+# Close snapshot semantics: if close is the canonical latest completed session,
+# it must remain planning-valid across midnight and must not be DATA_STALE.
+close_summary=load(resolve(root,m['datasets']['decision_close_summary']['url']))
+if vc == str(m.get('trade_date') or '')[:10]:
+    bad=[r.get('code') for r in close_summary if r.get('freshness') in ('STALE','UNKNOWN') or r.get('action_state')=='DATA_STALE']
+    if bad:
+        raise SystemExit(f'latest close snapshot incorrectly stale: {bad[:10]}')
+
+print('V2 source lock:', {'mode':mode,'build':m.get('active_build_id'),'close':vc,'intraday':vi,'daytrade':vd,'root_intraday':ide,'root_daytrade':dde,'version_set':m.get('version_set_id'),'market_capital':'split','zones':zone_counts,'stock_detail':'mission-split-v3','close_snapshot':'latest-completed-valid'})
 PY
 
 # The legacy service worker owns the repository root. Let /v2/ bypass it so iOS
