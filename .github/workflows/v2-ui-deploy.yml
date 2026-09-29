@@ -17,9 +17,9 @@ permissions:
   pages: write
   id-token: write
 
-# UI-only deploys start from the last successful production Pages artifact and
-# never mutate canonical market data. They must NOT cancel an in-flight Close /
-# Intraday data publication; wait for the canonical publisher, then overlay UI.
+# UI-only deploys overlay validated V2 UI on the latest successful canonical
+# Pages publisher. They never use another UI-only artifact as a data source and
+# never cancel an in-flight Close / Intraday data publication.
 concurrency:
   group: dogson-pages
   cancel-in-progress: false
@@ -37,23 +37,26 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Find latest successful production Pages artifact
+      - name: Find latest successful canonical Pages artifact
         id: source
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          run_id="$(gh api \
+          IFS=$'\t' read -r run_id run_name run_updated <<< "$(gh api \
             -H 'Accept: application/vnd.github+json' \
             "/repos/${GITHUB_REPOSITORY}/actions/runs?status=success&per_page=100" \
-            --jq '[.workflow_runs[] | select(.name == "Radar - Close Update" or .name == "Radar - Intraday Update" or .name == "Clean Build 2.0 UI-only Deploy")] | first | .id')"
+            --jq '[.workflow_runs[] | select(.name == "Radar - Close Update" or .name == "Radar - Intraday Update")] | max_by(.updated_at) | [.id,.name,.updated_at] | @tsv')"
           test -n "$run_id"
           test "$run_id" != "null"
+          test "$run_name" = "Radar - Close Update" -o "$run_name" = "Radar - Intraday Update"
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
-          echo "Using last successful production Pages run: $run_id"
+          echo "run_name=$run_name" >> "$GITHUB_OUTPUT"
+          echo "run_updated=$run_updated" >> "$GITHUB_OUTPUT"
+          echo "Using canonical Pages source: $run_name run=$run_id updated=$run_updated"
 
-      - name: Download exact current production Pages artifact
+      - name: Download exact canonical production Pages artifact
         uses: actions/download-artifact@v4
         with:
           name: github-pages
@@ -62,7 +65,7 @@ jobs:
           repository: ${{ github.repository }}
           run-id: ${{ steps.source.outputs.run_id }}
 
-      - name: Restore production artifact and overlay validated V2 UI only
+      - name: Restore canonical artifact and overlay validated V2 UI only
         shell: bash
         run: |
           set -euo pipefail
@@ -73,6 +76,30 @@ jobs:
           mv .production-pages docs
 
           test -s docs/v2/data/current_manifest.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root=Path('docs/v2/data')
+          m=json.loads((root/'current_manifest.json').read_text(encoding='utf-8'))
+          trade_date=str(m.get('trade_date') or '')[:10]
+          if len(trade_date) != 10 or not m.get('health',{}).get('validation_passed'):
+              raise SystemExit('canonical source manifest is not validated')
+          meta=(m.get('datasets') or {}).get('decision_close_summary')
+          if not meta:
+              raise SystemExit('canonical source missing decision_close_summary')
+          raw=str(meta.get('url') or '')
+          p=root/(raw[len('./data/'):] if raw.startswith('./data/') else raw.lstrip('./'))
+          rows=json.loads(p.read_text(encoding='utf-8'))
+          latest=[r for r in rows if str(r.get('trade_date') or r.get('as_of') or '')[:10] == trade_date]
+          if not latest:
+              raise SystemExit(f'canonical source has no close rows for {trade_date}')
+          bad=[r.get('code') for r in latest if r.get('freshness') in ('STALE','UNKNOWN') or r.get('action_state')=='DATA_STALE']
+          if bad:
+              raise SystemExit(f'canonical source latest-close semantics regressed: {bad[:10]}')
+          print('Canonical UI source verified:', {'build':m.get('active_build_id'),'trade_date':trade_date,'close_rows':len(latest)})
+          PY
+
           before_hash="$(sha256sum docs/v2/data/current_manifest.json | awk '{print $1}')"
           before_build="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json")).get("active_build_id", ""))')"
           before_date="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json")).get("trade_date", ""))')"
@@ -106,7 +133,12 @@ jobs:
             echo "Legacy detail-context-v2 is still active in index; refusing mixed display contracts" >&2
             exit 1
           fi
-          echo "UI-only source lock: build=$after_build trade_date=$after_date manifest_sha256=$after_hash"
+          if grep -q 'src="./quote-ui.js' docs/v2/index.html; then
+            echo "Legacy quote-ui is still active in index; refusing competing card renderers" >&2
+            exit 1
+          fi
+          grep -q 'function c3quotePayload' docs/v2/card-display-v3.js
+          echo "UI-only source lock: canonical_run=${{ steps.source.outputs.run_id }} publisher=${{ steps.source.outputs.run_name }} build=$after_build trade_date=$after_date manifest_sha256=$after_hash"
 
       - uses: actions/setup-node@v4
         with:
