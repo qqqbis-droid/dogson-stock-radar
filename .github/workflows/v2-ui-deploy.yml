@@ -19,7 +19,7 @@ permissions:
 
 # UI-only deploys are allowed to supersede slow data rebuilds because they start
 # from the last successful production Pages artifact and never mutate canonical
-# market data.  This prevents a CSS/JS/detail-card change from waiting on a full
+# market data. This prevents a CSS/JS/detail-card change from waiting on a full
 # universe refresh or after-hours MIS availability.
 concurrency:
   group: dogson-pages
@@ -99,8 +99,14 @@ jobs:
             echo "UI-only deploy mutated canonical V2 data; refusing publish" >&2
             exit 1
           fi
-          test -s docs/v2/detail-context-v2.js
-          grep -q 'detail-context-v2.js' docs/v2/index.html
+          test -s docs/v2/detail-context-v3.js
+          test -s docs/v2/card-display-v3.js
+          grep -q 'detail-context-v3.js' docs/v2/index.html
+          grep -q 'card-display-v3.js' docs/v2/index.html
+          if grep -q 'detail-context-v2.js' docs/v2/index.html; then
+            echo "Legacy detail-context-v2 is still active in index; refusing mixed display contracts" >&2
+            exit 1
+          fi
           echo "UI-only source lock: build=$after_build trade_date=$after_date manifest_sha256=$after_hash"
 
       - uses: actions/setup-node@v4
@@ -111,7 +117,8 @@ jobs:
         run: |
           node --check docs/v2/app.js
           node --check docs/v2/stock-detail-bridge.js
-          node --check docs/v2/detail-context-v2.js
+          node --check docs/v2/detail-context-v3.js
+          node --check docs/v2/card-display-v3.js
           node --check docs/v2/market-capital-ui.js
           node --check docs/sw.js
 
