@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f5f3ec">
+<title>犬子老師・V2 修復入口</title>
+<style>
+html,body{margin:0;min-height:100%;background:#f5f3ec;color:#18332b;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif}
+main{min-height:100vh;display:grid;place-items:center;padding:28px;box-sizing:border-box}
+.card{width:min(92vw,460px);background:#fffdf8;border:1px solid #d8e0da;border-radius:28px;padding:28px;box-shadow:0 10px 35px rgba(24,51,43,.08);text-align:center}
+h1{font-size:22px;margin:0 0 12px}.msg{font-size:15px;line-height:1.75;color:#65766f}.dot{display:inline-block;width:10px;height:10px;border-radius:99px;background:#246b57;margin-right:8px;animation:p 1s infinite alternate}@keyframes p{to{opacity:.28}}
+a{display:none;margin-top:20px;color:#246b57;font-weight:800}
+</style>
+</head>
+<body>
+<main><div class="card"><h1>🐶 犬子老師・V2 修復中</h1><div id="msg" class="msg"><span class="dot"></span>正在清除舊版快取與 Service Worker…</div><a id="manual" href="./?recovered=1">如果沒有自動前往，點這裡開啟 V2</a></div></main>
+<script>
+(async()=>{
+  const msg=document.getElementById('msg'), manual=document.getElementById('manual');
+  try{
+    if('serviceWorker' in navigator){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.filter(r=>String(r.scope||'').includes('/dogson-stock-radar/')).map(r=>r.unregister()));
+    }
+    if('caches' in window){
+      const keys=await caches.keys();
+      await Promise.all(keys.filter(k=>k.startsWith('dogson-free-')).map(k=>caches.delete(k)));
+    }
+    msg.textContent='舊版控制已清除，正在重新開啟 V2…';
+  }catch(e){
+    msg.textContent='已切換到乾淨入口，正在重新開啟 V2…';
+  }
+  manual.style.display='inline-block';
+  setTimeout(()=>location.replace('./?recovered='+Date.now()),500);
+})();
+</script>
+</body>
+</html>
