@@ -8,21 +8,28 @@ on:
       - '.github/workflows/v2-latest-refresh.yml'
       - '.github/triggers/v2-latest-refresh.trigger'
   schedule:
-    # 15:10 Asia/Taipei, Monday–Friday once this workflow is present on the
-    # default branch. This intentionally runs after the production close build.
+    # 15:10 Asia/Taipei, Monday–Friday. Rebuild and deploy the newest validated
+    # completed-session bundle after the production close build.
     - cron: '10 7 * * 1-5'
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
+# This workflow now publishes Pages itself, so serialize it with every other
+# production Pages publisher. Never cancel an in-flight market-data publish.
 concurrency:
-  group: clean-build-v2-latest-refresh
-  cancel-in-progress: true
+  group: dogson-pages
+  cancel-in-progress: false
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
     timeout-minutes: 50
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -147,8 +154,8 @@ jobs:
             REMOTE_DATE="$(python -c 'import json,pathlib; p=pathlib.Path("docs/v2/data/current_manifest.json"); print(json.loads(p.read_text()).get("trade_date","") if p.exists() else "")')"
 
             if [ -n "$REMOTE_DATE" ] && [ -n "$CANDIDATE_DATE" ] && [[ "$CANDIDATE_DATE" < "$REMOTE_DATE" ]]; then
-              echo "Remote already has newer session $REMOTE_DATE; refusing regression from $CANDIDATE_DATE"
-              exit 0
+              echo "Remote already has newer session $REMOTE_DATE; keeping newer canonical branch state"
+              break
             fi
 
             mkdir -p docs/v2/data shadow
@@ -157,14 +164,78 @@ jobs:
             git add docs/v2/data shadow
             if git diff --cached --quiet; then
               echo 'Latest validated Shadow data already published'
-              exit 0
+              break
             fi
             git commit -m "chore(v2): refresh latest completed Shadow session [skip ci]"
             if git push origin HEAD:clean-build-v2; then
               echo "Published latest session $CANDIDATE_DATE / $CANDIDATE_ID"
-              exit 0
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo 'Unable to publish latest validated Shadow data after 3 attempts'
+              exit 1
             fi
             echo "Branch advanced during latest-session publish; retrying ($attempt/3)"
           done
-          echo 'Unable to publish latest validated Shadow data after 3 attempts'
-          exit 1
+
+      - name: Verify deploy target is the latest branch manifest
+        run: |
+          set -euo pipefail
+          git fetch origin clean-build-v2
+          git reset --hard origin/clean-build-v2
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('docs/v2/data/current_manifest.json').read_text(encoding='utf-8'))
+          print('Deploying canonical:', m.get('trade_date'), m.get('session_phase'), m.get('active_build_id'))
+          if not m.get('active_build_id'):
+              raise SystemExit('active_build_id missing before Pages deploy')
+          PY
+
+      - name: Checkout production main shell for Pages composition
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: mainsrc
+
+      - name: Compose Pages artifact with newest canonical V2 bundle
+        run: |
+          set -euo pipefail
+          rm -rf _site
+          mkdir -p _site
+          cp -a mainsrc/docs/. _site/
+
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('_site/sw.js')
+          s=p.read_text(encoding='utf-8')
+          guarded="  const url=new URL(req.url);\n  if(url.pathname.includes('/v2/'))return;\n  if(url.pathname.includes('/data/'))"
+          needle="  const url=new URL(req.url);\n  if(url.pathname.includes('/data/'))"
+          if guarded not in s:
+              if needle not in s:
+                  raise SystemExit('legacy sw fetch handler shape changed; refusing unsafe V2 publish')
+              s=s.replace(needle,guarded,1)
+              p.write_text(s,encoding='utf-8')
+          PY
+
+          rm -rf _site/v2
+          mkdir -p _site/v2
+          rsync -a --exclude 'data/' docs/v2/ _site/v2/
+          mkdir -p _site/v2/data/builds
+          cp docs/v2/data/current_manifest.json _site/v2/data/current_manifest.json
+          test -f docs/v2/data/market-detail.json && cp docs/v2/data/market-detail.json _site/v2/data/market-detail.json
+          test -f docs/v2/data/sector-members.json && cp docs/v2/data/sector-members.json _site/v2/data/sector-members.json
+          ACTIVE_BUILD="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json"))["active_build_id"])')"
+          test -d "docs/v2/data/builds/$ACTIVE_BUILD"
+          cp -a "docs/v2/data/builds/$ACTIVE_BUILD" "_site/v2/data/builds/$ACTIVE_BUILD"
+          test -f _site/v2/index.html
+          test -f _site/v2/data/current_manifest.json
+          test -f "_site/v2/data/builds/$ACTIVE_BUILD/decision-close-summary.json"
+          echo "Pages V2 active build: $ACTIVE_BUILD"
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
