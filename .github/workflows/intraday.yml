@@ -28,8 +28,6 @@ permissions:
   pages: write
   id-token: write
 
-# All production Pages publishers share one group. Queue instead of cancelling
-# so UI / close work cannot terminate an in-flight market-data publish.
 concurrency:
   group: dogson-pages
   cancel-in-progress: false
@@ -61,13 +59,10 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-
           p=Path('docs/data/intraday.json')
           obj=json.loads(p.read_text(encoding='utf-8'))
           rows=[r for r in (obj.get('rows') or []) if isinstance(r,dict)]
-          bridge=obj.get('bridge') or {}
-          qlayer=obj.get('quote_layer') or {}
-
+          bridge=obj.get('bridge') or {}; qlayer=obj.get('quote_layer') or {}
           dates=[]
           for v in (bridge.get('trade_date'), obj.get('trade_date')):
               s=str(v or '')[:10]
@@ -75,11 +70,8 @@ jobs:
           for r in rows:
               s=str(r.get('quote_date') or r.get('market_trade_date') or r.get('date') or '')[:10]
               if len(s)==10: dates.append(s)
-          if not dates:
-              raise SystemExit('intraday effective trade date missing')
+          if not dates: raise SystemExit('intraday effective trade date missing')
           effective=max(dates)
-
-          # Prefer the exchange snapshot clock; generated_at/updated_at is only the build clock.
           clocks=[]
           for v in (bridge.get('latest_quote_time'), qlayer.get('latest_time'), bridge.get('latest_trade_time'), qlayer.get('latest_trade_time')):
               s=str(v or '').strip()
@@ -89,13 +81,8 @@ jobs:
               for k in ('quote_snapshot_time','quote_time','structure_time'):
                   s=str(r.get(k) or '').strip()
                   if ':' in s: clocks.append(s[:8] if len(s)>=8 else s[:5]+':00')
-          latest=max(clocks) if clocks else '13:30:00'
-          as_of=f'{effective}T{latest}+08:00'
-
-          obj['trade_date']=effective
-          obj['source_trade_date']=effective
-          obj['as_of']=as_of
-          obj['source_updated_at']=as_of
+          latest=max(clocks) if clocks else '13:30:00'; as_of=f'{effective}T{latest}+08:00'
+          obj['trade_date']=effective; obj['source_trade_date']=effective; obj['as_of']=as_of; obj['source_updated_at']=as_of
           p.write_text(json.dumps(obj,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
           print('intraday normalized:', effective, as_of, 'rows=',len(rows))
           PY
@@ -110,16 +97,10 @@ jobs:
           import json
           from pathlib import Path
           ip=Path('docs/data/intraday.json'); dp=Path('docs/data/daytrade.json')
-          intra=json.loads(ip.read_text(encoding='utf-8'))
-          day=json.loads(dp.read_text(encoding='utf-8'))
-          td=str(intra.get('trade_date') or '')[:10]
-          asof=str(intra.get('as_of') or '')
-          if len(td)!=10 or not asof.startswith(td):
-              raise SystemExit(f'invalid normalized intraday metadata: {td} / {asof}')
-          day['trade_date']=td
-          day['source_trade_date']=td
-          day['as_of']=asof
-          day['source_updated_at']=asof
+          intra=json.loads(ip.read_text(encoding='utf-8')); day=json.loads(dp.read_text(encoding='utf-8'))
+          td=str(intra.get('trade_date') or '')[:10]; asof=str(intra.get('as_of') or '')
+          if len(td)!=10 or not asof.startswith(td): raise SystemExit(f'invalid normalized intraday metadata: {td} / {asof}')
+          day['trade_date']=td; day['source_trade_date']=td; day['as_of']=asof; day['source_updated_at']=asof
           dp.write_text(json.dumps(day,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
           print('daytrade normalized:', td, asof)
           PY
@@ -145,6 +126,9 @@ jobs:
           test -f docs/v2/index.html
           test -f scripts/v2/shadow_cycle.py
           test -f scripts/v2/live_publish_patch.py
+          test -f scripts/v2/restore_market_capital_context.py
+          test -f scripts/v2/validate_market_capital_context.py
+          test -f scripts/v2/stamp_version_contract.py
           test -f requirements-contract.txt
 
       - name: Install V2 contract validator
@@ -156,10 +140,11 @@ jobs:
           set -euo pipefail
           rm -rf /tmp/dogson-shadow
           python -m scripts.v2.shadow_cycle --legacy-root docs/data --output docs/v2/data --reports /tmp/dogson-shadow/reports
-          # During the cash-session this upgrades the bundle to LIVE and applies the 12m/20m gates.
-          # After the close shadow_cycle still preserves today's final snapshot as CLOSE_FREEZE/FROZEN.
           python scripts/v2/live_publish_patch.py --legacy-root docs/data --root docs/v2/data
+          python scripts/v2/restore_market_capital_context.py --legacy-root docs/data --root docs/v2/data
+          python scripts/v2/stamp_version_contract.py --root docs/v2/data
           python -m scripts.v2.validate_bundle --root docs/v2/data
+          python scripts/v2/validate_market_capital_context.py --root docs/v2/data
 
       - name: Publish V2 UI companions for this Atomic Build
         run: |
@@ -167,7 +152,6 @@ jobs:
           import json
           from collections import defaultdict
           from pathlib import Path
-
           def load(p): return json.loads(Path(p).read_text(encoding='utf-8'))
           def rows_of(x):
               if isinstance(x,list): return x
@@ -185,8 +169,7 @@ jobs:
                   v=str(r.get('quote_date') or r.get('market_trade_date') or r.get('date') or '')[:10]
                   if len(v)==10: dates.append(v)
               return max(dates) if dates else None
-          def group_of(r):
-              return str(r.get('sector_group') or r.get('industry_name') or r.get('industry') or '未分類').strip() or '未分類'
+          def group_of(r): return str(r.get('sector_group') or r.get('industry_name') or r.get('industry') or '未分類').strip() or '未分類'
           def member_map(payload):
               rows=rows_of(payload); groups=defaultdict(list); seen=defaultdict(set)
               for r in rows:
@@ -194,16 +177,10 @@ jobs:
                   if not code: continue
                   g=group_of(r)
                   if code in seen[g]: continue
-                  seen[g].add(code)
-                  groups[g].append({'code':code,'name':str(r.get('name') or '').strip()})
+                  seen[g].add(code); groups[g].append({'code':code,'name':str(r.get('name') or '').strip()})
               for g in groups: groups[g].sort(key=lambda x:x['code'])
               return {'trade_date':date_of(payload,rows),'groups':dict(groups)}
-
-          root=Path('docs/v2/data')
-          manifest=load(root/'current_manifest.json')
-          market=load('docs/data/market.json')
-          close=load('docs/data/close.json')
-          intraday=load('docs/data/intraday.json')
+          root=Path('docs/v2/data'); manifest=load(root/'current_manifest.json'); market=load('docs/data/market.json'); close=load('docs/data/close.json'); intraday=load('docs/data/intraday.json')
           (root/'market-detail.json').write_text(json.dumps({'schema_version':'1.0.0','build_id':manifest['active_build_id'],'trade_date':market.get('trade_date'),'payload':market},ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8')
           members={'schema_version':'1.0.0','build_id':manifest['active_build_id'],'close':member_map(close),'intraday':member_map(intraday)}
           (root/'sector-members.json').write_text(json.dumps(members,ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8')
@@ -216,30 +193,16 @@ jobs:
           import json
           from pathlib import Path
           def load(p): return json.loads(Path(p).read_text(encoding='utf-8'))
-          src=load('docs/data/intraday.json')
-          day=load('docs/data/daytrade.json')
-          close=load('docs/data/close.json')
-          m=load('docs/v2/data/current_manifest.json')
-          src_date=str(src.get('trade_date') or '')[:10]
-          day_date=str(day.get('trade_date') or day.get('source_trade_date') or '')[:10]
-          close_date=str(close.get('trade_date') or '')[:10]
-          intra=m['datasets']['decision_intraday_summary']
-          daymeta=m['datasets']['decision_daytrade_summary']
-          v2_i=str(intra.get('as_of') or '')[:10]
-          v2_d=str(daymeta.get('as_of') or '')[:10]
-          print('source intraday:', src_date, src.get('as_of'))
-          print('source daytrade:', day_date, day.get('as_of'))
-          print('source close:', close_date)
-          print('V2 active:', m['active_build_id'])
-          print('V2 phase/date:', m['session_phase'], m['trade_date'])
-          print('V2 intraday as_of:', intra.get('as_of'))
-          print('V2 daytrade as_of:', daymeta.get('as_of'))
-          if not src_date or src_date != day_date:
-              raise SystemExit('source intraday/daytrade dates disagree')
-          if v2_i != src_date or v2_d != src_date:
-              raise SystemExit(f'V2 source-date mismatch: source={src_date} intraday={v2_i} daytrade={v2_d}')
-          if close_date and src_date < close_date:
-              raise SystemExit(f'intraday {src_date} older than latest completed close {close_date}')
+          src=load('docs/data/intraday.json'); day=load('docs/data/daytrade.json'); close=load('docs/data/close.json'); m=load('docs/v2/data/current_manifest.json')
+          src_date=str(src.get('trade_date') or '')[:10]; day_date=str(day.get('trade_date') or day.get('source_trade_date') or '')[:10]; close_date=str(close.get('trade_date') or '')[:10]
+          intra=m['datasets']['decision_intraday_summary']; daymeta=m['datasets']['decision_daytrade_summary']; v2_i=str(intra.get('as_of') or '')[:10]; v2_d=str(daymeta.get('as_of') or '')[:10]
+          print('source intraday:', src_date, src.get('as_of')); print('source daytrade:', day_date, day.get('as_of')); print('source close:', close_date); print('V2 active:', m['active_build_id']); print('V2 phase/date:', m['session_phase'], m['trade_date']); print('V2 intraday as_of:', intra.get('as_of')); print('V2 daytrade as_of:', daymeta.get('as_of'))
+          if not src_date or src_date != day_date: raise SystemExit('source intraday/daytrade dates disagree')
+          if v2_i != src_date or v2_d != src_date: raise SystemExit(f'V2 source-date mismatch: source={src_date} intraday={v2_i} daytrade={v2_d}')
+          if close_date and src_date < close_date: raise SystemExit(f'intraday {src_date} older than latest completed close {close_date}')
+          required=('market_intraday_context','market_close_context','capital_intraday_context','capital_close_context')
+          missing=[k for k in required if k not in m.get('datasets',{})]
+          if missing: raise SystemExit(f'missing mission contexts: {missing}')
           PY
 
       - uses: actions/configure-pages@v5

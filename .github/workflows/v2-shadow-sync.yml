@@ -101,9 +101,15 @@ jobs:
       - name: Migrate structural support / resistance zones
         run: python scripts/v2/enrich_zones.py --legacy-root .shadow-main-data --output docs/v2/data
 
+      - name: Restore mission-specific market and capital contexts
+        run: |
+          python scripts/v2/restore_market_capital_context.py --legacy-root .shadow-main-data --root docs/v2/data
+          python scripts/v2/stamp_version_contract.py --root docs/v2/data
+
       - name: Validate contract and UI syntax
         run: |
           python scripts/v2/validate_bundle.py --root docs/v2/data
+          python scripts/v2/validate_market_capital_context.py --root docs/v2/data
           python - <<'PY'
           import json
           from pathlib import Path
@@ -119,6 +125,7 @@ jobs:
           print('Shadow version binding:', {k:m[k] for k in required})
           PY
           node --check docs/v2/app.js
+          node --check docs/v2/market-capital-ui.js
           node --check docs/v2/quote-ui.js
 
       - name: Publish validated Shadow bundle to clean-build-v2
