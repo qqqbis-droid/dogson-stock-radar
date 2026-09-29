@@ -1,9 +1,52 @@
 {
-  "app_contract_version": "2.0.0",
-  "schema_version": "2.0.0",
-  "engine_version": "2.0.0-alpha.1",
-  "enum_registry_version": "2.0.0",
-  "threshold_registry_version": "2.0.0",
-  "taxonomy_version": "2.0.0",
-  "compatibility": {"supported_schema_major": [2], "legacy_v1_direct_ui_import": false, "migration_adapter_required": true}
+  "registry_version": "2.0.0",
+  "status": "frozen",
+  "active_version_set_id": "cb2-vset-2.0.0-alpha.1",
+  "version_sets": {
+    "cb2-vset-2.0.0-alpha.1": {
+      "status": "active",
+      "app_contract_version": "2.0.0",
+      "schema_version": "2.0.0",
+      "engine_version": "2.0.0-alpha.1",
+      "enum_registry_version": "2.0.0",
+      "threshold_registry_version": "2.0.0",
+      "taxonomy_version": "2.0.0",
+      "compatibility": {
+        "supported_schema_major": [2],
+        "legacy_v1_direct_ui_import": false,
+        "migration_adapter_required": true
+      }
+    }
+  },
+  "manifest_binding": {
+    "required": true,
+    "fields": [
+      "version_registry_version",
+      "version_set_id",
+      "app_contract_version",
+      "schema_version",
+      "engine_version",
+      "enum_registry_version",
+      "threshold_registry_version",
+      "taxonomy_version"
+    ],
+    "rule": "Every Atomic Bundle manifest MUST bind to the active version set exactly. Partial version drift fails closed. build_id identifies an immutable artifact and is not a contract version."
+  },
+  "bump_policy": {
+    "major": [
+      "breaking schema or manifest shape change",
+      "removal or semantic redefinition of an existing enum",
+      "breaking change to actionability, fallback, null, or UNKNOWN semantics"
+    ],
+    "minor": [
+      "backward-compatible optional field addition",
+      "new enum value or registry capability requiring coordinated consumer support",
+      "new compatible dataset or contract surface"
+    ],
+    "patch": [
+      "documentation or metadata correction with no accepted-domain change",
+      "validator or implementation fix that preserves contract semantics"
+    ],
+    "engine_only": "Any Decision Engine behavior change MUST bump engine_version and mint a new version_set_id even when schemas and registries are unchanged."
+  }
 }

@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VersionRegistry",
+  "type": "object",
+  "required": [
+    "registry_version",
+    "status",
+    "active_version_set_id",
+    "version_sets",
+    "manifest_binding",
+    "bump_policy"
+  ],
+  "properties": {
+    "registry_version": {"const": "2.0.0"},
+    "status": {"const": "frozen"},
+    "active_version_set_id": {"type": "string", "minLength": 1},
+    "version_sets": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "status",
+          "app_contract_version",
+          "schema_version",
+          "engine_version",
+          "enum_registry_version",
+          "threshold_registry_version",
+          "taxonomy_version",
+          "compatibility"
+        ],
+        "properties": {
+          "status": {"enum": ["active", "retired"]},
+          "app_contract_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"},
+          "schema_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"},
+          "engine_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"},
+          "enum_registry_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"},
+          "threshold_registry_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"},
+          "taxonomy_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"},
+          "compatibility": {
+            "type": "object",
+            "required": ["supported_schema_major", "legacy_v1_direct_ui_import", "migration_adapter_required"],
+            "properties": {
+              "supported_schema_major": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "integer", "minimum": 0}},
+              "legacy_v1_direct_ui_import": {"type": "boolean"},
+              "migration_adapter_required": {"type": "boolean"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "manifest_binding": {
+      "type": "object",
+      "required": ["required", "fields", "rule"],
+      "properties": {
+        "required": {"const": true},
+        "fields": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "rule": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "bump_policy": {
+      "type": "object",
+      "required": ["major", "minor", "patch", "engine_only"],
+      "properties": {
+        "major": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "minor": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "patch": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "engine_only": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
