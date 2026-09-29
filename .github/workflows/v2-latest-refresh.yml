@@ -7,6 +7,10 @@ on:
     paths:
       - '.github/workflows/v2-latest-refresh.yml'
       - '.github/triggers/v2-latest-refresh.trigger'
+  schedule:
+    # 15:10 Asia/Taipei, Monday–Friday once this workflow is present on the
+    # default branch. This intentionally runs after the production close build.
+    - cron: '10 7 * * 1-5'
 
 permissions:
   contents: write
@@ -44,7 +48,7 @@ jobs:
         run: |
           python scripts/sync_live_data.py || true
           python scripts/build_close_fresh.py
-      - name: Confirm completed-session date moved forward honestly
+      - name: Confirm completed-session source is internally consistent
         run: |
           python - <<'PY'
           import json
@@ -53,12 +57,19 @@ jobs:
           close=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
           rows=close.get('rows') or []
           dates=sorted({str(r.get('date') or '')[:10] for r in rows if r.get('date')})
-          print('market trade_date:', market.get('trade_date'))
-          print('close dates:', dates[-3:])
-          if market.get('trade_date') != '2026-09-24':
-              raise SystemExit(f"Expected latest completed session 2026-09-24, got {market.get('trade_date')}")
-          if not rows or dates != ['2026-09-24']:
-              raise SystemExit(f'Close dataset is not cleanly locked to 2026-09-24: {dates}')
+          candidate=str(market.get('trade_date') or '')[:10]
+          current_path=Path('docs/v2/data/current_manifest.json')
+          current=json.loads(current_path.read_text(encoding='utf-8')) if current_path.exists() else {}
+          current_date=str(current.get('trade_date') or '')[:10]
+          print('current canonical trade_date:', current_date)
+          print('candidate market trade_date:', candidate)
+          print('candidate close dates:', dates[-3:])
+          if not candidate:
+              raise SystemExit('Candidate market trade_date is missing')
+          if not rows or dates != [candidate]:
+              raise SystemExit(f'Close dataset is not cleanly locked to candidate trade_date: market={candidate}, close={dates}')
+          if current_date and candidate < current_date:
+              raise SystemExit(f'Refusing source regression from {current_date} to {candidate}')
           PY
       - name: Build validated canonical Shadow cycle
         run: |
