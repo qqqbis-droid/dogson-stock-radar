@@ -59,7 +59,7 @@ jobs:
           node --check docs/v2/components-ui.js
           if [ -f docs/v2/tradeplan-ui.js ]; then node --check docs/v2/tradeplan-ui.js; fi
           if [ -f docs/v2/case-ui.js ]; then node --check docs/v2/case-ui.js; fi
-      - name: Publish validated bundle without branch races
+      - name: Publish validated bundle without branch races or date regression
         env:
           START_SHA: ${{ github.sha }}
         run: |
@@ -70,7 +70,8 @@ jobs:
           SNAPSHOT_DIR="$(mktemp -d)"
           cp -a docs/v2/data "$SNAPSHOT_DIR/data"
           CANDIDATE_ID="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json"))["active_build_id"])')"
-          echo "Validated candidate: $CANDIDATE_ID"
+          CANDIDATE_DATE="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json")).get("trade_date") or "")')"
+          echo "Validated candidate: $CANDIDATE_ID ($CANDIDATE_DATE)"
 
           for attempt in 1 2 3; do
             git fetch origin clean-build-v2
@@ -87,6 +88,14 @@ jobs:
 
             git reset --hard "$REMOTE_SHA"
             OLD_ID="$(python -c 'import json,pathlib; p=pathlib.Path("docs/v2/data/current_manifest.json"); print(json.loads(p.read_text(encoding="utf-8")).get("active_build_id","") if p.exists() else "")')"
+            OLD_DATE="$(python -c 'import json,pathlib; p=pathlib.Path("docs/v2/data/current_manifest.json"); print(json.loads(p.read_text(encoding="utf-8")).get("trade_date","") if p.exists() else "")')"
+
+            # Canonical public data is monotonic by completed trading session.
+            # A stale builder must never replace a newer validated trading day.
+            if [ -n "$OLD_DATE" ] && [ -n "$CANDIDATE_DATE" ] && [[ "$CANDIDATE_DATE" < "$OLD_DATE" ]]; then
+              echo "Refusing date regression: candidate $CANDIDATE_DATE < published $OLD_DATE"
+              exit 0
+            fi
 
             if [ "$OLD_ID" = "$CANDIDATE_ID" ]; then
               echo "Atomic Build $CANDIDATE_ID is already published; keep the existing immutable snapshot."
