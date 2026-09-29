@@ -17,13 +17,12 @@ permissions:
   pages: write
   id-token: write
 
-# UI-only deploys are allowed to supersede slow data rebuilds because they start
-# from the last successful production Pages artifact and never mutate canonical
-# market data. This prevents a CSS/JS/detail-card change from waiting on a full
-# universe refresh or after-hours MIS availability.
+# UI-only deploys start from the last successful production Pages artifact and
+# never mutate canonical market data. They must NOT cancel an in-flight Close /
+# Intraday data publication; wait for the canonical publisher, then overlay UI.
 concurrency:
   group: dogson-pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy-v2-ui:
