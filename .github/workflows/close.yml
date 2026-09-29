@@ -50,6 +50,88 @@ jobs:
         run: python scripts/sync_live_data.py || true
       - name: Build full close + chips + market with latest-session guard
         run: python scripts/build_close_fresh.py
+
+      - name: Ensure intraday/daytrade snapshot is not older than latest close
+        shell: bash
+        run: |
+          set -euo pipefail
+          need_refresh="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          def date_of(path, *keys):
+              p=Path(path)
+              if not p.exists(): return ''
+              try: obj=json.loads(p.read_text(encoding='utf-8'))
+              except Exception: return ''
+              vals=[]
+              for key in keys:
+                  s=str(obj.get(key) or '')[:10]
+                  if len(s)==10: vals.append(s)
+              bridge=obj.get('bridge') or {}
+              s=str(bridge.get('trade_date') or '')[:10]
+              if len(s)==10: vals.append(s)
+              for r in obj.get('rows') or []:
+                  if not isinstance(r,dict): continue
+                  s=str(r.get('quote_date') or r.get('market_trade_date') or r.get('date') or '')[:10]
+                  if len(s)==10: vals.append(s)
+              return max(vals) if vals else ''
+          close=date_of('docs/data/close.json','trade_date','source_trade_date','date')
+          intra=date_of('docs/data/intraday.json','trade_date','source_trade_date','date')
+          day=date_of('docs/data/daytrade.json','trade_date','source_trade_date','date')
+          refresh=bool(close) and (not intra or intra < close or not day or day < close)
+          print('1' if refresh else '0')
+          print(f'close={close} intraday={intra} daytrade={day}', file=__import__('sys').stderr)
+          PY
+          )"
+          if [[ "$need_refresh" == "1" ]]; then
+            echo "Latest close is newer than intraday/daytrade; rebuilding final MIS snapshot."
+            python scripts/bridge_intraday.py
+            python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('docs/data/intraday.json')
+          obj=json.loads(p.read_text(encoding='utf-8'))
+          rows=[r for r in (obj.get('rows') or []) if isinstance(r,dict)]
+          bridge=obj.get('bridge') or {}; qlayer=obj.get('quote_layer') or {}
+          dates=[]
+          for v in (bridge.get('trade_date'), obj.get('trade_date')):
+              s=str(v or '')[:10]
+              if len(s)==10: dates.append(s)
+          for r in rows:
+              s=str(r.get('quote_date') or r.get('market_trade_date') or r.get('date') or '')[:10]
+              if len(s)==10: dates.append(s)
+          if not dates: raise SystemExit('intraday effective trade date missing after close refresh')
+          effective=max(dates)
+          clocks=[]
+          for v in (bridge.get('latest_quote_time'), qlayer.get('latest_time'), bridge.get('latest_trade_time'), qlayer.get('latest_trade_time')):
+              s=str(v or '').strip()
+              if ':' in s: clocks.append(s[:8] if len(s)>=8 else s[:5]+':00')
+          for r in rows:
+              if str(r.get('quote_date') or '')[:10] != effective: continue
+              for k in ('quote_snapshot_time','quote_time','structure_time'):
+                  s=str(r.get(k) or '').strip()
+                  if ':' in s: clocks.append(s[:8] if len(s)>=8 else s[:5]+':00')
+          latest=max(clocks) if clocks else '13:30:00'; as_of=f'{effective}T{latest}+08:00'
+          obj['trade_date']=effective; obj['source_trade_date']=effective; obj['as_of']=as_of; obj['source_updated_at']=as_of
+          p.write_text(json.dumps(obj,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+          print('close refresh intraday normalized:', effective, as_of, 'rows=',len(rows))
+          PY
+            python scripts/build_daytrade.py
+            python - <<'PY'
+          import json
+          from pathlib import Path
+          ip=Path('docs/data/intraday.json'); dp=Path('docs/data/daytrade.json')
+          intra=json.loads(ip.read_text(encoding='utf-8')); day=json.loads(dp.read_text(encoding='utf-8'))
+          td=str(intra.get('trade_date') or '')[:10]; asof=str(intra.get('as_of') or '')
+          if len(td)!=10 or not asof.startswith(td): raise SystemExit(f'invalid refreshed intraday metadata: {td} / {asof}')
+          day['trade_date']=td; day['source_trade_date']=td; day['as_of']=asof; day['source_updated_at']=asof
+          dp.write_text(json.dumps(day,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+          print('close refresh daytrade normalized:', td, asof)
+          PY
+          else
+            echo "Intraday/daytrade are already aligned with latest close."
+          fi
+
       - name: Build 60m lifecycle + entry-position lights
         run: python scripts/build_hourly.py
       - name: Archive signals + resolve real outcomes
@@ -84,6 +166,12 @@ jobs:
             raise SystemExit(f"canonical system status app_version mismatch: {s.get('app_version')} != {APP_VERSION}")
           if not s.get('latest_completed_trade_date'):
             raise SystemExit('latest_completed_trade_date missing')
+          dates=s.get('dates') or {}
+          close_date=str(dates.get('close') or '')[:10]
+          intraday_date=str(dates.get('intraday') or '')[:10]
+          daytrade_date=str(dates.get('daytrade') or '')[:10]
+          if close_date and (intraday_date < close_date or daytrade_date < close_date):
+            raise SystemExit(f'latest-session regression: close={close_date} intraday={intraday_date} daytrade={daytrade_date}')
           PY
       - name: Include Clean Build 2.0 in Pages artifact
         run: |
