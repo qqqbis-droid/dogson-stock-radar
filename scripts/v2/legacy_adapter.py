@@ -162,7 +162,15 @@ def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, mar
     action, actionable = synthesize_action(stage, overlays, freshness, entry_score=entry, has_position=has_position)
     if session_phase == "CLOSE_FREEZE": actionable = False
     bucket = bucket_for(mission, stage, action, freshness, actionable, has_position=has_position)
-    score = num(row.get("swing_quality_score", row.get("score")))
+
+    # A generic legacy `score` is mission-dependent.  It is a valid fallback for
+    # the close/next-day swing model, but it must not be copied into an intraday
+    # swing-quality slot just because the intraday row happens to have a score.
+    # Otherwise the UI can show a fake `swing quality == intraday momentum` pair.
+    score = num(row.get("swing_quality_score"))
+    if score is None and (mission == "close_next_day" or isinstance(row.get("swing_components"), dict)):
+        score = num(row.get("score"))
+
     intraday = num(row.get("intraday_score", row.get("intraday_momentum_score")))
     daytrade = num(row.get("daytrade_score"))
     components = build_component_models(row, score, intraday, daytrade)
