@@ -4,7 +4,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from scripts.v2.engine import bucket_for, synthesize_action
 
@@ -78,11 +83,11 @@ def normalize_decision(row: dict, canonical_date: str) -> bool:
     if row.get("action_state") != action:
         row["action_state"] = action
         changed = True
-    if row.get("actionable") is not bool(actionable):
+    if row.get("actionable") != bool(actionable):
         row["actionable"] = bool(actionable)
         changed = True
     no_chase = action == "DO_NOT_CHASE"
-    if row.get("no_chase") is not no_chase:
+    if row.get("no_chase") != no_chase:
         row["no_chase"] = no_chase
         changed = True
 
