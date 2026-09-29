@@ -23,6 +23,11 @@ def write(path: Path, obj):
     }
 
 
+def file_meta(path: Path):
+    raw = path.read_bytes()
+    return {"hash": "sha256:" + hashlib.sha256(raw).hexdigest(), "bytes": len(raw)}
+
+
 def rows_of(payload):
     if isinstance(payload, list):
         return payload
@@ -59,6 +64,20 @@ def parse_dt(value):
         return None
 
 
+def parse_clock(trade_date, value):
+    if not trade_date or not isinstance(value, str) or not value:
+        return None
+    if "T" in value:
+        return parse_dt(value)
+    try:
+        clock = value.strip()[:8]
+        if len(clock) == 5:
+            clock += ":00"
+        return datetime.fromisoformat(f"{trade_date}T{clock}+08:00").astimezone(TW)
+    except Exception:
+        return None
+
+
 def source_as_of(payload, trade_date):
     if not isinstance(payload, dict) or not trade_date:
         return None
@@ -71,6 +90,24 @@ def source_as_of(payload, trade_date):
     if candidates:
         return max(candidates).isoformat(timespec="seconds")
     return None
+
+
+def fresh_structure_codes(payload, trade_date, now, max_age_minutes=20):
+    fresh = set()
+    for row in rows_of(payload):
+        if not isinstance(row, dict):
+            continue
+        code = str(row.get("code") or "").strip()
+        qd = str(row.get("quote_date") or row.get("date") or "")[:10]
+        if not code or qd != trade_date:
+            continue
+        st = parse_clock(trade_date, row.get("structure_time"))
+        if not st:
+            continue
+        age = (now - st).total_seconds() / 60.0
+        if -5 <= age <= max_age_minutes:
+            fresh.add(code)
+    return fresh
 
 
 def resolve(root: Path, url: str):
@@ -92,9 +129,10 @@ def clamp_live_file(path: Path, trade_date: str, as_of: str, *, sector=False):
     changed = False
     limit = parse_dt(as_of)
     for row in iter_records(obj):
-        if str(row.get("trade_date") or "")[:10] != trade_date:
+        row_trade_date = str(row.get("trade_date") or "")[:10]
+        if row_trade_date and row_trade_date != trade_date:
             continue
-        if row.get("session_phase") != "LIVE" and not sector:
+        if row.get("session_phase") not in (None, "LIVE") and not sector:
             continue
         if sector:
             if row.get("session_phase") != "LIVE":
@@ -106,24 +144,49 @@ def clamp_live_file(path: Path, trade_date: str, as_of: str, *, sector=False):
             if row.get("as_of") != as_of:
                 row["as_of"] = as_of
                 changed = True
-            # Legacy sector adapter has no row-level quote timestamp and used a
-            # close-time fallback. During LIVE, the source payload updated_at is
-            # the earliest trustworthy timestamp for this aggregate.
             if row.get("known_at") != as_of:
                 row["known_at"] = as_of
                 changed = True
-        else:
+        elif "as_of" in row:
             current = parse_dt(row.get("as_of"))
             if current is None or (limit is not None and current > limit):
                 row["as_of"] = as_of
                 changed = True
-    if changed:
-        return write(path, obj)
-    text = path.read_bytes()
-    return {
-        "hash": "sha256:" + hashlib.sha256(text).hexdigest(),
-        "bytes": len(text),
-    }
+    return write(path, obj) if changed else file_meta(path)
+
+
+def gate_structure_file(path: Path, fresh_codes: set[str], *, mission: str):
+    obj = load(path)
+    changed = False
+    blocker = "5分結構尚未更新到目前時段；保留即時報價，但不可視為可執行訊號"
+    for row in iter_records(obj):
+        code = str(row.get("code") or "").strip()
+        if not code or code in fresh_codes:
+            continue
+        if row.get("actionable") is not False:
+            row["actionable"] = False
+            changed = True
+        desired_action = "WATCH"
+        if row.get("action_state") != desired_action:
+            row["action_state"] = desired_action
+            changed = True
+        desired_bucket = "STALE" if mission == "daytrade" else "RESEARCH_ONLY"
+        if row.get("opportunity_bucket") != desired_bucket:
+            row["opportunity_bucket"] = desired_bucket
+            changed = True
+        blockers = list(row.get("blockers") or [])
+        if blocker not in blockers:
+            row["blockers"] = ([blocker] + blockers)[:3]
+            changed = True
+        overlays = list(row.get("risk_overlays") or [])
+        if "DATA_QUALITY_RISK" not in overlays:
+            row["risk_overlays"] = overlays + ["DATA_QUALITY_RISK"]
+            changed = True
+        missing = list(row.get("missing_fields") or [])
+        if "fresh_5m_structure" not in missing:
+            row["missing_fields"] = missing + ["fresh_5m_structure"]
+            changed = True
+    return write(path, obj) if changed else file_meta(path)
 
 
 def main():
@@ -153,6 +216,7 @@ def main():
         return
 
     active = manifest["active_build_id"]
+    structure_codes = fresh_structure_codes(intraday, intraday_date, now, 20)
     intraday_keys = (
         "sector_intraday",
         "decision_intraday_summary",
@@ -170,8 +234,10 @@ def main():
         if not meta:
             continue
         path = resolve(root, meta["url"])
-        file_meta = clamp_live_file(path, intraday_date, intraday_as_of, sector=(key == "sector_intraday"))
-        meta.update(file_meta)
+        result = clamp_live_file(path, intraday_date, intraday_as_of, sector=(key == "sector_intraday"))
+        if key.startswith("decision_intraday"):
+            result = gate_structure_file(path, structure_codes, mission="intraday")
+        meta.update(result)
         meta["as_of"] = intraday_as_of
         meta["complete"] = True
         meta["build_id"] = active
@@ -182,8 +248,9 @@ def main():
             if not meta:
                 continue
             path = resolve(root, meta["url"])
-            file_meta = clamp_live_file(path, daytrade_date, daytrade_as_of)
-            meta.update(file_meta)
+            clamp_live_file(path, daytrade_date, daytrade_as_of)
+            result = gate_structure_file(path, structure_codes, mission="daytrade")
+            meta.update(result)
             meta["as_of"] = daytrade_as_of
             meta["complete"] = True
             meta["build_id"] = active
@@ -192,11 +259,13 @@ def main():
     manifest["session_phase"] = "LIVE"
     warnings = list((manifest.get("health") or {}).get("warnings") or [])
     live_warning = "LIVE Preview：盤中資料由既有 TWSE MIS 5 分鐘管線橋接至 V2 Canonical Bundle；仍屬 Shadow 驗證。"
-    if live_warning not in warnings:
-        warnings.append(live_warning)
+    coverage_warning = f"LIVE 結構 Gate：{len(structure_codes)}/{len(rows_of(intraday))} 檔具 20 分鐘內新鮮 5 分結構；其餘只顯示即時報價/觀察，不提供可執行狀態。"
+    for msg in (live_warning, coverage_warning):
+        if msg not in warnings:
+            warnings.append(msg)
     manifest.setdefault("health", {})["warnings"] = warnings
     write(manifest_path, manifest)
-    print("V2 LIVE patched", active, "intraday", intraday_as_of, "daytrade", daytrade_as_of)
+    print("V2 LIVE patched", active, "intraday", intraday_as_of, "daytrade", daytrade_as_of, "fresh_structure", len(structure_codes), "/", len(rows_of(intraday)))
 
 
 if __name__ == "__main__":
