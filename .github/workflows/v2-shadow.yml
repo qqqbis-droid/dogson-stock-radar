@@ -8,9 +8,8 @@ on:
     paths:
       - '.github/triggers/v2-shadow.trigger'
   schedule:
-    # 16:45 Asia/Taipei, Monday–Friday. Trading-calendar validity is still
-    # determined from the source datasets; duplicate trade dates do not create
-    # additional Shadow samples.
+    # 16:45 Asia/Taipei, Monday–Friday once this workflow is on the default branch.
+    # Trading-calendar validity is determined from the refreshed source datasets.
     - cron: '45 8 * * 1-5'
 
 permissions:
@@ -24,32 +23,52 @@ jobs:
   shadow:
     if: github.ref == 'refs/heads/clean-build-v2' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
         with:
           ref: clean-build-v2
-          fetch-depth: 1
-      - name: Fetch current production data snapshot
-        run: |
-          git fetch origin main --depth=1
-          mkdir -p /tmp/dogson-main-data
-          for f in market.json close.json intraday.json daytrade.json; do
-            git show origin/main:docs/data/$f > /tmp/dogson-main-data/$f
-          done
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: pip install -r requirements-contract.txt
+      - name: Install builders and contract validator
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-contract.txt
+      - name: Refresh source snapshot from deployed production data
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          git checkout origin/main -- docs/data
+          python scripts/sync_live_data.py || true
+          python scripts/build_close_fresh.py
+      - name: Verify close source is internally date-consistent
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          market=json.loads(Path('docs/data/market.json').read_text(encoding='utf-8'))
+          close=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          rows=close.get('rows') or []
+          dates=sorted({str(r.get('date') or '')[:10] for r in rows if r.get('date')})
+          trade_date=str(market.get('trade_date') or '')[:10]
+          print('market trade_date:', trade_date)
+          print('close dates:', dates[-3:])
+          if not trade_date or not rows or dates != [trade_date]:
+              raise SystemExit(f'Close source is not cleanly locked to market trade_date: market={trade_date}, close={dates}')
+          PY
       - name: Contract and structural engine gates
         run: |
           python -m unittest discover -s contracts/contract-tests -p 'test_*.py' -v
           python -m unittest scripts.v2.test_engine -v
           python -m unittest scripts.v2.test_shadow_summary -v
-      - name: Build validated Shadow cycle from production public data
-        run: python -m scripts.v2.shadow_cycle --legacy-root /tmp/dogson-main-data --output docs/v2/data --reports shadow/reports
+      - name: Build validated Shadow cycle from freshest public data
+        run: python -m scripts.v2.shadow_cycle --legacy-root docs/data --output docs/v2/data --reports shadow/reports
       - name: Refresh distinct-day Shadow summary
         run: python -m scripts.v2.shadow_summary --reports shadow/reports --output shadow/summary.json
       - name: Validate active atomic bundle
@@ -68,7 +87,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/v2/data shadow
           if git diff --cached --quiet; then
-            echo "No new source build / Shadow sample"
+            echo "No newer source build / Shadow sample"
           else
             git commit -m "chore(v2): record Phase 5 Shadow snapshot [skip ci]"
             git push origin HEAD:clean-build-v2
