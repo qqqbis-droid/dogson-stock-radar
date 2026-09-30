@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -141,6 +142,12 @@ def main():
     if errors:
         raise SystemExit("single-writer UI gate failed: " + " | ".join(errors))
 
+    # Product smoke is intentionally a separate validator: this file protects
+    # ownership/syntax/privacy; the smoke gate protects the end-user decision
+    # journey. Bind them here so every publisher gets both automatically.
+    smoke = ROOT / "scripts" / "v2" / "validate_product_surface.py"
+    subprocess.run([sys.executable, str(smoke)], cwd=ROOT, check=True)
+
     print({
         "status": "PASS",
         "active_scripts": sorted(scripts),
@@ -155,6 +162,7 @@ def main():
         "portfolio_fields": sorted(PORTFOLIO_FIELDS),
         "runtime_metrics_storage": "session-local-only",
         "syntax_checked": sorted(REQUIRED),
+        "product_smoke": "PASS",
         "deprecated_overlays_active": [],
     })
 
