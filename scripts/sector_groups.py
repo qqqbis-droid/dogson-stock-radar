@@ -1,138 +1,289 @@
 # -*- coding: utf-8 -*-
-"""犬子老師雷達 Sector Taxonomy 2.1。
+"""犬子老師雷達 Sector Taxonomy registry-backed resolver.
 
-Production 唯一族群 resolver。
-- official industry 是 fallback，不等於窄族群。
-- primary_group 才能進核心族群分。
-- secondary/theme 只做解釋與搜尋，不重複灌分。
-- confidence <80 或 peer_count <3 時回傳 None，讓既有 scorer 退回官方產業 proxy。
-- 主分類代號衝突直接 fail closed，不再 setdefault 靜默吃第一個。
+Single source of truth:
+    contracts/registries/sector_registry.json
+
+Rules:
+- official industry is fallback context, not a narrow sector.
+- only a unique primary_group with confidence >= policy threshold and enough peers
+  may enter core sector scoring.
+- secondary_groups/theme_tags never stack core sector points.
+- missing narrow classification is OFFICIAL_ONLY when official industry is known;
+  it is not silently interpreted as sector weakness.
+- duplicate registry membership fails closed.
 """
 from __future__ import annotations
-from collections import Counter
 
-TAXONOMY_VERSION="2.1.0"
-PRIMARY_GROUP_MIN_CONFIDENCE=80
-SECONDARY_GROUP_MIN_CONFIDENCE=70
-PRIMARY_GROUP_MIN_PEERS=3
+import json
+from collections import Counter, defaultdict
+from pathlib import Path
 
-INDUSTRY_NAMES={
-"01":"水泥工業","02":"食品工業","03":"塑膠工業","04":"紡織纖維","05":"電機機械","06":"電器電纜",
-"08":"玻璃陶瓷","09":"造紙工業","10":"鋼鐵工業","11":"橡膠工業","12":"汽車工業","14":"建材營造",
-"15":"航運業","16":"觀光餐旅","17":"金融保險","18":"貿易百貨","19":"綜合","20":"其他","21":"化學工業",
-"22":"生技醫療","23":"油電燃氣","24":"半導體業","25":"電腦及週邊設備業","26":"光電業","27":"通信網路業",
-"28":"電子零組件業","29":"電子通路業","30":"資訊服務業","31":"其他電子業","32":"文化創意","33":"農業科技",
-"34":"電子商務","35":"綠能環保","36":"數位雲端","37":"運動休閒","38":"居家生活"}
+ROOT = Path(__file__).resolve().parents[1]
+REGISTRY_PATH = ROOT / "contracts" / "registries" / "sector_registry.json"
+POLICY_PATH = ROOT / "contracts" / "registries" / "taxonomy_registry.json"
 
-PRIMARY_GROUPS={
-    'PCB／多層板': "2313 2355 2367 2368 3044 3715 4927 4958 5469 6191 8155".split(),
-    'CCL／銅箔': "2383 6213 6274 8358".split(),
-    'ABF載板': "3037 3189 8046".split(),
-    'PCB設備／耗材': "1595 3455 3563 6664 8021".split(),
-    'AI伺服器ODM': "2317 2356 2382 3231 3706 6669".split(),
-    '伺服器機構件／滑軌': "2059 3013 6117 8210".split(),
-    '電源／UPS': "2301 2308 3078 6282 6409 6412".split(),
-    'BBU／電池備援': "3211 3323 6121 6781".split(),
-    '散熱': "2421 3017 3324 3338 3483 3653 6230 8996".split(),
-    '高速連接／線材': "3023 3533 3605 3665 6197 6290".split(),
-    'CPO／光通訊': "3081 3163 3234 3363 3450 4908 4971 4979 6426 6442".split(),
-    '晶圓代工': "2303 2330 5347 6770".split(),
-    'IC封裝測試': "2329 2449 3265 3372 3374 3711 6147 6239 6257 6271 6451 8131 8150".split(),
-    'ASIC／IC設計服務／IP': "3035 3443 3529 3661 6533 6643 8227".split(),
-    'IC設計': "2379 2401 2436 2454 2458 3014 3034 3141 3227 3545 3592 4919 4961 4966 5269 5274 5471 6104 6138 6202 6415 6462 6526 6679 6719 8016 8054 8081".split(),
-    '記憶體IC': "2337 2344 2408 3006 5351 6531".split(),
-    '儲存控制／模組': "2451 3260 4967 4973 8271 8299".split(),
-    '功率半導體': "2481 3317 3675 3707 5425 6435 8261".split(),
-    '化合物半導體／磊晶': "2455 3016 3105 4991 8086".split(),
-    '矽晶圓': "3532 5483 6182 6488".split(),
-    '半導體測試介面': "3581 6223 6510 6515 6683".split(),
-    '半導體設備': "2467 3131 3413 3583 3680 5443 6187 6532 6640 6788 6937 7734 7751 7769".split(),
-    '半導體廠務／工程': "2404 5536 6139 6196 6613 6667 6691 6903".split(),
-    '半導體材料／電子化學': "1727 1785 4749 4768 4772 5234".split(),
-    '被動元件': "2327 2375 2492 3026 6173 8042".split(),
-    '網通設備': "2345 2419 3062 3596 3704 4906 5388 6285".split(),
-    '主機板／PC硬體': "2357 2376 2377 3515 4938".split(),
-    '工業電腦': "2395 3022 6166 6414 6579 8050".split(),
-    '自動化／線性傳動': "1590 1597 2049 4540 4576 7750".split(),
-    '重電／電網': "1503 1504 1513 1514 1519 2371".split(),
-    '電線電纜': "1605 1608 1609 2061".split(),
-    '航太／國防': "2634 3004 4541 8033 8222".split(),
+INDUSTRY_NAMES = {
+    "01":"水泥工業","02":"食品工業","03":"塑膠工業","04":"紡織纖維","05":"電機機械","06":"電器電纜",
+    "08":"玻璃陶瓷","09":"造紙工業","10":"鋼鐵工業","11":"橡膠工業","12":"汽車工業","14":"建材營造",
+    "15":"航運業","16":"觀光餐旅","17":"金融保險","18":"貿易百貨","19":"綜合","20":"其他","21":"化學工業",
+    "22":"生技醫療","23":"油電燃氣","24":"半導體業","25":"電腦及週邊設備業","26":"光電業","27":"通信網路業",
+    "28":"電子零組件業","29":"電子通路業","30":"資訊服務業","31":"其他電子業","32":"文化創意","33":"農業科技",
+    "34":"電子商務","35":"綠能環保","36":"數位雲端","37":"運動休閒","38":"居家生活"
 }
-GROUP_CONFIDENCE={g:90 for g in PRIMARY_GROUPS}
-GROUP_CONFIDENCE.update({'IC設計':85,'半導體廠務／工程':85,'半導體材料／電子化學':85,'主機板／PC硬體':85,'航太／國防':85})
 
-SECONDARY_GROUPS={
-'1303':[{'confidence':78,'exposure_note':'電子材料/銅箔基板相關業務存在，但公司營運高度多角化，不列主族群核心計分。','group':'CCL／電子材料'}],
-'2301':[{'confidence':82,'exposure_note':'伺服器電源為重要應用。','group':'AI伺服器電源'}],
-'2308':[{'confidence':88,'exposure_note':'AI伺服器電源為重要應用，但公司主業更廣。','group':'AI伺服器電源'}],
-'2317':[{'confidence':85,'exposure_note':'AI伺服器為重要應用，但主分類維持ODM。','group':'AI伺服器供應鏈'}],
-'2379':[{'confidence':88,'exposure_note':'網通/連線晶片為重要產品線；保留為次分類，避免與IC設計主群重複灌分。','group':'網通IC'}],
-'2382':[{'confidence':90,'exposure_note':'AI伺服器為主要成長應用。','group':'AI伺服器供應鏈'}],
-'3017':[{'confidence':90,'exposure_note':'AI伺服器散熱為核心成長應用。','group':'AI伺服器散熱'}],
-'3231':[{'confidence':90,'exposure_note':'AI伺服器為主要成長應用。','group':'AI伺服器供應鏈'}],
-'3324':[{'confidence':90,'exposure_note':'AI伺服器散熱為核心成長應用。','group':'AI伺服器散熱'}],
-'3653':[{'confidence':85,'exposure_note':'伺服器高階散熱/機構零件應用。','group':'AI伺服器散熱'}],
-'4966':[{'confidence':90,'exposure_note':'高速介面晶片曝險。','group':'高速傳輸IC'}],
-'5269':[{'confidence':90,'exposure_note':'高速I/O控制晶片曝險。','group':'高速傳輸IC'}],
-'6282':[{'confidence':80,'exposure_note':'伺服器電源為重要應用。','group':'AI伺服器電源'}],
-'6412':[{'confidence':82,'exposure_note':'伺服器電源為重要應用。','group':'AI伺服器電源'}],
-'6526':[{'confidence':85,'exposure_note':'連線/網通晶片曝險。','group':'網通IC'}],
-'6669':[{'confidence':95,'exposure_note':'AI伺服器為核心營運曝險。','group':'AI伺服器供應鏈'}],
-'8996':[{'confidence':85,'exposure_note':'液冷/熱交換相關應用。','group':'AI伺服器散熱'}]}
-THEME_TAGS={
-'1503':['電網建設'],'1504':['自動化／機器人','電網建設'],'1513':['電網建設'],'1514':['電網建設'],'1519':['電網建設'],
-'1590':['自動化／機器人'],'1597':['自動化／機器人'],'1605':['電網建設'],'1608':['電網建設'],'1609':['電網建設'],
-'2049':['自動化／機器人'],'2061':['電網建設'],'2301':['AI'],'2308':['AI','自動化／機器人'],'2313':['AI'],'2317':['AI'],
-'2356':['AI'],'2368':['AI'],'2371':['電網建設'],'2382':['AI'],'2383':['AI'],'2634':['國防航太'],'3004':['國防航太'],
-'3017':['AI'],'3037':['AI'],'3044':['AI'],'3081':['AI','CPO／光通訊'],'3163':['AI','CPO／光通訊'],'3189':['AI'],
-'3211':['AI'],'3231':['AI'],'3234':['CPO／光通訊'],'3323':['AI'],'3324':['AI'],'3363':['AI','CPO／光通訊'],
-'3450':['AI','CPO／光通訊'],'3653':['AI'],'3706':['AI'],'4540':['自動化／機器人'],'4541':['國防航太'],
-'4576':['自動化／機器人'],'4908':['CPO／光通訊'],'4971':['CPO／光通訊'],'4979':['AI','CPO／光通訊'],
-'6121':['AI'],'6274':['AI'],'6282':['AI'],'6412':['AI'],'6426':['CPO／光通訊'],'6442':['AI','CPO／光通訊'],
-'6669':['AI'],'6781':['AI'],'7750':['自動化／機器人'],'8033':['國防航太'],'8046':['AI'],'8222':['國防航太'],'8996':['AI']}
-SECONDARY_ONLY={'1303'}
+def _load_json(path: Path, expected_type):
+    if not path.is_file():
+        raise RuntimeError(f"Sector Taxonomy required file missing: {path}")
+    try:
+        obj = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise RuntimeError(f"Sector Taxonomy invalid JSON: {path}: {exc}") from exc
+    if not isinstance(obj, expected_type):
+        raise RuntimeError(f"Sector Taxonomy wrong JSON type: {path}")
+    return obj
+
+_POLICY = _load_json(POLICY_PATH, dict)
+TAXONOMY_VERSION = str(_POLICY.get("taxonomy_version") or "UNKNOWN")
+_CLASS_POLICY = _POLICY.get("classification_policy") or {}
+PRIMARY_GROUP_MIN_CONFIDENCE = float(_CLASS_POLICY.get("primary_group_min_confidence", 80))
+SECONDARY_GROUP_MIN_CONFIDENCE = float(_CLASS_POLICY.get("secondary_group_min_confidence", 70))
+PRIMARY_GROUP_MIN_PEERS = int(_CLASS_POLICY.get("primary_group_min_peers", 3))
+REVIEW_DAYS = int(_CLASS_POLICY.get("review_days", 180))
+
+_REGISTRY = _load_json(REGISTRY_PATH, dict)
+if str(_REGISTRY.get("taxonomy_version") or "") != TAXONOMY_VERSION:
+    raise RuntimeError(
+        f"Sector Taxonomy version mismatch registry={_REGISTRY.get('taxonomy_version')} policy={TAXONOMY_VERSION}"
+    )
+
+CODE_TO_RECORD = {}
+_group_members = defaultdict(list)
+for grow in _REGISTRY.get("groups") or []:
+    if not isinstance(grow, dict):
+        raise RuntimeError("Sector Taxonomy group row must be object")
+    group = str(grow.get("group") or "").strip()
+    if not group:
+        raise RuntimeError("Sector Taxonomy group missing name")
+    try:
+        confidence = float(grow.get("confidence"))
+    except Exception as exc:
+        raise RuntimeError(f"Sector Taxonomy group {group} missing confidence") from exc
+    for raw_code in grow.get("members") or []:
+        code = str(raw_code or "").strip()
+        if not code:
+            raise RuntimeError(f"Sector Taxonomy group {group} contains empty code")
+        if code in CODE_TO_RECORD:
+            raise RuntimeError(
+                f"Sector Taxonomy {TAXONOMY_VERSION} duplicate primary code "
+                f"{code}: {CODE_TO_RECORD[code].get('primary_group')} vs {group}"
+            )
+        CODE_TO_RECORD[code] = {
+            "code": code,
+            "primary_group": group,
+            "primary_group_confidence": confidence,
+            "secondary_groups": [],
+            "theme_tags": [],
+            "supply_chain_role": [group],
+            "evidence_quality": grow.get("evidence_quality") or "UNSPECIFIED",
+            "evidence_urls_or_refs": list(grow.get("evidence_urls_or_refs") or []),
+            "classification_reason": grow.get("classification_reason"),
+            "last_reviewed_at": grow.get("last_reviewed_at") or _REGISTRY.get("last_reviewed_at"),
+            "review_due_at": grow.get("review_due_at") or _REGISTRY.get("review_due_at"),
+            "revenue_evidence_period": grow.get("revenue_evidence_period"),
+            "exposure_pct": grow.get("exposure_pct"),
+        }
+        _group_members[group].append(code)
+
+for raw_code, override in (_REGISTRY.get("stock_overrides") or {}).items():
+    code = str(raw_code or "").strip()
+    if not code or not isinstance(override, dict):
+        continue
+    rec = CODE_TO_RECORD.setdefault(code, {
+        "code": code,
+        "primary_group": None,
+        "primary_group_confidence": None,
+        "secondary_groups": [],
+        "theme_tags": [],
+        "supply_chain_role": [],
+        "evidence_quality": "UNSPECIFIED",
+        "evidence_urls_or_refs": [],
+        "classification_reason": None,
+        "last_reviewed_at": _REGISTRY.get("last_reviewed_at"),
+        "review_due_at": _REGISTRY.get("review_due_at"),
+        "revenue_evidence_period": None,
+        "exposure_pct": None,
+    })
+    for key in (
+        "primary_group","primary_group_confidence","secondary_groups","supply_chain_role",
+        "evidence_quality","evidence_urls_or_refs","classification_reason",
+        "last_reviewed_at","review_due_at","revenue_evidence_period","exposure_pct",
+    ):
+        if key in override:
+            rec[key] = override[key]
+
+for raw_code, tags in (_REGISTRY.get("theme_tags") or {}).items():
+    code = str(raw_code or "").strip()
+    if not code:
+        continue
+    rec = CODE_TO_RECORD.setdefault(code, {
+        "code": code,
+        "primary_group": None,
+        "primary_group_confidence": None,
+        "secondary_groups": [],
+        "theme_tags": [],
+        "supply_chain_role": [],
+        "evidence_quality": "UNSPECIFIED",
+        "evidence_urls_or_refs": [],
+        "classification_reason": None,
+        "last_reviewed_at": _REGISTRY.get("last_reviewed_at"),
+        "review_due_at": _REGISTRY.get("review_due_at"),
+        "revenue_evidence_period": None,
+        "exposure_pct": None,
+    })
+    rec["theme_tags"] = list(tags or [])
+
+PRIMARY_GROUPS = {g: sorted(codes) for g, codes in sorted(_group_members.items())}
+GROUP_SIZES = {g: len(codes) for g, codes in PRIMARY_GROUPS.items()}
+CODE_TO_GROUP = {
+    code: str(rec.get("primary_group") or "").strip()
+    for code, rec in CODE_TO_RECORD.items()
+    if str(rec.get("primary_group") or "").strip()
+}
+GROUP_CONFIDENCE = {}
+for group, members in PRIMARY_GROUPS.items():
+    vals = []
+    for code in members:
+        try:
+            vals.append(float(CODE_TO_RECORD[code].get("primary_group_confidence")))
+        except Exception:
+            pass
+    GROUP_CONFIDENCE[group] = min(vals) if vals else 0.0
+
+SECONDARY_GROUPS = {
+    code: [dict(x) for x in (rec.get("secondary_groups") or []) if isinstance(x, dict)]
+    for code, rec in CODE_TO_RECORD.items()
+    if rec.get("secondary_groups")
+}
+THEME_TAGS = {
+    code: list(rec.get("theme_tags") or [])
+    for code, rec in CODE_TO_RECORD.items()
+    if rec.get("theme_tags")
+}
+SECONDARY_ONLY = {
+    code for code, rec in CODE_TO_RECORD.items()
+    if not str(rec.get("primary_group") or "").strip() and rec.get("secondary_groups")
+}
 
 def industry_name_for(industry):
-    key=str(industry or '').strip()
-    return INDUSTRY_NAMES.get(key,key if key and key!='nan' else '未分類')
+    key = str(industry or "").strip()
+    return INDUSTRY_NAMES.get(key, key if key and key != "nan" else "未分類")
 
-def _build_primary_index():
-    out={}
-    for group,codes in PRIMARY_GROUPS.items():
-        for code in codes:
-            if code in out:
-                raise RuntimeError(f'Sector Taxonomy {TAXONOMY_VERSION} duplicate primary code {code}: {out[code]} vs {group}')
-            out[code]=group
-    return out
+def _confidence(value):
+    try:
+        return float(value) if value is not None else None
+    except Exception:
+        return None
 
-CODE_TO_GROUP=_build_primary_index()
-GROUP_SIZES=dict(Counter(CODE_TO_GROUP.values()))
+def classification_for(code, name=None, industry=None):
+    code = str(code or "").strip()
+    rec = CODE_TO_RECORD.get(code) or {}
 
-def classification_for(code,name=None,industry=None):
-    code=str(code or '').strip(); official=industry_name_for(industry); group=CODE_TO_GROUP.get(code)
-    conf=float(GROUP_CONFIDENCE[group]) if group else None
-    peer_count=int(GROUP_SIZES.get(group,0)) if group else 0
-    eligible=bool(group and conf>=PRIMARY_GROUP_MIN_CONFIDENCE and peer_count>=PRIMARY_GROUP_MIN_PEERS)
-    if eligible: status,score_source='VERIFIED','PRIMARY_GROUP'
-    elif group: status='PROVISIONAL'; score_source='OFFICIAL_PROXY' if official!='未分類' else 'NONE'
-    elif official!='未分類': status,score_source='OFFICIAL_ONLY','OFFICIAL_PROXY'
-    else: status,score_source='UNCLASSIFIED','NONE'
-    secondary=[dict(x) for x in SECONDARY_GROUPS.get(code,[]) if float(x.get('confidence') or 0)>=SECONDARY_GROUP_MIN_CONFIDENCE]
-    return {'taxonomy_version':TAXONOMY_VERSION,'code':code,'name':str(name or code),'official_industry':official,
-        'primary_group':group,'primary_group_confidence':conf,'secondary_groups':secondary,'theme_tags':list(THEME_TAGS.get(code,[])),
-        'supply_chain_role':[group] if group else [],'classification_status':status,
-        'classification_reason':(f'Taxonomy {TAXONOMY_VERSION} 主分類：{group}；高信心且同儕樣本足夠才進核心族群分。' if group else ('尚無高信心窄主族群；使用官方產業 proxy。' if official!='未分類' else '分類證據不足。')),
-        'peer_count':peer_count,'score_source':score_source,'core_sector_score_eligible':eligible}
+    official = industry_name_for(industry)
+    group = str(rec.get("primary_group") or "").strip() or None
+    conf = _confidence(rec.get("primary_group_confidence"))
+    peer_count = int(GROUP_SIZES.get(group, 0)) if group else 0
+    eligible = bool(
+        group and conf is not None
+        and conf >= PRIMARY_GROUP_MIN_CONFIDENCE
+        and peer_count >= PRIMARY_GROUP_MIN_PEERS
+    )
 
-def sector_group_for(code,name=None,industry=None):
-    c=classification_for(code,name=name,industry=industry)
-    return c['primary_group'] if c['core_sector_score_eligible'] else None
+    if eligible:
+        status, score_source = "VERIFIED", "PRIMARY_GROUP"
+    elif group:
+        status = "PROVISIONAL"
+        score_source = "OFFICIAL_PROXY" if official != "未分類" else "NONE"
+    elif official != "未分類":
+        status, score_source = "OFFICIAL_ONLY", "OFFICIAL_PROXY"
+    else:
+        status, score_source = "UNCLASSIFIED", "NONE"
 
-def sector_confidence_for(code,name=None,industry=None):
-    return classification_for(code,name=name,industry=industry)['primary_group_confidence']
+    secondary = []
+    for item in rec.get("secondary_groups") or []:
+        if not isinstance(item, dict):
+            continue
+        c = _confidence(item.get("confidence")) or 0
+        if c >= SECONDARY_GROUP_MIN_CONFIDENCE and item.get("group"):
+            secondary.append(dict(item))
+
+    reason = rec.get("classification_reason")
+    if not reason:
+        if group:
+            reason = (
+                f"Taxonomy {TAXONOMY_VERSION} 主分類：{group}；"
+                "只有信心門檻與同儕樣本都通過才進核心族群分。"
+            )
+        elif official != "未分類":
+            reason = "尚無高信心窄主族群；使用官方產業 proxy。"
+        else:
+            reason = "分類證據不足。"
+
+    return {
+        "taxonomy_version": TAXONOMY_VERSION,
+        "code": code,
+        "name": str(name or code),
+        "official_industry": official,
+        "primary_group": group,
+        "primary_group_confidence": conf,
+        "secondary_groups": secondary,
+        "theme_tags": list(rec.get("theme_tags") or []),
+        "supply_chain_role": list(rec.get("supply_chain_role") or ([group] if group else [])),
+        "exposure_pct": rec.get("exposure_pct"),
+        "revenue_evidence_period": rec.get("revenue_evidence_period"),
+        "evidence_urls_or_refs": list(rec.get("evidence_urls_or_refs") or []),
+        "evidence_quality": rec.get("evidence_quality") or "UNSPECIFIED",
+        "last_reviewed_at": rec.get("last_reviewed_at") or _REGISTRY.get("last_reviewed_at"),
+        "review_due_at": rec.get("review_due_at") or _REGISTRY.get("review_due_at"),
+        "classification_status": status,
+        "classification_reason": reason,
+        "peer_count": peer_count,
+        "score_source": score_source,
+        "core_sector_score_eligible": eligible,
+    }
+
+def sector_group_for(code, name=None, industry=None):
+    c = classification_for(code, name=name, industry=industry)
+    return c["primary_group"] if c["core_sector_score_eligible"] else None
+
+def sector_confidence_for(code, name=None, industry=None):
+    return classification_for(code, name=name, industry=industry)["primary_group_confidence"]
 
 def taxonomy_stats():
-    eligible=sum(1 for code in CODE_TO_GROUP if classification_for(code)['core_sector_score_eligible'])
-    return {'taxonomy_version':TAXONOMY_VERSION,'registry_entries':len(set(CODE_TO_GROUP)|SECONDARY_ONLY),'primary_groups':len(PRIMARY_GROUPS),
-        'eligible_primary_codes':eligible,'primary_group_min_confidence':PRIMARY_GROUP_MIN_CONFIDENCE,'secondary_group_min_confidence':SECONDARY_GROUP_MIN_CONFIDENCE,
-        'primary_group_min_peers':PRIMARY_GROUP_MIN_PEERS,'group_sizes':dict(sorted(GROUP_SIZES.items()))}
+    statuses = Counter()
+    evidence = Counter()
+    eligible = 0
+    primary_with_evidence = 0
+    for code, rec in CODE_TO_RECORD.items():
+        c = classification_for(code)
+        statuses[c["classification_status"]] += 1
+        evidence[c["evidence_quality"]] += 1
+        if c["core_sector_score_eligible"]:
+            eligible += 1
+        if c["primary_group"] and c["evidence_urls_or_refs"]:
+            primary_with_evidence += 1
+    return {
+        "taxonomy_version": TAXONOMY_VERSION,
+        "registry_path": str(REGISTRY_PATH.relative_to(ROOT)),
+        "registry_entries": len(CODE_TO_RECORD),
+        "primary_groups": len(PRIMARY_GROUPS),
+        "eligible_primary_codes": eligible,
+        "primary_codes_with_evidence": primary_with_evidence,
+        "primary_group_min_confidence": PRIMARY_GROUP_MIN_CONFIDENCE,
+        "secondary_group_min_confidence": SECONDARY_GROUP_MIN_CONFIDENCE,
+        "primary_group_min_peers": PRIMARY_GROUP_MIN_PEERS,
+        "review_days": REVIEW_DAYS,
+        "registry_statuses_without_runtime_industry": dict(sorted(statuses.items())),
+        "evidence_quality_counts": dict(sorted(evidence.items())),
+        "group_sizes": dict(sorted(GROUP_SIZES.items())),
+    }

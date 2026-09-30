@@ -1,0 +1,15 @@
+{
+  "taxonomy_version": "2.1.0",
+  "lifecycle_labels": {"OBSERVE": "觀察", "SETUP": "蓄勢待發", "LAUNCH": "剛啟動", "TREND": "趨勢持有", "PULLBACK_TEST": "回踩觀察", "PULLBACK_CONFIRMED": "回踩承接", "WEAKENING": "轉弱警戒", "FAILED": "結構失效"},
+  "action_labels": {"WATCH": "觀察", "WAIT_TRIGGER": "等觸發", "SMALL_TEST": "小量試單候選", "WAIT_PULLBACK": "等回踩", "HOLD": "續抱", "ADD_ON_CONFIRM": "確認後加碼候選", "DO_NOT_CHASE": "過熱不追", "REDUCE_WATCH": "減碼觀察", "EXIT_PRIORITY": "優先出場", "DATA_STALE": "資料失效"},
+  "classification_policy": {
+    "primary_group_min_confidence": 80,
+    "secondary_group_min_confidence": 70,
+    "primary_group_min_peers": 3,
+    "primary_group_must_be_unique": true,
+    "theme_is_core_score": false,
+    "unknown_classification_is_zero": false,
+    "official_industry_proxy_max_points_close": 6,
+    "review_days": 180
+  }
+}
