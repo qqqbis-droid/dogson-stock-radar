@@ -1,1 +1,1 @@
-2026-09-29T12:05:00+08:00 manual refresh after full-candidate and stale-close fixes
+2026-09-30T20:20:00+08:00 deploy close ranking: bucket > swing quality > entry position > confidence > code
