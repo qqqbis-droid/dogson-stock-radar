@@ -225,6 +225,20 @@ def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, mar
     primary_group = taxonomy.get("primary_group") if taxonomy.get("core_sector_score_eligible") else None
     secondary_groups = [x.get("group") for x in taxonomy.get("secondary_groups") or [] if x.get("group")]
     theme_tags = list(taxonomy.get("theme_tags") or [])
+    taxonomy_meta = {
+        "version": str(taxonomy.get("taxonomy_version") or "unknown"),
+        "classification_status": str(taxonomy.get("classification_status") or "UNCLASSIFIED"),
+        "evidence_status": str(taxonomy.get("evidence_status") or "NO_EXTERNAL_EVIDENCE"),
+        "score_source": str(taxonomy.get("score_source") or "NONE"),
+        "core_sector_score_eligible": bool(taxonomy.get("core_sector_score_eligible")),
+        "peer_count": int(taxonomy.get("peer_count")) if taxonomy.get("peer_count") is not None else None,
+        "primary_group_confidence": num(taxonomy.get("primary_group_confidence")),
+        "evidence_quality": str(taxonomy.get("evidence_quality") or "UNSPECIFIED"),
+        "evidence_urls_or_refs": [str(x) for x in taxonomy.get("evidence_urls_or_refs") or []],
+        "last_reviewed_at": taxonomy.get("last_reviewed_at"),
+        "review_due_at": taxonomy.get("review_due_at"),
+        "classification_reason": taxonomy.get("classification_reason"),
+    }
 
     return {
         "schema_version": "2.0.0",
@@ -254,6 +268,7 @@ def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, mar
         "primary_group": primary_group,
         "secondary_groups": secondary_groups,
         "theme_tags": theme_tags,
+        "taxonomy": taxonomy_meta,
         "quote": quote,
         "scores": {
             "swing_quality_score": score,
