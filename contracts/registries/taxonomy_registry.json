@@ -10,8 +10,7 @@
     "theme_is_core_score": false,
     "unknown_classification_is_zero": false,
     "official_industry_proxy_max_points_close": 6,
-    "official_industry_core_codes": ["01", "08", "09", "10", "11", "15", "17", "23"],
-    "official_industry_core_confidence": 100,
+    "official_industry_can_grant_full_core_score": false,
     "review_days": 180
   }
 }
