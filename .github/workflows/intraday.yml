@@ -6,6 +6,11 @@ on:
     paths:
       - "scripts/build_data.py"
       - "scripts/bridge_intraday.py"
+      - "scripts/bridge_intraday_fast.py"
+      - "scripts/normalize_intraday_clock.py"
+      - "scripts/validate_intraday_fast_publish.py"
+      - "scripts/publish_v2_companions.py"
+      - "scripts/verify_v2_intraday.py"
       - "scripts/sync_live_data.py"
       - "scripts/build_validation.py"
       - "scripts/build_daytrade.py"
@@ -19,9 +24,9 @@ on:
       - "api/quote.js"
       - ".github/workflows/intraday.yml"
   schedule:
-    # 台灣時間約 09:00~13:59；GitHub cron 可能延遲數分鐘。
+    # Fast quote lane: 台灣時間約 09:00~13:59，每 5 分鐘抓官方 MIS。
     - cron: "*/5 1-5 * * 1-5"
-    # 收盤後再做一次 final snapshot，避免最後一輪盤中更新失敗時整天停在舊交易日。
+    # Deep final audit: 台灣時間 14:10，重建 Yahoo/MIS 橋接與 60 分結構。
     - cron: "10 6 * * 1-5"
 
 permissions:
@@ -29,14 +34,16 @@ permissions:
   pages: write
   id-token: write
 
+# Fresh scheduled quotes are more valuable than finishing an older queued tick.
+# This prevents a 5-minute cron backlog from surfacing 10~20 minute old pages.
 concurrency:
   group: dogson-pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   intraday:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 12
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -48,145 +55,67 @@ jobs:
           cache: "pip"
       - run: pip install -r requirements.txt
 
-      - name: Preserve latest published close/chip files before intraday deploy
+      - name: Preserve latest published close/chip/structure files
         run: python scripts/sync_live_data.py
 
-      - name: Refresh intraday data
-        run: python scripts/bridge_intraday.py
-
-      - name: Normalize intraday source date and data clock
+      - name: Choose intraday lane
+        id: lane
         shell: bash
         run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          p=Path('docs/data/intraday.json')
-          obj=json.loads(p.read_text(encoding='utf-8'))
-          rows=[r for r in (obj.get('rows') or []) if isinstance(r,dict)]
-          bridge=obj.get('bridge') or {}; qlayer=obj.get('quote_layer') or {}
-          dates=[]
-          for v in (bridge.get('trade_date'), obj.get('trade_date')):
-              s=str(v or '')[:10]
-              if len(s)==10: dates.append(s)
-          for r in rows:
-              s=str(r.get('quote_date') or r.get('market_trade_date') or r.get('date') or '')[:10]
-              if len(s)==10: dates.append(s)
-          if not dates: raise SystemExit('intraday effective trade date missing')
-          effective=max(dates)
-          clocks=[]
-          for v in (bridge.get('latest_quote_time'), qlayer.get('latest_time'), bridge.get('latest_trade_time'), qlayer.get('latest_trade_time')):
-              s=str(v or '').strip()
-              if ':' in s: clocks.append(s[:8] if len(s)>=8 else s[:5]+':00')
-          for r in rows:
-              if str(r.get('quote_date') or '')[:10] != effective: continue
-              for k in ('quote_snapshot_time','quote_time','structure_time'):
-                  s=str(r.get(k) or '').strip()
-                  if ':' in s: clocks.append(s[:8] if len(s)>=8 else s[:5]+':00')
-          latest=max(clocks) if clocks else '13:30:00'; as_of=f'{effective}T{latest}+08:00'
-          obj['trade_date']=effective; obj['source_trade_date']=effective; obj['as_of']=as_of; obj['source_updated_at']=as_of
-          p.write_text(json.dumps(obj,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
-          print('intraday normalized:', effective, as_of, 'rows=',len(rows))
-          PY
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "schedule" && "${{ github.event.schedule }}" == "10 6 * * 1-5" ]]; then
+            mode=deep
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            mode=deep
+          else
+            mode=fast
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "Intraday lane: $mode"
+
+      - name: Refresh official MIS quote layer (fast lane)
+        if: ${{ steps.lane.outputs.mode == 'fast' }}
+        run: python scripts/bridge_intraday_fast.py
+
+      - name: Refresh full Yahoo/MIS 5m structure (deep lane)
+        if: ${{ steps.lane.outputs.mode == 'deep' }}
+        run: python scripts/bridge_intraday.py
 
       - name: Build daytrade data
         run: python scripts/build_daytrade.py
 
-      - name: Normalize daytrade source date and data clock
-        shell: bash
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          ip=Path('docs/data/intraday.json'); dp=Path('docs/data/daytrade.json')
-          intra=json.loads(ip.read_text(encoding='utf-8')); day=json.loads(dp.read_text(encoding='utf-8'))
-          td=str(intra.get('trade_date') or '')[:10]; asof=str(intra.get('as_of') or '')
-          if len(td)!=10 or not asof.startswith(td): raise SystemExit(f'invalid normalized intraday metadata: {td} / {asof}')
-          day['trade_date']=td; day['source_trade_date']=td; day['as_of']=asof; day['source_updated_at']=asof
-          dp.write_text(json.dumps(day,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
-          print('daytrade normalized:', td, asof)
-          PY
+      - name: Normalize mission date and data clock
+        run: python scripts/normalize_intraday_clock.py
 
+      # Expensive lifecycle/history work no longer blocks every 5-minute quote tick.
       - name: Build 60m lifecycle + entry-position lights
+        if: ${{ steps.lane.outputs.mode == 'deep' }}
         run: python scripts/build_hourly.py
 
       - name: Archive signals + resolve real outcomes
+        if: ${{ steps.lane.outputs.mode == 'deep' }}
         run: python scripts/build_validation.py --mode intraday
 
       - name: Build canonical data status
         run: python scripts/build_system_status.py
 
-      - name: Contract freshness gate - never publish stale intraday as current
+      - name: Fast quote freshness gate
+        if: ${{ steps.lane.outputs.mode == 'fast' }}
+        run: python scripts/validate_intraday_fast_publish.py
+
+      - name: Full intraday freshness gate
+        if: ${{ steps.lane.outputs.mode == 'deep' }}
         run: python scripts/validate_intraday_publish.py
 
       - name: Build and validate Clean Build 2.0 Atomic Bundle
         shell: bash
         run: bash scripts/include_v2_pages.sh
 
-      - name: Publish V2 UI companions for this Atomic Build
-        run: |
-          python - <<'PY'
-          import json
-          from collections import defaultdict
-          from pathlib import Path
-          def load(p): return json.loads(Path(p).read_text(encoding='utf-8'))
-          def rows_of(x):
-              if isinstance(x,list): return x
-              if isinstance(x,dict):
-                  for k in ('rows','items','data','stocks','results'):
-                      if isinstance(x.get(k),list): return x[k]
-              return []
-          def date_of(x, rows):
-              dates=[]
-              if isinstance(x,dict):
-                  for k in ('trade_date','date'):
-                      v=x.get(k)
-                      if isinstance(v,str) and len(v)>=10: dates.append(v[:10])
-              for r in rows:
-                  v=str(r.get('quote_date') or r.get('market_trade_date') or r.get('date') or '')[:10]
-                  if len(v)==10: dates.append(v)
-              return max(dates) if dates else None
-          def group_of(r): return str(r.get('sector_group') or r.get('industry_name') or r.get('industry') or '未分類').strip() or '未分類'
-          def member_map(payload):
-              rows=rows_of(payload); groups=defaultdict(list); seen=defaultdict(set)
-              for r in rows:
-                  code=str(r.get('code') or '').strip()
-                  if not code: continue
-                  g=group_of(r)
-                  if code in seen[g]: continue
-                  seen[g].add(code); groups[g].append({'code':code,'name':str(r.get('name') or '').strip()})
-              for g in groups: groups[g].sort(key=lambda x:x['code'])
-              return {'trade_date':date_of(payload,rows),'groups':dict(groups)}
-          root=Path('docs/v2/data'); manifest=load(root/'current_manifest.json'); market=load('docs/data/market.json'); close=load('docs/data/close.json'); intraday=load('docs/data/intraday.json')
-          (root/'market-detail.json').write_text(json.dumps({'schema_version':'1.0.0','build_id':manifest['active_build_id'],'trade_date':market.get('trade_date'),'payload':market},ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8')
-          members={'schema_version':'1.0.0','build_id':manifest['active_build_id'],'close':member_map(close),'intraday':member_map(intraday)}
-          (root/'sector-members.json').write_text(json.dumps(members,ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8')
-          print('V2 companions:', manifest['active_build_id'], manifest['trade_date'], manifest['session_phase'], members['intraday']['trade_date'])
-          PY
+      - name: Publish V2 UI companions
+        run: python scripts/publish_v2_companions.py
 
       - name: Verify V2 source date, zones and detail evidence
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          def load(p): return json.loads(Path(p).read_text(encoding='utf-8'))
-          def resolve(root,url):
-              raw=str(url or '')
-              return root/raw[len('./data/'):] if raw.startswith('./data/') else root/raw.lstrip('./')
-          src=load('docs/data/intraday.json'); day=load('docs/data/daytrade.json'); close=load('docs/data/close.json'); root=Path('docs/v2/data'); m=load(root/'current_manifest.json')
-          src_date=str(src.get('trade_date') or '')[:10]; day_date=str(day.get('trade_date') or day.get('source_trade_date') or '')[:10]; close_date=str(close.get('trade_date') or '')[:10]
-          intra=m['datasets']['decision_intraday_summary']; daymeta=m['datasets']['decision_daytrade_summary']; v2_i=str(intra.get('as_of') or '')[:10]; v2_d=str(daymeta.get('as_of') or '')[:10]
-          print('source intraday:', src_date, src.get('as_of')); print('source daytrade:', day_date, day.get('as_of')); print('source close:', close_date); print('V2 active:', m['active_build_id']); print('V2 phase/date:', m['session_phase'], m['trade_date']); print('V2 intraday as_of:', intra.get('as_of')); print('V2 daytrade as_of:', daymeta.get('as_of'))
-          if not src_date or src_date != day_date: raise SystemExit('source intraday/daytrade dates disagree')
-          if v2_i != src_date or v2_d != src_date: raise SystemExit(f'V2 source-date mismatch: source={src_date} intraday={v2_i} daytrade={v2_d}')
-          if close_date and src_date < close_date: raise SystemExit(f'intraday {src_date} older than latest completed close {close_date}')
-          required=('market_intraday_context','market_close_context','capital_intraday_context','capital_close_context','zone_intraday','zone_close','zone_daytrade','stock_detail_intraday','stock_detail_close','stock_detail_daytrade')
-          missing=[k for k in required if k not in m.get('datasets',{})]
-          if missing: raise SystemExit(f'missing mission datasets: {missing}')
-          for key in ('zone_intraday','zone_close','zone_daytrade','stock_detail_intraday','stock_detail_close','stock_detail_daytrade'):
-              p=resolve(root,m['datasets'][key]['url'])
-              if not p.is_file() or p.stat().st_size==0: raise SystemExit(f'{key} missing from active build: {p}')
-          print('V2 stock detail bundle verified')
-          PY
+        run: python scripts/verify_v2_intraday.py
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
