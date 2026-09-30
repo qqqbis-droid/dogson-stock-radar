@@ -49,7 +49,8 @@ COMMON = (
     "code", "name", "market", "industry_name", "sector_group", "close", "high", "low", "day_change",
     "volume", "avg_volume20", "avg_turnover20", "avg_turnover20_mn", "vol_x", "vwap", "vwap_dist", "pace", "ret15", "ret60",
     "current_turnover", "recent_turnover", "previous_turnover", "quote_bid1", "quote_ask1", "quote_volume_lots",
-    "amplitude_pct", "range_position_pct", "amplitude_regime", "stage_reason", "structure_confidence",
+    "quote_date", "quote_time", "quote_snapshot_time", "quote_source", "quote_carried", "quote_has_trade",
+    "amplitude_pct", "range_position_pct", "amplitude_regime", "stage_reason", "structure_confidence", "structure_time",
     "chip_background", "chip_score", "chip_coverage_pct", "sector_score", "sector_score_source", "sector_score_label",
     "sector_hot_count", "industry_hot_count", "sector_hot_ratio", "liquidity_level",
     "support", "resistance", "reasons", "overheat_reasons", "stage_signals", "stage_risks",
@@ -60,8 +61,8 @@ CLOSE = (
     "margin_3d_pct", "margin_status", "swing_components", "sector_detail",
 )
 INTRADAY = (
-    "intraday_score", "intraday_components", "multi_timeframe", "relative_multiframe", "structure_source",
-    "structure_volume_verified", "dynamic_thresholds",
+    "intraday_score", "intraday_components", "technical_score", "trend5", "break3", "break12",
+    "multi_timeframe", "relative_multiframe", "structure_source", "structure_volume_verified", "dynamic_thresholds",
 )
 DAYTRADE = (
     "daytrade_score", "daytrade_state", "daytrade_headline", "daytrade_components", "daytrade_reasons",
@@ -119,7 +120,7 @@ def enrich(*, legacy_root: Path, root: Path):
         counts[context] = len(items)
 
     warnings = manifest.setdefault("health", {}).setdefault("warnings", [])
-    note = "個股詳情已分任務補入同 Atomic Build 的盤中／盤後／當沖證據快照；V4 額外保留評分可解釋欄位，不由前端重算 Engine 分數。"
+    note = "個股詳情已分任務補入同 Atomic Build 的盤中／盤後／當沖證據快照；評分解釋只呈現 Engine 已算出的分項，不由前端重算。"
     if note not in warnings:
         warnings.append(note)
     write(manifest_path, manifest)
