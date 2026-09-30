@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -61,6 +63,28 @@ def main():
         if "MutationObserver" in text:
             errors.append(f"single-writer renderer must not use MutationObserver: {name}")
 
+    # Production release gate: every active first-party JS module must parse.
+    # This is deliberately kept inside the shared validator so all publishing
+    # workflows get the same protection instead of relying on workflow-specific
+    # node --check lists that can drift over time.
+    node = shutil.which("node")
+    if not node:
+        errors.append("node executable unavailable; cannot syntax-check active UI")
+    else:
+        for name in sorted(REQUIRED):
+            path = ROOT / "docs" / "v2" / name
+            if not path.is_file():
+                continue
+            proc = subprocess.run(
+                [node, "--check", str(path)],
+                capture_output=True,
+                text=True,
+                cwd=ROOT,
+            )
+            if proc.returncode != 0:
+                msg = (proc.stderr or proc.stdout or "syntax error").strip().splitlines()[-1]
+                errors.append(f"active UI syntax failed {name}: {msg}")
+
     mounts = {
         "marketSummary": "market-capital-renderer.js",
         "sectorList": "market-capital-renderer.js",
@@ -86,6 +110,7 @@ def main():
         "detail_owner": "stock-detail-renderer.js",
         "portfolio_owner": "portfolio-renderer.js",
         "portfolio_storage": "browser-local-only",
+        "syntax_checked": sorted(REQUIRED),
         "deprecated_overlays_active": [],
     })
 
