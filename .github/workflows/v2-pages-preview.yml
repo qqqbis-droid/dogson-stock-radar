@@ -11,6 +11,7 @@ on:
       - 'docs/v2/data/current_manifest.json'
       - 'docs/v2/data/market-detail.json'
       - 'docs/v2/data/sector-members.json'
+      - 'scripts/v2/*.py'
       - 'vercel.json'
       - '.github/workflows/v2-pages-preview.yml'
 
@@ -41,7 +42,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate V2 browser modules
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate V2 browser modules and score normalizer
         run: |
           node --check v2src/docs/v2/data-source.js
           node --check v2src/docs/v2/app.js
@@ -50,16 +54,17 @@ jobs:
           node --check v2src/docs/v2/tradeplan-ui.js
           node --check v2src/docs/v2/case-ui.js
           node --check v2src/docs/v2/ux-detail.js
+          node --check v2src/docs/v2/detail-context-v3.js
+          node --check v2src/docs/v2/card-display-v3.js
+          node --check v2src/docs/v2/score-explain-v4.js
+          python -m py_compile v2src/scripts/v2/normalize_close_snapshot.py
+          python -m py_compile v2src/scripts/v2/enrich_stock_detail_context.py
       - name: Compose Pages artifact without replacing production root
         run: |
           set -euo pipefail
           mkdir -p _site
           cp -a mainsrc/docs/. _site/
 
-          # The legacy production worker owns the whole repository scope. Without
-          # this guard it also intercepts /v2/ navigations, transforms V2 HTML as
-          # legacy HTML and may fall back to the old cached index. Keep legacy
-          # behavior for production root, but let every /v2/ request bypass it.
           python - <<'PY'
           from pathlib import Path
           p = Path('_site/sw.js')
@@ -78,8 +83,6 @@ jobs:
           mkdir -p _site/v2
           rsync -a --exclude 'data/' v2src/docs/v2/ _site/v2/
 
-          # Ship the active validated V2 bundle on the same origin. This avoids
-          # iOS/Safari depending on raw.githubusercontent.com for normal boot.
           mkdir -p _site/v2/data/builds
           cp v2src/docs/v2/data/current_manifest.json _site/v2/data/current_manifest.json
           test -f v2src/docs/v2/data/market-detail.json && cp v2src/docs/v2/data/market-detail.json _site/v2/data/market-detail.json
@@ -98,6 +101,7 @@ jobs:
           test -f _site/v2/index.html
           test -f _site/v2/data-source.js
           test -f _site/v2/ux-detail.js
+          test -f _site/v2/score-explain-v4.js
           test -f _site/v2/data/current_manifest.json
           test -f "_site/v2/data/builds/$ACTIVE_BUILD/market-summary.json"
           echo "Production root source: main/docs"
