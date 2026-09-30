@@ -49,6 +49,7 @@ jobs:
         working-directory: v2src
         run: |
           node --check docs/v2/data-source.js
+          node --check docs/v2/universe-search.js
           node --check docs/v2/app.js
           node --check docs/v2/market-capital-renderer.js
           node --check docs/v2/stock-detail-renderer.js
@@ -59,6 +60,7 @@ jobs:
           python -m py_compile scripts/v2/enrich_stock_detail_context.py
           python -m py_compile scripts/v2/validate_mission_evidence.py
           python -m py_compile scripts/v2/rebuild_close_rank_views.py
+          python -m py_compile scripts/v2/build_radar_stats.py
       - name: Compose Pages artifact without replacing production root
         run: |
           set -euo pipefail
@@ -99,6 +101,7 @@ jobs:
 
           test -f _site/index.html
           test -f _site/v2/index.html
+          test -f _site/v2/universe-search.js
           test -f _site/v2/app.js
           test -f _site/v2/market-capital-renderer.js
           test -f _site/v2/stock-detail-renderer.js
