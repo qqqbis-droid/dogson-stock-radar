@@ -11,7 +11,7 @@
     "bump_policy"
   ],
   "properties": {
-    "registry_version": {"const": "2.0.0"},
+    "registry_version": {"const": "2.1.0"},
     "status": {"const": "frozen"},
     "active_version_set_id": {"type": "string", "minLength": 1},
     "version_sets": {
