@@ -1,0 +1,50 @@
+name: Sector Taxonomy 2.1 Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "contracts/registries/taxonomy_registry.json"
+      - "contracts/registries/sector_registry.json"
+      - "contracts/schemas/sector-registry.schema.json"
+      - "scripts/sector_groups.py"
+      - "scripts/v2/validate_sector_registry.py"
+      - "docs/data/universe.json"
+      - "docs/data/close.json"
+  pull_request:
+    paths:
+      - "contracts/registries/taxonomy_registry.json"
+      - "contracts/registries/sector_registry.json"
+      - "contracts/schemas/sector-registry.schema.json"
+      - "scripts/sector_groups.py"
+      - "scripts/v2/validate_sector_registry.py"
+
+permissions:
+  contents: read
+
+jobs:
+  taxonomy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate canonical sector registry and coverage
+        run: python scripts/v2/validate_sector_registry.py
+      - name: Verify production resolver invariants
+        run: |
+          python - <<'PY'
+          from scripts.sector_groups import classification_for, taxonomy_stats
+          stats = taxonomy_stats()
+          print(stats)
+          if stats.get('taxonomy_version') != '2.1.0':
+              raise SystemExit('taxonomy version mismatch')
+          if int(stats.get('eligible_primary_codes') or 0) < 200:
+              raise SystemExit('eligible primary coverage unexpectedly low')
+          if classification_for('2379', industry='24').get('primary_group') != 'IC設計':
+              raise SystemExit('2379 primary-group regression')
+          if classification_for('1303', industry='03').get('core_sector_score_eligible'):
+              raise SystemExit('1303 diversified-company guard regression')
+          PY
