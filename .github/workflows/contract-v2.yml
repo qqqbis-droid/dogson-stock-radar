@@ -5,12 +5,17 @@ on:
     branches: [ clean-build-v2 ]
     paths:
       - 'contracts/**'
+      - 'scripts/sector_groups.py'
+      - 'scripts/v2/legacy_adapter.py'
       - 'requirements-contract.txt'
       - '.github/workflows/contract-v2.yml'
   pull_request:
     paths:
       - 'contracts/**'
+      - 'scripts/sector_groups.py'
+      - 'scripts/v2/legacy_adapter.py'
       - 'requirements-contract.txt'
+      - '.github/workflows/contract-v2.yml'
 
 jobs:
   contract:
