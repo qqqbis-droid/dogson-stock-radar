@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """Verify that V2 intraday/daytrade contexts match the source just published."""
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 
@@ -12,6 +14,19 @@ def load(p):
 def resolve(root, url):
     raw = str(url or "")
     return root / (raw[len("./data/"):] if raw.startswith("./data/") else raw.lstrip("./"))
+
+
+def run_mission_gate(mission):
+    gate = Path("scripts/v2/validate_mission_evidence.py")
+    if not gate.is_file():
+        raise SystemExit(f"mission evidence validator missing after V2 overlay: {gate}")
+    subprocess.run([
+        sys.executable,
+        str(gate),
+        "--root", "docs/v2/data",
+        "--legacy-root", "docs/data",
+        "--mission", mission,
+    ], check=True)
 
 
 def main():
@@ -52,7 +67,13 @@ def main():
         p = resolve(root, m["datasets"][key]["url"])
         if not p.is_file() or p.stat().st_size == 0:
             raise SystemExit(f"{key} missing from active build: {p}")
-    print("V2 stock detail bundle verified")
+
+    # Stronger P0 gate: existence is not enough. Detail, evidence and zones must
+    # be bound to the same Atomic Build, and stale structure can never coexist
+    # with actionable intraday/daytrade decisions.
+    run_mission_gate("intraday")
+    run_mission_gate("daytrade")
+    print("V2 stock detail/evidence bundle verified")
 
 
 if __name__ == "__main__":
