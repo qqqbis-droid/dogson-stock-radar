@@ -37,17 +37,16 @@ jobs:
         run: python scripts/v2/build_bundle.py --demo
       - name: Validate atomic bundle
         run: python scripts/v2/validate_bundle.py
-      - name: Syntax check UI modules
+      - name: Syntax and single-writer UI gate
         run: |
           node --check docs/v2/data-source.js
           node --check docs/v2/app.js
-          node --check docs/v2/quote-ui.js
-          node --check docs/v2/components-ui.js
-          node --check docs/v2/tradeplan-ui.js
-          node --check docs/v2/case-ui.js
-          node --check docs/v2/detail-context-v2.js
-          node --check docs/v2/detail-context-v3.js
-          node --check docs/v2/card-display-v3.js
+          node --check docs/v2/market-capital-renderer.js
+          node --check docs/v2/stock-detail-renderer.js
+          node --check docs/v2/radar-transparency-v7.js
+          python scripts/v2/validate_single_writer_ui.py
+          python -m py_compile scripts/v2/validate_mission_evidence.py
+          python -m py_compile scripts/v2/rebuild_close_rank_views.py
       - name: Upload preview artifact
         uses: actions/upload-artifact@v4
         with:
