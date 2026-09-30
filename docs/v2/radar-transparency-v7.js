@@ -3,7 +3,7 @@ const r7esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':
 const r7view=()=>document.querySelector('.tab.active')?.dataset.view||'intraday';
 const R7CFG={
  intraday:{index:'decision_intraday_index',title:'盤中排序',rule:'先依機會狀態：觸發就緒 → 等待觸發 → 趨勢追蹤 → 等待回踩 → 研究觀察 → 風險；同一層再按「盤中動能」高到低，其次資料信心高到低，最後股票代號。'},
- close:{index:'decision_close_index',title:'盤後排序',rule:'先依機會狀態：明日候選 → 突破觀察 → 回踩觀察 → 趨勢品質 → 研究觀察 → 風險；同一層再按「進場位置」高到低，其次資料信心高到低，最後股票代號。'},
+ close:{index:'decision_close_index',title:'盤後排序',rule:'先依機會狀態：明日候選 → 突破觀察 → 回踩觀察 → 趨勢品質 → 研究觀察 → 風險；同一層先按「波段品質」高到低，再按「進場位置」高到低，其次資料信心高到低，最後股票代號。'},
  daytrade:{index:'decision_daytrade_index',title:'當沖排序',rule:'先依機會狀態：可執行 → 等待觸發 → 不交易 → 資料失效；同一層再按「當沖分」高到低，其次資料信心高到低，最後股票代號。'}
 };
 async function r7json(url){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error(`${url} ${r.status}`);return r.json()}
