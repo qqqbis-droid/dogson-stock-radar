@@ -27,16 +27,18 @@ python scripts/v2/stamp_version_contract.py --root docs/v2/data
 python scripts/v2/validate_bundle.py --root docs/v2/data
 python scripts/v2/validate_market_capital_context.py --root docs/v2/data
 
+# Production UI is deliberately single-writer. Old overlay files may remain in
+# git history, but they must not be loaded by index.html or use MutationObserver
+# against production-owned DOM regions.
 node --check docs/v2/app.js
-node --check docs/v2/detail-context-v3.js
-node --check docs/v2/card-display-v3.js
-node --check docs/v2/market-capital-ui.js
-node --check docs/v2/score-explain-v4.js
+node --check docs/v2/market-capital-renderer.js
+node --check docs/v2/stock-detail-renderer.js
 node --check docs/v2/radar-transparency-v7.js
-node --check docs/v2/ui-coherence-v5.js
-node --check docs/v2/copy-polish-v6.js
+python scripts/v2/validate_single_writer_ui.py
 python -m py_compile scripts/v2/enrich_stock_detail_context.py
 python -m py_compile scripts/v2/restore_market_capital_context.py
+python -m py_compile scripts/v2/validate_mission_evidence.py
+python -m py_compile scripts/v2/rebuild_close_rank_views.py
 
 python - <<'PY'
 import json
