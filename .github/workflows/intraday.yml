@@ -7,6 +7,7 @@ on:
       - "scripts/build_data.py"
       - "scripts/bridge_intraday.py"
       - "scripts/bridge_intraday_fast.py"
+      - "scripts/run_bridge_intraday_fast.py"
       - "scripts/normalize_intraday_clock.py"
       - "scripts/validate_intraday_fast_publish.py"
       - "scripts/publish_v2_companions.py"
@@ -75,7 +76,7 @@ jobs:
 
       - name: Refresh official MIS quote layer (fast lane)
         if: ${{ steps.lane.outputs.mode == 'fast' }}
-        run: python scripts/bridge_intraday_fast.py
+        run: python scripts/run_bridge_intraday_fast.py
 
       - name: Refresh full Yahoo/MIS 5m structure (deep lane)
         if: ${{ steps.lane.outputs.mode == 'deep' }}
