@@ -32,8 +32,11 @@ node --check docs/v2/detail-context-v3.js
 node --check docs/v2/card-display-v3.js
 node --check docs/v2/market-capital-ui.js
 node --check docs/v2/score-explain-v4.js
+node --check docs/v2/radar-transparency-v7.js
 node --check docs/v2/ui-coherence-v5.js
 node --check docs/v2/copy-polish-v6.js
+python -m py_compile scripts/v2/enrich_stock_detail_context.py
+python -m py_compile scripts/v2/restore_market_capital_context.py
 
 python - <<'PY'
 import json
