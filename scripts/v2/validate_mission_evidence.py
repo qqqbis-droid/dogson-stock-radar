@@ -158,7 +158,6 @@ def check_safety(mission, decisions, now, errors):
                 if mission == "daytrade" and action in {"SMALL_TEST", "ADD_ON_CONFIRM", "HOLD"}:
                     errors.append(f"daytrade:{code} executable action while not LIVE: {action}")
             elif not live_clock:
-                # LIVE payload outside the exchange live window is semantically unsafe.
                 errors.append(f"{mission}:{code} marked LIVE outside live clock")
         else:
             if fresh in {"STALE", "UNKNOWN"} and actionable:
@@ -187,6 +186,7 @@ def validate_one(root: Path, legacy_root: Path, manifest: dict, mission: str):
         raise SystemExit(f"mission evidence gate: {mission} zones empty")
 
     errors = []
+    warnings = []
     missing_stock = sorted(set(decisions) - set(stock))
     if missing_stock:
         errors.append(f"missing stock detail {missing_stock[:20]}")
@@ -217,7 +217,6 @@ def validate_one(root: Path, legacy_root: Path, manifest: dict, mission: str):
     quote_age = None
     structure_age = None
     if mission in {"intraday", "daytrade"}:
-        # daytrade shares the same live quote/structure context as intraday.
         intraday_source_path = legacy_root / "intraday.json"
         intraday_source = load(intraday_source_path) if intraday_source_path.is_file() else source
         qdt = source_asof(intraday_source)
@@ -233,8 +232,16 @@ def validate_one(root: Path, legacy_root: Path, manifest: dict, mission: str):
                 errors.append(f"live source is not today: {source_date(intraday_source)}")
             if qdt is None or quote_age is None or quote_age > MAX_QUOTE_AGE_SEC:
                 errors.append(f"live quote too old/missing: {quote_age}s")
-            if sdt is None or structure_age is None or structure_age > MAX_STRUCTURE_AGE_SEC:
-                errors.append(f"live structure too old/missing: {structure_age}s")
+
+            structure_stale = sdt is None or structure_age is None or structure_age > MAX_STRUCTURE_AGE_SEC
+            if structure_stale:
+                actionable = [str(code) for code, row in decisions.items() if isinstance(row, dict) and row.get("actionable")]
+                if actionable:
+                    errors.append(
+                        f"live structure old/missing ({structure_age}s) while actionable rows exist: {actionable[:10]}"
+                    )
+                else:
+                    warnings.append(f"structure is delayed ({structure_age}s); quote may publish because decisions fail closed")
 
     report = {
         "mission": mission,
@@ -247,6 +254,7 @@ def validate_one(root: Path, legacy_root: Path, manifest: dict, mission: str):
         "quote_age_sec": round(quote_age, 1) if quote_age is not None else None,
         "structure_age_sec": round(structure_age, 1) if structure_age is not None else None,
         "ok": not errors,
+        "warnings": warnings,
         "errors": errors,
     }
     print(json.dumps(report, ensure_ascii=False))
