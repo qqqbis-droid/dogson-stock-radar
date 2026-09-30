@@ -1,6 +1,6 @@
 const CP6={timer:null};
 const cp6num=v=>v==null||v===''||!Number.isFinite(Number(v))?null:Number(v);
-function cp6trimNumbers(text){return String(text??'').replace(/-?\d+\.\d{3,}/g,m=>{const n=Number(m);if(!Number.isFinite(n))return m;return n.toLocaleString('zh-TW',{maximumFractionDigits:2})})}
+function cp6trimNumbers(text){return String(text??'').replace(/-?\d+\.\d+/g,m=>m.replace(/(\.\d*?[1-9])0+$/,'$1').replace(/\.0+$/,''))}
 function cp6phrase(text){let s=cp6trimNumbers(text);
   s=s.replace(/明日第一確認點是\s*([^；。]+)[；；]\s*未站穩前不視為突破完成。?/g,'明天先看 $1 能不能站穩；沒站穩就先當作還沒突破。');
   s=s.replace(/明日量能維持並站穩\s*([^，。]+)[，,]\s*才升級為突破確認。?/g,'明天若量能維持、股價站穩 $1，再視為突破確認。');
@@ -14,8 +14,8 @@ function cp6phrase(text){let s=cp6trimNumbers(text);
 }
 function cp6reason(text){let s=cp6trimNumbers(text).trim();
   s=s.replace(/^20日突破$/,'突破20日高點').replace(/^3日突破$/,'突破近3日高點');
-  s=s.replace(/^量比\s*([\d.]+)x$/i,(_,x)=>`量能約平常 ${x} 倍`);
-  s=s.replace(/^距20MA\s*([+-]?[\d.]+%)$/i,(_,x)=>`距20日線 ${x}`);
+  s=s.replace(/^量比\s*([\d.]+)x$/i,(_,x)=>`量能約平常 ${cp6trimNumbers(x)} 倍`);
+  s=s.replace(/^距20MA\s*([+-]?[\d.]+%)$/i,(_,x)=>`距20日線 ${cp6trimNumbers(x)}`);
   s=s.replace(/^均線多頭$/,'短中期均線偏多');
   return s;
 }
