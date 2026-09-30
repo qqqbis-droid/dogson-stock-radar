@@ -1,14 +1,14 @@
 {
   "shadow_summary_schema_version": "1.0.0",
-  "generated_at": "2026-09-29T15:37:41+08:00",
-  "total_report_files": 6,
-  "distinct_trading_days": 3,
+  "generated_at": "2026-09-30T15:40:03+08:00",
+  "total_report_files": 7,
+  "distinct_trading_days": 4,
   "first_trade_date": "2026-09-23",
-  "latest_trade_date": "2026-09-29",
-  "latest_build_id": "cb2-legacy-20260929-da70743925",
-  "latest_status": "WARN",
+  "latest_trade_date": "2026-09-30",
+  "latest_build_id": "cb2-legacy-20260930-304f52d8c7",
+  "latest_status": "PASS",
   "daily_status_counts": {
-    "PASS": 1,
+    "PASS": 2,
     "WARN": 2
   },
   "unresolved_safety_violations": 0,
@@ -19,13 +19,13 @@
   },
   "payload": {
     "latest_initial_bytes": {
-      "intraday": 101107,
-      "close": 97156,
-      "portfolio": 62089,
-      "daytrade": 115168
+      "intraday": 101609,
+      "close": 97060,
+      "portfolio": 62032,
+      "daytrade": 114621
     },
     "max_initial_bytes": {
-      "intraday": 101149,
+      "intraday": 101609,
       "close": 98166,
       "portfolio": 62124,
       "daytrade": 115210
@@ -38,7 +38,7 @@
     "ready_for_review": false,
     "eligible_for_cutover": false,
     "blockers": [
-      "Need 17 more distinct trading-day Shadow samples to reach the minimum review window.",
+      "Need 16 more distinct trading-day Shadow samples to reach the minimum review window.",
       "Predictive threshold validation evidence and rollback verification remain separate Phase 5/6 gates."
     ]
   }
