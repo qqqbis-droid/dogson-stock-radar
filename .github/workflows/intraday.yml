@@ -8,6 +8,7 @@ on:
       - "scripts/bridge_intraday.py"
       - "scripts/bridge_intraday_fast.py"
       - "scripts/run_bridge_intraday_fast.py"
+      - "scripts/run_bridge_intraday_deep_fastmis.py"
       - "scripts/normalize_intraday_clock.py"
       - "scripts/validate_intraday_fast_publish.py"
       - "scripts/publish_v2_companions.py"
@@ -69,6 +70,8 @@ jobs:
             mode=deep
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             mode=deep
+          elif [[ "${{ github.event_name }}" == "push" && "${{ contains(github.event.head_commit.message, '[deep]') }}" == "true" ]]; then
+            mode=deep
           else
             mode=fast
           fi
@@ -81,7 +84,7 @@ jobs:
 
       - name: Refresh full Yahoo/MIS 5m structure (deep lane)
         if: ${{ steps.lane.outputs.mode == 'deep' }}
-        run: python scripts/bridge_intraday.py
+        run: python scripts/run_bridge_intraday_deep_fastmis.py
 
       - name: Build daytrade data
         run: python scripts/build_daytrade.py
