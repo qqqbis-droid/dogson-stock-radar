@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - "scripts/sector_groups.py"
       - "scripts/build_data.py"
       - "scripts/bridge_intraday.py"
       - "scripts/bridge_intraday_fast.py"
@@ -61,6 +62,16 @@ jobs:
           cache: "pip"
       - run: pip install -r requirements.txt
 
+      - name: Verify Sector Taxonomy 2.1 resolver
+        run: |
+          python - <<'PY'
+          from scripts.sector_groups import taxonomy_stats
+          stats=taxonomy_stats()
+          print('sector taxonomy:', stats)
+          if stats.get('taxonomy_version') != '2.1.0' or int(stats.get('eligible_primary_codes') or 0) < 200:
+              raise SystemExit('Sector Taxonomy gate failed')
+          PY
+
       - name: Preserve latest published close/chip/structure files
         run: python scripts/sync_live_data.py
 
@@ -98,7 +109,6 @@ jobs:
       - name: Normalize mission date and data clock
         run: python scripts/normalize_intraday_clock.py
 
-      # 60m and history/outcome work is audit-only; it must not block live quote ticks.
       - name: Build 60m lifecycle + entry-position lights
         if: ${{ steps.lane.outputs.mode == 'audit' }}
         run: python scripts/build_hourly.py

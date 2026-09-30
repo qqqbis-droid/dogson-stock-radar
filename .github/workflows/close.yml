@@ -6,6 +6,7 @@ on:
   push:
     branches: ["main"]
     paths:
+      - "scripts/sector_groups.py"
       - "scripts/chip_data.py"
       - "scripts/build_hourly.py"
       - "scripts/sync_live_data.py"
@@ -46,6 +47,19 @@ jobs:
           python-version: "3.12"
           cache: "pip"
       - run: pip install -r requirements.txt
+      - name: Verify Sector Taxonomy 2.1 resolver
+        run: |
+          python - <<'PY'
+          from scripts.sector_groups import taxonomy_stats, classification_for
+          stats=taxonomy_stats()
+          print('sector taxonomy:', stats)
+          if stats.get('taxonomy_version') != '2.1.0':
+              raise SystemExit('Sector Taxonomy version mismatch')
+          if int(stats.get('eligible_primary_codes') or 0) < 200:
+              raise SystemExit('Sector Taxonomy coverage unexpectedly low')
+          if classification_for('2379', industry='24').get('primary_group') != 'IC設計':
+              raise SystemExit('Cross-sector primary classification regression')
+          PY
       - name: Keep last live intraday/hourly data if available
         run: python scripts/sync_live_data.py || true
       - name: Build full close + chips + market with latest-session guard
@@ -171,10 +185,6 @@ jobs:
           intraday_date=str(dates.get('intraday') or '')[:10]
           daytrade_date=str(dates.get('daytrade') or '')[:10]
           if close_date and (intraday_date < close_date or daytrade_date < close_date):
-            # After-hours MIS may no longer expose the just-finished session.
-            # Do not mutate dates.  The V2 overlay gate will either preserve an
-            # already-validated same-day canonical bundle or fail closed if no
-            # such bundle exists.
             print(f'warning: root intraday/daytrade lag close after hours: close={close_date} intraday={intraday_date} daytrade={daytrade_date}')
           PY
       - name: Include Clean Build 2.0 in Pages artifact
