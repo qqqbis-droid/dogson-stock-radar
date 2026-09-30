@@ -45,20 +45,20 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Validate V2 browser modules and score normalizer
+      - name: Validate V2 single-writer browser modules and data gates
+        working-directory: v2src
         run: |
-          node --check v2src/docs/v2/data-source.js
-          node --check v2src/docs/v2/app.js
-          node --check v2src/docs/v2/quote-ui.js
-          node --check v2src/docs/v2/components-ui.js
-          node --check v2src/docs/v2/tradeplan-ui.js
-          node --check v2src/docs/v2/case-ui.js
-          node --check v2src/docs/v2/ux-detail.js
-          node --check v2src/docs/v2/detail-context-v3.js
-          node --check v2src/docs/v2/card-display-v3.js
-          node --check v2src/docs/v2/score-explain-v4.js
-          python -m py_compile v2src/scripts/v2/normalize_close_snapshot.py
-          python -m py_compile v2src/scripts/v2/enrich_stock_detail_context.py
+          node --check docs/v2/data-source.js
+          node --check docs/v2/app.js
+          node --check docs/v2/market-capital-renderer.js
+          node --check docs/v2/stock-detail-renderer.js
+          node --check docs/v2/radar-transparency-v7.js
+          python scripts/v2/validate_single_writer_ui.py
+          python -m py_compile scripts/v2/normalize_close_snapshot.py
+          python -m py_compile scripts/v2/normalize_close_snapshot_by_close_date.py
+          python -m py_compile scripts/v2/enrich_stock_detail_context.py
+          python -m py_compile scripts/v2/validate_mission_evidence.py
+          python -m py_compile scripts/v2/rebuild_close_rank_views.py
       - name: Compose Pages artifact without replacing production root
         run: |
           set -euo pipefail
@@ -99,14 +99,15 @@ jobs:
 
           test -f _site/index.html
           test -f _site/v2/index.html
-          test -f _site/v2/data-source.js
-          test -f _site/v2/ux-detail.js
-          test -f _site/v2/score-explain-v4.js
+          test -f _site/v2/app.js
+          test -f _site/v2/market-capital-renderer.js
+          test -f _site/v2/stock-detail-renderer.js
+          test -f _site/v2/radar-transparency-v7.js
           test -f _site/v2/data/current_manifest.json
           test -f "_site/v2/data/builds/$ACTIVE_BUILD/market-summary.json"
           echo "Production root source: main/docs"
           echo "Legacy SW: V2 bypass enabled"
-          echo "V2 shell: clean-build-v2/docs/v2"
+          echo "V2 shell: single-writer clean-build-v2/docs/v2"
           echo "V2 same-origin active data: $ACTIVE_BUILD"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
