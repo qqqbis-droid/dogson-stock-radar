@@ -13,6 +13,7 @@ INDEX = ROOT / "docs" / "v2" / "index.html"
 REQUIRED = {
     "app.js",
     "market-capital-renderer.js",
+    "sector-ranking-panel.js",
     "stock-detail-renderer.js",
     "portfolio-store.js",
     "portfolio-renderer.js",
@@ -42,6 +43,7 @@ FORBIDDEN_ACTIVE = {
 SINGLE_WRITER_FILES = {
     "app.js",
     "market-capital-renderer.js",
+    "sector-ranking-panel.js",
     "stock-detail-renderer.js",
     "portfolio-renderer.js",
 }
@@ -96,6 +98,7 @@ def main():
     mounts = {
         "marketSummary": "market-capital-renderer.js",
         "sectorList": "market-capital-renderer.js",
+        "sectorRankExplain": "sector-ranking-panel.js",
         "detailBody": "stock-detail-renderer.js",
         "cards": "app.js",
         "portfolioPanel": "portfolio-renderer.js",
@@ -153,6 +156,7 @@ def main():
         "active_scripts": sorted(scripts),
         "card_owner": "app.js",
         "market_capital_owner": "market-capital-renderer.js",
+        "sector_rank_owner": "sector-ranking-panel.js",
         "detail_owner": "stock-detail-renderer.js",
         "portfolio_owner": "portfolio-renderer.js",
         "portfolio_quick_add_owner": "portfolio-quick-add.js",
