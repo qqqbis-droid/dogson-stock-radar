@@ -29,7 +29,10 @@ on:
   schedule:
     # Fast quote lane: 台灣時間約 09:00~13:59，每 5 分鐘抓官方 MIS。
     - cron: "*/5 1-5 * * 1-5"
-    # Deep final audit: 台灣時間 14:10，重建 Yahoo/MIS 橋接與 60 分結構。
+    # Structure lane: 盤中每 10 分鐘重建 Yahoo 5m + MIS bridge；刻意錯開快線 2 分鐘。
+    - cron: "2,12,22,32,42,52 1-4 * * 1-5"
+    - cron: "2,12,22 5 * * 1-5"
+    # Final audit: 台灣時間 14:10，再重建 60 分K與歷史驗證。
     - cron: "10 6 * * 1-5"
 
 permissions:
@@ -37,8 +40,8 @@ permissions:
   pages: write
   id-token: write
 
-# Fresh scheduled quotes are more valuable than finishing an older queued tick.
-# This prevents a 5-minute cron backlog from surfacing 10~20 minute old pages.
+# Fresh scheduled work wins. If GitHub cron jitters and a newer quote tick arrives,
+# it may cancel an older structure job rather than publish stale data late.
 concurrency:
   group: dogson-pages
   cancel-in-progress: true
@@ -66,12 +69,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" == "schedule" && "${{ github.event.schedule }}" == "10 6 * * 1-5" ]]; then
-            mode=deep
+          sched="${{ github.event.schedule }}"
+          if [[ "${{ github.event_name }}" == "schedule" && "$sched" == "10 6 * * 1-5" ]]; then
+            mode=audit
+          elif [[ "${{ github.event_name }}" == "schedule" && ( "$sched" == "2,12,22,32,42,52 1-4 * * 1-5" || "$sched" == "2,12,22 5 * * 1-5" ) ]]; then
+            mode=structure
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            mode=deep
+            mode=audit
           elif [[ "${{ github.event_name }}" == "push" && "${{ contains(github.event.head_commit.message, '[deep]') }}" == "true" ]]; then
-            mode=deep
+            mode=audit
           else
             mode=fast
           fi
@@ -82,8 +88,8 @@ jobs:
         if: ${{ steps.lane.outputs.mode == 'fast' }}
         run: python scripts/run_bridge_intraday_fast.py
 
-      - name: Refresh full Yahoo/MIS 5m structure (deep lane)
-        if: ${{ steps.lane.outputs.mode == 'deep' }}
+      - name: Refresh Yahoo/MIS 5m technical structure
+        if: ${{ steps.lane.outputs.mode == 'structure' || steps.lane.outputs.mode == 'audit' }}
         run: python scripts/run_bridge_intraday_deep_fastmis.py
 
       - name: Build daytrade data
@@ -92,13 +98,13 @@ jobs:
       - name: Normalize mission date and data clock
         run: python scripts/normalize_intraday_clock.py
 
-      # Expensive lifecycle/history work no longer blocks every 5-minute quote tick.
+      # 60m and history/outcome work is audit-only; it must not block live quote ticks.
       - name: Build 60m lifecycle + entry-position lights
-        if: ${{ steps.lane.outputs.mode == 'deep' }}
+        if: ${{ steps.lane.outputs.mode == 'audit' }}
         run: python scripts/build_hourly.py
 
       - name: Archive signals + resolve real outcomes
-        if: ${{ steps.lane.outputs.mode == 'deep' }}
+        if: ${{ steps.lane.outputs.mode == 'audit' }}
         run: python scripts/build_validation.py --mode intraday
 
       - name: Build canonical data status
@@ -108,17 +114,17 @@ jobs:
         if: ${{ steps.lane.outputs.mode == 'fast' }}
         run: python scripts/validate_intraday_fast_publish.py
 
-      - name: Full intraday freshness gate
-        if: ${{ steps.lane.outputs.mode == 'deep' }}
+      - name: Structure freshness gate
+        if: ${{ steps.lane.outputs.mode == 'structure' || steps.lane.outputs.mode == 'audit' }}
         run: python scripts/validate_intraday_publish.py
 
-      - name: Rebuild Clean Build 2.0 Atomic Bundle from current MIS (fast lane)
-        if: ${{ steps.lane.outputs.mode == 'fast' }}
+      - name: Rebuild Clean Build 2.0 Atomic Bundle from current intraday source
+        if: ${{ steps.lane.outputs.mode == 'fast' || steps.lane.outputs.mode == 'structure' }}
         shell: bash
         run: bash scripts/include_v2_intraday_fast.sh
 
-      - name: Build and validate full Clean Build 2.0 Atomic Bundle (deep lane)
-        if: ${{ steps.lane.outputs.mode == 'deep' }}
+      - name: Build and validate full Clean Build 2.0 Atomic Bundle (audit lane)
+        if: ${{ steps.lane.outputs.mode == 'audit' }}
         shell: bash
         run: bash scripts/include_v2_pages.sh
 
