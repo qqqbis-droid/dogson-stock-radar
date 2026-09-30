@@ -12,7 +12,7 @@ def lots_text(s: str):
     m=re.search(r'([+-]?[\d,]+(?:\.\d+)?)\s*股',str(s or ''))
     if not m:return s
     n=float(m.group(1).replace(',',''))/1000.0
-    txt=f'{n:+,.1f}' if n else '0.0'
+    txt='0' if n == 0 else (f'{n:+,.0f}' if float(n).is_integer() else f'{n:+,.1f}')
     return str(s).replace(m.group(0),f'{txt} 張')
 
 def main():
