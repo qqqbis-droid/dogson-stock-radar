@@ -5,12 +5,11 @@ Single source of truth:
     contracts/registries/sector_registry.json
     contracts/registries/taxonomy_registry.json
 
-Classification and evidence are intentionally separate:
-- a curated narrow primary may be structurally usable but is still CURATED_ONLY
-  until external evidence upgrades it;
-- a small allow-list of sufficiently narrow official TWSE/TPEx industries can be
-  OFFICIAL_DIRECT core groups without a hand-written stock list;
-- broad official industries remain capped proxy context;
+Classification confidence and evidence provenance are separate:
+- registry primary groups may pass structural scoring gates while their external
+  evidence status is still CURATED_ONLY;
+- official TWSE/TPEx industry is OFFICIAL_DIRECT evidence for broad industry
+  membership, but NEVER grants full narrow-sector score by itself;
 - secondary/theme tags never stack core sector points;
 - duplicate registry primary membership fails closed.
 """
@@ -53,10 +52,9 @@ _CLASS_POLICY = _POLICY.get("classification_policy") or {}
 PRIMARY_GROUP_MIN_CONFIDENCE = float(_CLASS_POLICY.get("primary_group_min_confidence", 80))
 SECONDARY_GROUP_MIN_CONFIDENCE = float(_CLASS_POLICY.get("secondary_group_min_confidence", 70))
 PRIMARY_GROUP_MIN_PEERS = int(_CLASS_POLICY.get("primary_group_min_peers", 3))
-OFFICIAL_INDUSTRY_CORE_CODES = {
-    str(x).strip() for x in (_CLASS_POLICY.get("official_industry_core_codes") or []) if str(x).strip()
-}
-OFFICIAL_INDUSTRY_CORE_CONFIDENCE = float(_CLASS_POLICY.get("official_industry_core_confidence", 100))
+OFFICIAL_INDUSTRY_CAN_GRANT_FULL_CORE_SCORE = bool(
+    _CLASS_POLICY.get("official_industry_can_grant_full_core_score", False)
+)
 REVIEW_DAYS = int(_CLASS_POLICY.get("review_days", 180))
 
 _REGISTRY = _load_json(REGISTRY_PATH, dict)
@@ -210,70 +208,24 @@ def classification_for(code, name=None, industry=None):
     rec = CODE_TO_RECORD.get(code) or {}
     official_code = industry_code_for(industry)
     official = industry_name_for(industry)
-
-    registry_group = str(rec.get("primary_group") or "").strip() or None
-    registry_conf = _confidence(rec.get("primary_group_confidence"))
-    registry_peers = int(GROUP_SIZES.get(registry_group, 0)) if registry_group else 0
-    registry_eligible = bool(
-        registry_group and registry_conf is not None
-        and registry_conf >= PRIMARY_GROUP_MIN_CONFIDENCE
-        and registry_peers >= PRIMARY_GROUP_MIN_PEERS
+    group = str(rec.get("primary_group") or "").strip() or None
+    conf = _confidence(rec.get("primary_group_confidence"))
+    peer_count = int(GROUP_SIZES.get(group, 0)) if group else 0
+    eligible = bool(
+        group and conf is not None
+        and conf >= PRIMARY_GROUP_MIN_CONFIDENCE
+        and peer_count >= PRIMARY_GROUP_MIN_PEERS
     )
-    official_core = bool(official_code in OFFICIAL_INDUSTRY_CORE_CODES and official != "未分類")
 
-    if registry_eligible:
-        primary_group = registry_group
-        primary_conf = registry_conf
-        peer_count = registry_peers
-        status = "VERIFIED"
-        score_source = "PRIMARY_GROUP"
-        eligible = True
-        evidence_quality = rec.get("evidence_quality") or "UNSPECIFIED"
-        evidence_refs = list(rec.get("evidence_urls_or_refs") or [])
-        reason = rec.get("classification_reason") or (
-            f"Taxonomy {TAXONOMY_VERSION} 窄主分類：{registry_group}；"
-            "已通過主分類唯一性、信心與同儕樣本門檻。"
-        )
-    elif official_core:
-        primary_group = official
-        primary_conf = OFFICIAL_INDUSTRY_CORE_CONFIDENCE
-        peer_count = None
-        status = "VERIFIED"
-        score_source = "OFFICIAL_INDUSTRY_CORE"
-        eligible = True
-        evidence_quality = "OFFICIAL_DIRECT"
-        evidence_refs = [f"TWSE/TPEx official industry code:{official_code}"]
-        reason = f"官方產業「{official}」屬 Taxonomy 2.1 核心白名單，可直接作同業族群，不需人工題材推定。"
-    elif registry_group:
-        primary_group = registry_group
-        primary_conf = registry_conf
-        peer_count = registry_peers
+    if eligible:
+        status, score_source = "VERIFIED", "PRIMARY_GROUP"
+    elif group:
         status = "PROVISIONAL"
         score_source = "OFFICIAL_PROXY" if official != "未分類" else "NONE"
-        eligible = False
-        evidence_quality = rec.get("evidence_quality") or "UNSPECIFIED"
-        evidence_refs = list(rec.get("evidence_urls_or_refs") or [])
-        reason = rec.get("classification_reason") or f"窄主分類 {registry_group} 尚未通過核心族群門檻。"
     elif official != "未分類":
-        primary_group = None
-        primary_conf = None
-        peer_count = 0
-        status = "OFFICIAL_ONLY"
-        score_source = "OFFICIAL_PROXY"
-        eligible = False
-        evidence_quality = "OFFICIAL_DIRECT"
-        evidence_refs = [f"TWSE/TPEx official industry code:{official_code or official}"]
-        reason = rec.get("classification_reason") or "尚無高信心窄主族群；使用官方產業 proxy，不視為族群弱勢。"
+        status, score_source = "OFFICIAL_ONLY", "OFFICIAL_PROXY"
     else:
-        primary_group = registry_group
-        primary_conf = registry_conf
-        peer_count = registry_peers
-        status = "UNCLASSIFIED"
-        score_source = "NONE"
-        eligible = False
-        evidence_quality = rec.get("evidence_quality") or "UNSPECIFIED"
-        evidence_refs = list(rec.get("evidence_urls_or_refs") or [])
-        reason = rec.get("classification_reason") or "分類證據不足。"
+        status, score_source = "UNCLASSIFIED", "NONE"
 
     secondary = []
     for item in rec.get("secondary_groups") or []:
@@ -283,18 +235,40 @@ def classification_for(code, name=None, industry=None):
         if c >= SECONDARY_GROUP_MIN_CONFIDENCE and item.get("group"):
             secondary.append(dict(item))
 
+    if group:
+        evidence_quality = rec.get("evidence_quality") or "UNSPECIFIED"
+        evidence_refs = list(rec.get("evidence_urls_or_refs") or [])
+    elif official != "未分類":
+        evidence_quality = "OFFICIAL_DIRECT"
+        evidence_refs = [f"TWSE/TPEx official industry code:{official_code or official}"]
+    else:
+        evidence_quality = rec.get("evidence_quality") or "UNSPECIFIED"
+        evidence_refs = list(rec.get("evidence_urls_or_refs") or [])
+
+    reason = rec.get("classification_reason")
+    if not reason:
+        if group:
+            reason = (
+                f"Taxonomy {TAXONOMY_VERSION} 主分類：{group}；"
+                "已通過唯一性、信心與同儕樣本門檻。外部證據狀態另行標示。"
+            )
+        elif official != "未分類":
+            reason = "官方產業已確認，但尚無足以取得完整窄族群分的 Primary；僅使用 capped proxy。"
+        else:
+            reason = "分類證據不足。"
+
     return {
         "taxonomy_version": TAXONOMY_VERSION,
         "code": code,
         "name": str(name or code),
         "official_industry": official,
         "official_industry_code": official_code,
-        "registry_primary_group": registry_group,
-        "primary_group": primary_group,
-        "primary_group_confidence": primary_conf,
+        "registry_primary_group": group,
+        "primary_group": group,
+        "primary_group_confidence": conf,
         "secondary_groups": secondary,
         "theme_tags": list(rec.get("theme_tags") or []),
-        "supply_chain_role": list(rec.get("supply_chain_role") or ([registry_group] if registry_group else [])),
+        "supply_chain_role": list(rec.get("supply_chain_role") or ([group] if group else [])),
         "exposure_pct": rec.get("exposure_pct"),
         "revenue_evidence_period": rec.get("revenue_evidence_period"),
         "evidence_urls_or_refs": evidence_refs,
@@ -342,7 +316,7 @@ def taxonomy_stats():
         "primary_group_min_confidence": PRIMARY_GROUP_MIN_CONFIDENCE,
         "secondary_group_min_confidence": SECONDARY_GROUP_MIN_CONFIDENCE,
         "primary_group_min_peers": PRIMARY_GROUP_MIN_PEERS,
-        "official_industry_core_codes": sorted(OFFICIAL_INDUSTRY_CORE_CODES),
+        "official_industry_can_grant_full_core_score": OFFICIAL_INDUSTRY_CAN_GRANT_FULL_CORE_SCORE,
         "review_days": REVIEW_DAYS,
         "registry_statuses_without_runtime_industry": dict(sorted(statuses.items())),
         "evidence_status_counts": dict(sorted(evidence.items())),
