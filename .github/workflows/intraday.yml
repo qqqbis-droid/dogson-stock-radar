@@ -19,6 +19,7 @@ on:
       - "scripts/build_system_status.py"
       - "scripts/validate_intraday_publish.py"
       - "scripts/include_v2_pages.sh"
+      - "scripts/include_v2_intraday_fast.sh"
       - "docs/index.html"
       - "docs/realtime.js"
       - "docs/ui-filters.js"
@@ -108,7 +109,13 @@ jobs:
         if: ${{ steps.lane.outputs.mode == 'deep' }}
         run: python scripts/validate_intraday_publish.py
 
-      - name: Build and validate Clean Build 2.0 Atomic Bundle
+      - name: Rebuild Clean Build 2.0 Atomic Bundle from current MIS (fast lane)
+        if: ${{ steps.lane.outputs.mode == 'fast' }}
+        shell: bash
+        run: bash scripts/include_v2_intraday_fast.sh
+
+      - name: Build and validate full Clean Build 2.0 Atomic Bundle (deep lane)
+        if: ${{ steps.lane.outputs.mode == 'deep' }}
         shell: bash
         run: bash scripts/include_v2_pages.sh
 
