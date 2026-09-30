@@ -25,9 +25,14 @@ def main():
     if not dmeta or not imeta: raise SystemExit('close semantics v5: decision close datasets missing')
     detail_path=resolve(root,dmeta.get('url')); index_path=resolve(root,imeta.get('url'))
     detail=load(detail_path); items=(detail.get('items') or {}) if isinstance(detail,dict) else {}
+    index=load(index_path)
+    rank_map={str(r.get('code')):r.get('opportunity_rank') for r in index if isinstance(r,dict) and r.get('code')} if isinstance(index,list) else {}
     detail_changed=False
     for row in items.values():
         if str(row.get('trade_date') or row.get('as_of') or '')[:10]!=close_date: continue
+        code=str(row.get('code') or '')
+        if rank_map.get(code) is not None and row.get('opportunity_rank')!=rank_map[code]:
+            row['opportunity_rank']=rank_map[code]; detail_changed=True
         exp=row.get('score_explanations') or {}; chip=(exp.get('chip') or {}).get('items') or []
         for it in chip:
             if isinstance(it,dict) and re.search(r'外資|投信',str(it.get('label') or '')):
@@ -35,7 +40,7 @@ def main():
                 if new!=old: it['detail']=new; detail_changed=True
     if detail_changed: dmeta.update(write(detail_path,detail))
 
-    index=load(index_path); changed=0
+    changed=0
     for row in index if isinstance(index,list) else []:
         src=items.get(str(row.get('code')))
         if not src or str(src.get('trade_date') or src.get('as_of') or '')[:10]!=close_date: continue
