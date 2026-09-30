@@ -41,9 +41,11 @@ jobs:
         run: |
           node --check docs/v2/data-source.js
           node --check docs/v2/universe-search.js
+          node --check docs/v2/portfolio-store.js
           node --check docs/v2/app.js
           node --check docs/v2/market-capital-renderer.js
           node --check docs/v2/stock-detail-renderer.js
+          node --check docs/v2/portfolio-renderer.js
           node --check docs/v2/radar-transparency-v7.js
           python scripts/v2/validate_single_writer_ui.py
           python -m py_compile scripts/v2/validate_mission_evidence.py
