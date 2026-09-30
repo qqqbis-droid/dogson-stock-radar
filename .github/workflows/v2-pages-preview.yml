@@ -50,9 +50,11 @@ jobs:
         run: |
           node --check docs/v2/data-source.js
           node --check docs/v2/universe-search.js
+          node --check docs/v2/portfolio-store.js
           node --check docs/v2/app.js
           node --check docs/v2/market-capital-renderer.js
           node --check docs/v2/stock-detail-renderer.js
+          node --check docs/v2/portfolio-renderer.js
           node --check docs/v2/radar-transparency-v7.js
           python scripts/v2/validate_single_writer_ui.py
           python -m py_compile scripts/v2/normalize_close_snapshot.py
@@ -102,15 +104,18 @@ jobs:
           test -f _site/index.html
           test -f _site/v2/index.html
           test -f _site/v2/universe-search.js
+          test -f _site/v2/portfolio-store.js
           test -f _site/v2/app.js
           test -f _site/v2/market-capital-renderer.js
           test -f _site/v2/stock-detail-renderer.js
+          test -f _site/v2/portfolio-renderer.js
           test -f _site/v2/radar-transparency-v7.js
           test -f _site/v2/data/current_manifest.json
           test -f "_site/v2/data/builds/$ACTIVE_BUILD/market-summary.json"
           echo "Production root source: main/docs"
           echo "Legacy SW: V2 bypass enabled"
           echo "V2 shell: single-writer clean-build-v2/docs/v2"
+          echo "V2 private portfolio: browser-local only"
           echo "V2 same-origin active data: $ACTIVE_BUILD"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
