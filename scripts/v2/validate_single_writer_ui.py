@@ -15,6 +15,7 @@ REQUIRED = {
     "stock-detail-renderer.js",
     "portfolio-store.js",
     "portfolio-renderer.js",
+    "portfolio-quick-add.js",
     "radar-transparency-v7.js",
     "theme-toggle.js",
     "runtime-observability.js",
@@ -129,6 +130,14 @@ def main():
             if field not in store:
                 errors.append(f"portfolio store schema missing {field}")
 
+    quick_path = ROOT / "docs" / "v2" / "portfolio-quick-add.js"
+    if quick_path.is_file():
+        quick = quick_path.read_text(encoding="utf-8")
+        if "RadarPortfolioStore.upsert" not in quick:
+            errors.append("portfolio quick-add must write through the canonical browser-local store")
+        if "MutationObserver" in quick:
+            errors.append("portfolio quick-add must not watch/rewrite stock detail DOM")
+
     if errors:
         raise SystemExit("single-writer UI gate failed: " + " | ".join(errors))
 
@@ -139,6 +148,7 @@ def main():
         "market_capital_owner": "market-capital-renderer.js",
         "detail_owner": "stock-detail-renderer.js",
         "portfolio_owner": "portfolio-renderer.js",
+        "portfolio_quick_add_owner": "portfolio-quick-add.js",
         "theme_owner": "theme-toggle.js",
         "runtime_observability_owner": "runtime-observability.js",
         "portfolio_storage": "browser-local-only",
