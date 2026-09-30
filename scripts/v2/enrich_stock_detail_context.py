@@ -47,14 +47,15 @@ def trade_date_of(payload, rows):
 
 COMMON = (
     "code", "name", "market", "industry_name", "sector_group", "close", "high", "low", "day_change",
-    "volume", "avg_volume20", "avg_turnover20_mn", "vol_x", "vwap", "vwap_dist", "pace", "ret15", "ret60",
+    "volume", "avg_volume20", "avg_turnover20", "avg_turnover20_mn", "vol_x", "vwap", "vwap_dist", "pace", "ret15", "ret60",
     "current_turnover", "recent_turnover", "previous_turnover", "quote_bid1", "quote_ask1", "quote_volume_lots",
     "amplitude_pct", "range_position_pct", "amplitude_regime", "stage_reason", "structure_confidence",
-    "chip_background", "chip_score", "chip_coverage_pct", "sector_score_label", "sector_hot_ratio",
+    "chip_background", "chip_score", "chip_coverage_pct", "sector_score", "sector_score_source", "sector_score_label",
+    "sector_hot_count", "industry_hot_count", "sector_hot_ratio", "liquidity_level",
     "support", "resistance", "reasons", "overheat_reasons", "stage_signals", "stage_risks",
 )
 CLOSE = (
-    "ma5", "ma10", "ma20", "dist20", "rsi", "macd_h", "macd_acc", "break3", "break20", "trend",
+    "ma5", "ma10", "ma20", "dist20", "ret5", "ret20", "rsi", "macd_h", "macd_acc", "break3", "break20", "trend",
     "foreign_3buy", "foreign_net_latest", "foreign_3d_net", "sbl_3down", "sbl_3change_pct", "trust_net_latest",
     "margin_3d_pct", "margin_status", "swing_components", "sector_detail",
 )
@@ -118,7 +119,7 @@ def enrich(*, legacy_root: Path, root: Path):
         counts[context] = len(items)
 
     warnings = manifest.setdefault("health", {}).setdefault("warnings", [])
-    note = "個股詳情已分任務補入同 Atomic Build 的盤中／盤後／當沖證據快照；只作解釋，不重算 Engine 分數。"
+    note = "個股詳情已分任務補入同 Atomic Build 的盤中／盤後／當沖證據快照；V4 額外保留評分可解釋欄位，不由前端重算 Engine 分數。"
     if note not in warnings:
         warnings.append(note)
     write(manifest_path, manifest)
