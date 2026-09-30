@@ -56,26 +56,50 @@ def mission_stats(root, manifest, key):
     }
 
 
+def best_embedded_shadow(root: Path, manifest: dict):
+    candidates = []
+    old_meta = (manifest.get("datasets") or {}).get("radar_stats") or {}
+    if old_meta.get("url"):
+        candidates.append(resolve(root, old_meta["url"]))
+    # A fast intraday rebuild may replace current_manifest before radar_stats is
+    # rebuilt, while previous validated build directories are still present.
+    # Reuse only an already-embedded Shadow object and choose the greatest real
+    # distinct-day count. This preserves evidence; it never increments samples.
+    candidates.extend((root / "builds").glob("*/radar-stats.json"))
+    best = None
+    best_days = -1
+    seen = set()
+    for path in candidates:
+        key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        obj = load(path)
+        shadow = obj.get("shadow") if isinstance(obj, dict) else None
+        if not isinstance(shadow, dict) or not shadow.get("available"):
+            continue
+        try:
+            days = int(shadow.get("distinct_trading_days") or 0)
+        except Exception:
+            continue
+        if days > best_days:
+            best = shadow
+            best_days = days
+    return best
+
+
 def shadow_progress(root: Path, manifest: dict):
-    # The completed-session workflow keeps the canonical distinct-day summary at
-    # shadow/summary.json. Fast intraday publishers also archive that file from
-    # clean-build-v2 so every Atomic Build can expose the same validation status.
-    candidates = [
-        Path("shadow/summary.json"),
-        root / "shadow-summary.json",  # compatibility fallback during migration
-    ]
+    # Completed-session builds have the canonical distinct-day summary. Intraday
+    # fast builds may not carry the shadow/ directory, so they preserve the most
+    # recent already-embedded value from a validated prior build instead.
+    candidates = [Path("shadow/summary.json"), root / "shadow-summary.json"]
     summary = None
     for path in candidates:
         summary = load(path)
         if isinstance(summary, dict):
             break
     if not isinstance(summary, dict):
-        # Preserve a previous embedded value if this publisher legitimately lacks
-        # the Shadow tree. Never invent sample counts.
-        old_meta = (manifest.get("datasets") or {}).get("radar_stats") or {}
-        old_path = resolve(root, old_meta.get("url")) if old_meta.get("url") else None
-        old = load(old_path) if old_path and old_path.exists() else None
-        prior = old.get("shadow") if isinstance(old, dict) else None
+        prior = best_embedded_shadow(root, manifest)
         if isinstance(prior, dict):
             return prior
         return {
