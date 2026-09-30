@@ -11,6 +11,8 @@ REQUIRED = {
     "app.js",
     "market-capital-renderer.js",
     "stock-detail-renderer.js",
+    "portfolio-store.js",
+    "portfolio-renderer.js",
     "radar-transparency-v7.js",
 }
 
@@ -34,6 +36,7 @@ SINGLE_WRITER_FILES = {
     "app.js",
     "market-capital-renderer.js",
     "stock-detail-renderer.js",
+    "portfolio-renderer.js",
 }
 
 
@@ -58,14 +61,19 @@ def main():
         if "MutationObserver" in text:
             errors.append(f"single-writer renderer must not use MutationObserver: {name}")
 
-    if html.count('id="marketSummary"') != 1:
-        errors.append("marketSummary must have exactly one DOM owner mount")
-    if html.count('id="sectorList"') != 1:
-        errors.append("sectorList must have exactly one DOM owner mount")
-    if html.count('id="detailBody"') != 1:
-        errors.append("detailBody must have exactly one DOM owner mount")
-    if html.count('id="cards"') != 1:
-        errors.append("cards must have exactly one DOM owner mount")
+    mounts = {
+        "marketSummary": "market-capital-renderer.js",
+        "sectorList": "market-capital-renderer.js",
+        "detailBody": "stock-detail-renderer.js",
+        "cards": "app.js",
+        "portfolioPanel": "portfolio-renderer.js",
+        "portfolioCards": "portfolio-renderer.js",
+        "portfolioEditDialog": "portfolio-renderer.js",
+        "portfolioDetailDialog": "portfolio-renderer.js",
+    }
+    for mount, owner in mounts.items():
+        if html.count(f'id="{mount}"') != 1:
+            errors.append(f"{mount} must have exactly one DOM owner mount ({owner})")
 
     if errors:
         raise SystemExit("single-writer UI gate failed: " + " | ".join(errors))
@@ -76,6 +84,8 @@ def main():
         "card_owner": "app.js",
         "market_capital_owner": "market-capital-renderer.js",
         "detail_owner": "stock-detail-renderer.js",
+        "portfolio_owner": "portfolio-renderer.js",
+        "portfolio_storage": "browser-local-only",
         "deprecated_overlays_active": [],
     })
 
