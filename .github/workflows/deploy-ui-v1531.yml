@@ -111,7 +111,10 @@ jobs:
         run: |
           set -euo pipefail
           base="https://qqqbis-droid.github.io/dogson-stock-radar/data"
-          critical=(close.json market.json intraday.json hourly.json daytrade.json system_status.json)
+          # system_status.json is generated locally in the next step. Requiring a
+          # previously published copy here can deadlock a safe UI-only deploy when
+          # the live site does not yet expose that derived file.
+          critical=(close.json market.json intraday.json hourly.json daytrade.json)
           optional=(universe.json status.json chip_history.json chip_status.json mis_snapshots.json validation_history.json validation.json decision_history.json)
           mkdir -p docs/data
 
