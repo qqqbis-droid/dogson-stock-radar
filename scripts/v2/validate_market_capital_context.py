@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
+import sys
 from pathlib import Path
 from jsonschema import Draft202012Validator, FormatChecker
 
@@ -23,6 +25,13 @@ def validate(schema_name,obj):
         for e in errors[:20]: print("ERROR",schema_name,list(e.path),e.message)
         return False
     return True
+
+
+def validate_release_surface():
+    gate=ROOT/"scripts"/"v2"/"validate_single_writer_ui.py"
+    if not gate.is_file():
+        raise SystemExit(f"release surface gate missing: {gate}")
+    subprocess.run([sys.executable,str(gate)],cwd=ROOT,check=True)
 
 
 def main():
@@ -61,6 +70,10 @@ def main():
     if any("today_amount_100m" in r for r in ci.get("rows") or []): print("ERROR intraday capital contaminated by close money fields"); ok=False
     if cc.get("rows") and not any(r.get("today_amount_100m") is not None for r in cc.get("rows") or []): print("ERROR close capital has no amount rows"); ok=False
     if not ok: raise SystemExit(1)
-    print("market/capital context validation OK",active,"scores",mi.get("market_score"),mc.get("market_score"),"rows",len(ci.get("rows") or []),len(cc.get("rows") or []))
+    # Shared production release gate: every publisher already calls this data
+    # validator, so bind the UI single-writer/syntax checks here to prevent a
+    # stale workflow check-list from reintroducing deprecated overlay renderers.
+    validate_release_surface()
+    print("market/capital context validation OK",active,"scores",mi.get("market_score"),mc.get("market_score"),"rows",len(ci.get("rows") or []),len(cc.get("rows") or []),"ui_gate","PASS")
 
 if __name__=="__main__": main()
