@@ -2,34 +2,27 @@
 from __future__ import annotations
 
 import json
+import sys
 from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 REGISTRY = ROOT / "contracts" / "registries" / "sector_registry.json"
 UNIVERSE = ROOT / "docs" / "data" / "universe.json"
 CLOSE = ROOT / "docs" / "data" / "close.json"
 
-try:
-    from scripts.sector_groups import (
-        CODE_TO_RECORD,
-        PRIMARY_GROUP_MIN_CONFIDENCE,
-        PRIMARY_GROUP_MIN_PEERS,
-        SECONDARY_GROUP_MIN_CONFIDENCE,
-        TAXONOMY_VERSION,
-        classification_for,
-        taxonomy_stats,
-    )
-except ImportError:  # pragma: no cover
-    from sector_groups import (
-        CODE_TO_RECORD,
-        PRIMARY_GROUP_MIN_CONFIDENCE,
-        PRIMARY_GROUP_MIN_PEERS,
-        SECONDARY_GROUP_MIN_CONFIDENCE,
-        TAXONOMY_VERSION,
-        classification_for,
-        taxonomy_stats,
-    )
+from scripts.sector_groups import (
+    CODE_TO_RECORD,
+    PRIMARY_GROUP_MIN_CONFIDENCE,
+    PRIMARY_GROUP_MIN_PEERS,
+    SECONDARY_GROUP_MIN_CONFIDENCE,
+    TAXONOMY_VERSION,
+    classification_for,
+    taxonomy_stats,
+)
 
 
 def load(path: Path, default):
