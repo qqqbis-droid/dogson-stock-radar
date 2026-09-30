@@ -283,14 +283,27 @@ BUCKET_ORDER = {
 
 def rank_rows(rows, mission):
     order = BUCKET_ORDER[mission]
-    def feature(d):
-        scores = d.get("scores") or {}
-        if mission == "daytrade_execution":
-            return scores.get("daytrade_score")
+
+    def score(d, key):
+        value = (d.get("scores") or {}).get(key)
+        return value if value is not None else -1
+
+    def sort_key(d):
+        bucket = order.get(d.get("opportunity_bucket"), 99)
+        confidence = d.get("data_confidence") or 0
+        if mission == "close_next_day":
+            return (
+                bucket,
+                -score(d, "swing_quality_score"),
+                -score(d, "entry_position_score"),
+                -confidence,
+                d["code"],
+            )
         if mission == "intraday_swing":
-            return scores.get("intraday_momentum_score")
-        return scores.get("entry_position_score")
-    rows.sort(key=lambda d: (order.get(d.get("opportunity_bucket"), 99), -(feature(d) if feature(d) is not None else -1), -(d.get("data_confidence") or 0), d["code"]))
+            return (bucket, -score(d, "intraday_momentum_score"), -confidence, d["code"])
+        return (bucket, -score(d, "daytrade_score"), -confidence, d["code"])
+
+    rows.sort(key=sort_key)
     for i, d in enumerate(rows, 1):
         d["opportunity_rank"] = i
     return rows
