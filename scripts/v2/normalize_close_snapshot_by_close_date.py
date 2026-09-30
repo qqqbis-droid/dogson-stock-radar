@@ -43,15 +43,18 @@ def run_script(name: str, root: Path, *extra: str):
     subprocess.run([sys.executable, str(Path(__file__).with_name(name)), "--root", str(root), *extra], check=True)
 
 
+def finalize_common(root: Path):
+    run_script("close_semantics_v5.py", root)
+    run_script("build_radar_stats.py", root)
+    run_script("validate_mission_evidence.py", root, "--legacy-root", "docs/data", "--mission", "close")
+
+
 def finalize_close(root: Path):
     # The normalizer can change entry-position and ranks. Rebuild the physical
     # summary/index arrays after rank assignment so card order and displayed #rank
     # are guaranteed to be the same thing.
     run_script("rebuild_close_rank_views.py", root)
-    run_script("close_semantics_v5.py", root)
-    # Close evidence is a deployment invariant: a score without same-build detail
-    # and zones must never be published again.
-    run_script("validate_mission_evidence.py", root, "--legacy-root", "docs/data", "--mission", "close")
+    finalize_common(root)
 
 
 def main():
@@ -74,10 +77,8 @@ def main():
 
     # The Atomic Bundle may already be on today's pre-open/intraday date while
     # close_next_day intentionally refers to the most recently completed cash
-    # session. The close normalizer keys its mutations by manifest.trade_date,
-    # so temporarily bind that field to the close dataset's own date, run the
-    # canonical normalizer, then restore only the bundle date. Dataset hashes,
-    # warnings and score explanations written by the normalizer are preserved.
+    # session. Temporarily bind only manifest.trade_date to the close date while
+    # normalizing close semantics, then restore the bundle date.
     manifest["trade_date"] = close_date
     write(manifest_path, manifest)
     try:
@@ -87,8 +88,7 @@ def main():
         latest = load(manifest_path)
         latest["trade_date"] = bundle_date
         write(manifest_path, latest)
-    run_script("close_semantics_v5.py", root)
-    run_script("validate_mission_evidence.py", root, "--legacy-root", "docs/data", "--mission", "close")
+    finalize_common(root)
     print("close-date wrapper", {"bundle_date": bundle_date, "close_date": close_date, "mode": "temporary-close-bind"})
 
 
