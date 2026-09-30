@@ -39,6 +39,10 @@ def close_trade_date(root: Path, manifest: dict) -> str:
     return ""
 
 
+def run_close_semantics(root: Path):
+    subprocess.run([sys.executable, str(Path(__file__).with_name("close_semantics_v5.py")), "--root", str(root)], check=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default="docs/v2/data")
@@ -53,14 +57,15 @@ def main():
 
     if close_date == bundle_date:
         subprocess.run([sys.executable, str(Path(__file__).with_name("normalize_close_snapshot.py")), "--root", str(root)], check=True)
+        run_close_semantics(root)
         print("close-date wrapper", {"bundle_date": bundle_date, "close_date": close_date, "mode": "same-date"})
         return
 
     # The Atomic Bundle may already be on today's pre-open/intraday date while
     # close_next_day intentionally refers to the most recently completed cash
-    # session.  The close normalizer keys its mutations by manifest.trade_date,
+    # session. The close normalizer keys its mutations by manifest.trade_date,
     # so temporarily bind that field to the close dataset's own date, run the
-    # canonical normalizer, then restore only the bundle date.  Dataset hashes,
+    # canonical normalizer, then restore only the bundle date. Dataset hashes,
     # warnings and score explanations written by the normalizer are preserved.
     manifest["trade_date"] = close_date
     write(manifest_path, manifest)
@@ -70,6 +75,7 @@ def main():
         latest = load(manifest_path)
         latest["trade_date"] = bundle_date
         write(manifest_path, latest)
+    run_close_semantics(root)
     print("close-date wrapper", {"bundle_date": bundle_date, "close_date": close_date, "mode": "temporary-close-bind"})
 
 
