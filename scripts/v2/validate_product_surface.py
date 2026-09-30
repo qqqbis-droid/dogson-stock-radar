@@ -29,6 +29,7 @@ def main():
     html = text("index.html")
     app = text("app.js")
     market = text("market-capital-renderer.js")
+    sector_rank = text("sector-ranking-panel.js")
     detail = text("stock-detail-renderer.js")
     portfolio = text("portfolio-renderer.js")
     store = text("portfolio-store.js")
@@ -43,7 +44,7 @@ def main():
     # Core mobile decision flow mounts.
     for mount in (
         "marketPulse", "mission", "marketSummary", "marketDetail",
-        "capitalTitle", "sectorList", "rankingTitle", "countText",
+        "capitalTitle", "sectorList", "sectorRankExplain", "rankingTitle", "countText",
         "radarSummary", "searchInput", "stageFilter", "actionFilter",
         "positionFilter", "sectorFilter", "cards", "loadMore",
         "detailDialog", "detailTitle", "detailBody",
@@ -67,6 +68,13 @@ def main():
         require(market, needle, "market environment", errors)
     require(market, "點一下看細節", "capital drill-down affordance", errors)
     require(market, "radar:open-stock", "sector-to-stock bridge", errors)
+
+    # Sector drill-down must explain attention order without inventing a second score.
+    require(sector_rank, "族群內先看", "sector watch-priority panel", errors)
+    require(sector_rank, "沿用盤後正式排序", "close sector ranking semantics", errors)
+    require(sector_rank, "沿用盤中正式排序", "intraday sector ranking semantics", errors)
+    require(sector_rank, "不另外發明一套族群內分數", "sector ranking no-fake-score rule", errors)
+    require(sector_rank, "radar:open-stock", "sector ranked stock bridge", errors)
 
     # Radar summary, filters and full-universe search.
     for needle in ("radarSummary", "positionFilter", "sectorFilter", "RadarUniverseSearch"):
@@ -107,6 +115,7 @@ def main():
         "filters": ["stage", "action", "position", "sector"],
         "full_market_search": True,
         "sector_drilldown": True,
+        "sector_attention_reason": True,
         "stock_detail": True,
         "score_explanation": True,
         "portfolio_private": True,
