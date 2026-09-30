@@ -216,16 +216,9 @@ jobs:
           print('companions:', manifest['active_build_id'], members['close']['trade_date'], members['intraday']['trade_date'])
           PY
 
-      - name: Verify UI modules
+      - name: Verify production V2 release surface
         run: |
-          node --check docs/v2/data-source.js
-          node --check docs/v2/app.js
-          node --check docs/v2/ux-detail.js
-          node --check docs/v2/market-capital-ui.js
-          node --check docs/v2/score-explain-v4.js
-          node --check docs/v2/detail-context-v3.js
-          node --check docs/v2/card-display-v3.js
-          node --check docs/v2/radar-transparency-v7.js
+          python scripts/v2/validate_single_writer_ui.py
 
       - name: Publish latest validated Shadow data safely
         run: |
