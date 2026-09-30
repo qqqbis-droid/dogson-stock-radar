@@ -18,6 +18,7 @@ REQUIRED = {
     "radar-transparency-v7.js",
     "theme-toggle.js",
     "runtime-observability.js",
+    "universe-search.js",
 }
 
 FORBIDDEN_ACTIVE = {
@@ -43,6 +44,12 @@ SINGLE_WRITER_FILES = {
     "portfolio-renderer.js",
 }
 
+PORTFOLIO_FIELDS = {
+    "code", "name", "shares", "avg_cost", "entry_date", "reason_status",
+    "entry_reason", "hold_reason", "validation_condition", "failure_condition",
+    "strategy", "note",
+}
+
 
 def main():
     html = INDEX.read_text(encoding="utf-8")
@@ -66,9 +73,6 @@ def main():
             errors.append(f"single-writer renderer must not use MutationObserver: {name}")
 
     # Production release gate: every active first-party JS module must parse.
-    # This is deliberately kept inside the shared validator so all publishing
-    # workflows get the same protection instead of relying on workflow-specific
-    # node --check lists that can drift over time.
     node = shutil.which("node")
     if not node:
         errors.append("node executable unavailable; cannot syntax-check active UI")
@@ -101,6 +105,30 @@ def main():
         if html.count(f'id="{mount}"') != 1:
             errors.append(f"{mount} must have exactly one DOM owner mount ({owner})")
 
+    # Private portfolio contract: the public repo contains only UI/schema code.
+    # User holdings must remain browser-local and all decision-reason fields are
+    # mandatory UI capabilities even though their text values may be empty.
+    form_fields = set(re.findall(r'<(?:input|select|textarea)[^>]+name=["\']([^"\']+)', html))
+    missing_fields = sorted(PORTFOLIO_FIELDS - form_fields)
+    if missing_fields:
+        errors.append(f"portfolio form missing required fields: {missing_fields}")
+    if 'min="1"' not in html or 'name="shares"' not in html:
+        errors.append("portfolio must accept actual holdings from 1 share")
+    if "localStorage" not in html or "不會寫入公開 GitHub" not in html:
+        errors.append("portfolio privacy disclosure missing")
+
+    store_path = ROOT / "docs" / "v2" / "portfolio-store.js"
+    if store_path.is_file():
+        store = store_path.read_text(encoding="utf-8")
+        if "localStorage" not in store:
+            errors.append("portfolio store is not browser-local")
+        for forbidden_api in ("fetch(", "XMLHttpRequest", "sendBeacon", "WebSocket("):
+            if forbidden_api in store:
+                errors.append(f"portfolio store may not transmit holdings: found {forbidden_api}")
+        for field in PORTFOLIO_FIELDS - {"note"}:
+            if field not in store:
+                errors.append(f"portfolio store schema missing {field}")
+
     if errors:
         raise SystemExit("single-writer UI gate failed: " + " | ".join(errors))
 
@@ -114,6 +142,7 @@ def main():
         "theme_owner": "theme-toggle.js",
         "runtime_observability_owner": "runtime-observability.js",
         "portfolio_storage": "browser-local-only",
+        "portfolio_fields": sorted(PORTFOLIO_FIELDS),
         "runtime_metrics_storage": "session-local-only",
         "syntax_checked": sorted(REQUIRED),
         "deprecated_overlays_active": [],
