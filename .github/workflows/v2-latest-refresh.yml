@@ -3,7 +3,7 @@ name: Clean Build 2.0 Latest Completed Session Refresh
 on:
   workflow_dispatch:
   push:
-    branches: [ clean-build-v2 ]
+    branches: [ main, clean-build-v2 ]
     paths:
       - '.github/workflows/v2-latest-refresh.yml'
       - '.github/triggers/v2-latest-refresh.trigger'
@@ -17,8 +17,6 @@ permissions:
   pages: write
   id-token: write
 
-# This workflow now publishes Pages itself, so serialize it with every other
-# production Pages publisher. Never cancel an in-flight market-data publish.
 concurrency:
   group: dogson-pages
   cancel-in-progress: false
@@ -35,26 +33,32 @@ jobs:
         with:
           ref: clean-build-v2
           fetch-depth: 0
+
       - name: Seed current public production datasets
         run: |
           set -euo pipefail
           git fetch origin main --depth=1
           git checkout origin/main -- docs/data
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: 'pip'
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
       - name: Install builders and contract validator
         run: |
           pip install -r requirements.txt
           pip install -r requirements-contract.txt
+
       - name: Rebuild latest completed close from public sources
         run: |
           python scripts/sync_live_data.py || true
           python scripts/build_close_fresh.py
+
       - name: Confirm completed-session source is internally consistent
         run: |
           python - <<'PY'
@@ -78,11 +82,93 @@ jobs:
           if current_date and candidate < current_date:
               raise SystemExit(f'Refusing source regression from {current_date} to {candidate}')
           PY
-      - name: Build validated canonical Shadow cycle
+
+      - name: Build complete canonical Atomic Bundle and evidence
         run: |
+          set -euo pipefail
           python -m scripts.v2.shadow_cycle --legacy-root docs/data --output docs/v2/data --reports shadow/reports
           python -m scripts.v2.shadow_summary --reports shadow/reports --output shadow/summary.json
+          python scripts/v2/live_publish_patch.py --legacy-root docs/data --root docs/v2/data
+          python scripts/v2/enrich_zones.py --legacy-root docs/data --output docs/v2/data
+          python scripts/v2/enrich_stock_detail_context.py --legacy-root docs/data --root docs/v2/data
+          python scripts/v2/restore_market_capital_context.py --legacy-root docs/data --root docs/v2/data
+          python scripts/v2/normalize_close_snapshot_by_close_date.py --root docs/v2/data
+          python scripts/v2/stamp_version_contract.py --root docs/v2/data
           python -m scripts.v2.validate_bundle --root docs/v2/data
+          python scripts/v2/validate_market_capital_context.py --root docs/v2/data
+
+      - name: Gate completed-close evidence completeness
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root=Path('docs/v2/data')
+          load=lambda p: json.loads(Path(p).read_text(encoding='utf-8'))
+          m=load(root/'current_manifest.json')
+          ds=m.get('datasets') or {}
+          active=m.get('active_build_id')
+
+          def resolve(meta):
+              raw=str((meta or {}).get('url') or '')
+              if raw.startswith('./data/'):
+                  return root/raw[len('./data/'):]
+              return root/raw.lstrip('./')
+
+          required=('decision_close_detail','stock_detail_close','zone_close','market_close_context','capital_close_context')
+          missing=[k for k in required if k not in ds]
+          if missing:
+              raise SystemExit(f'close evidence gate: manifest missing {missing}')
+          paths={k:resolve(ds[k]) for k in required}
+          absent=[f'{k}:{p}' for k,p in paths.items() if not p.is_file() or p.stat().st_size==0]
+          if absent:
+              raise SystemExit(f'close evidence gate: files missing {absent}')
+
+          detail=load(paths['decision_close_detail'])
+          stock=load(paths['stock_detail_close'])
+          zones=load(paths['zone_close'])
+          raw_close=load(Path('docs/data/close.json'))
+          ditems=(detail.get('items') or {}) if isinstance(detail,dict) else {}
+          sitems=(stock.get('items') or {}) if isinstance(stock,dict) else {}
+          raw={str(r.get('code')):r for r in (raw_close.get('rows') or []) if isinstance(r,dict) and r.get('code')}
+
+          if not ditems:
+              raise SystemExit('close evidence gate: decision_close_detail empty')
+          missing_stock=sorted(set(ditems)-set(sitems))
+          if missing_stock:
+              raise SystemExit(f'close evidence gate: stock detail missing {missing_stock[:20]}')
+          if not isinstance(zones,list) or not zones:
+              raise SystemExit('close evidence gate: zone_close empty')
+
+          missing_zone=[]
+          missing_explain=[]
+          for code,row in ditems.items():
+              src=raw.get(str(code)) or {}
+              if src.get('support') not in (None,'',[]) and not row.get('support_zone_ids'):
+                  missing_zone.append(f'{code}:support')
+              if src.get('resistance') not in (None,'',[]) and not row.get('resistance_zone_ids'):
+                  missing_zone.append(f'{code}:resistance')
+              exp=row.get('score_explanations') or {}
+              if exp.get('version')!='score-explain-v4-resistance-aware':
+                  missing_explain.append(code)
+          if missing_zone:
+              raise SystemExit(f'close evidence gate: source zones were not migrated {missing_zone[:20]}')
+          if missing_explain:
+              raise SystemExit(f'close evidence gate: score explanations missing {missing_explain[:20]}')
+
+          for key in required:
+              if (ds[key].get('build_id') or active) != active:
+                  raise SystemExit(f'close evidence gate: {key} build_id mismatch')
+
+          print('close evidence gate OK', {
+              'build':active,
+              'decision_rows':len(ditems),
+              'stock_detail_rows':len(sitems),
+              'zones':len(zones),
+              'trade_date':str((ds.get('decision_close_detail') or {}).get('as_of') or '')[:10],
+          })
+          PY
+
       - name: Publish UI detail companions bound to Atomic Build
         run: |
           python - <<'PY'
@@ -129,11 +215,18 @@ jobs:
           (root/'sector-members.json').write_text(json.dumps(members,ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8')
           print('companions:', manifest['active_build_id'], members['close']['trade_date'], members['intraday']['trade_date'])
           PY
+
       - name: Verify UI modules
         run: |
           node --check docs/v2/data-source.js
           node --check docs/v2/app.js
           node --check docs/v2/ux-detail.js
+          node --check docs/v2/market-capital-ui.js
+          node --check docs/v2/score-explain-v4.js
+          node --check docs/v2/detail-context-v3.js
+          node --check docs/v2/card-display-v3.js
+          node --check docs/v2/radar-transparency-v7.js
+
       - name: Publish latest validated Shadow data safely
         run: |
           set -euo pipefail
@@ -190,6 +283,9 @@ jobs:
           print('Deploying canonical:', m.get('trade_date'), m.get('session_phase'), m.get('active_build_id'))
           if not m.get('active_build_id'):
               raise SystemExit('active_build_id missing before Pages deploy')
+          for key in ('decision_close_detail','stock_detail_close','zone_close'):
+              if key not in (m.get('datasets') or {}):
+                  raise SystemExit(f'deploy target missing required close evidence: {key}')
           PY
 
       - name: Checkout production main shell for Pages composition
@@ -231,7 +327,10 @@ jobs:
           test -f _site/v2/index.html
           test -f _site/v2/data/current_manifest.json
           test -f "_site/v2/data/builds/$ACTIVE_BUILD/decision-close-summary.json"
-          echo "Pages V2 active build: $ACTIVE_BUILD"
+          test -f "_site/v2/data/builds/$ACTIVE_BUILD/decision-close-detail.json"
+          test -f "_site/v2/data/builds/$ACTIVE_BUILD/stock-detail-close.json"
+          test -f "_site/v2/data/builds/$ACTIVE_BUILD/zone-close.json"
+          echo "Pages V2 active build with complete close evidence: $ACTIVE_BUILD"
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
