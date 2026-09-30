@@ -39,8 +39,19 @@ def close_trade_date(root: Path, manifest: dict) -> str:
     return ""
 
 
-def run_close_semantics(root: Path):
-    subprocess.run([sys.executable, str(Path(__file__).with_name("close_semantics_v5.py")), "--root", str(root)], check=True)
+def run_script(name: str, root: Path, *extra: str):
+    subprocess.run([sys.executable, str(Path(__file__).with_name(name)), "--root", str(root), *extra], check=True)
+
+
+def finalize_close(root: Path):
+    # The normalizer can change entry-position and ranks. Rebuild the physical
+    # summary/index arrays after rank assignment so card order and displayed #rank
+    # are guaranteed to be the same thing.
+    run_script("rebuild_close_rank_views.py", root)
+    run_script("close_semantics_v5.py", root)
+    # Close evidence is a deployment invariant: a score without same-build detail
+    # and zones must never be published again.
+    run_script("validate_mission_evidence.py", root, "--legacy-root", "docs/data", "--mission", "close")
 
 
 def main():
@@ -56,8 +67,8 @@ def main():
         raise SystemExit("close-date normalizer: decision_close_detail trade date missing")
 
     if close_date == bundle_date:
-        subprocess.run([sys.executable, str(Path(__file__).with_name("normalize_close_snapshot.py")), "--root", str(root)], check=True)
-        run_close_semantics(root)
+        run_script("normalize_close_snapshot.py", root)
+        finalize_close(root)
         print("close-date wrapper", {"bundle_date": bundle_date, "close_date": close_date, "mode": "same-date"})
         return
 
@@ -70,12 +81,14 @@ def main():
     manifest["trade_date"] = close_date
     write(manifest_path, manifest)
     try:
-        subprocess.run([sys.executable, str(Path(__file__).with_name("normalize_close_snapshot.py")), "--root", str(root)], check=True)
+        run_script("normalize_close_snapshot.py", root)
+        run_script("rebuild_close_rank_views.py", root)
     finally:
         latest = load(manifest_path)
         latest["trade_date"] = bundle_date
         write(manifest_path, latest)
-    run_close_semantics(root)
+    run_script("close_semantics_v5.py", root)
+    run_script("validate_mission_evidence.py", root, "--legacy-root", "docs/data", "--mission", "close")
     print("close-date wrapper", {"bundle_date": bundle_date, "close_date": close_date, "mode": "temporary-close-bind"})
 
 
