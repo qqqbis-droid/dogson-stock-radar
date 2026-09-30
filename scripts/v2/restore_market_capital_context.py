@@ -95,7 +95,12 @@ def close_components(m):
     elif breadth >= 45: bs = 0.5
     else: bs = 0.0
     fs = num(m.get("foreign_score"), 1.5)
-    return {"taiex":{"score":ts,"max":5},"otc":{"score":os,"max":4},"breadth":{"score":bs,"max":3},"foreign":{"score":fs,"max":3}}
+    return {
+        "taiex":{"score":ts,"max":5,"trend":bool(t.get("trend")) if t else None,"above20":bool(t.get("above20")) if t else None},
+        "otc":{"score":os,"max":4,"trend":bool(o.get("trend")) if o else None,"above20":bool(o.get("above20")) if o else None},
+        "breadth":{"score":bs,"max":3,"breadth_up_pct":breadth},
+        "foreign":{"score":fs,"max":3,"foreign_net_billion":num(m.get("foreign_net_billion")),"foreign_5d_billion":num(m.get("foreign_5d_billion"))},
+    }
 
 
 def market_close(close, fallback, build_id, generated_at):
@@ -123,14 +128,19 @@ def market_intraday(intra, build_id, generated_at):
     comps = {}
     for key, mx in (("taiex",3),("otc",3),("breadth",3),("funds",4),("sector",2)):
         r = raw.get(key) if isinstance(raw.get(key), dict) else {}
-        comps[key] = {"score":num(r.get("score")),"max":num(r.get("max"),mx)}
+        comps[key] = {**r, "score":num(r.get("score")), "max":num(r.get("max"),mx)}
+    q = intra.get("quote_layer") if isinstance(intra.get("quote_layer"), dict) else {}
+    b = intra.get("bridge") if isinstance(intra.get("bridge"), dict) else {}
+    quote_time = q.get("latest_time") or b.get("latest_quote_time")
+    last_trade = q.get("latest_trade_time") or b.get("latest_trade_time")
+    structure_time = q.get("structure_latest_time") or b.get("latest_structure_time")
     return {
         "schema_version":"2.0.0","build_id":build_id,"dataset":"market_context","context":"INTRADAY","trade_date":td,"session_phase":phase,
         "as_of":as_of,"known_at":as_of,"generated_at":generated_at,"freshness":fresh,"complete":bool(m.get("market_score") is not None and td),"source_status":source_status("docs/data/intraday.json",as_of),
         "market_regime":regime(m.get("market_mode")),"market_score":num(m.get("market_score")),"market_confidence":90 if m.get("market_score") is not None else 55,
         "score_model":"intraday_3_3_3_4_2","components":comps,
-        "metrics":{"breadth_up_pct":num(m.get("breadth_up_pct")),"turnover_up_pct":num(m.get("turnover_up_pct")),"above_vwap_turnover_pct":num(m.get("above_vwap_turnover_pct")),"weighted_pace":num(m.get("weighted_pace")),"sector_positive_pct":num(m.get("sector_positive_pct")),"sector_positive_count":num(m.get("sector_positive_count")),"sector_negative_count":num(m.get("sector_negative_count"))},
-        "notes":["盤中15分＝加權3＋櫃買3＋市場廣度3＋資金動能4＋族群擴散2。","盤後外資只作背景，不計入盤中15分。"]
+        "metrics":{"breadth_up_pct":num(m.get("breadth_up_pct")),"turnover_up_pct":num(m.get("turnover_up_pct")),"above_vwap_turnover_pct":num(m.get("above_vwap_turnover_pct")),"weighted_pace":num(m.get("weighted_pace")),"sector_positive_pct":num(m.get("sector_positive_pct")),"sector_positive_count":num(m.get("sector_positive_count")),"sector_negative_count":num(m.get("sector_negative_count")),"quote_snapshot_time":quote_time,"latest_trade_time":last_trade,"structure_latest_time":structure_time},
+        "notes":["盤中15分＝加權3＋櫃買3＋市場廣度3＋資金動能4＋族群擴散2。","盤後外資只作背景，不計入盤中15分。","盤中資料採雙時鐘：官方MIS報價快線約5分鐘；VWAP、量速與族群結構約10分鐘更新。"]
     }
 
 
@@ -186,10 +196,14 @@ def main():
     mc=market_close(close,fallback,bid,generated); mi=market_intraday(intra,bid,generated); cc=capital_close(close,bid,generated); ci=capital_intraday(intra,bid,generated)
     register(root,manifest,"market_close_context","market-close-context.json",mc); register(root,manifest,"market_intraday_context","market-intraday-context.json",mi); register(root,manifest,"capital_close_context","capital-close-context.json",cc); register(root,manifest,"capital_intraday_context","capital-intraday-context.json",ci)
     patch_scores(root,manifest,mc.get("market_score"),mi.get("market_score"))
-    warnings=manifest.setdefault("health",{}).setdefault("warnings",[]); msg="Market/Capital Context 已分離：盤中/當沖使用即時15分與族群成交動能；盤後使用收盤15分與法人估算金額。"
+    warnings=manifest.setdefault("health",{}).setdefault("warnings",[])
+    msg="Market/Capital Context 已分離：盤中/當沖使用即時15分與族群成交動能；盤後使用收盤15分與法人估算金額。"
     if msg not in warnings: warnings.append(msg)
+    msg2="盤中市場環境使用雙時鐘：MIS報價快線約5分鐘；VWAP/量速/族群結構約10分鐘，UI須分別標示。"
+    if msg2 not in warnings: warnings.append(msg2)
     write(manifest_path,manifest)
     print("restored market/capital contexts",{"build":bid,"intraday_score":mi.get("market_score"),"close_score":mc.get("market_score"),"intraday_sectors":len(ci["rows"]),"close_sectors":len(cc["rows"])})
 
 
-if __name__=="__main__": main()
+if __name__ == "__main__":
+    main()
