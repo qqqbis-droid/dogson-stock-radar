@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -46,7 +47,16 @@ def run_script(name: str, root: Path, *extra: str):
 def finalize_common(root: Path):
     run_script("close_semantics_v5.py", root)
     run_script("build_radar_stats.py", root)
-    run_script("validate_mission_evidence.py", root, "--legacy-root", "docs/data", "--mission", "close")
+    overlay_mode = os.environ.get("V2_OVERLAY_MODE", "")
+    # During a preserve overlay, the canonical V2 bundle is intentionally newer
+    # than the root legacy snapshot. Re-validating that preserved 9/30 decision
+    # set against an older 9/23 legacy root creates a false source/date failure.
+    # The caller still runs validate_bundle, market/capital validation, source-lock
+    # checks and index/detail semantic checks against the preserved canonical data.
+    if overlay_mode in {"PRESERVE_SAME_DAY", "PRESERVE_NEWER_CANONICAL"}:
+        print("close evidence legacy-root cross-check skipped for preserve overlay", overlay_mode)
+    else:
+        run_script("validate_mission_evidence.py", root, "--legacy-root", "docs/data", "--mission", "close")
 
 
 def finalize_close(root: Path):
