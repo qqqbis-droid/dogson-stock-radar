@@ -309,7 +309,16 @@ def evidence_maps(root: Path, manifest: dict, canonical_date: str):
 
 def rerank(rows):
     order = {"NEXT_DAY_READY":0,"BREAKOUT_WATCH":1,"PULLBACK_WATCH":2,"TREND_QUALITY":3,"RESEARCH":4,"RISK":5}
-    ranked = sorted(rows, key=lambda d: (order.get(d.get("opportunity_bucket"),99), -(num((d.get("scores") or {}).get("entry_position_score"), -1)), -(num(d.get("data_confidence"),0)), str(d.get("code") or "")))
+    ranked = sorted(
+        rows,
+        key=lambda d: (
+            order.get(d.get("opportunity_bucket"), 99),
+            -(num((d.get("scores") or {}).get("swing_quality_score"), -1)),
+            -(num((d.get("scores") or {}).get("entry_position_score"), -1)),
+            -(num(d.get("data_confidence"), 0)),
+            str(d.get("code") or ""),
+        ),
+    )
     return {str(d.get("code")): i for i,d in enumerate(ranked,1)}
 
 
