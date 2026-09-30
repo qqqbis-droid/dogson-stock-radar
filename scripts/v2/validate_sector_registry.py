@@ -16,13 +16,19 @@ CLOSE = ROOT / "docs" / "data" / "close.json"
 
 from scripts.sector_groups import (
     CODE_TO_RECORD,
+    OFFICIAL_INDUSTRY_CORE_CODES,
     PRIMARY_GROUP_MIN_CONFIDENCE,
     PRIMARY_GROUP_MIN_PEERS,
     SECONDARY_GROUP_MIN_CONFIDENCE,
     TAXONOMY_VERSION,
     classification_for,
+    industry_code_for,
     taxonomy_stats,
 )
+
+# These official industries are intentionally too heterogeneous to be promoted
+# to full core-sector scoring solely from the exchange industry code.
+BROAD_OFFICIAL_DENYLIST = {"24", "25", "26", "27", "28", "29", "31"}
 
 
 def load(path: Path, default):
@@ -47,6 +53,10 @@ def main():
         errors.append(
             f"version mismatch registry={registry.get('taxonomy_version')} resolver={TAXONOMY_VERSION}"
         )
+
+    leaked_broad = sorted(OFFICIAL_INDUSTRY_CORE_CODES & BROAD_OFFICIAL_DENYLIST)
+    if leaked_broad:
+        errors.append("broad official industries may not be core-only groups: " + ",".join(leaked_broad))
 
     for grow in registry.get("groups") or []:
         if not isinstance(grow, dict):
@@ -103,15 +113,24 @@ def main():
 
     universe = load(UNIVERSE, [])
     coverage = Counter()
+    score_sources = Counter()
+    evidence_status = Counter()
+    official_counts = Counter()
     unclassified_codes = []
     if isinstance(universe, list):
         for row in universe:
             if not isinstance(row, dict):
                 continue
+            raw_industry = row.get("industry")
+            ind_code = industry_code_for(raw_industry)
+            if ind_code:
+                official_counts[ind_code] += 1
             c = classification_for(
-                row.get("code"), name=row.get("name"), industry=row.get("industry")
+                row.get("code"), name=row.get("name"), industry=raw_industry
             )
             coverage[c["classification_status"]] += 1
+            score_sources[c["score_source"]] += 1
+            evidence_status[c["evidence_status"]] += 1
             if c["classification_status"] == "UNCLASSIFIED":
                 unclassified_codes.append(str(row.get("code") or ""))
         if universe and unclassified_codes:
@@ -120,15 +139,28 @@ def main():
                 + ",".join(unclassified_codes[:20])
             )
 
+    official_core_peer_counts = {
+        code: int(official_counts.get(code, 0)) for code in sorted(OFFICIAL_INDUSTRY_CORE_CODES)
+    }
+    for code, count in official_core_peer_counts.items():
+        if count < PRIMARY_GROUP_MIN_PEERS:
+            errors.append(
+                f"official-core industry {code} has only {count} universe peers; min={PRIMARY_GROUP_MIN_PEERS}"
+            )
+
     close = load(CLOSE, {})
     top = (close.get("rows") or [])[:50] if isinstance(close, dict) else []
     top_status = Counter()
+    top_score_sources = Counter()
+    top_evidence = Counter()
     top_unclassified = []
     for row in top:
         c = classification_for(
             row.get("code"), name=row.get("name"), industry=row.get("industry")
         )
         top_status[c["classification_status"]] += 1
+        top_score_sources[c["score_source"]] += 1
+        top_evidence[c["evidence_status"]] += 1
         if c["classification_status"] == "UNCLASSIFIED":
             top_unclassified.append(str(row.get("code") or ""))
     if top_unclassified:
@@ -139,12 +171,18 @@ def main():
         "status": "FAIL" if errors else "PASS",
         "taxonomy_version": TAXONOMY_VERSION,
         "registry_entries": stats.get("registry_entries"),
-        "eligible_primary_codes": stats.get("eligible_primary_codes"),
-        "primary_groups": stats.get("primary_groups"),
+        "eligible_registry_primary_codes": stats.get("eligible_primary_codes"),
+        "registry_primary_groups": stats.get("primary_groups"),
+        "official_industry_core_codes": sorted(OFFICIAL_INDUSTRY_CORE_CODES),
+        "official_core_peer_counts": official_core_peer_counts,
         "universe_rows": len(universe) if isinstance(universe, list) else 0,
         "universe_status": dict(sorted(coverage.items())),
+        "universe_score_sources": dict(sorted(score_sources.items())),
+        "universe_evidence_status": dict(sorted(evidence_status.items())),
         "top50_status": dict(sorted(top_status.items())),
-        "evidence_quality": dict(sorted(evidence_quality.items())),
+        "top50_score_sources": dict(sorted(top_score_sources.items())),
+        "top50_evidence_status": dict(sorted(top_evidence.items())),
+        "registry_evidence_quality": dict(sorted(evidence_quality.items())),
         "warnings": warnings,
         "errors": errors,
     }
