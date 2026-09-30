@@ -16,17 +16,20 @@ def resolve(root, url):
     return root / (raw[len("./data/"):] if raw.startswith("./data/") else raw.lstrip("./"))
 
 
+def run_py(path, *args):
+    p = Path(path)
+    if not p.is_file():
+        raise SystemExit(f"required V2 validator missing after overlay: {p}")
+    subprocess.run([sys.executable, str(p), *args], check=True)
+
+
 def run_mission_gate(mission):
-    gate = Path("scripts/v2/validate_mission_evidence.py")
-    if not gate.is_file():
-        raise SystemExit(f"mission evidence validator missing after V2 overlay: {gate}")
-    subprocess.run([
-        sys.executable,
-        str(gate),
+    run_py(
+        "scripts/v2/validate_mission_evidence.py",
         "--root", "docs/v2/data",
         "--legacy-root", "docs/data",
         "--mission", mission,
-    ], check=True)
+    )
 
 
 def main():
@@ -68,12 +71,10 @@ def main():
         if not p.is_file() or p.stat().st_size == 0:
             raise SystemExit(f"{key} missing from active build: {p}")
 
-    # Stronger P0 gate: existence is not enough. Detail, evidence and zones must
-    # be bound to the same Atomic Build, and stale structure can never coexist
-    # with actionable intraday/daytrade decisions.
     run_mission_gate("intraday")
     run_mission_gate("daytrade")
-    print("V2 stock detail/evidence bundle verified")
+    run_py("scripts/v2/validate_single_writer_ui.py")
+    print("V2 stock detail/evidence + single-writer UI verified")
 
 
 if __name__ == "__main__":
