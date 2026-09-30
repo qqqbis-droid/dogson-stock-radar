@@ -15,6 +15,7 @@ test -f docs/v2/index.html
 test -f docs/v2/detail-context-v2.js
 test -f docs/v2/detail-context-v3.js
 test -f docs/v2/card-display-v3.js
+test -f docs/v2/score-explain-v4.js
 test -f scripts/v2/shadow_cycle.py
 test -f scripts/v2/live_publish_patch.py
 test -f scripts/v2/enrich_zones.py
@@ -61,17 +62,13 @@ print(f'V2 overlay dates canonical={canonical} close={close} intraday={intra} da
 if not canonical:
     print('REBUILD')
 elif close and close > canonical:
-    # A new completed session must never borrow an older canonical intraday set.
     if not intra or intra < close or not day or day < close:
         print('BLOCK_NEW_SESSION')
     else:
         print('REBUILD')
 elif close == canonical and ((intra and intra < close) or (day and day < close) or not intra or not day):
-    # Same completed session: after-hours quote APIs may no longer expose the
-    # final snapshot.  Keep the already validated canonical session intact.
     print('PRESERVE_SAME_DAY')
 elif close and canonical > close:
-    # Root data is older than the canonical bundle.  Never regress V2.
     print('PRESERVE_NEWER_CANONICAL')
 else:
     print('REBUILD')
@@ -87,8 +84,6 @@ case "$mode" in
     ;;
   PRESERVE_SAME_DAY|PRESERVE_NEWER_CANONICAL)
     echo "Preserving verified canonical V2 data; deploying UI without rebuilding from stale after-hours MIS."
-    # Crossing midnight does not make the latest completed close session stale.
-    # Repair that semantic before validation while leaving intraday/daytrade frozen.
     python scripts/v2/normalize_close_snapshot.py --root docs/v2/data
     python scripts/v2/stamp_version_contract.py --root docs/v2/data
     python scripts/v2/validate_bundle.py --root docs/v2/data
@@ -101,8 +96,6 @@ case "$mode" in
       --output docs/v2/data \
       --reports /tmp/dogson-pages-v2-shadow/reports
     python scripts/v2/live_publish_patch.py --legacy-root docs/data --root docs/v2/data
-    # A fresh shadow_cycle rebuild replaces the active build directory. Re-run
-    # all enrichers that create decision-linked datasets inside that build.
     python scripts/v2/enrich_zones.py --legacy-root docs/data --output docs/v2/data
     python scripts/v2/enrich_stock_detail_context.py --legacy-root docs/data --root docs/v2/data
     python scripts/v2/restore_market_capital_context.py --legacy-root docs/data --root docs/v2/data
@@ -121,6 +114,9 @@ node --check docs/v2/stock-detail-bridge.js
 node --check docs/v2/detail-context-v2.js
 node --check docs/v2/detail-context-v3.js
 node --check docs/v2/card-display-v3.js
+node --check docs/v2/score-explain-v4.js
+python -m py_compile scripts/v2/normalize_close_snapshot.py
+python -m py_compile scripts/v2/enrich_stock_detail_context.py
 
 test -f docs/v2/data/current_manifest.json
 
@@ -171,10 +167,6 @@ if mode == 'REBUILD':
     if cde and vc != cde:
         raise SystemExit(f'V2 close regression: source={cde} v2={vc}')
 else:
-    # Preservation is allowed only when the canonical bundle represents at
-    # least the latest completed close session and its three decision contexts
-    # are internally same-session.  Older root intraday data is explicitly not
-    # imported into the canonical build.
     if cde and vc < cde:
         raise SystemExit(f'preserved canonical close is older than root close: v2={vc} root={cde}')
     if not vc or vi != vc or vd != vc:
@@ -206,19 +198,37 @@ for ctx in ('intraday','close','daytrade'):
     if zone_counts[ctx] <= 0:
         raise SystemExit(f'V2 zone_{ctx} is empty after overlay')
 
-# Close snapshot semantics: if close is the canonical latest completed session,
-# it must remain planning-valid across midnight and must not be DATA_STALE.
 close_summary=load(resolve(root,m['datasets']['decision_close_summary']['url']))
 if vc == str(m.get('trade_date') or '')[:10]:
     bad=[r.get('code') for r in close_summary if r.get('freshness') in ('STALE','UNKNOWN') or r.get('action_state')=='DATA_STALE']
     if bad:
         raise SystemExit(f'latest close snapshot incorrectly stale: {bad[:10]}')
 
-print('V2 source lock:', {'mode':mode,'build':m.get('active_build_id'),'close':vc,'intraday':vi,'daytrade':vd,'root_intraday':ide,'root_daytrade':dde,'version_set':m.get('version_set_id'),'market_capital':'split','zones':zone_counts,'stock_detail':'mission-split-v3','close_snapshot':'latest-completed-valid'})
+# Score Explain V4 contract: every current close detail row must explain its
+# component scores and pressure-aware entry position.  A row that is inside a
+# known resistance zone must never retain a perfect 100 entry-position score.
+close_detail=load(resolve(root,m['datasets']['decision_close_detail']['url']))
+items=(close_detail.get('items') or {}) if isinstance(close_detail,dict) else {}
+missing_explain=[]; bad_pressure=[]
+for code,row in items.items():
+    exp=row.get('score_explanations') or {}
+    if exp.get('version')!='score-explain-v4-resistance-aware':
+        missing_explain.append(code)
+        continue
+    entry=exp.get('entry_position') or {}
+    reasons=entry.get('items') or []
+    inside=any(x.get('label')=='身處壓力區' for x in reasons if isinstance(x,dict))
+    score=(row.get('scores') or {}).get('entry_position_score')
+    if inside and score is not None and float(score)>=100:
+        bad_pressure.append(code)
+if missing_explain:
+    raise SystemExit(f'close score explanations missing: {missing_explain[:10]}')
+if bad_pressure:
+    raise SystemExit(f'resistance-aware entry score failed: {bad_pressure[:10]}')
+
+print('V2 source lock:', {'mode':mode,'build':m.get('active_build_id'),'close':vc,'intraday':vi,'daytrade':vd,'root_intraday':ide,'root_daytrade':dde,'version_set':m.get('version_set_id'),'market_capital':'split','zones':zone_counts,'stock_detail':'mission-split-v3','close_snapshot':'latest-completed-valid','score_explain':'v4-pressure-aware'})
 PY
 
-# The legacy service worker owns the repository root. Let /v2/ bypass it so iOS
-# navigation is handled by the V2 app instead of the legacy SPA fallback/cache.
 python - <<'PY'
 from pathlib import Path
 p = Path('docs/sw.js')
