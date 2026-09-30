@@ -3,15 +3,16 @@
 
 Single source of truth:
     contracts/registries/sector_registry.json
+    contracts/registries/taxonomy_registry.json
 
-Rules:
-- official industry is fallback context, not a narrow sector.
-- only a unique primary_group with confidence >= policy threshold and enough peers
-  may enter core sector scoring.
-- secondary_groups/theme_tags never stack core sector points.
-- missing narrow classification is OFFICIAL_ONLY when official industry is known;
-  it is not silently interpreted as sector weakness.
-- duplicate registry membership fails closed.
+Classification and evidence are intentionally separate:
+- a curated narrow primary may be structurally usable but is still CURATED_ONLY
+  until external evidence upgrades it;
+- a small allow-list of sufficiently narrow official TWSE/TPEx industries can be
+  OFFICIAL_DIRECT core groups without a hand-written stock list;
+- broad official industries remain capped proxy context;
+- secondary/theme tags never stack core sector points;
+- duplicate registry primary membership fails closed.
 """
 from __future__ import annotations
 
@@ -31,6 +32,8 @@ INDUSTRY_NAMES = {
     "28":"電子零組件業","29":"電子通路業","30":"資訊服務業","31":"其他電子業","32":"文化創意","33":"農業科技",
     "34":"電子商務","35":"綠能環保","36":"數位雲端","37":"運動休閒","38":"居家生活"
 }
+INDUSTRY_CODES_BY_NAME = {v: k for k, v in INDUSTRY_NAMES.items()}
+
 
 def _load_json(path: Path, expected_type):
     if not path.is_file():
@@ -43,12 +46,17 @@ def _load_json(path: Path, expected_type):
         raise RuntimeError(f"Sector Taxonomy wrong JSON type: {path}")
     return obj
 
+
 _POLICY = _load_json(POLICY_PATH, dict)
 TAXONOMY_VERSION = str(_POLICY.get("taxonomy_version") or "UNKNOWN")
 _CLASS_POLICY = _POLICY.get("classification_policy") or {}
 PRIMARY_GROUP_MIN_CONFIDENCE = float(_CLASS_POLICY.get("primary_group_min_confidence", 80))
 SECONDARY_GROUP_MIN_CONFIDENCE = float(_CLASS_POLICY.get("secondary_group_min_confidence", 70))
 PRIMARY_GROUP_MIN_PEERS = int(_CLASS_POLICY.get("primary_group_min_peers", 3))
+OFFICIAL_INDUSTRY_CORE_CODES = {
+    str(x).strip() for x in (_CLASS_POLICY.get("official_industry_core_codes") or []) if str(x).strip()
+}
+OFFICIAL_INDUSTRY_CORE_CONFIDENCE = float(_CLASS_POLICY.get("official_industry_core_confidence", 100))
 REVIEW_DAYS = int(_CLASS_POLICY.get("review_days", 180))
 
 _REGISTRY = _load_json(REGISTRY_PATH, dict)
@@ -95,11 +103,9 @@ for grow in _REGISTRY.get("groups") or []:
         }
         _group_members[group].append(code)
 
-for raw_code, override in (_REGISTRY.get("stock_overrides") or {}).items():
-    code = str(raw_code or "").strip()
-    if not code or not isinstance(override, dict):
-        continue
-    rec = CODE_TO_RECORD.setdefault(code, {
+
+def _blank_record(code):
+    return {
         "code": code,
         "primary_group": None,
         "primary_group_confidence": None,
@@ -113,7 +119,14 @@ for raw_code, override in (_REGISTRY.get("stock_overrides") or {}).items():
         "review_due_at": _REGISTRY.get("review_due_at"),
         "revenue_evidence_period": None,
         "exposure_pct": None,
-    })
+    }
+
+
+for raw_code, override in (_REGISTRY.get("stock_overrides") or {}).items():
+    code = str(raw_code or "").strip()
+    if not code or not isinstance(override, dict):
+        continue
+    rec = CODE_TO_RECORD.setdefault(code, _blank_record(code))
     for key in (
         "primary_group","primary_group_confidence","secondary_groups","supply_chain_role",
         "evidence_quality","evidence_urls_or_refs","classification_reason",
@@ -126,21 +139,7 @@ for raw_code, tags in (_REGISTRY.get("theme_tags") or {}).items():
     code = str(raw_code or "").strip()
     if not code:
         continue
-    rec = CODE_TO_RECORD.setdefault(code, {
-        "code": code,
-        "primary_group": None,
-        "primary_group_confidence": None,
-        "secondary_groups": [],
-        "theme_tags": [],
-        "supply_chain_role": [],
-        "evidence_quality": "UNSPECIFIED",
-        "evidence_urls_or_refs": [],
-        "classification_reason": None,
-        "last_reviewed_at": _REGISTRY.get("last_reviewed_at"),
-        "review_due_at": _REGISTRY.get("review_due_at"),
-        "revenue_evidence_period": None,
-        "exposure_pct": None,
-    })
+    rec = CODE_TO_RECORD.setdefault(code, _blank_record(code))
     rec["theme_tags"] = list(tags or [])
 
 PRIMARY_GROUPS = {g: sorted(codes) for g, codes in sorted(_group_members.items())}
@@ -162,22 +161,29 @@ for group, members in PRIMARY_GROUPS.items():
 
 SECONDARY_GROUPS = {
     code: [dict(x) for x in (rec.get("secondary_groups") or []) if isinstance(x, dict)]
-    for code, rec in CODE_TO_RECORD.items()
-    if rec.get("secondary_groups")
+    for code, rec in CODE_TO_RECORD.items() if rec.get("secondary_groups")
 }
 THEME_TAGS = {
     code: list(rec.get("theme_tags") or [])
-    for code, rec in CODE_TO_RECORD.items()
-    if rec.get("theme_tags")
+    for code, rec in CODE_TO_RECORD.items() if rec.get("theme_tags")
 }
 SECONDARY_ONLY = {
     code for code, rec in CODE_TO_RECORD.items()
     if not str(rec.get("primary_group") or "").strip() and rec.get("secondary_groups")
 }
 
+
 def industry_name_for(industry):
     key = str(industry or "").strip()
     return INDUSTRY_NAMES.get(key, key if key and key != "nan" else "未分類")
+
+
+def industry_code_for(industry):
+    key = str(industry or "").strip()
+    if key in INDUSTRY_NAMES:
+        return key
+    return INDUSTRY_CODES_BY_NAME.get(key)
+
 
 def _confidence(value):
     try:
@@ -185,29 +191,89 @@ def _confidence(value):
     except Exception:
         return None
 
+
+def evidence_status_for(quality):
+    q = str(quality or "UNSPECIFIED").upper()
+    if q == "OFFICIAL_DIRECT":
+        return "OFFICIAL_DIRECT"
+    if q == "OFFICIAL_INDIRECT":
+        return "OFFICIAL_SUPPORTED"
+    if q == "CURATED_SEED":
+        return "CURATED_ONLY"
+    if q == "MULTI_BUSINESS_REVIEW":
+        return "REVIEWED_MULTI_BUSINESS"
+    return "NO_EXTERNAL_EVIDENCE"
+
+
 def classification_for(code, name=None, industry=None):
     code = str(code or "").strip()
     rec = CODE_TO_RECORD.get(code) or {}
-
+    official_code = industry_code_for(industry)
     official = industry_name_for(industry)
-    group = str(rec.get("primary_group") or "").strip() or None
-    conf = _confidence(rec.get("primary_group_confidence"))
-    peer_count = int(GROUP_SIZES.get(group, 0)) if group else 0
-    eligible = bool(
-        group and conf is not None
-        and conf >= PRIMARY_GROUP_MIN_CONFIDENCE
-        and peer_count >= PRIMARY_GROUP_MIN_PEERS
-    )
 
-    if eligible:
-        status, score_source = "VERIFIED", "PRIMARY_GROUP"
-    elif group:
+    registry_group = str(rec.get("primary_group") or "").strip() or None
+    registry_conf = _confidence(rec.get("primary_group_confidence"))
+    registry_peers = int(GROUP_SIZES.get(registry_group, 0)) if registry_group else 0
+    registry_eligible = bool(
+        registry_group and registry_conf is not None
+        and registry_conf >= PRIMARY_GROUP_MIN_CONFIDENCE
+        and registry_peers >= PRIMARY_GROUP_MIN_PEERS
+    )
+    official_core = bool(official_code in OFFICIAL_INDUSTRY_CORE_CODES and official != "未分類")
+
+    if registry_eligible:
+        primary_group = registry_group
+        primary_conf = registry_conf
+        peer_count = registry_peers
+        status = "VERIFIED"
+        score_source = "PRIMARY_GROUP"
+        eligible = True
+        evidence_quality = rec.get("evidence_quality") or "UNSPECIFIED"
+        evidence_refs = list(rec.get("evidence_urls_or_refs") or [])
+        reason = rec.get("classification_reason") or (
+            f"Taxonomy {TAXONOMY_VERSION} 窄主分類：{registry_group}；"
+            "已通過主分類唯一性、信心與同儕樣本門檻。"
+        )
+    elif official_core:
+        primary_group = official
+        primary_conf = OFFICIAL_INDUSTRY_CORE_CONFIDENCE
+        peer_count = None
+        status = "VERIFIED"
+        score_source = "OFFICIAL_INDUSTRY_CORE"
+        eligible = True
+        evidence_quality = "OFFICIAL_DIRECT"
+        evidence_refs = [f"TWSE/TPEx official industry code:{official_code}"]
+        reason = f"官方產業「{official}」屬 Taxonomy 2.1 核心白名單，可直接作同業族群，不需人工題材推定。"
+    elif registry_group:
+        primary_group = registry_group
+        primary_conf = registry_conf
+        peer_count = registry_peers
         status = "PROVISIONAL"
         score_source = "OFFICIAL_PROXY" if official != "未分類" else "NONE"
+        eligible = False
+        evidence_quality = rec.get("evidence_quality") or "UNSPECIFIED"
+        evidence_refs = list(rec.get("evidence_urls_or_refs") or [])
+        reason = rec.get("classification_reason") or f"窄主分類 {registry_group} 尚未通過核心族群門檻。"
     elif official != "未分類":
-        status, score_source = "OFFICIAL_ONLY", "OFFICIAL_PROXY"
+        primary_group = None
+        primary_conf = None
+        peer_count = 0
+        status = "OFFICIAL_ONLY"
+        score_source = "OFFICIAL_PROXY"
+        eligible = False
+        evidence_quality = "OFFICIAL_DIRECT"
+        evidence_refs = [f"TWSE/TPEx official industry code:{official_code or official}"]
+        reason = rec.get("classification_reason") or "尚無高信心窄主族群；使用官方產業 proxy，不視為族群弱勢。"
     else:
-        status, score_source = "UNCLASSIFIED", "NONE"
+        primary_group = registry_group
+        primary_conf = registry_conf
+        peer_count = registry_peers
+        status = "UNCLASSIFIED"
+        score_source = "NONE"
+        eligible = False
+        evidence_quality = rec.get("evidence_quality") or "UNSPECIFIED"
+        evidence_refs = list(rec.get("evidence_urls_or_refs") or [])
+        reason = rec.get("classification_reason") or "分類證據不足。"
 
     secondary = []
     for item in rec.get("secondary_groups") or []:
@@ -217,32 +283,23 @@ def classification_for(code, name=None, industry=None):
         if c >= SECONDARY_GROUP_MIN_CONFIDENCE and item.get("group"):
             secondary.append(dict(item))
 
-    reason = rec.get("classification_reason")
-    if not reason:
-        if group:
-            reason = (
-                f"Taxonomy {TAXONOMY_VERSION} 主分類：{group}；"
-                "只有信心門檻與同儕樣本都通過才進核心族群分。"
-            )
-        elif official != "未分類":
-            reason = "尚無高信心窄主族群；使用官方產業 proxy。"
-        else:
-            reason = "分類證據不足。"
-
     return {
         "taxonomy_version": TAXONOMY_VERSION,
         "code": code,
         "name": str(name or code),
         "official_industry": official,
-        "primary_group": group,
-        "primary_group_confidence": conf,
+        "official_industry_code": official_code,
+        "registry_primary_group": registry_group,
+        "primary_group": primary_group,
+        "primary_group_confidence": primary_conf,
         "secondary_groups": secondary,
         "theme_tags": list(rec.get("theme_tags") or []),
-        "supply_chain_role": list(rec.get("supply_chain_role") or ([group] if group else [])),
+        "supply_chain_role": list(rec.get("supply_chain_role") or ([registry_group] if registry_group else [])),
         "exposure_pct": rec.get("exposure_pct"),
         "revenue_evidence_period": rec.get("revenue_evidence_period"),
-        "evidence_urls_or_refs": list(rec.get("evidence_urls_or_refs") or []),
-        "evidence_quality": rec.get("evidence_quality") or "UNSPECIFIED",
+        "evidence_urls_or_refs": evidence_refs,
+        "evidence_quality": evidence_quality,
+        "evidence_status": evidence_status_for(evidence_quality),
         "last_reviewed_at": rec.get("last_reviewed_at") or _REGISTRY.get("last_reviewed_at"),
         "review_due_at": rec.get("review_due_at") or _REGISTRY.get("review_due_at"),
         "classification_status": status,
@@ -252,22 +309,25 @@ def classification_for(code, name=None, industry=None):
         "core_sector_score_eligible": eligible,
     }
 
+
 def sector_group_for(code, name=None, industry=None):
     c = classification_for(code, name=name, industry=industry)
     return c["primary_group"] if c["core_sector_score_eligible"] else None
 
+
 def sector_confidence_for(code, name=None, industry=None):
     return classification_for(code, name=name, industry=industry)["primary_group_confidence"]
+
 
 def taxonomy_stats():
     statuses = Counter()
     evidence = Counter()
     eligible = 0
     primary_with_evidence = 0
-    for code, rec in CODE_TO_RECORD.items():
+    for code in CODE_TO_RECORD:
         c = classification_for(code)
         statuses[c["classification_status"]] += 1
-        evidence[c["evidence_quality"]] += 1
+        evidence[c["evidence_status"]] += 1
         if c["core_sector_score_eligible"]:
             eligible += 1
         if c["primary_group"] and c["evidence_urls_or_refs"]:
@@ -282,8 +342,9 @@ def taxonomy_stats():
         "primary_group_min_confidence": PRIMARY_GROUP_MIN_CONFIDENCE,
         "secondary_group_min_confidence": SECONDARY_GROUP_MIN_CONFIDENCE,
         "primary_group_min_peers": PRIMARY_GROUP_MIN_PEERS,
+        "official_industry_core_codes": sorted(OFFICIAL_INDUSTRY_CORE_CODES),
         "review_days": REVIEW_DAYS,
         "registry_statuses_without_runtime_industry": dict(sorted(statuses.items())),
-        "evidence_quality_counts": dict(sorted(evidence.items())),
+        "evidence_status_counts": dict(sorted(evidence.items())),
         "group_sizes": dict(sorted(GROUP_SIZES.items())),
     }
