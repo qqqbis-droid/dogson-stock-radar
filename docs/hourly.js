@@ -156,3 +156,4 @@
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
+// deploy marker: v2 detail readability v6
