@@ -17,6 +17,7 @@ REQUIRED = {
     "portfolio-renderer.js",
     "radar-transparency-v7.js",
     "theme-toggle.js",
+    "runtime-observability.js",
 }
 
 FORBIDDEN_ACTIVE = {
@@ -111,7 +112,9 @@ def main():
         "detail_owner": "stock-detail-renderer.js",
         "portfolio_owner": "portfolio-renderer.js",
         "theme_owner": "theme-toggle.js",
+        "runtime_observability_owner": "runtime-observability.js",
         "portfolio_storage": "browser-local-only",
+        "runtime_metrics_storage": "session-local-only",
         "syntax_checked": sorted(REQUIRED),
         "deprecated_overlays_active": [],
     })
