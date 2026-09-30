@@ -2,6 +2,11 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 from .engine import canonical_stage, risk_overlays, synthesize_action, bucket_for
 
+try:
+    from sector_groups import classification_for
+except ImportError:  # package/import tests
+    from scripts.sector_groups import classification_for
+
 TW = timezone(timedelta(hours=8))
 
 SWING_COMPONENTS = {
@@ -85,8 +90,10 @@ def infer_volume_unit(row):
     return "UNKNOWN"
 
 def infer_freshness(row, session_phase):
-    if session_phase == "LIVE": return "LIVE"
-    if session_phase == "CLOSE_FREEZE": return "FROZEN"
+    if session_phase == "LIVE":
+        return "LIVE"
+    if session_phase == "CLOSE_FREEZE":
+        return "FROZEN"
     return "FRESH"
 
 def _component_model(*, model, source, total_score, raw, spec, contribution=None, contribution_max=None, note=None):
@@ -122,25 +129,21 @@ def _component_model(*, model, source, total_score, raw, spec, contribution=None
     }
 
 def build_component_models(row, swing_score, intraday_score, daytrade_score):
-    swing_raw = row.get("swing_components")
-    swing_contrib = row.get("swing_weighted_components")
-    swing_weights = row.get("swing_weights")
     swing = _component_model(
         model="swing_quality",
         source=row.get("swing_weight_source") or "baseline",
         total_score=swing_score,
-        raw=swing_raw,
+        raw=row.get("swing_components"),
         spec=SWING_COMPONENTS,
-        contribution=swing_contrib,
-        contribution_max=swing_weights,
+        contribution=row.get("swing_weighted_components"),
+        contribution_max=row.get("swing_weights"),
         note="原始 component 保留 50/25/15/10 尺度；若有歷史校準，實際貢獻顯示校準後權重。",
     )
-    intraday_raw = row.get("intraday_components") or row.get("source_intraday_components")
     intraday = _component_model(
         model="intraday_momentum",
         source="intraday_execution_30_25_15_20_10",
         total_score=intraday_score,
-        raw=intraday_raw,
+        raw=row.get("intraday_components") or row.get("source_intraday_components"),
         spec=INTRADAY_COMPONENTS,
         note="盤中籌碼只作最近盤後背景，不灌入即時動能分。",
     )
@@ -160,13 +163,10 @@ def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, mar
     overlays = risk_overlays(row, freshness=freshness)
     entry = num(row.get("entry_position_score", row.get("entry_score")))
     action, actionable = synthesize_action(stage, overlays, freshness, entry_score=entry, has_position=has_position)
-    if session_phase == "CLOSE_FREEZE": actionable = False
+    if session_phase == "CLOSE_FREEZE":
+        actionable = False
     bucket = bucket_for(mission, stage, action, freshness, actionable, has_position=has_position)
 
-    # A generic legacy `score` is mission-dependent.  It is a valid fallback for
-    # the close/next-day swing model, but it must not be copied into an intraday
-    # swing-quality slot just because the intraday row happens to have a score.
-    # Otherwise the UI can show a fake `swing quality == intraday momentum` pair.
     score = num(row.get("swing_quality_score"))
     if score is None and (mission == "close_next_day" or isinstance(row.get("swing_components"), dict)):
         score = num(row.get("score"))
@@ -175,6 +175,9 @@ def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, mar
     daytrade = num(row.get("daytrade_score"))
     components = build_component_models(row, score, intraday, daytrade)
     code = str(row.get("code") or "").strip()
+    name = str(row.get("name") or code)
+    industry_raw = row.get("industry")
+    taxonomy = classification_for(code, name=name, industry=industry_raw)
     now = datetime.now(TW).isoformat(timespec="seconds")
     raw_as_of = row.get("quote_time") or row.get("updated_at") or row.get("time")
     as_of = canonical_datetime(raw_as_of, trade_date)
@@ -194,24 +197,93 @@ def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, mar
         "quote_time": as_of,
     }
 
-    missing=[]
-    for name,value in [("swing_quality_score",score),("entry_position_score",entry),("quote.price",price)]:
-        if value is None: missing.append(name)
-    coverage=max(0,100-20*sum(1 for x in missing if x in {"swing_quality_score","entry_position_score"})-10*sum(1 for x in missing if x=="quote.price")); confidence=num(row.get("data_confidence"),coverage)
-    why=list(row.get("stage_signals") or row.get("reasons") or [])
-    blockers=[]
+    missing = []
+    for field, value in [
+        ("swing_quality_score", score),
+        ("entry_position_score", entry),
+        ("quote.price", price),
+    ]:
+        if value is None:
+            missing.append(field)
+    coverage = max(
+        0,
+        100
+        - 20 * sum(1 for x in missing if x in {"swing_quality_score", "entry_position_score"})
+        - 10 * sum(1 for x in missing if x == "quote.price"),
+    )
+    confidence = num(row.get("data_confidence"), coverage)
+    why = list(row.get("stage_signals") or row.get("reasons") or [])
+    blockers = []
     if not actionable:
-        if action=="WAIT_TRIGGER": blockers.append("等待正式觸發")
-        if action in {"WAIT_PULLBACK","DO_NOT_CHASE"}: blockers.append("位置不宜追價")
-        if action=="DATA_STALE": blockers.append("資料新鮮度不足")
+        if action == "WAIT_TRIGGER":
+            blockers.append("等待正式觸發")
+        if action in {"WAIT_PULLBACK", "DO_NOT_CHASE"}:
+            blockers.append("位置不宜追價")
+        if action == "DATA_STALE":
+            blockers.append("資料新鮮度不足")
+
+    primary_group = taxonomy.get("primary_group") if taxonomy.get("core_sector_score_eligible") else None
+    secondary_groups = [x.get("group") for x in taxonomy.get("secondary_groups") or [] if x.get("group")]
+    theme_tags = list(taxonomy.get("theme_tags") or [])
+
     return {
-        "schema_version":"2.0.0","build_id":build_id,"dataset":"decision","trade_date":trade_date,"session_phase":session_phase,"as_of":as_of,"known_at":now,"generated_at":now,"freshness":freshness,"complete":len(missing)==0,"confidence":confidence,
-        "source_status":{"sources":["legacy-v1-adapter"],"fallback":False,"fallback_source":None,"fallback_build_id":None,"fallback_reason":None,"last_success_at":now},
-        "decision_context_id":f"{build_id}:{mission}:{code}","code":code,"name":str(row.get("name") or code),"market":str(row.get("market") or "UNKNOWN"),"industry":row.get("industry_name") or row.get("industry"),"primary_group":row.get("sector_group"),"secondary_groups":[],"theme_tags":[],
-        "quote":quote,
-        "scores":{"swing_quality_score":score,"intraday_momentum_score":intraday,"daytrade_score":daytrade,"entry_position_score":entry,"market_score":market_score},
-        "components":components,
-        "lifecycle_stage":stage,"previous_stage":previous_stage,"stage_changed_at":None,"stage_age":None,"stage_confidence":None,"action_state":action,"actionable":bool(actionable),"no_chase":action=="DO_NOT_CHASE","risk_overlays":overlays,"opportunity_bucket":bucket,"opportunity_rank":None,
-        "why_now":why[:3],"blockers":blockers[:3],"upgrade_conditions":["等待下一個合法 Trigger / 結構確認"] if not actionable else [],"risk_flags":list(row.get("stage_risks") or []),"data_confidence":confidence,"component_coverage":coverage,"missing_fields":missing,
-        "trade_plan_id":None,"case_id":None,"support_zone_ids":[],"resistance_zone_ids":[],"evidence_ids":[]
+        "schema_version": "2.0.0",
+        "build_id": build_id,
+        "dataset": "decision",
+        "trade_date": trade_date,
+        "session_phase": session_phase,
+        "as_of": as_of,
+        "known_at": now,
+        "generated_at": now,
+        "freshness": freshness,
+        "complete": len(missing) == 0,
+        "confidence": confidence,
+        "source_status": {
+            "sources": ["legacy-v1-adapter", f"sector-taxonomy-{taxonomy.get('taxonomy_version') or 'unknown'}"],
+            "fallback": False,
+            "fallback_source": None,
+            "fallback_build_id": None,
+            "fallback_reason": None,
+            "last_success_at": now,
+        },
+        "decision_context_id": f"{build_id}:{mission}:{code}",
+        "code": code,
+        "name": name,
+        "market": str(row.get("market") or "UNKNOWN"),
+        "industry": row.get("industry_name") or taxonomy.get("official_industry") or industry_raw,
+        "primary_group": primary_group,
+        "secondary_groups": secondary_groups,
+        "theme_tags": theme_tags,
+        "quote": quote,
+        "scores": {
+            "swing_quality_score": score,
+            "intraday_momentum_score": intraday,
+            "daytrade_score": daytrade,
+            "entry_position_score": entry,
+            "market_score": market_score,
+        },
+        "components": components,
+        "lifecycle_stage": stage,
+        "previous_stage": previous_stage,
+        "stage_changed_at": None,
+        "stage_age": None,
+        "stage_confidence": None,
+        "action_state": action,
+        "actionable": bool(actionable),
+        "no_chase": action == "DO_NOT_CHASE",
+        "risk_overlays": overlays,
+        "opportunity_bucket": bucket,
+        "opportunity_rank": None,
+        "why_now": why[:3],
+        "blockers": blockers[:3],
+        "upgrade_conditions": ["等待下一個合法 Trigger / 結構確認"] if not actionable else [],
+        "risk_flags": list(row.get("stage_risks") or []),
+        "data_confidence": confidence,
+        "component_coverage": coverage,
+        "missing_fields": missing,
+        "trade_plan_id": None,
+        "case_id": None,
+        "support_zone_ids": [],
+        "resistance_zone_ids": [],
+        "evidence_ids": [],
     }
