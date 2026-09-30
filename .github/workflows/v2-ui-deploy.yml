@@ -82,8 +82,8 @@ jobs:
 
           root=Path('docs/v2/data')
           m=json.loads((root/'current_manifest.json').read_text(encoding='utf-8'))
-          trade_date=str(m.get('trade_date') or '')[:10]
-          if len(trade_date) != 10 or not m.get('health',{}).get('validation_passed'):
+          bundle_date=str(m.get('trade_date') or '')[:10]
+          if len(bundle_date) != 10 or not m.get('health',{}).get('validation_passed'):
               raise SystemExit('canonical source manifest is not validated')
           meta=(m.get('datasets') or {}).get('decision_close_summary')
           if not meta:
@@ -91,13 +91,19 @@ jobs:
           raw=str(meta.get('url') or '')
           p=root/(raw[len('./data/'):] if raw.startswith('./data/') else raw.lstrip('./'))
           rows=json.loads(p.read_text(encoding='utf-8'))
-          latest=[r for r in rows if str(r.get('trade_date') or r.get('as_of') or '')[:10] == trade_date]
+          close_date=str(meta.get('trade_date') or meta.get('as_of') or '')[:10]
+          if len(close_date) != 10:
+              dates=sorted({str(r.get('trade_date') or r.get('as_of') or '')[:10] for r in rows if len(str(r.get('trade_date') or r.get('as_of') or '')[:10]) == 10})
+              close_date=dates[-1] if dates else ''
+          if len(close_date) != 10:
+              raise SystemExit('canonical source close mission date is unavailable')
+          latest=[r for r in rows if str(r.get('trade_date') or r.get('as_of') or '')[:10] == close_date]
           if not latest:
-              raise SystemExit(f'canonical source has no close rows for {trade_date}')
+              raise SystemExit(f'canonical source has no close rows for close mission date {close_date}')
           bad=[r.get('code') for r in latest if r.get('freshness') in ('STALE','UNKNOWN') or r.get('action_state')=='DATA_STALE']
           if bad:
               raise SystemExit(f'canonical source latest-close semantics regressed: {bad[:10]}')
-          print('Canonical UI source verified:', {'build':m.get('active_build_id'),'trade_date':trade_date,'close_rows':len(latest)})
+          print('Canonical UI source verified:', {'build':m.get('active_build_id'),'bundle_date':bundle_date,'close_date':close_date,'close_rows':len(latest)})
           PY
 
           before_hash="$(sha256sum docs/v2/data/current_manifest.json | awk '{print $1}')"
@@ -150,6 +156,8 @@ jobs:
           node --check docs/v2/stock-detail-bridge.js
           node --check docs/v2/detail-context-v3.js
           node --check docs/v2/card-display-v3.js
+          node --check docs/v2/ui-coherence-v5.js
+          node --check docs/v2/copy-polish-v6.js
           node --check docs/v2/market-capital-ui.js
           node --check docs/sw.js
 
