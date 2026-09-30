@@ -10,6 +10,7 @@ Classification confidence and evidence provenance are separate:
   evidence status is still CURATED_ONLY;
 - official TWSE/TPEx industry is OFFICIAL_DIRECT evidence for broad industry
   membership, but NEVER grants full narrow-sector score by itself;
+- stock-specific review/evidence overrides generic official-industry evidence;
 - secondary/theme tags never stack core sector points;
 - duplicate registry primary membership fails closed.
 """
@@ -235,15 +236,18 @@ def classification_for(code, name=None, industry=None):
         if c >= SECONDARY_GROUP_MIN_CONFIDENCE and item.get("group"):
             secondary.append(dict(item))
 
-    if group:
-        evidence_quality = rec.get("evidence_quality") or "UNSPECIFIED"
-        evidence_refs = list(rec.get("evidence_urls_or_refs") or [])
+    rec_quality = str(rec.get("evidence_quality") or "").strip()
+    rec_refs = [str(x).strip() for x in (rec.get("evidence_urls_or_refs") or []) if str(x).strip()]
+    has_stock_specific_evidence = rec_quality not in ("", "UNSPECIFIED", "NONE") or bool(rec_refs)
+    if group or has_stock_specific_evidence:
+        evidence_quality = rec_quality or "UNSPECIFIED"
+        evidence_refs = rec_refs
     elif official != "未分類":
         evidence_quality = "OFFICIAL_DIRECT"
         evidence_refs = [f"TWSE/TPEx official industry code:{official_code or official}"]
     else:
-        evidence_quality = rec.get("evidence_quality") or "UNSPECIFIED"
-        evidence_refs = list(rec.get("evidence_urls_or_refs") or [])
+        evidence_quality = "UNSPECIFIED"
+        evidence_refs = []
 
     reason = rec.get("classification_reason")
     if not reason:
