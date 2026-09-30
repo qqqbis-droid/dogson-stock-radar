@@ -64,6 +64,25 @@
         "entry_position": {"$ref":"#/$defs/scoreExplanationBlock"}
       },
       "additionalProperties": false
+    },
+    "taxonomyMetadata": {
+      "type": "object",
+      "required": ["version","classification_status","evidence_status","score_source","core_sector_score_eligible","peer_count","primary_group_confidence","evidence_quality","evidence_urls_or_refs","last_reviewed_at","review_due_at","classification_reason"],
+      "properties": {
+        "version": {"type":"string","minLength":1},
+        "classification_status": {"enum":["VERIFIED","PROVISIONAL","OFFICIAL_ONLY","UNCLASSIFIED"]},
+        "evidence_status": {"enum":["OFFICIAL_DIRECT","OFFICIAL_SUPPORTED","CURATED_ONLY","REVIEWED_MULTI_BUSINESS","NO_EXTERNAL_EVIDENCE"]},
+        "score_source": {"enum":["PRIMARY_GROUP","OFFICIAL_PROXY","NONE"]},
+        "core_sector_score_eligible": {"type":"boolean"},
+        "peer_count": {"type":["integer","null"],"minimum":0},
+        "primary_group_confidence": {"type":["number","null"],"minimum":0,"maximum":100},
+        "evidence_quality": {"type":"string","minLength":1},
+        "evidence_urls_or_refs": {"type":"array","items":{"type":"string","minLength":1}},
+        "last_reviewed_at": {"type":["string","null"],"format":"date"},
+        "review_due_at": {"type":["string","null"],"format":"date"},
+        "classification_reason": {"type":["string","null"]}
+      },
+      "additionalProperties": false
     }
   },
   "type": "object",
@@ -71,7 +90,7 @@
   "properties": {
     "schema_version":{"const":"2.0.0"},"build_id":{"type":"string","minLength":1},"dataset":{"const":"decision"},"trade_date":{"type":["string","null"],"format":"date"},"session_phase":{"enum":["PRE_OPEN","LIVE","CLOSE_FREEZE","POST_CLOSE","NEXT_DAY"]},"as_of":{"type":["string","null"],"format":"date-time"},"known_at":{"type":["string","null"],"format":"date-time"},"generated_at":{"type":"string","format":"date-time"},"freshness":{"enum":["LIVE","FRESH","FROZEN","STALE","UNKNOWN"]},"complete":{"type":"boolean"},"confidence":{"type":["number","null"],"minimum":0,"maximum":100},
     "source_status":{"type":"object","required":["sources","fallback"],"properties":{"sources":{"type":"array","items":{"type":"string"}},"fallback":{"type":"boolean"},"fallback_source":{"type":["string","null"]},"fallback_build_id":{"type":["string","null"]},"fallback_reason":{"type":["string","null"]},"last_success_at":{"type":["string","null"],"format":"date-time"}},"additionalProperties":false},
-    "decision_context_id":{"type":"string","minLength":1},"code":{"type":"string","pattern":"^[0-9A-Z-]{2,12}$"},"name":{"type":"string","minLength":1},"market":{"type":"string","minLength":1},"industry":{"type":["string","null"]},"primary_group":{"type":["string","null"]},"secondary_groups":{"type":"array","items":{"type":"string"}},"theme_tags":{"type":"array","items":{"type":"string"}},
+    "decision_context_id":{"type":"string","minLength":1},"code":{"type":"string","pattern":"^[0-9A-Z-]{2,12}$"},"name":{"type":"string","minLength":1},"market":{"type":"string","minLength":1},"industry":{"type":["string","null"]},"primary_group":{"type":["string","null"]},"secondary_groups":{"type":"array","items":{"type":"string"}},"theme_tags":{"type":"array","items":{"type":"string"}},"taxonomy":{"$ref":"#/$defs/taxonomyMetadata"},
     "quote":{"type":"object","required":["price","day_change_pct","volume","volume_unit","relative_volume","turnover_value_twd","quote_time"],"properties":{"price":{"type":["number","null"],"minimum":0},"day_change_pct":{"type":["number","null"]},"volume":{"type":["number","null"],"minimum":0},"volume_unit":{"enum":["SHARES","LOTS","UNKNOWN"]},"relative_volume":{"type":["number","null"],"minimum":0},"turnover_value_twd":{"type":["number","null"],"minimum":0},"quote_time":{"type":["string","null"],"format":"date-time"}},"additionalProperties":false},
     "scores":{"type":"object","required":["swing_quality_score","intraday_momentum_score","daytrade_score","entry_position_score","market_score"],"properties":{"swing_quality_score":{"type":["number","null"],"minimum":0,"maximum":100},"intraday_momentum_score":{"type":["number","null"],"minimum":0,"maximum":100},"daytrade_score":{"type":["number","null"],"minimum":0,"maximum":100},"entry_position_score":{"type":["number","null"],"minimum":0,"maximum":100},"market_score":{"type":["number","null"],"minimum":0,"maximum":15}},"additionalProperties":false},
     "components":{"type":"object","required":["swing","intraday","daytrade"],"properties":{"swing":{"anyOf":[{"$ref":"#/$defs/scoreComponentModel"},{"type":"null"}]},"intraday":{"anyOf":[{"$ref":"#/$defs/scoreComponentModel"},{"type":"null"}]},"daytrade":{"anyOf":[{"$ref":"#/$defs/scoreComponentModel"},{"type":"null"}]}},"additionalProperties":false},
