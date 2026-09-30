@@ -2,11 +2,11 @@
 set -euo pipefail
 
 # Every GitHub Pages publisher replaces the whole site artifact. Pull the V2
-# runtime from clean-build-v2 first.  When all legacy sources are aligned we
+# runtime from clean-build-v2 first. When all legacy sources are aligned we
 # rebuild the Atomic Bundle from the exact root data that is about to ship.
-# After-hours MIS can no longer reconstruct an already-finished intraday
-# snapshot, however, so a verified same-trade-date canonical bundle is preserved
-# instead of being overwritten by an older intraday/daytrade source.
+# A newer mission date may legitimately coexist with the latest completed close
+# date (for example 9/30 pre-open + 9/29 close), so preserve/validate each
+# mission on its own date instead of forcing every context onto one session.
 git fetch origin clean-build-v2 --depth=1
 rm -rf docs/v2 scripts/v2 contracts
 git archive FETCH_HEAD docs/v2 scripts/v2 contracts requirements-contract.txt | tar -xf -
@@ -16,6 +16,7 @@ test -f docs/v2/detail-context-v2.js
 test -f docs/v2/detail-context-v3.js
 test -f docs/v2/card-display-v3.js
 test -f docs/v2/score-explain-v4.js
+test -f docs/v2/ui-coherence-v5.js
 test -f scripts/v2/shadow_cycle.py
 test -f scripts/v2/live_publish_patch.py
 test -f scripts/v2/enrich_zones.py
@@ -24,6 +25,7 @@ test -f scripts/v2/restore_market_capital_context.py
 test -f scripts/v2/validate_market_capital_context.py
 test -f scripts/v2/normalize_close_snapshot.py
 test -f scripts/v2/normalize_close_snapshot_by_close_date.py
+test -f scripts/v2/close_semantics_v5.py
 test -f scripts/v2/stamp_version_contract.py
 test -f requirements-contract.txt
 
@@ -116,8 +118,10 @@ node --check docs/v2/detail-context-v2.js
 node --check docs/v2/detail-context-v3.js
 node --check docs/v2/card-display-v3.js
 node --check docs/v2/score-explain-v4.js
+node --check docs/v2/ui-coherence-v5.js
 python -m py_compile scripts/v2/normalize_close_snapshot.py
 python -m py_compile scripts/v2/normalize_close_snapshot_by_close_date.py
+python -m py_compile scripts/v2/close_semantics_v5.py
 python -m py_compile scripts/v2/enrich_stock_detail_context.py
 
 test -f docs/v2/data/current_manifest.json
@@ -160,6 +164,7 @@ ide=effective_date(intra); dde=effective_date(day); cde=effective_date(close)
 vi=str((m.get('datasets',{}).get('decision_intraday_summary') or {}).get('as_of') or '')[:10]
 vd=str((m.get('datasets',{}).get('decision_daytrade_summary') or {}).get('as_of') or '')[:10]
 vc=str((m.get('datasets',{}).get('decision_close_summary') or {}).get('as_of') or '')[:10]
+bundle_date=str(m.get('trade_date') or '')[:10]
 
 if mode == 'REBUILD':
     if ide and vi != ide:
@@ -168,11 +173,24 @@ if mode == 'REBUILD':
         raise SystemExit(f'V2 daytrade regression: source={dde} v2={vd}')
     if cde and vc != cde:
         raise SystemExit(f'V2 close regression: source={cde} v2={vc}')
-else:
+elif mode == 'PRESERVE_SAME_DAY':
     if cde and vc < cde:
         raise SystemExit(f'preserved canonical close is older than root close: v2={vc} root={cde}')
     if not vc or vi != vc or vd != vc:
-        raise SystemExit(f'preserved V2 decision contexts are not same-session: close={vc} intraday={vi} daytrade={vd}')
+        raise SystemExit(f'preserved same-day V2 contexts disagree: close={vc} intraday={vi} daytrade={vd}')
+elif mode == 'PRESERVE_NEWER_CANONICAL':
+    if cde and vc < cde:
+        raise SystemExit(f'preserved canonical close is older than root close: v2={vc} root={cde}')
+    if not vc:
+        raise SystemExit('preserved V2 close context is missing')
+    if vi != vd:
+        raise SystemExit(f'preserved newer-bundle intraday/daytrade disagree: intraday={vi} daytrade={vd}')
+    if bundle_date and vi and vi != bundle_date:
+        raise SystemExit(f'preserved newer-bundle mission date mismatch: bundle={bundle_date} intraday={vi} daytrade={vd}')
+    if vi and vi < vc:
+        raise SystemExit(f'preserved newer-bundle intraday is older than close: close={vc} intraday={vi}')
+else:
+    raise SystemExit(f'unexpected validation mode: {mode}')
 
 required_versions=('version_registry_version','version_set_id','schema_version','app_contract_version','engine_version','enum_registry_version','threshold_registry_version','taxonomy_version')
 missing=[k for k in required_versions if not m.get(k)]
@@ -201,10 +219,12 @@ for ctx in ('intraday','close','daytrade'):
         raise SystemExit(f'V2 zone_{ctx} is empty after overlay')
 
 close_summary=load(resolve(root,m['datasets']['decision_close_summary']['url']))
-if vc == cde:
-    bad=[r.get('code') for r in close_summary if r.get('freshness') in ('STALE','UNKNOWN') or r.get('action_state')=='DATA_STALE']
-    if bad:
-        raise SystemExit(f'latest completed close snapshot incorrectly stale: {bad[:10]}')
+# The close mission is valid when it represents the newest preserved completed
+# close, even if the root legacy close temporarily regresses or today's bundle
+# has already advanced to pre-open/intraday.
+bad=[r.get('code') for r in close_summary if r.get('freshness') in ('STALE','UNKNOWN') or r.get('action_state')=='DATA_STALE']
+if bad:
+    raise SystemExit(f'latest completed close snapshot incorrectly stale: {bad[:10]}')
 
 # Score Explain V4 contract: every current close detail row must explain its
 # component scores and pressure-aware entry position. A row that is inside a
@@ -228,7 +248,24 @@ if missing_explain:
 if bad_pressure:
     raise SystemExit(f'resistance-aware entry score failed: {bad_pressure[:10]}')
 
-print('V2 source lock:', {'mode':mode,'build':m.get('active_build_id'),'bundle_date':m.get('trade_date'),'close':vc,'intraday':vi,'daytrade':vd,'root_close':cde,'root_intraday':ide,'root_daytrade':dde,'version_set':m.get('version_set_id'),'market_capital':'split','zones':zone_counts,'stock_detail':'mission-split-v3','close_snapshot':'latest-completed-valid','score_explain':'v4-pressure-aware'})
+# Close UI Semantics V5: index/card state must agree with detail state. This is
+# the guard that prevents cards from saying DATA_STALE while the detail is FRESH.
+close_index=load(resolve(root,m['datasets']['decision_close_index']['url']))
+mismatches=[]
+for row in close_index if isinstance(close_index,list) else []:
+    code=str(row.get('code') or '')
+    detail=items.get(code)
+    if not detail: continue
+    for key in ('freshness','action_state','opportunity_bucket'):
+        if row.get(key)!=detail.get(key):
+            mismatches.append(f'{code}:{key}')
+            break
+    if (row.get('scores') or {}).get('entry_position_score') != (detail.get('scores') or {}).get('entry_position_score'):
+        mismatches.append(f'{code}:entry_position_score')
+if mismatches:
+    raise SystemExit(f'close index/detail semantics mismatch: {mismatches[:10]}')
+
+print('V2 source lock:', {'mode':mode,'build':m.get('active_build_id'),'bundle_date':m.get('trade_date'),'close':vc,'intraday':vi,'daytrade':vd,'root_close':cde,'root_intraday':ide,'root_daytrade':dde,'version_set':m.get('version_set_id'),'market_capital':'split','zones':zone_counts,'stock_detail':'mission-split-v3','close_snapshot':'latest-completed-valid','score_explain':'v4-pressure-aware','close_ui':'v5-mission-date-aware'})
 PY
 
 python - <<'PY'
