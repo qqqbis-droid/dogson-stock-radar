@@ -20,14 +20,14 @@
     "health"
   ],
   "properties": {
-    "version_registry_version": {"const": "2.0.0"},
-    "version_set_id": {"const": "cb2-vset-2.0.0-alpha.1"},
+    "version_registry_version": {"const": "2.1.0"},
+    "version_set_id": {"const": "cb2-vset-2.1.0-alpha.2"},
     "schema_version": {"const": "2.0.0"},
     "app_contract_version": {"const": "2.0.0"},
-    "engine_version": {"const": "2.0.0-alpha.1"},
+    "engine_version": {"const": "2.0.0-alpha.2"},
     "enum_registry_version": {"const": "2.0.0"},
     "threshold_registry_version": {"const": "2.0.0"},
-    "taxonomy_version": {"const": "2.0.0"},
+    "taxonomy_version": {"const": "2.1.0"},
     "active_build_id": {"type": "string"},
     "previous_good_build_id": {"type": ["string", "null"]},
     "trade_date": {"type": ["string", "null"], "format": "date"},
