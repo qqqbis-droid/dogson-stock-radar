@@ -1,0 +1,19 @@
+const R7={build:null,manifest:null,universe:null,index:{},timer:null};
+const r7esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const r7view=()=>document.querySelector('.tab.active')?.dataset.view||'intraday';
+const R7CFG={
+ intraday:{index:'decision_intraday_index',title:'盤中排序',rule:'先依機會狀態：觸發就緒 → 等待觸發 → 趨勢追蹤 → 等待回踩 → 研究觀察 → 風險；同一層再按「盤中動能」高到低，其次資料信心高到低，最後股票代號。'},
+ close:{index:'decision_close_index',title:'盤後排序',rule:'先依機會狀態：明日候選 → 突破觀察 → 回踩觀察 → 趨勢品質 → 研究觀察 → 風險；同一層再按「進場位置」高到低，其次資料信心高到低，最後股票代號。'},
+ daytrade:{index:'decision_daytrade_index',title:'當沖排序',rule:'先依機會狀態：可執行 → 等待觸發 → 不交易 → 資料失效；同一層再按「當沖分」高到低，其次資料信心高到低，最後股票代號。'}
+};
+async function r7json(url){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error(`${url} ${r.status}`);return r.json()}
+function r7style(){if(document.getElementById('radarTransparencyV7Style'))return;const st=document.createElement('style');st.id='radarTransparencyV7Style';st.textContent=`
+.r7-meta{margin:-2px 0 10px;border:1px solid #e2e7e3;border-radius:10px;background:#f8faf7}.r7-meta summary{padding:8px 10px;cursor:pointer;font-size:.8rem;font-weight:750;color:#53645c;list-style:none}.r7-meta summary::-webkit-details-marker{display:none}.r7-meta summary:after{content:'＋';float:right}.r7-meta[open] summary:after{content:'－'}.r7-body{padding:0 10px 9px;color:#66756e;font-size:.77rem;line-height:1.5}.r7-count{font-weight:750;color:#354840;margin-bottom:4px}.r7-rule{margin-top:4px}`;document.head.appendChild(st)}
+async function r7manifest(){const m=await r7json(`./data/current_manifest.json?t=${Date.now()}`);if(R7.build!==m.active_build_id){R7.build=m.active_build_id;R7.index={}}R7.manifest=m;return m}
+async function r7universe(){if(R7.universe)return R7.universe;const u=await r7json(`../data/universe.json?t=${Date.now()}`);R7.universe=Array.isArray(u)?u:(u.rows||[]);return R7.universe}
+async function r7index(m,key){if(R7.index[key])return R7.index[key];const meta=m.datasets?.[key];if(!meta)return[];const obj=await r7json(meta.url);const rows=Array.isArray(obj)?obj:Object.values(obj.items||{});R7.index[key]=rows;return rows}
+function r7ensure(){r7style();const h=document.getElementById('rankingTitle');const head=h?.closest('.section-head');if(!head?.parentNode)return null;let d=document.getElementById('rankingMetaV7');if(!d){d=document.createElement('details');d.id='rankingMetaV7';d.className='r7-meta';head.parentNode.insertBefore(d,head.nextSibling)}return d}
+async function r7render(){try{const view=r7view(),box=r7ensure();if(!box)return;if(view==='portfolio'){box.hidden=true;return}box.hidden=false;const cfg=R7CFG[view]||R7CFG.intraday;const [m,u]=await Promise.all([r7manifest(),r7universe()]);const rows=await r7index(m,cfg.index);const listed=u.filter(x=>x?.market==='上市').length,otc=u.filter(x=>x?.market==='上櫃').length,total=u.length;box.innerHTML=`<summary>排序方式・雷達池範圍</summary><div class="r7-body"><div class="r7-count">目前可排序雷達池 ${rows.length.toLocaleString('zh-TW')} 檔 ／ 官方股票清單 ${total.toLocaleString('zh-TW')} 檔（上市 ${listed.toLocaleString('zh-TW')}、上櫃 ${otc.toLocaleString('zh-TW')}）</div><div>雷達不是只抓700多檔全市場資料；目前「排名池」會排除20日平均成交金額低於3,000萬元或資料不足的股票，避免低流動性股票用假精準分數混入執行排行。</div><div class="r7-rule"><b>${r7esc(cfg.title)}：</b>${r7esc(cfg.rule)}</div><div>排序是注意力優先順序，不代表上漲機率。</div></div>`}catch(err){console.warn('radar transparency v7',err)}}
+function r7schedule(ms=120){clearTimeout(R7.timer);R7.timer=setTimeout(r7render,ms)}
+function r7boot(){document.getElementById('tabs')?.addEventListener('click',()=>r7schedule(180));document.getElementById('refreshBtn')?.addEventListener('click',()=>{R7.universe=null;r7schedule(800)});r7schedule(250)}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',r7boot);else r7boot();
