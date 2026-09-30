@@ -1,0 +1,28 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "title":"MissionMarketContext",
+  "type":"object",
+  "required":["schema_version","build_id","dataset","context","trade_date","session_phase","as_of","known_at","generated_at","freshness","complete","source_status","market_regime","market_score","market_confidence","score_model","components","metrics"],
+  "properties":{
+    "schema_version":{"const":"2.0.0"},
+    "build_id":{"type":"string","minLength":1},
+    "dataset":{"const":"market_context"},
+    "context":{"enum":["INTRADAY","CLOSE"]},
+    "trade_date":{"type":["string","null"],"format":"date"},
+    "session_phase":{"enum":["PRE_OPEN","LIVE","CLOSE_FREEZE","POST_CLOSE","NEXT_DAY"]},
+    "as_of":{"type":["string","null"],"format":"date-time"},
+    "known_at":{"type":["string","null"],"format":"date-time"},
+    "generated_at":{"type":"string","format":"date-time"},
+    "freshness":{"enum":["LIVE","FRESH","FROZEN","STALE","UNKNOWN"]},
+    "complete":{"type":"boolean"},
+    "source_status":{"type":"object"},
+    "market_regime":{"enum":["BROAD_RISK_ON","SELECTIVE_RISK_ON","NEUTRAL","DEFENSIVE","RISK_OFF"]},
+    "market_score":{"type":["number","null"],"minimum":0,"maximum":15},
+    "market_confidence":{"type":["number","null"],"minimum":0,"maximum":100},
+    "score_model":{"enum":["intraday_3_3_3_4_2","close_5_4_3_3"]},
+    "components":{"type":"object","additionalProperties":{"type":"object","required":["score","max"],"properties":{"score":{"type":["number","null"]},"max":{"type":"number","exclusiveMinimum":0}},"additionalProperties":true}},
+    "metrics":{"type":"object","additionalProperties":{"type":["number","string","boolean","null"]}},
+    "notes":{"type":"array","items":{"type":"string"}}
+  },
+  "additionalProperties":false
+}

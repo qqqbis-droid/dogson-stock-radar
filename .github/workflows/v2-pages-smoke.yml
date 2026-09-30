@@ -1,0 +1,97 @@
+name: Clean Build 2.0 Pages Public Smoke Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ clean-build-v2 ]
+    paths:
+      - '.github/workflows/v2-pages-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Verify public V2 page, recovery route and same-origin canonical data
+        shell: bash
+        run: |
+          set -euo pipefail
+          PAGE_URL="https://qqqbis-droid.github.io/dogson-stock-radar/v2/"
+          RESET_URL="https://qqqbis-droid.github.io/dogson-stock-radar/v2/reset.html"
+          SW_URL="https://qqqbis-droid.github.io/dogson-stock-radar/sw.js"
+          MANIFEST_URL="https://qqqbis-droid.github.io/dogson-stock-radar/v2/data/current_manifest.json"
+
+          for attempt in 1 2 3 4 5 6; do
+            if curl -fsSL --retry 2 --connect-timeout 10 "$PAGE_URL" -o /tmp/v2.html \
+              && curl -fsSL --retry 2 --connect-timeout 10 "$RESET_URL" -o /tmp/reset.html \
+              && curl -fsSL --retry 2 --connect-timeout 10 "$SW_URL" -o /tmp/sw.js \
+              && curl -fsSL --retry 2 --connect-timeout 10 "$MANIFEST_URL" -o /tmp/manifest.json; then
+              break
+            fi
+            sleep 5
+          done
+
+          grep -q 'Clean Build 2.0' /tmp/v2.html
+          grep -q 'data-source.js?v=20260929c' /tmp/v2.html
+          grep -q 'V2 修復入口' /tmp/reset.html
+          grep -q "url.pathname.includes('/v2/')" /tmp/sw.js
+          if grep -q 'Clean Build 2.0 · Shadow' /tmp/v2.html; then
+            echo 'Old Shadow subtitle is still public'
+            exit 1
+          fi
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('/tmp/manifest.json').read_text())
+          assert m.get('schema_version') == '2.0.0'
+          assert m.get('health',{}).get('validation_passed') is True
+          assert m.get('trade_date') == '2026-09-24', m.get('trade_date')
+          active=m.get('active_build_id')
+          assert active
+          print('Public same-origin manifest PASS:', m.get('trade_date'), active)
+          Path('/tmp/active.txt').write_text(active)
+          PY
+
+          ACTIVE_BUILD=$(cat /tmp/active.txt)
+          curl -fsSL --retry 3 --connect-timeout 10 "$PAGE_URL/data/builds/$ACTIVE_BUILD/market-summary.json" -o /tmp/market.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('/tmp/market.json').read_text())
+          assert x.get('build_id')
+          print('Public active market dataset PASS:', x.get('trade_date'), x.get('market_score'))
+          PY
+          echo 'Public legacy-SW V2 bypass PASS'
+          echo 'Public mobile recovery route PASS'
+
+      - name: Verify browser can actually render V2 content
+        shell: bash
+        run: |
+          set -euo pipefail
+          PAGE_URL="https://qqqbis-droid.github.io/dogson-stock-radar/v2/?smoke=$(date +%s)"
+          CHROME=$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)
+          if [ -z "$CHROME" ]; then
+            echo "Chrome/Chromium not found on runner"
+            exit 1
+          fi
+          if ! timeout 45s "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage \
+            --virtual-time-budget=15000 --dump-dom "$PAGE_URL" > /tmp/rendered.html 2>/tmp/chrome.log; then
+            echo 'Browser render timed out or failed'
+            cat /tmp/chrome.log || true
+            exit 1
+          fi
+          grep -q 'Contract ✓' /tmp/rendered.html
+          grep -q '市場環境' /tmp/rendered.html
+          grep -q '盤中優先' /tmp/rendered.html
+          grep -q '2026-09-24' /tmp/rendered.html
+          if grep -q '>載入中<' /tmp/rendered.html; then
+            echo 'Browser render is still stuck at loading state'
+            exit 1
+          fi
+          echo 'Browser render PASS'
+
+# manual verification refresh: 2026-09-29T09:02+08:00

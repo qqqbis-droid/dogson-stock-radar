@@ -1,0 +1,116 @@
+name: Clean Build 2.0 GitHub Pages Shadow Preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ clean-build-v2 ]
+    paths:
+      - 'docs/v2/*.html'
+      - 'docs/v2/*.js'
+      - 'docs/v2/*.css'
+      - 'docs/v2/data/current_manifest.json'
+      - 'docs/v2/data/market-detail.json'
+      - 'docs/v2/data/sector-members.json'
+      - 'scripts/v2/*.py'
+      - 'vercel.json'
+      - '.github/workflows/v2-pages-preview.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: dogson-pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Clean Build 2.0 shell
+        uses: actions/checkout@v4
+        with:
+          ref: clean-build-v2
+          path: v2src
+      - name: Checkout production main shell
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: mainsrc
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate V2 browser modules and score normalizer
+        run: |
+          node --check v2src/docs/v2/data-source.js
+          node --check v2src/docs/v2/app.js
+          node --check v2src/docs/v2/quote-ui.js
+          node --check v2src/docs/v2/components-ui.js
+          node --check v2src/docs/v2/tradeplan-ui.js
+          node --check v2src/docs/v2/case-ui.js
+          node --check v2src/docs/v2/ux-detail.js
+          node --check v2src/docs/v2/detail-context-v3.js
+          node --check v2src/docs/v2/card-display-v3.js
+          node --check v2src/docs/v2/score-explain-v4.js
+          python -m py_compile v2src/scripts/v2/normalize_close_snapshot.py
+          python -m py_compile v2src/scripts/v2/enrich_stock_detail_context.py
+      - name: Compose Pages artifact without replacing production root
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp -a mainsrc/docs/. _site/
+
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('_site/sw.js')
+          s = p.read_text(encoding='utf-8')
+          guarded = "  const url=new URL(req.url);\n  if(url.pathname.includes('/v2/'))return;\n  if(url.pathname.includes('/data/'))"
+          needle = "  const url=new URL(req.url);\n  if(url.pathname.includes('/data/'))"
+          if guarded not in s:
+              if needle not in s:
+                  raise SystemExit('legacy sw fetch handler shape changed; refusing unsafe patch')
+              s = s.replace(needle, guarded, 1)
+              p.write_text(s, encoding='utf-8')
+          PY
+          grep -q "url.pathname.includes('/v2/')" _site/sw.js
+
+          rm -rf _site/v2
+          mkdir -p _site/v2
+          rsync -a --exclude 'data/' v2src/docs/v2/ _site/v2/
+
+          mkdir -p _site/v2/data/builds
+          cp v2src/docs/v2/data/current_manifest.json _site/v2/data/current_manifest.json
+          test -f v2src/docs/v2/data/market-detail.json && cp v2src/docs/v2/data/market-detail.json _site/v2/data/market-detail.json
+          test -f v2src/docs/v2/data/sector-members.json && cp v2src/docs/v2/data/sector-members.json _site/v2/data/sector-members.json
+          ACTIVE_BUILD=$(python - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('v2src/docs/v2/data/current_manifest.json').read_text(encoding='utf-8'))
+          print(m['active_build_id'])
+          PY
+          )
+          test -d "v2src/docs/v2/data/builds/$ACTIVE_BUILD"
+          cp -a "v2src/docs/v2/data/builds/$ACTIVE_BUILD" "_site/v2/data/builds/$ACTIVE_BUILD"
+
+          test -f _site/index.html
+          test -f _site/v2/index.html
+          test -f _site/v2/data-source.js
+          test -f _site/v2/ux-detail.js
+          test -f _site/v2/score-explain-v4.js
+          test -f _site/v2/data/current_manifest.json
+          test -f "_site/v2/data/builds/$ACTIVE_BUILD/market-summary.json"
+          echo "Production root source: main/docs"
+          echo "Legacy SW: V2 bypass enabled"
+          echo "V2 shell: clean-build-v2/docs/v2"
+          echo "V2 same-origin active data: $ACTIVE_BUILD"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

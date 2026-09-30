@@ -1,0 +1,25 @@
+name: Clean Build 2.0 Contract Gate
+
+on:
+  push:
+    branches: [ clean-build-v2 ]
+    paths:
+      - 'contracts/**'
+      - 'requirements-contract.txt'
+      - '.github/workflows/contract-v2.yml'
+  pull_request:
+    paths:
+      - 'contracts/**'
+      - 'requirements-contract.txt'
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-contract.txt
+      - name: Run contract tests
+        run: python -m unittest discover -s contracts/contract-tests -p 'test_*.py' -v

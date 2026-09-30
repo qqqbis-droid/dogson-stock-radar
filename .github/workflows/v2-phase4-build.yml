@@ -1,0 +1,126 @@
+name: Clean Build 2.0 Phase 4 Real Data Preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ clean-build-v2 ]
+    paths:
+      - 'scripts/v2/**'
+      - 'contracts/**'
+      - 'docs/data/**'
+      - 'requirements-contract.txt'
+      - '.github/workflows/v2-phase4-build.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: clean-build-v2-real-preview
+  cancel-in-progress: true
+
+jobs:
+  build-real-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install -r requirements-contract.txt
+      - name: Contract + engine + case tests
+        run: |
+          python -m unittest discover -s contracts/contract-tests -p 'test_*.py' -v
+          python -m unittest scripts.v2.test_engine -v
+          python -m unittest scripts.v2.test_tradecases -v
+      - name: Build canonical bundle from public legacy datasets
+        run: python scripts/v2/build_legacy_bundle.py --legacy-root docs/data --output docs/v2/data
+      - name: Assign immutable Atomic Build identity
+        run: python scripts/v2/rekey_build.py --legacy-root docs/data --output docs/v2/data
+      - name: Copy canonical quote snapshot into lightweight indexes
+        run: python scripts/v2/enrich_quote_index.py --output docs/v2/data
+      - name: Migrate structural support / resistance zones
+        run: python scripts/v2/enrich_zones.py --legacy-root docs/data --output docs/v2/data
+      - name: Build canonical TradePlan datasets
+        run: python scripts/v2/enrich_tradeplans.py --output docs/v2/data
+      - name: Build canonical TradeCase and DecisionDelta datasets
+        run: python scripts/v2/enrich_tradecases.py --output docs/v2/data
+      - name: Validate canonical atomic bundle
+        run: python scripts/v2/validate_bundle.py --root docs/v2/data
+      - name: Syntax check current UI modules
+        run: |
+          node --check docs/v2/data-source.js
+          node --check docs/v2/app.js
+          node --check docs/v2/quote-ui.js
+          node --check docs/v2/components-ui.js
+          if [ -f docs/v2/tradeplan-ui.js ]; then node --check docs/v2/tradeplan-ui.js; fi
+          if [ -f docs/v2/case-ui.js ]; then node --check docs/v2/case-ui.js; fi
+      - name: Publish validated bundle without branch races or date regression
+        env:
+          START_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          SNAPSHOT_DIR="$(mktemp -d)"
+          cp -a docs/v2/data "$SNAPSHOT_DIR/data"
+          CANDIDATE_ID="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json"))["active_build_id"])')"
+          CANDIDATE_DATE="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json")).get("trade_date") or "")')"
+          echo "Validated candidate: $CANDIDATE_ID ($CANDIDATE_DATE)"
+
+          for attempt in 1 2 3; do
+            git fetch origin clean-build-v2
+            REMOTE_SHA="$(git rev-parse origin/clean-build-v2)"
+
+            if [ "$REMOTE_SHA" != "$START_SHA" ]; then
+              CRITICAL_CHANGES="$(git diff --name-only "$START_SHA" "$REMOTE_SHA" -- scripts/v2 contracts docs/data requirements-contract.txt .github/workflows/v2-phase4-build.yml || true)"
+              if [ -n "$CRITICAL_CHANGES" ]; then
+                echo "Critical build inputs advanced while this run was executing; a newer run owns publication."
+                echo "$CRITICAL_CHANGES"
+                exit 0
+              fi
+            fi
+
+            git reset --hard "$REMOTE_SHA"
+            OLD_ID="$(python -c 'import json,pathlib; p=pathlib.Path("docs/v2/data/current_manifest.json"); print(json.loads(p.read_text(encoding="utf-8")).get("active_build_id","") if p.exists() else "")')"
+            OLD_DATE="$(python -c 'import json,pathlib; p=pathlib.Path("docs/v2/data/current_manifest.json"); print(json.loads(p.read_text(encoding="utf-8")).get("trade_date","") if p.exists() else "")')"
+
+            # Canonical public data is monotonic by completed trading session.
+            # A stale builder must never replace a newer validated trading day.
+            if [ -n "$OLD_DATE" ] && [ -n "$CANDIDATE_DATE" ] && [[ "$CANDIDATE_DATE" < "$OLD_DATE" ]]; then
+              echo "Refusing date regression: candidate $CANDIDATE_DATE < published $OLD_DATE"
+              exit 0
+            fi
+
+            if [ "$OLD_ID" = "$CANDIDATE_ID" ]; then
+              echo "Atomic Build $CANDIDATE_ID is already published; keep the existing immutable snapshot."
+              exit 0
+            fi
+
+            mkdir -p docs/v2/data/builds
+            rm -rf "docs/v2/data/builds/$CANDIDATE_ID"
+            cp -a "$SNAPSHOT_DIR/data/builds/$CANDIDATE_ID" "docs/v2/data/builds/$CANDIDATE_ID"
+            cp "$SNAPSHOT_DIR/data/current_manifest.json" docs/v2/data/current_manifest.json
+
+            OLD_ID="$OLD_ID" python -c 'import json,os,pathlib; p=pathlib.Path("docs/v2/data/current_manifest.json"); m=json.loads(p.read_text(encoding="utf-8")); old=os.environ.get("OLD_ID") or None; m["previous_good_build_id"]=old if old and old != m.get("active_build_id") else m.get("previous_good_build_id"); p.write_text(json.dumps(m,ensure_ascii=False,separators=(",",":"))+"\n",encoding="utf-8")'
+
+            git add docs/v2/data
+            if git diff --cached --quiet; then
+              echo "No publishable bundle changes"
+              exit 0
+            fi
+            git commit -m "chore(v2): publish immutable canonical bundle [skip ci]"
+            if git push origin HEAD:clean-build-v2; then
+              echo "Published $CANDIDATE_ID; previous good: ${OLD_ID:-none}"
+              exit 0
+            fi
+            echo "Branch advanced during publish; retrying safely ($attempt/3)"
+          done
+
+          echo "Unable to publish validated preview bundle after 3 safe attempts"
+          exit 1

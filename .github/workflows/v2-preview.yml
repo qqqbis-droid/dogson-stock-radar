@@ -1,0 +1,56 @@
+name: Clean Build 2.0 Preview Gate
+
+on:
+  push:
+    branches: [ clean-build-v2 ]
+    paths:
+      - 'scripts/v2/**'
+      - 'docs/v2/**'
+      - 'contracts/**'
+      - 'requirements-contract.txt'
+      - '.github/workflows/v2-preview.yml'
+  pull_request:
+    paths:
+      - 'scripts/v2/**'
+      - 'docs/v2/**'
+      - 'contracts/**'
+
+jobs:
+  build-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install -r requirements-contract.txt
+      - name: Contract tests
+        run: python -m unittest discover -s contracts/contract-tests -p 'test_*.py' -v
+      - name: Engine structural tests
+        run: python -m unittest scripts.v2.test_engine -v
+      - name: TradeCase structural tests
+        run: python -m unittest scripts.v2.test_tradecases -v
+      - name: Build deterministic v2 demo bundle
+        run: python scripts/v2/build_bundle.py --demo
+      - name: Validate atomic bundle
+        run: python scripts/v2/validate_bundle.py
+      - name: Syntax check UI modules
+        run: |
+          node --check docs/v2/data-source.js
+          node --check docs/v2/app.js
+          node --check docs/v2/quote-ui.js
+          node --check docs/v2/components-ui.js
+          node --check docs/v2/tradeplan-ui.js
+          node --check docs/v2/case-ui.js
+          node --check docs/v2/detail-context-v2.js
+          node --check docs/v2/detail-context-v3.js
+          node --check docs/v2/card-display-v3.js
+      - name: Upload preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dogson-clean-build-v2-preview
+          path: docs/v2
+          if-no-files-found: error
