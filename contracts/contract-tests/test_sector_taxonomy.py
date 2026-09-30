@@ -17,6 +17,7 @@ class SectorTaxonomy21Tests(unittest.TestCase):
         self.assertGreaterEqual(stats["registry_entries"], 220)
         self.assertGreaterEqual(stats["primary_groups"], 30)
         self.assertGreaterEqual(stats["eligible_primary_codes"], 220)
+        self.assertFalse(stats["official_industry_can_grant_full_core_score"])
 
     def test_every_registry_scoring_group_has_minimum_peer_sample(self):
         for group, count in sg.taxonomy_stats()["group_sizes"].items():
@@ -39,22 +40,24 @@ class SectorTaxonomy21Tests(unittest.TestCase):
         self.assertIsNone(r["primary_group"])
         self.assertFalse(r["core_sector_score_eligible"])
         self.assertEqual(r["score_source"], "OFFICIAL_PROXY")
+        self.assertEqual(r["evidence_status"], "REVIEWED_MULTI_BUSINESS")
         self.assertEqual(sg.sector_group_for("1303", industry="03"), None)
         self.assertIn("CCL／電子材料", [x["group"] for x in r["secondary_groups"]])
 
-    def test_narrow_official_industry_can_be_direct_core(self):
+    def test_even_narrow_official_industry_stays_capped_proxy(self):
         r = sg.classification_for("1101", industry="01")
-        self.assertEqual(r["primary_group"], "水泥工業")
-        self.assertTrue(r["core_sector_score_eligible"])
-        self.assertEqual(r["score_source"], "OFFICIAL_INDUSTRY_CORE")
+        self.assertIsNone(r["primary_group"])
+        self.assertFalse(r["core_sector_score_eligible"])
+        self.assertEqual(r["score_source"], "OFFICIAL_PROXY")
         self.assertEqual(r["evidence_status"], "OFFICIAL_DIRECT")
-        self.assertEqual(sg.sector_group_for("1101", industry="01"), "水泥工業")
+        self.assertIsNone(sg.sector_group_for("1101", industry="01"))
 
     def test_broad_official_industry_stays_proxy(self):
         for code in ("24", "25", "26", "27", "28", "31"):
             r = sg.classification_for("9999", industry=code)
             self.assertEqual(r["classification_status"], "OFFICIAL_ONLY", code)
             self.assertEqual(r["score_source"], "OFFICIAL_PROXY", code)
+            self.assertEqual(r["evidence_status"], "OFFICIAL_DIRECT", code)
             self.assertFalse(r["core_sector_score_eligible"], code)
             self.assertIsNone(sg.sector_group_for("9999", industry=code), code)
 
