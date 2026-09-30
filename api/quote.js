@@ -114,3 +114,5 @@ export default async function handler(req, res) {
     return res.status(502).json({ ok: false, error: e?.message || 'quote fetch failed' });
   }
 }
+
+// deploy trigger: close UI coherence v5 (2026-09-30)
