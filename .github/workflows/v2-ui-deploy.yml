@@ -13,14 +13,13 @@ on:
 
 permissions:
   contents: read
-  actions: read
   pages: write
   id-token: write
 
-# UI-only deploys overlay validated V2 UI on the latest successful canonical
-# Close / Intraday Pages publisher. Completed-session refresh artifacts are
-# deliberately excluded here because a newer workflow timestamp must never
-# override a fresher root market snapshot with older data.
+# Production composition no longer depends on short-lived Pages artifacts.
+# main supplies the stable root site shell; clean-build-v2 supplies a validated,
+# atomic V2 UI + data bundle. This makes UI deploys reproducible even after old
+# Close/Intraday artifacts expire.
 concurrency:
   group: dogson-pages
   cancel-in-progress: false
@@ -29,182 +28,105 @@ jobs:
   deploy-v2-ui:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout production root shell
+        uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 1
 
-      - name: Find latest successful canonical Pages artifact
-        id: source
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          python - <<'PY' > /tmp/canonical-source.tsv
-          import json
-          import os
-          import subprocess
-
-          repo = os.environ['GITHUB_REPOSITORY']
-          candidates = []
-          for workflow in ('close.yml', 'intraday.yml'):
-              raw = subprocess.check_output([
-                  'gh', 'api',
-                  f'/repos/{repo}/actions/workflows/{workflow}/runs?status=success&per_page=20'
-              ], text=True)
-              for run in json.loads(raw).get('workflow_runs', []):
-                  if run.get('name') in {'Radar - Close Update', 'Radar - Intraday Update'}:
-                      candidates.append(run)
-
-          candidates.sort(key=lambda r: str(r.get('updated_at') or ''), reverse=True)
-          selected = None
-          selected_artifact = None
-          for run in candidates:
-              run_id = run.get('id')
-              raw = subprocess.check_output([
-                  'gh', 'api',
-                  f'/repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100'
-              ], text=True)
-              artifacts = json.loads(raw).get('artifacts', [])
-              pages = next((a for a in artifacts if a.get('name') == 'github-pages' and not a.get('expired')), None)
-              if pages:
-                  selected = run
-                  selected_artifact = pages
-                  break
-
-          if not selected or not selected_artifact:
-              raise SystemExit('No recent successful Close/Intraday run has a live github-pages artifact')
-
-          print(f"{selected['id']}\t{selected['name']}\t{selected['updated_at']}\t{selected_artifact['id']}")
-          PY
-
-          IFS=$'\t' read -r run_id run_name run_updated artifact_id < /tmp/canonical-source.tsv
-          test -n "$run_id"
-          test -n "$artifact_id"
-          case "$run_name" in
-            "Radar - Close Update"|"Radar - Intraday Update") ;;
-            *) echo "Unexpected canonical publisher: $run_name" >&2; exit 1 ;;
-          esac
-          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
-          echo "run_name=$run_name" >> "$GITHUB_OUTPUT"
-          echo "run_updated=$run_updated" >> "$GITHUB_OUTPUT"
-          echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"
-          echo "Using canonical Pages source: $run_name run=$run_id artifact=$artifact_id updated=$run_updated"
-
-      - name: Download exact canonical production Pages artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: github-pages
-          path: .production-pages-artifact
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          run-id: ${{ steps.source.outputs.run_id }}
-
-      - name: Restore canonical artifact and overlay validated V2 UI only
+      - name: Fetch validated V2 branch
         shell: bash
         run: |
           set -euo pipefail
-          test -s .production-pages-artifact/artifact.tar
-          rm -rf .production-pages docs
-          mkdir -p .production-pages
-          tar -xf .production-pages-artifact/artifact.tar -C .production-pages
-          mv .production-pages docs
+          git fetch origin clean-build-v2 --depth=1
+          rm -rf /tmp/v2-source
+          mkdir -p /tmp/v2-source
+          git archive FETCH_HEAD docs/v2 scripts/v2/validate_single_writer_ui.py scripts/v2/validate_product_surface.py scripts/v2/test_portfolio_ledger.js | tar -xf - -C /tmp/v2-source
+          test -s /tmp/v2-source/docs/v2/index.html
+          test -s /tmp/v2-source/docs/v2/data/current_manifest.json
 
-          test -s docs/v2/data/current_manifest.json
+      - name: Verify canonical V2 Atomic bundle
+        shell: bash
+        run: |
+          set -euo pipefail
           python - <<'PY'
           import json
           from pathlib import Path
 
-          root=Path('docs/v2/data')
+          root=Path('/tmp/v2-source/docs/v2/data')
           m=json.loads((root/'current_manifest.json').read_text(encoding='utf-8'))
-          bundle_date=str(m.get('trade_date') or '')[:10]
-          if len(bundle_date) != 10 or not m.get('health',{}).get('validation_passed'):
-              raise SystemExit('canonical source manifest is not validated')
-          meta=(m.get('datasets') or {}).get('decision_close_summary')
-          if not meta:
-              raise SystemExit('canonical source missing decision_close_summary')
-          raw=str(meta.get('url') or '')
-          p=root/(raw[len('./data/'):] if raw.startswith('./data/') else raw.lstrip('./'))
-          rows=json.loads(p.read_text(encoding='utf-8'))
-          close_date=str(meta.get('trade_date') or meta.get('as_of') or '')[:10]
-          if len(close_date) != 10:
-              dates=sorted({str(r.get('trade_date') or r.get('as_of') or '')[:10] for r in rows if len(str(r.get('trade_date') or r.get('as_of') or '')[:10]) == 10})
-              close_date=dates[-1] if dates else ''
-          if len(close_date) != 10:
-              raise SystemExit('canonical source close mission date is unavailable')
-          latest=[r for r in rows if str(r.get('trade_date') or r.get('as_of') or '')[:10] == close_date]
-          if not latest:
-              raise SystemExit(f'canonical source has no close rows for close mission date {close_date}')
-          bad=[r.get('code') for r in latest if r.get('freshness') in ('STALE','UNKNOWN') or r.get('action_state')=='DATA_STALE']
-          if bad:
-              raise SystemExit(f'canonical source latest-close semantics regressed: {bad[:10]}')
+          if m.get('schema_version') != '2.0.0':
+              raise SystemExit('V2 manifest schema is not 2.0.0')
+          if not m.get('health',{}).get('validation_passed'):
+              raise SystemExit('V2 canonical manifest has not passed validation')
+          build=str(m.get('active_build_id') or '')
+          trade_date=str(m.get('trade_date') or '')[:10]
+          if not build or len(trade_date) != 10:
+              raise SystemExit('V2 canonical build/trade_date missing')
 
-          def load(path):
-              try:
-                  return json.loads(Path(path).read_text(encoding='utf-8'))
-              except Exception:
-                  return {}
-          def td(obj):
-              if not isinstance(obj,dict): return ''
-              for key in ('trade_date','source_trade_date','date'):
-                  s=str(obj.get(key) or '')[:10]
-                  if len(s)==10: return s
-              bridge=obj.get('bridge') or {}
-              s=str(bridge.get('trade_date') or '')[:10]
-              if len(s)==10: return s
-              dates=[]
-              for r in obj.get('rows') or []:
-                  if not isinstance(r,dict): continue
-                  s=str(r.get('quote_date') or r.get('market_trade_date') or r.get('date') or '')[:10]
-                  if len(s)==10: dates.append(s)
-              return max(dates) if dates else ''
+          required=(
+              'decision_close_summary','decision_close_index','decision_close_detail',
+              'stock_detail_close','zone_close','market_close_context','capital_close_context',
+              'decision_intraday_summary','decision_intraday_index','decision_intraday_detail',
+              'market_intraday_context','capital_intraday_context'
+          )
+          ds=m.get('datasets') or {}
+          missing=[k for k in required if k not in ds]
+          if missing:
+              raise SystemExit(f'V2 canonical manifest missing datasets: {missing}')
 
-          legacy_market=load('docs/data/market.json')
-          legacy_intra=load('docs/data/intraday.json')
-          market_date=td(legacy_market)
-          intra_date=td(legacy_intra)
-          if market_date != bundle_date and intra_date != bundle_date:
-              raise SystemExit(f'canonical source has no same-day index snapshot: bundle={bundle_date} market={market_date} intraday={intra_date}')
-          if close_date and market_date and market_date < close_date and intra_date < close_date:
-              raise SystemExit(f'canonical root data regressed behind close mission: close={close_date} market={market_date} intraday={intra_date}')
-          print('Canonical UI source verified:', {'build':m.get('active_build_id'),'bundle_date':bundle_date,'close_date':close_date,'close_rows':len(latest),'market_date':market_date,'intraday_date':intra_date})
+          for key in required:
+              meta=ds[key]
+              raw=str(meta.get('url') or '')
+              p=root/(raw[len('./data/'):] if raw.startswith('./data/') else raw.lstrip('./'))
+              if not p.is_file() or p.stat().st_size == 0:
+                  raise SystemExit(f'V2 canonical dataset missing: {key} -> {p}')
+              if meta.get('build_id') and meta.get('build_id') != build:
+                  raise SystemExit(f'V2 canonical dataset build mismatch: {key}')
+
+          iq=ds.get('index_quote')
+          if iq:
+              raw=str(iq.get('url') or '')
+              p=root/(raw[len('./data/'):] if raw.startswith('./data/') else raw.lstrip('./'))
+              q=json.loads(p.read_text(encoding='utf-8'))
+              if str(q.get('trade_date') or '')[:10] != trade_date:
+                  raise SystemExit('index_quote trade_date differs from atomic bundle')
+              if q.get('build_id') and q.get('build_id') != build:
+                  raise SystemExit('index_quote build mismatch')
+              print('Same-build index_quote:', {k:(q.get(k) or {}).get('source') for k in ('taiex','otc')})
+          else:
+              print('index_quote not present yet; UI will intentionally show — instead of stale index values')
+
+          print('Validated V2 production source:', {'build':build,'trade_date':trade_date,'datasets':len(ds)})
           PY
 
-          before_hash="$(sha256sum docs/v2/data/current_manifest.json | awk '{print $1}')"
-          before_build="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json")).get("active_build_id", ""))')"
-          before_date="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json")).get("trade_date", ""))')"
-          test -n "$before_build"
-          test -n "$before_date"
-
-          rm -rf /tmp/v2-production-data /tmp/v2-ui
-          mkdir -p /tmp/v2-production-data /tmp/v2-ui
-          cp -a docs/v2/data/. /tmp/v2-production-data/
-
-          git fetch origin clean-build-v2 --depth=1
-          git archive FETCH_HEAD docs/v2 scripts/v2/validate_single_writer_ui.py scripts/v2/validate_product_surface.py scripts/v2/test_portfolio_ledger.js | tar -xf - -C /tmp/v2-ui
+      - name: Compose production Pages site
+        shell: bash
+        run: |
+          set -euo pipefail
           rm -rf docs/v2
-          mv /tmp/v2-ui/docs/v2 docs/v2
-          rm -rf docs/v2/data
-          mkdir -p docs/v2/data
-          cp -a /tmp/v2-production-data/. docs/v2/data/
+          cp -a /tmp/v2-source/docs/v2 docs/v2
           mkdir -p scripts/v2
-          cp /tmp/v2-ui/scripts/v2/validate_single_writer_ui.py scripts/v2/validate_single_writer_ui.py
-          cp /tmp/v2-ui/scripts/v2/validate_product_surface.py scripts/v2/validate_product_surface.py
-          cp /tmp/v2-ui/scripts/v2/test_portfolio_ledger.js scripts/v2/test_portfolio_ledger.js
+          cp /tmp/v2-source/scripts/v2/validate_single_writer_ui.py scripts/v2/validate_single_writer_ui.py
+          cp /tmp/v2-source/scripts/v2/validate_product_surface.py scripts/v2/validate_product_surface.py
+          cp /tmp/v2-source/scripts/v2/test_portfolio_ledger.js scripts/v2/test_portfolio_ledger.js
 
-          after_hash="$(sha256sum docs/v2/data/current_manifest.json | awk '{print $1}')"
-          after_build="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json")).get("active_build_id", ""))')"
-          after_date="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json")).get("trade_date", ""))')"
-          if [[ "$before_hash" != "$after_hash" || "$before_build" != "$after_build" || "$before_date" != "$after_date" ]]; then
-            echo "UI-only deploy mutated canonical V2 data; refusing publish" >&2
-            exit 1
-          fi
-          echo "UI-only source lock: canonical_run=${{ steps.source.outputs.run_id }} publisher=${{ steps.source.outputs.run_name }} build=$after_build trade_date=$after_date manifest_sha256=$after_hash"
+          # Legacy service worker must never intercept V2/data requests.
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('docs/sw.js')
+          if p.exists():
+              s=p.read_text(encoding='utf-8')
+              guarded="  const url=new URL(req.url);\n  if(url.pathname.includes('/v2/'))return;\n  if(url.pathname.includes('/data/'))"
+              needle="  const url=new URL(req.url);\n  if(url.pathname.includes('/data/'))"
+              if guarded not in s and needle in s:
+                  p.write_text(s.replace(needle,guarded,1),encoding='utf-8')
+          PY
 
       - uses: actions/setup-node@v4
         with:
@@ -214,12 +136,15 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Validate single-writer V2 UI without touching data
+      - name: Validate composed V2 production site
         run: |
           python scripts/v2/validate_single_writer_ui.py
-          node --check docs/v2/live-ui-20261001.js
-          node --check docs/v2/live-index-source-guard.js
-          node --check docs/v2/sector-member-alias-guard.js
+          python scripts/v2/validate_product_surface.py
+          node scripts/v2/test_portfolio_ledger.js
+          node --check docs/v2/app.js
+          node --check docs/v2/market-pulse-v2.js
+          node --check docs/v2/stock-detail-renderer.js
+          node --check docs/v2/price-map-v2-lite.js
           node --check docs/sw.js
 
       - uses: actions/configure-pages@v5
