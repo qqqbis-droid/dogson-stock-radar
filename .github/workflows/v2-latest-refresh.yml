@@ -56,7 +56,7 @@ jobs:
 
       - name: Rebuild latest completed close from public sources
         run: |
-          python scripts/sync_live_data.py || true
+          python scripts/sync_live_data.py
           python scripts/build_close_fresh.py
 
       - name: Confirm completed-session source is internally consistent
@@ -66,21 +66,31 @@ jobs:
           from pathlib import Path
           market=json.loads(Path('docs/data/market.json').read_text(encoding='utf-8'))
           close=json.loads(Path('docs/data/close.json').read_text(encoding='utf-8'))
+          intraday=json.loads(Path('docs/data/intraday.json').read_text(encoding='utf-8'))
           rows=close.get('rows') or []
           dates=sorted({str(r.get('date') or '')[:10] for r in rows if r.get('date')})
           candidate=str(market.get('trade_date') or '')[:10]
+          intraday_rows=intraday.get('rows') or []
+          intraday_date=str(intraday.get('trade_date') or '')[:10]
+          if not intraday_date:
+              vals=[str(r.get('quote_date') or r.get('date') or '')[:10] for r in intraday_rows]
+              vals=[v for v in vals if len(v)==10]
+              intraday_date=max(vals) if vals else ''
           current_path=Path('docs/v2/data/current_manifest.json')
           current=json.loads(current_path.read_text(encoding='utf-8')) if current_path.exists() else {}
           current_date=str(current.get('trade_date') or '')[:10]
           print('current canonical trade_date:', current_date)
           print('candidate market trade_date:', candidate)
           print('candidate close dates:', dates[-3:])
+          print('candidate intraday trade_date:', intraday_date)
           if not candidate:
               raise SystemExit('Candidate market trade_date is missing')
           if not rows or dates != [candidate]:
               raise SystemExit(f'Close dataset is not cleanly locked to candidate trade_date: market={candidate}, close={dates}')
           if current_date and candidate < current_date:
               raise SystemExit(f'Refusing source regression from {current_date} to {candidate}')
+          if intraday_date != candidate:
+              raise SystemExit(f'Refusing V2 refresh with stale intraday source: close={candidate}, intraday={intraday_date}')
           PY
 
       - name: Build complete canonical Atomic Bundle and evidence
@@ -216,6 +226,14 @@ jobs:
           print('companions:', manifest['active_build_id'], members['close']['trade_date'], members['intraday']['trade_date'])
           PY
 
+      - name: Snapshot refreshed root market data for Pages
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/latest-root-data
+          cp -a docs/data /tmp/latest-root-data
+          test -s /tmp/latest-root-data/intraday.json
+          test -s /tmp/latest-root-data/close.json
+
       - name: Verify production V2 release surface
         run: |
           python scripts/v2/validate_single_writer_ui.py
@@ -293,6 +311,11 @@ jobs:
           rm -rf _site
           mkdir -p _site
           cp -a mainsrc/docs/. _site/
+
+          # The root market-data surface must come from the refreshed production
+          # snapshot from this run, never from stale JSON committed on main.
+          rm -rf _site/data
+          cp -a /tmp/latest-root-data _site/data
 
           python - <<'PY'
           from pathlib import Path
