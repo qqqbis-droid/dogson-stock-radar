@@ -10,9 +10,10 @@ function patch(){
   });
 }
 function loadBrand(){
+  if(document.querySelector('script[src*="brand-inuko-lab.js"]'))return;
   if(document.querySelector('script[data-inuko-brand-loader]'))return;
   const s=document.createElement('script');
-  s.src='./brand-inuko-lab.js?v=20261001a';
+  s.src='./brand-inuko-lab.js?v=20261001b';
   s.dataset.inukoBrandLoader='1';
   s.defer=true;
   document.head.appendChild(s);
