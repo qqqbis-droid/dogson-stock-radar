@@ -24,41 +24,64 @@
 #cards .reason{margin-top:9px;line-height:1.48}
 #cards .blocker{margin-top:7px;padding-top:7px;border-top:1px dashed var(--line);line-height:1.45}
 
-/* Sector summary: direct CSS targeting; no MutationObserver/class patcher required. */
-#sectorList.chips{gap:12px;align-items:stretch}
-#sectorList .capital-chip{min-width:252px;max-width:286px;padding:14px 14px 12px;border-radius:18px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-content:start;box-sizing:border-box}
-#sectorList .capital-chip> b{grid-column:1;align-self:center;font-size:.98rem;line-height:1.25;margin:0}
-#sectorList .capital-chip> strong{grid-column:2;align-self:center;text-align:right;font-size:1.12rem;line-height:1.2;white-space:nowrap}
-#sectorList .capital-chip>div:not(.capital-more):not(.capital-hint):not(.live-sector-preview){grid-column:1/-1;color:var(--muted);font-size:.77rem;line-height:1.42}
-#sectorList .capital-chip>.live-sector-preview{grid-column:1/-1;margin-top:3px!important;font-size:.69rem!important;line-height:1.4!important}
-#sectorList .capital-chip>.capital-hint{grid-column:1/-1;margin-top:5px;padding-top:9px;border-top:1px dashed var(--line);color:var(--green);font-weight:850;font-size:.72rem;line-height:1.25}
-#sectorList .capital-chip>.capital-more{grid-column:1/-1;margin-top:2px;padding-top:10px;border-top:1px solid var(--line);grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+/* Sector summary: compact grid instead of clipped horizontal cards. */
+#sectorList.chips{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:stretch;overflow:visible!important;padding-bottom:0!important}
+#sectorList .capital-chip{min-width:0!important;max-width:none!important;width:auto!important;padding:12px;border-radius:16px;display:grid;grid-template-columns:minmax(0,1fr);gap:4px;align-content:start;box-sizing:border-box;overflow:hidden}
+#sectorList .capital-chip[aria-expanded="true"]{grid-column:1/-1;overflow:visible}
+#sectorList .capital-chip> b{grid-column:1;font-size:.8rem;line-height:1.25;margin:0;white-space:normal;overflow-wrap:anywhere}
+#sectorList .capital-chip> strong{grid-column:1;text-align:left;font-size:1rem;line-height:1.15;white-space:nowrap}
+#sectorList .capital-chip>div:not(.capital-more):not(.capital-hint):not(.live-sector-preview){grid-column:1;color:var(--muted);font-size:.67rem;line-height:1.35;min-width:0}
+#sectorList .capital-chip>.live-sector-preview{grid-column:1;margin-top:2px!important;font-size:.64rem!important;line-height:1.35!important}
+#sectorList .capital-chip>.capital-hint{grid-column:1;margin-top:4px;padding-top:7px;border-top:1px dashed var(--line);color:var(--green);font-weight:850;font-size:.63rem;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sectorList .capital-chip>.capital-more{grid-column:1/-1;margin-top:6px;padding-top:10px;border-top:1px solid var(--line);grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
 #sectorList .capital-chip>.capital-more:not([hidden]){display:grid}
 #sectorList .capital-chip>.capital-more .mc-row{display:flex;flex-direction:column;justify-content:flex-start;gap:2px;padding:8px 9px;border-radius:10px;background:color-mix(in srgb,var(--soft) 76%,transparent);min-width:0}
-#sectorList .capital-chip>.capital-more .mc-row span{font-size:.66rem;color:var(--muted)}
-#sectorList .capital-chip>.capital-more .mc-row b{font-size:.8rem;line-height:1.25;overflow-wrap:anywhere}
-#sectorList .capital-chip>.capital-more>.capital-hint{grid-column:1/-1;margin-top:2px;font-size:.67rem;line-height:1.4}
+#sectorList .capital-chip>.capital-more .mc-row span{font-size:.64rem;color:var(--muted)}
+#sectorList .capital-chip>.capital-more .mc-row b{font-size:.78rem;line-height:1.25;overflow-wrap:anywhere}
+#sectorList .capital-chip>.capital-more>.capital-hint{grid-column:1/-1;margin-top:2px;font-size:.65rem;line-height:1.4;white-space:normal}
 #sectorList .capital-chip .member-list,#sectorList .capital-chip .capital-section-label,#sectorList .capital-chip .live-sector-members{display:none!important}
-#sectorRankExplain{margin-top:12px}
-#sectorRankExplain .sector-rank-panel,#sectorRankExplain .live-sector-rank{padding:13px;border-radius:16px;background:var(--soft);border:1px solid var(--line)}
-#sectorRankExplain .sector-rank-head,#sectorRankExplain .live-sector-rank-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
-#sectorRankExplain .sector-rank-list,#sectorRankExplain .live-sector-rank-list{display:grid;gap:7px}
-#sectorRankExplain .sector-rank-row,#sectorRankExplain .live-sector-rank-row{width:100%;display:grid;grid-template-columns:30px minmax(0,1fr);gap:8px;align-items:center;padding:9px 10px;border-radius:12px;background:var(--card);border:1px solid var(--line);text-align:left;color:var(--ink);box-sizing:border-box}
-#sectorRankExplain .sector-rank-no,#sectorRankExplain .live-sector-rank-row> b:first-child{font-size:.8rem;font-weight:900;color:var(--green);text-align:center}
-#sectorRankExplain .sector-rank-id b,#sectorRankExplain .live-sector-rank-row strong{font-size:.8rem;line-height:1.25}
-#sectorRankExplain .sector-rank-id small,#sectorRankExplain .live-sector-rank-row small{display:block;margin-top:3px;color:var(--muted);font-size:.66rem;line-height:1.3}
 
-/* Detail shell */
-dialog#detailDialog{border-radius:22px;overflow:hidden}
-#detailDialog .dialog-head{padding:14px 16px;background:color-mix(in srgb,var(--card) 94%,transparent);backdrop-filter:blur(10px)}
-#detailBody{padding:16px}
+/* Same-sector ranking: two compact columns on phones; expanded data stays readable. */
+#sectorRankExplain{margin-top:12px}
+#sectorRankExplain .sector-rank-panel,#sectorRankExplain .live-sector-rank{padding:12px;border-radius:16px;background:var(--soft);border:1px solid var(--line)}
+#sectorRankExplain .sector-rank-head,#sectorRankExplain .live-sector-rank-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:5px}
+#sectorRankExplain .sector-rank-note{font-size:.64rem;line-height:1.4;margin-bottom:8px}
+#sectorRankExplain .sector-rank-list,#sectorRankExplain .live-sector-rank-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#sectorRankExplain .sector-rank-row,#sectorRankExplain .live-sector-rank-row{width:100%;display:grid;grid-template-columns:24px minmax(0,1fr);gap:5px 7px;align-items:start;padding:9px;border-radius:12px;background:var(--card);border:1px solid var(--line);text-align:left;color:var(--ink);box-sizing:border-box;min-width:0}
+#sectorRankExplain .sector-rank-no,#sectorRankExplain .live-sector-rank-row> b:first-child{grid-row:1/3;font-size:.78rem;font-weight:900;color:var(--green);text-align:center;padding-top:1px}
+#sectorRankExplain .sector-rank-id{min-width:0}
+#sectorRankExplain .sector-rank-id b,#sectorRankExplain .live-sector-rank-row strong{display:block;font-size:.73rem;line-height:1.25;white-space:normal;overflow-wrap:anywhere}
+#sectorRankExplain .sector-rank-id small,#sectorRankExplain .live-sector-rank-row small{display:block;margin-top:3px;color:var(--muted);font-size:.61rem;line-height:1.35}
+#sectorRankExplain .sector-rank-score{grid-column:2;display:flex;align-items:baseline;gap:5px;text-align:left;font-size:.58rem;color:var(--muted)}
+#sectorRankExplain .sector-rank-score b{display:inline;font-size:.74rem;color:var(--ink)}
+
+/* Detail shell: fixed header + independently scrollable content on iOS. */
+dialog#detailDialog{width:min(92vw,720px);max-width:720px;height:min(88dvh,920px);max-height:88dvh;margin:auto;padding:0;border-radius:22px;overflow:hidden}
+dialog#detailDialog[open]{display:flex;flex-direction:column}
+#detailDialog .dialog-head{position:relative;z-index:3;flex:0 0 auto;padding:14px 16px;background:color-mix(in srgb,var(--card) 96%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+#detailBody{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;padding:16px 16px calc(22px + env(safe-area-inset-bottom));scrollbar-gutter:stable}
 #detailBody .detail-hero{padding:12px;border-radius:15px;background:var(--soft);margin-bottom:11px}
 #detailBody .sdr-quick>div{border:1px solid color-mix(in srgb,var(--line) 72%,transparent)}
+
+@media(max-width:760px){
+  #sectorList.chips{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
 
 @media(max-width:560px){
   .top .brand{gap:8px}.top .brand .inuko-mark{width:28px;height:28px;flex-basis:28px}.top .brand .inuko-name b{font-size:1rem}.top .brand .inuko-name em{font-size:.58rem}.top .sub{font-size:.66rem;margin-top:3px}
   #cards .card{padding:13px;border-radius:16px}
   #cards .rank{font-size:.61rem;padding:3px 6px}
-  #sectorList .capital-chip{min-width:248px;max-width:268px;padding:13px}
-  #sectorRankExplain .sector-rank-row,#sectorRankExplain .live-sector-rank-row{grid-template-columns:28px minmax(0,1fr);padding:9px 8px}
+  #sectorList.chips{gap:8px}
+  #sectorList .capital-chip{padding:10px;border-radius:14px;gap:3px}
+  #sectorList .capital-chip> b{font-size:.72rem}
+  #sectorList .capital-chip> strong{font-size:.92rem}
+  #sectorList .capital-chip>div:not(.capital-more):not(.capital-hint):not(.live-sector-preview){font-size:.61rem}
+  #sectorList .capital-chip>.capital-hint{font-size:.58rem;padding-top:6px}
+  #sectorRankExplain .sector-rank-panel{padding:10px}
+  #sectorRankExplain .sector-rank-row,#sectorRankExplain .live-sector-rank-row{grid-template-columns:22px minmax(0,1fr);padding:8px 7px}
+  #sectorRankExplain .sector-rank-id b{font-size:.69rem}
+  #sectorRankExplain .sector-rank-id small{font-size:.58rem}
+  dialog#detailDialog{width:94vw;height:86dvh;max-height:86dvh;border-radius:20px}
+  #detailDialog .dialog-head{padding:12px 14px}
+  #detailBody{padding:14px 14px calc(24px + env(safe-area-inset-bottom))}
 }
