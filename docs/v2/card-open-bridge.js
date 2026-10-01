@@ -32,6 +32,7 @@
     return /明日候選/.test(rank)&&v.quality!=null&&v.quality>=QUALITY_MIN&&v.position!=null&&v.position>=POSITION_MIN&&v.confidence!=null&&v.confidence>=CONFIDENCE_MIN;
   }
 
+  function setText(el,value){if(el&&el.textContent!==value)el.textContent=value}
   function applyNextDayPolicy(){
     if(policyBusy)return;policyBusy=true;
     try{
@@ -41,12 +42,12 @@
       if(!isClose())return;
       const eligible=cards.filter(elite).slice(0,ELITE_LIMIT);
       const count=eligible.length;
-      const strong=tile?.querySelector('strong');if(strong)strong.textContent=String(count);
-      const small=tile?.querySelector('small');if(small)small.textContent=`品質≥${QUALITY_MIN}・位置≥${POSITION_MIN}・最多${ELITE_LIMIT}檔`;
+      setText(tile?.querySelector('strong'),String(count));
+      setText(tile?.querySelector('small'),`品質≥${QUALITY_MIN}・位置≥${POSITION_MIN}・最多${ELITE_LIMIT}檔`);
       if(nextDayActive()){
         const keep=new Set(eligible);
         cards.forEach(card=>{if(!keep.has(card)){card.style.display='none';card.dataset.eliteHidden='1'}});
-        const ct=document.getElementById('countText');if(ct)ct.textContent=`明日候選 · ${count} 檔`;
+        setText(document.getElementById('countText'),`明日候選 · ${count} 檔`);
         const more=document.getElementById('loadMore');if(more)more.classList.add('hidden');
       }
     }finally{policyBusy=false}
