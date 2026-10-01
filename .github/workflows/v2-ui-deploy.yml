@@ -186,7 +186,7 @@ jobs:
           cp -a docs/v2/data/. /tmp/v2-production-data/
 
           git fetch origin clean-build-v2 --depth=1
-          git archive FETCH_HEAD docs/v2 scripts/v2/validate_single_writer_ui.py scripts/v2/validate_product_surface.py | tar -xf - -C /tmp/v2-ui
+          git archive FETCH_HEAD docs/v2 scripts/v2/validate_single_writer_ui.py scripts/v2/validate_product_surface.py scripts/v2/test_portfolio_ledger.js | tar -xf - -C /tmp/v2-ui
           rm -rf docs/v2
           mv /tmp/v2-ui/docs/v2 docs/v2
           rm -rf docs/v2/data
@@ -195,6 +195,7 @@ jobs:
           mkdir -p scripts/v2
           cp /tmp/v2-ui/scripts/v2/validate_single_writer_ui.py scripts/v2/validate_single_writer_ui.py
           cp /tmp/v2-ui/scripts/v2/validate_product_surface.py scripts/v2/validate_product_surface.py
+          cp /tmp/v2-ui/scripts/v2/test_portfolio_ledger.js scripts/v2/test_portfolio_ledger.js
 
           after_hash="$(sha256sum docs/v2/data/current_manifest.json | awk '{print $1}')"
           after_build="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json")).get("active_build_id", ""))')"
