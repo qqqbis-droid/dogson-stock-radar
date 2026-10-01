@@ -9,6 +9,12 @@
   "theme_color": "#183a30",
   "icons": [
     {
+      "src": "./assets/inuko-lab/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "./assets/inuko-lab/mark.svg",
       "sizes": "any",
       "type": "image/svg+xml",
