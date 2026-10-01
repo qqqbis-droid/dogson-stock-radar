@@ -75,8 +75,8 @@
       const card=e.target?.closest?.('#cards .card');if(!card)return;
       if(e.target?.closest?.(INTERACTIVE))return;
       if(e.target?.closest?.('.dogson-quick-detail-back,#peerPeekBack,#portfolioEditBack'))return;
-      const top=e.target?.closest?.(':scope>.top,:scope>.dogson-card-brief');
-      if(!top&&e.target!==card)return;
+      const tap=e.target?.closest?.('.top,.dogson-card-brief');
+      if((!tap||tap.parentElement!==card)&&e.target!==card)return;
       e.preventDefault();
       toggleCard(card);
     });
