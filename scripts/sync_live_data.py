@@ -6,6 +6,7 @@
 """
 from pathlib import Path
 import os
+import time
 import requests
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,9 +25,20 @@ files = [
     "validation_history.json", "validation.json", "daytrade.json", "decision_history.json",
 ]
 
+# Pages sits behind a CDN.  Cache-Control alone is not a strong enough guarantee
+# for a scheduled producer that immediately consumes the previous deployment.
+# Give every workflow invocation its own cache-busting token while retaining the
+# canonical output filenames on disk.
+stamp = time.time_ns()
+
 for name in files:
     try:
-        r = requests.get(base + name, timeout=12, headers={"Cache-Control": "no-cache"})
+        r = requests.get(
+            base + name,
+            params={"ts": f"{stamp}-{name}"},
+            timeout=12,
+            headers={"Cache-Control": "no-cache, no-store", "Pragma": "no-cache"},
+        )
         if r.ok and r.text.strip():
             (OUT / name).write_bytes(r.content)
             print("synced", name)
