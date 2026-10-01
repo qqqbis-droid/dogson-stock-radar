@@ -35,6 +35,7 @@ def main():
     card_bridge = text("card-open-bridge.js")
     portfolio = text("portfolio-renderer.js")
     store = text("portfolio-store.js")
+    ledger = text("portfolio-ledger-ui.js")
     quick = text("portfolio-quick-add.js")
     universe = text("universe-search.js")
     transparency = text("radar-transparency-v7.js")
@@ -43,7 +44,6 @@ def main():
 
     errors: list[str] = []
 
-    # Core mobile decision flow mounts.
     for mount in (
         "marketPulse", "mission", "marketSummary", "marketDetail",
         "capitalTitle", "sectorList", "sectorRankExplain", "rankingTitle", "countText",
@@ -54,37 +54,31 @@ def main():
     ):
         require_once(html, f'id="{mount}"', "index mount", errors)
 
-    # Four missions must remain distinct in the navigation.
     for view, label in (("intraday", "盤中"), ("close", "盤後"), ("portfolio", "庫存"), ("daytrade", "當沖")):
         require(html, f'data-view="{view}"', f"tab {label}", errors)
 
-    # Product semantics: no score/probability confusion.
     require(html, "分數表示條件同步程度，不代表上漲機率", "footer semantics", errors)
     require(html, "排名是注意力順序", "footer ranking semantics", errors)
     require(transparency, "名次只代表今天的注意力順序", "ranking transparency", errors)
     require(transparency, "Shadow", "shadow validation state", errors)
     require(transparency, "官方股票清單", "universe vs pool disclosure", errors)
 
-    # Market environment must expose score reasons and independent clocks.
     for needle in ("市場分", "資料信心", "報價快照", "最後成交", "VWAP／量速／族群結構"):
         require(market, needle, "market environment", errors)
     require(market, "點一下看細節", "capital drill-down affordance", errors)
     require(market, "radar:open-stock", "sector-to-stock bridge", errors)
 
-    # Sector drill-down must explain attention order without inventing a second score.
     require(sector_rank, "族群內先看", "sector watch-priority panel", errors)
     require(sector_rank, "沿用盤後正式排序", "close sector ranking semantics", errors)
     require(sector_rank, "沿用盤中正式排序", "intraday sector ranking semantics", errors)
     require(sector_rank, "不另外發明一套族群內分數", "sector ranking no-fake-score rule", errors)
     require(sector_rank, "radar:open-stock", "sector ranked stock bridge", errors)
 
-    # Radar summary, filters and full-universe search.
     for needle in ("radarSummary", "positionFilter", "sectorFilter", "RadarUniverseSearch"):
         require(app, needle, "radar interaction", errors)
     require(universe, "_outsidePool", "full-market outside-pool state", errors)
     require(universe, "系統不會用假分數補滿", "outside-pool honesty", errors)
 
-    # Ranked stock cards must stay tappable without creating a second detail writer.
     require(html, "card-open-bridge.js", "stock card click bridge script", errors)
     require(card_bridge, "#cards .card[data-code]", "ranked card tap target", errors)
     require(card_bridge, "radar:open-stock", "ranked card open event", errors)
@@ -92,7 +86,6 @@ def main():
     if ".innerHTML" in card_bridge or "showModal" in card_bridge:
         errors.append("stock card bridge must not become a second detail renderer")
 
-    # Stock detail keeps canonical S/R data but presents it in the Dogson price-map language.
     for needle in ("支撐區", "壓力區", "評分依據", "資料品質"):
         require(detail, needle, "stock detail", errors)
     require(detail, "radar:open-stock", "stock detail open event", errors)
@@ -102,16 +95,22 @@ def main():
     require(price_map, "沒有可信結構就留白", "price-map no-guess rule", errors)
     require(price_map, "第二層不額外灌分", "price-map no-score-inflation rule", errors)
 
-    # Private portfolio contract and one-share rule.
     for needle in ("entry_reason", "hold_reason", "validation_condition", "failure_condition", "strategy"):
         require(store, needle, "portfolio store schema", errors)
         require(portfolio, needle, "portfolio renderer", errors)
     require(html, 'name="shares"', "portfolio shares field", errors)
     require(html, 'min="1"', "portfolio one-share rule", errors)
     require(html, "不會寫入公開 GitHub", "portfolio privacy disclosure", errors)
-    require(quick, "RadarPortfolioStore.upsert", "detail-to-portfolio canonical write", errors)
+    require(html, "Portfolio Ledger 2.0", "portfolio ledger disclosure", errors)
+    require(html, "portfolio-ledger-ui.js", "portfolio ledger script", errors)
+    for needle in ("transactions", "addTransaction", "history", "realized_pl", "cycle_count"):
+        require(store, needle, "portfolio ledger store", errors)
+    for needle in ("新增成交", "交易流水", "已實現", "addTransaction"):
+        require(ledger, needle, "portfolio ledger interaction", errors)
+    require(quick, "RadarPortfolioStore.addTransaction", "detail-to-portfolio ledger append", errors)
+    if "RadarPortfolioStore.upsert" in quick:
+        errors.append("detail quick-add must not overwrite aggregate holdings in ledger 2.0")
 
-    # Theme and runtime observability are independent controllers, not decision writers.
     require(theme, "data-theme", "dark mode controller", errors)
     require(theme, "dogson.theme.v1", "theme persistence", errors)
     require(runtime, "sessionStorage", "runtime metrics local storage", errors)
@@ -137,6 +136,8 @@ def main():
         "score_explanation": True,
         "portfolio_private": True,
         "portfolio_one_share": True,
+        "portfolio_ledger": "2.0.0",
+        "portfolio_transaction_history": True,
         "dark_mode": True,
         "runtime_observability": True,
         "shadow_disclosure": True,
