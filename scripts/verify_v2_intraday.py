@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Verify that V2 intraday/daytrade contexts match the source just published."""
+"""Verify that V2 intraday/daytrade contexts match the source just published.
+
+The production gate also proves Support/Resistance 2.0 is real data, not merely
+UI capability: active zone datasets must contain genuine S2 and R2 records.
+"""
 import json
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 
 
@@ -30,6 +35,23 @@ def run_mission_gate(mission):
         "--legacy-root", "docs/data",
         "--mission", mission,
     )
+
+
+def verify_ranked_zones(root, manifest, key):
+    p = resolve(root, manifest["datasets"][key]["url"])
+    zones = load(p)
+    if not isinstance(zones, list):
+        raise SystemExit(f"{key} must be a list")
+    ranks = Counter(str(z.get("rank") or "") for z in zones if isinstance(z, dict))
+    print(key, "zone ranks", dict(ranks))
+    # We deliberately do not require every stock to have S2/R2; a second level
+    # is omitted when the engine cannot find an independent trustworthy cluster.
+    # But a production dataset with zero second levels means enrichment regressed.
+    if ranks.get("S1", 0) == 0 or ranks.get("R1", 0) == 0:
+        raise SystemExit(f"{key} missing primary S1/R1 zones: {dict(ranks)}")
+    if ranks.get("S2", 0) < 10 or ranks.get("R2", 0) < 10:
+        raise SystemExit(f"{key} S/R 2.0 regression; too few genuine S2/R2 zones: {dict(ranks)}")
+    return ranks
 
 
 def main():
@@ -71,10 +93,16 @@ def main():
         if not p.is_file() or p.stat().st_size == 0:
             raise SystemExit(f"{key} missing from active build: {p}")
 
+    verify_ranked_zones(root, m, "zone_intraday")
+    verify_ranked_zones(root, m, "zone_daytrade")
+    # Close is also checked here because the same deployment publishes the
+    # cross-mission detail panel.  It must not silently fall back to legacy-only.
+    verify_ranked_zones(root, m, "zone_close")
+
     run_mission_gate("intraday")
     run_mission_gate("daytrade")
     run_py("scripts/v2/validate_single_writer_ui.py")
-    print("V2 stock detail/evidence + single-writer UI verified")
+    print("V2 stock detail/evidence + S1/S2/R1/R2 + single-writer UI verified")
 
 
 if __name__ == "__main__":
