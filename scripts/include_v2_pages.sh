@@ -70,7 +70,11 @@ elif close and close > canonical:
     else:
         print('REBUILD')
 elif close == canonical and ((intra and intra < close) or (day and day < close) or not intra or not day):
-    print('PRESERVE_SAME_DAY')
+    # The completed close is authoritative after hours. Intraday/daytrade may
+    # legitimately remain on the last verified live session when a late MIS
+    # refresh cannot reconstruct today's live context. Preserve the bundle and
+    # advance only the close mission; stale live missions stay frozen/disabled.
+    print('PRESERVE_CLOSE_ADVANCE')
 elif close and canonical > close:
     print('PRESERVE_NEWER_CANONICAL')
 else:
@@ -85,7 +89,7 @@ case "$mode" in
     echo "A newer close session exists but intraday/daytrade are stale; refusing to fabricate or reuse another session." >&2
     exit 1
     ;;
-  PRESERVE_SAME_DAY|PRESERVE_NEWER_CANONICAL)
+  PRESERVE_SAME_DAY|PRESERVE_CLOSE_ADVANCE|PRESERVE_NEWER_CANONICAL)
     echo "Preserving verified canonical V2 data; deploying UI without rebuilding from stale after-hours MIS."
     python scripts/v2/normalize_close_snapshot_by_close_date.py --root docs/v2/data
     python scripts/v2/stamp_version_contract.py --root docs/v2/data
@@ -178,6 +182,15 @@ elif mode == 'PRESERVE_SAME_DAY':
         raise SystemExit(f'preserved canonical close is older than root close: v2={vc} root={cde}')
     if not vc or vi != vc or vd != vc:
         raise SystemExit(f'preserved same-day V2 contexts disagree: close={vc} intraday={vi} daytrade={vd}')
+elif mode == 'PRESERVE_CLOSE_ADVANCE':
+    if cde and vc < cde:
+        raise SystemExit(f'preserved canonical close is older than root close: v2={vc} root={cde}')
+    if not vc:
+        raise SystemExit('preserved close-advance V2 close context is missing')
+    if vi != vd:
+        raise SystemExit(f'preserved close-advance intraday/daytrade disagree: intraday={vi} daytrade={vd}')
+    if vi and vi > vc:
+        raise SystemExit(f'preserved close-advance intraday is newer than close: close={vc} intraday={vi}')
 elif mode == 'PRESERVE_NEWER_CANONICAL':
     if cde and vc < cde:
         raise SystemExit(f'preserved canonical close is older than root close: v2={vc} root={cde}')
