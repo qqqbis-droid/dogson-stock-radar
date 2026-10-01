@@ -30,6 +30,7 @@ def main():
     app = text("app.js")
     market = text("market-capital-renderer.js")
     sector_rank = text("sector-ranking-panel.js")
+    sector_layout = text("sector-summary-layout-v2.js")
     detail = text("stock-detail-renderer.js")
     price_map = text("price-map-theme.js")
     card_bridge = text("card-open-bridge.js")
@@ -68,10 +69,22 @@ def main():
     require(market, "點一下看細節", "capital drill-down affordance", errors)
     require(market, "radar:open-stock", "sector-to-stock bridge", errors)
 
-    require(sector_rank, "族群內先看", "sector watch-priority panel", errors)
-    require(sector_rank, "沿用盤後正式排序", "close sector ranking semantics", errors)
-    require(sector_rank, "沿用盤中正式排序", "intraday sector ranking semantics", errors)
-    require(sector_rank, "不另外發明一套族群內分數", "sector ranking no-fake-score rule", errors)
+    # Sector summary V2: upper cards explain the sector; the lower panel owns the
+    # stock list. Ranking must reuse the page's official opportunity order and
+    # existing mission score instead of inventing a separate sector-member score.
+    require(html, "sector-summary-layout-v2.js", "sector summary layout script", errors)
+    require(sector_layout, "查看族群明細", "sector summary drill-down", errors)
+    require(sector_layout, "同族群股票 ↓", "sector member handoff", errors)
+    for needle in (".member-list", ".capital-section-label", ".live-sector-preview", ".live-sector-members"):
+        require(sector_layout, needle, "sector upper-member dedupe", errors)
+    require(sector_layout, "display:none!important", "sector upper-member hide rule", errors)
+
+    require(sector_rank, "同族群股票", "sector member ranking panel", errors)
+    require(sector_rank, "opportunity_rank", "sector official ranking reuse", errors)
+    require(sector_rank, "intraday_momentum_score", "intraday sector ranking semantics", errors)
+    require(sector_rank, "swing_quality_score", "close sector ranking semantics", errors)
+    require(sector_rank, "daytrade_score", "daytrade sector ranking semantics", errors)
+    require(sector_rank, "系統不會用假分數補滿", "sector ranking no-fake-score rule", errors)
     require(sector_rank, "radar:open-stock", "sector ranked stock bridge", errors)
 
     for needle in ("radarSummary", "positionFilter", "sectorFilter", "RadarUniverseSearch"):
@@ -130,6 +143,8 @@ def main():
         "full_market_search": True,
         "sector_drilldown": True,
         "sector_attention_reason": True,
+        "sector_summary_deduped": True,
+        "sector_member_table": True,
         "stock_card_click_bridge": True,
         "stock_detail": True,
         "dogson_price_map": True,
