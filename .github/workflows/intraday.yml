@@ -42,11 +42,12 @@ permissions:
   pages: write
   id-token: write
 
-# Fresh scheduled work wins. If GitHub cron jitters and a newer quote tick arrives,
-# it may cancel an older structure job rather than publish stale data late.
+# All Pages publishers share the same single-writer group. Intraday ticks may
+# replace an older *pending* tick, but must never cancel a running close/audit
+# publisher; otherwise the latest-completed-session background can never finish.
 concurrency:
   group: dogson-pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   intraday:
