@@ -5,6 +5,8 @@ set -euo pipefail
 # official MIS quote layer. Do not preserve an older same-day V2 bundle, because
 # that would make the website look stale even though docs/data/intraday.json is
 # current. Close/chip contexts still keep their own latest-completed-session date.
+# The V2 live patch must bind exactly to the canonical MIS `as_of` market clock;
+# file-write/update timestamps are not allowed to make the decision bundle newer.
 
 git fetch origin clean-build-v2 --depth=1
 rm -rf docs/v2 scripts/v2 contracts
