@@ -78,18 +78,51 @@ def evidence_of(value):
     basis = value.get("basis") or value.get("reason")
     if isinstance(basis, str) and basis.strip():
         items.extend(x.strip() for x in basis.replace("+", "＋").split("＋") if x.strip())
-    return list(dict.fromkeys(items))[:6]
+    return list(dict.fromkeys(items))[:8]
 
 
-def make_zone(value, side, decision):
+def levels_for(row, side):
+    """Return ordered S1/S2 or R1/R2 source levels, with legacy fallback."""
+    array_key = "support_levels" if side == "SUPPORT" else "resistance_levels"
+    raw = row.get(array_key)
+    if isinstance(raw, list):
+        values = [x for x in raw if isinstance(x, dict)]
+        if values:
+            return values[:2]
+    legacy_keys = (
+        ("support", "support_zone", "entry_support", "near_support")
+        if side == "SUPPORT"
+        else ("resistance", "resistance_zone", "near_resistance")
+    )
+    value = first_present(row, legacy_keys)
+    return [value] if value is not None else []
+
+
+def make_zone(value, side, decision, ordinal):
     low, high, center = zone_numbers(value)
     if low is None or high is None or center is None:
         return None
     low, high = sorted((low, high))
-    zone_id = f"{decision['decision_context_id']}:{side}"
-    strength = None
+    prefix = "S" if side == "SUPPORT" else "R"
+    default_rank = f"{prefix}{ordinal}"
+    rank = str(value.get("rank") or default_rank) if isinstance(value, dict) else default_rank
+    if rank not in {"S1", "S2", "R1", "R2"}:
+        rank = default_rank
+    zone_id = f"{decision['decision_context_id']}:{side}:{rank}"
+    strength = num(value.get("strength")) if isinstance(value, dict) else None
+    confidence = num(value.get("confidence")) if isinstance(value, dict) else None
+    distance_pct = num(value.get("distance_pct")) if isinstance(value, dict) else None
+    evidence_count = None
+    label = None
+    structure_state = None
+    validation_condition = None
+    invalidation_condition = None
     if isinstance(value, dict):
-        strength = num(value.get("strength"))
+        evidence_count = value.get("evidence_count")
+        label = value.get("label")
+        structure_state = value.get("structure_state")
+        validation_condition = value.get("validation_condition")
+        invalidation_condition = value.get("invalidation_condition")
     return {
         "schema_version": "2.0.0",
         "build_id": decision["build_id"],
@@ -104,12 +137,19 @@ def make_zone(value, side, decision):
         "source_status": deepcopy(decision.get("source_status") or {"sources": [], "fallback": False}),
         "zone_id": zone_id,
         "side": side,
+        "rank": rank,
+        "label": str(label or ("近端支撐" if rank == "S1" else "第二支撐" if rank == "S2" else "第一壓力" if rank == "R1" else "第二壓力")),
         "low": round(low, 4),
         "high": round(high, 4),
         "center": round(center, 4),
+        "distance_pct": round(distance_pct, 4) if distance_pct is not None else None,
         "strength": strength,
-        "confidence": None,
+        "confidence": confidence,
         "evidence": evidence_of(value),
+        "evidence_count": int(evidence_count) if evidence_count is not None else len(evidence_of(value)),
+        "structure_state": str(structure_state or "ACTIVE"),
+        "validation_condition": str(validation_condition) if validation_condition else None,
+        "invalidation_condition": str(invalidation_condition) if invalidation_condition else None,
         "created_at": decision.get("generated_at"),
         "last_tested_at": None,
         "role_state": "ORIGINAL",
@@ -138,14 +178,20 @@ def enrich_context(*, legacy_root, output_root, manifest, context, source_file):
     zone_by_id = {}
     for code, decision in (detail.get("items") or {}).items():
         row = raw.get(str(code), {})
-        support = first_present(row, ("support", "support_zone", "entry_support", "near_support"))
-        resistance = first_present(row, ("resistance", "resistance_zone", "near_resistance"))
-        support_zone = make_zone(support, "SUPPORT", decision) if support is not None else None
-        resistance_zone = make_zone(resistance, "RESISTANCE", decision) if resistance is not None else None
-        decision["support_zone_ids"] = [support_zone["zone_id"]] if support_zone else []
-        decision["resistance_zone_ids"] = [resistance_zone["zone_id"]] if resistance_zone else []
-        for zone in (support_zone, resistance_zone):
-            if zone and zone["zone_id"] not in zone_by_id:
+        support_zones = [
+            make_zone(value, "SUPPORT", decision, i)
+            for i, value in enumerate(levels_for(row, "SUPPORT"), start=1)
+        ]
+        resistance_zones = [
+            make_zone(value, "RESISTANCE", decision, i)
+            for i, value in enumerate(levels_for(row, "RESISTANCE"), start=1)
+        ]
+        support_zones = [z for z in support_zones if z]
+        resistance_zones = [z for z in resistance_zones if z]
+        decision["support_zone_ids"] = [z["zone_id"] for z in support_zones]
+        decision["resistance_zone_ids"] = [z["zone_id"] for z in resistance_zones]
+        for zone in [*support_zones, *resistance_zones]:
+            if zone["zone_id"] not in zone_by_id:
                 zone_by_id[zone["zone_id"]] = zone
                 zones.append(zone)
 
@@ -203,11 +249,11 @@ def main():
         counts[context] = len(zones)
 
     warnings = manifest.setdefault("health", {}).setdefault("warnings", [])
-    note = "Phase 4：支撐／壓力區間由 v1.x 已計算結構遷移為 StructuralZone；Zone 本身不是買進訊號。"
+    note = "支撐／壓力結構 2.0：每檔最多保留 S1/S2/R1/R2；Zone 只描述結構，不等於買進訊號。"
     if note not in warnings:
         warnings.append(note)
     write_json(manifest_path, manifest)
-    print("zone enrichment OK", counts)
+    print("zone enrichment 2.0 OK", counts)
 
 
 if __name__ == "__main__":
