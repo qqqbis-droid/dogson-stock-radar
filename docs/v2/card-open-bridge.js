@@ -4,33 +4,12 @@
   const ELITE_LIMIT=8,QUALITY_MIN=75,POSITION_MIN=65,CONFIDENCE_MIN=80;
   let lastOpen={code:'',at:0},policyBusy=false;
 
-  function safeShow(dialog){
-    if(!dialog||dialog.open)return;
-    try{
-      if(typeof dialog.showModal==='function')dialog.showModal();
-      else dialog.setAttribute('open','');
-    }catch(_){
-      dialog.setAttribute('open','');
-      dialog.classList.add('dialog-fallback-open');
-    }
-  }
-
-  function showLoading(code){
-    const dialog=document.getElementById('detailDialog');
-    const title=document.getElementById('detailTitle');
-    const body=document.getElementById('detailBody');
-    if(title)title.textContent=code||'個股詳情';
-    if(body)body.innerHTML='<div class="muted">讀取個股資訊…</div>';
-    safeShow(dialog);
-  }
-
   function openCode(code){
     code=String(code||'').trim();
     if(!code)return;
     const now=Date.now();
     if(lastOpen.code===code&&now-lastOpen.at<450)return;
     lastOpen={code,at:now};
-    showLoading(code);
     document.dispatchEvent(new CustomEvent('radar:open-stock',{detail:{code}}));
   }
 
@@ -72,11 +51,6 @@
       }
     }finally{policyBusy=false}
   }
-
-  document.addEventListener('radar:open-stock',function(event){
-    const code=String(event.detail?.code||'').trim();
-    if(code)showLoading(code);
-  },true);
 
   document.addEventListener('pointerup',function(event){
     if(event.pointerType==='mouse')return;
