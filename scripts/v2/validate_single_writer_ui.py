@@ -19,6 +19,7 @@ REQUIRED = {
     "live-pulse-points.js",
     "portfolio-store.js",
     "portfolio-renderer.js",
+    "portfolio-ledger-ui.js",
     "portfolio-quick-add.js",
     "radar-transparency-v7.js",
     "theme-toggle.js",
@@ -78,7 +79,6 @@ def main():
         if "MutationObserver" in text:
             errors.append(f"single-writer renderer must not use MutationObserver: {name}")
 
-    # Production release gate: every required first-party JS module must parse.
     node = shutil.which("node")
     if not node:
         errors.append("node executable unavailable; cannot syntax-check active UI")
@@ -87,12 +87,7 @@ def main():
             path = ROOT / "docs" / "v2" / name
             if not path.is_file():
                 continue
-            proc = subprocess.run(
-                [node, "--check", str(path)],
-                capture_output=True,
-                text=True,
-                cwd=ROOT,
-            )
+            proc = subprocess.run([node, "--check", str(path)], capture_output=True, text=True, cwd=ROOT)
             if proc.returncode != 0:
                 msg = (proc.stderr or proc.stdout or "syntax error").strip().splitlines()[-1]
                 errors.append(f"active UI syntax failed {name}: {msg}")
@@ -112,9 +107,6 @@ def main():
         if html.count(f'id="{mount}"') != 1:
             errors.append(f"{mount} must have exactly one DOM owner mount ({owner})")
 
-    # Private portfolio contract: the public repo contains only UI/schema code.
-    # User holdings must remain browser-local and all decision-reason fields are
-    # mandatory UI capabilities even though their text values may be empty.
     form_fields = set(re.findall(r'<(?:input|select|textarea)[^>]+name=["\']([^"\']+)', html))
     missing_fields = sorted(PORTFOLIO_FIELDS - form_fields)
     if missing_fields:
@@ -123,6 +115,8 @@ def main():
         errors.append("portfolio must accept actual holdings from 1 share")
     if "localStorage" not in html or "不會寫入公開 GitHub" not in html:
         errors.append("portfolio privacy disclosure missing")
+    if "Portfolio Ledger 2.0" not in html or "portfolio-ledger-ui.js" not in html:
+        errors.append("portfolio transaction-ledger surface missing")
 
     store_path = ROOT / "docs" / "v2" / "portfolio-store.js"
     if store_path.is_file():
@@ -132,24 +126,30 @@ def main():
         for forbidden_api in ("fetch(", "XMLHttpRequest", "sendBeacon", "WebSocket("):
             if forbidden_api in store:
                 errors.append(f"portfolio store may not transmit holdings: found {forbidden_api}")
-        for field in PORTFOLIO_FIELDS - {"note"}:
-            if field not in store:
-                errors.append(f"portfolio store schema missing {field}")
+        for token in ("transactions", "addTransaction", "deleteTransaction", "history", "realized_pl", "LEGACY_POSITION_MIGRATION", "2.0.0"):
+            if token not in store:
+                errors.append(f"portfolio ledger 2.0 store missing {token}")
+
+    ledger_path = ROOT / "docs" / "v2" / "portfolio-ledger-ui.js"
+    if ledger_path.is_file():
+        ledger = ledger_path.read_text(encoding="utf-8")
+        for token in ("新增成交", "交易流水", "addTransaction", "deleteTransaction", "已實現"):
+            if token not in ledger:
+                errors.append(f"portfolio ledger UI missing {token}")
+        if "MutationObserver" in ledger:
+            errors.append("portfolio ledger UI must not DOM-watch/rewrite with MutationObserver")
 
     quick_path = ROOT / "docs" / "v2" / "portfolio-quick-add.js"
     if quick_path.is_file():
         quick = quick_path.read_text(encoding="utf-8")
-        if "RadarPortfolioStore.upsert" not in quick:
-            errors.append("portfolio quick-add must write through the canonical browser-local store")
+        if "RadarPortfolioStore.addTransaction" not in quick:
+            errors.append("portfolio quick-add must append through canonical transaction ledger")
         if "MutationObserver" in quick:
             errors.append("portfolio quick-add must not watch/rewrite stock detail DOM")
 
     if errors:
         raise SystemExit("single-writer UI gate failed: " + " | ".join(errors))
 
-    # Product smoke is intentionally a separate validator: this file protects
-    # ownership/syntax/privacy; the smoke gate protects the end-user decision
-    # journey. Bind them here so every publisher gets both automatically.
     smoke = ROOT / "scripts" / "v2" / "validate_product_surface.py"
     subprocess.run([sys.executable, str(smoke)], cwd=ROOT, check=True)
 
@@ -163,6 +163,8 @@ def main():
         "price_map_decorator": "price-map-theme.js",
         "pinned_index_point_change": "live-pulse-points.js",
         "portfolio_owner": "portfolio-renderer.js",
+        "portfolio_ledger": "2.0.0",
+        "portfolio_ledger_ui": "portfolio-ledger-ui.js",
         "portfolio_quick_add_owner": "portfolio-quick-add.js",
         "theme_owner": "theme-toggle.js",
         "runtime_observability_owner": "runtime-observability.js",
