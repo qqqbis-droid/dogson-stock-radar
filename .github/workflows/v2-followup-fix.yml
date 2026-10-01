@@ -1,0 +1,68 @@
+name: V2 Follow-up Fix
+
+on:
+  push:
+    branches: ["clean-build-v2"]
+    paths:
+      - ".github/workflows/v2-followup-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: clean-build-v2
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Apply guarded follow-up patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p=Path('docs/v2/stock-detail-renderer.js')
+          s=p.read_text(encoding='utf-8')
+          s2=re.sub(r'(?<!e)include\(out,', 'einclude(out,', s)
+          if s2 == s:
+              print('No bare include(out, calls found; renderer already corrected')
+          p.write_text(s2,encoding='utf-8')
+
+          p=Path('docs/v2/index.html')
+          s=p.read_text(encoding='utf-8')
+          repl={
+              './app.js?v=20261001fullfix1':'./app.js?v=20261002follow1',
+              './sector-ranking-panel.js?v=20261001fullfix1':'./sector-ranking-panel.js?v=20261002follow1',
+              './stock-detail-renderer.js?v=20261001fullfix1':'./stock-detail-renderer.js?v=20261002follow1',
+          }
+          for a,b in repl.items():
+              s=s.replace(a,b)
+          p.write_text(s,encoding='utf-8')
+          PY
+
+          node --check docs/v2/app.js
+          node --check docs/v2/sector-ranking-panel.js
+          node --check docs/v2/stock-detail-renderer.js
+
+      - name: Commit corrected UI files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/v2/app.js docs/v2/sector-ranking-panel.js docs/v2/stock-detail-renderer.js docs/v2/index.html
+          if git diff --cached --quiet; then
+            echo 'No follow-up changes needed'
+            exit 0
+          fi
+          git commit -m "fix(v2): finalize inline sector and intraday evidence UI"
+          git push origin HEAD:clean-build-v2
