@@ -45,12 +45,47 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          IFS=$'\t' read -r run_id run_name run_updated <<< "$(gh api \
-            -H 'Accept: application/vnd.github+json' \
-            "/repos/${GITHUB_REPOSITORY}/actions/runs?status=success&per_page=100" \
-            --jq '[.workflow_runs[] | select(.name == "Radar - Close Update" or .name == "Radar - Intraday Update")] | max_by(.updated_at) | [.id,.name,.updated_at] | @tsv')"
+          python - <<'PY' > /tmp/canonical-source.tsv
+          import json
+          import os
+          import subprocess
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          candidates = []
+          for workflow in ('close.yml', 'intraday.yml'):
+              raw = subprocess.check_output([
+                  'gh', 'api',
+                  f'/repos/{repo}/actions/workflows/{workflow}/runs?status=success&per_page=20'
+              ], text=True)
+              for run in json.loads(raw).get('workflow_runs', []):
+                  if run.get('name') in {'Radar - Close Update', 'Radar - Intraday Update'}:
+                      candidates.append(run)
+
+          candidates.sort(key=lambda r: str(r.get('updated_at') or ''), reverse=True)
+          selected = None
+          selected_artifact = None
+          for run in candidates:
+              run_id = run.get('id')
+              raw = subprocess.check_output([
+                  'gh', 'api',
+                  f'/repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100'
+              ], text=True)
+              artifacts = json.loads(raw).get('artifacts', [])
+              pages = next((a for a in artifacts if a.get('name') == 'github-pages' and not a.get('expired')), None)
+              if pages:
+                  selected = run
+                  selected_artifact = pages
+                  break
+
+          if not selected or not selected_artifact:
+              raise SystemExit('No recent successful Close/Intraday run has a live github-pages artifact')
+
+          print(f"{selected['id']}\t{selected['name']}\t{selected['updated_at']}\t{selected_artifact['id']}")
+          PY
+
+          IFS=$'\t' read -r run_id run_name run_updated artifact_id < /tmp/canonical-source.tsv
           test -n "$run_id"
-          test "$run_id" != "null"
+          test -n "$artifact_id"
           case "$run_name" in
             "Radar - Close Update"|"Radar - Intraday Update") ;;
             *) echo "Unexpected canonical publisher: $run_name" >&2; exit 1 ;;
@@ -58,7 +93,8 @@ jobs:
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
           echo "run_name=$run_name" >> "$GITHUB_OUTPUT"
           echo "run_updated=$run_updated" >> "$GITHUB_OUTPUT"
-          echo "Using canonical Pages source: $run_name run=$run_id updated=$run_updated"
+          echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"
+          echo "Using canonical Pages source: $run_name run=$run_id artifact=$artifact_id updated=$run_updated"
 
       - name: Download exact canonical production Pages artifact
         uses: actions/download-artifact@v4
