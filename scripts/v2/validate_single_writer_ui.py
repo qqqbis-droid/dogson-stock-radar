@@ -39,7 +39,6 @@ FORBIDDEN_ACTIVE = {
     "card-display-v3.js",
     "ui-coherence-v5.js",
     "copy-polish-v6.js",
-    # Retired V2 overlays: these caused competing DOM writers / timers.
     "card-open-bridge.js",
     "stock-detail-prime.js",
     "live-ui-20261001.js",
@@ -106,9 +105,14 @@ def main():
     detail = (ROOT / "docs" / "v2" / "stock-detail-renderer.js").read_text(encoding="utf-8")
     market = (ROOT / "docs" / "v2" / "market-capital-renderer.js").read_text(encoding="utf-8")
 
-    for token in ('#cards .card[data-code]', 'radar:open-stock', 'NEXT_DAY_ELITE', 'qualityMin:75', 'positionMin:65', 'confidenceMin:80', 'limit:8'):
+    for token in ('#cards .card[data-code]', 'radar:open-stock', 'NEXT_DAY_ELITE', 'qualityMin:75', 'positionMin:65', 'confidenceMin:80'):
         if token not in app:
             errors.append(f"canonical app interaction missing {token}")
+    for capped in ('limit:8', 'NEXT_DAY_ELITE.limit', 'slice(0,NEXT_DAY_ELITE.limit)'):
+        if capped in app:
+            errors.append(f"tomorrow candidate policy must be uncapped: found {capped}")
+    if 'showAllNextDay' not in app:
+        errors.append("tomorrow candidate quick filter must render all qualified rows")
     if "await dataset(cfg.detail)" in app.split("async function ensureIndex()", 1)[-1].split("async function ensureDetail()", 1)[0]:
         errors.append("ensureIndex must not fetch multi-megabyte detail data")
 
@@ -198,7 +202,7 @@ def main():
         "detail_loading": "progressive",
         "legacy_index_writer_active": False,
         "mutation_observers_in_single_writers": False,
-        "next_day_elite_limit": 8,
+        "next_day_elite_limit": "unlimited",
         "portfolio_ledger": "2.0.0",
         "portfolio_storage": "browser-local-only",
         "product_smoke": "PASS",
