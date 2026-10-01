@@ -99,8 +99,11 @@ jobs:
           PY
           )"
           if [[ "$need_refresh" == "1" ]]; then
-            echo "Latest close is newer than root intraday/daytrade; attempting final MIS snapshot."
-            python scripts/bridge_intraday.py || true
+            echo "Latest close is newer than root intraday/daytrade; attempting official MIS fast repair first."
+            if ! python scripts/run_bridge_intraday_fast.py; then
+              echo "Official MIS fast repair failed; falling back to legacy bridge."
+              python scripts/bridge_intraday.py || true
+            fi
             python - <<'PY'
           import json
           from pathlib import Path
@@ -168,32 +171,35 @@ jobs:
           covered = [r for r in rows if float(r.get('chip_coverage_pct') or 0) > 0]
           print('chip covered rows:', len(covered), '/', len(rows))
           if rows and not covered:
-            raise SystemExit('chip coverage is still 0% for all rows')
+              raise SystemExit('chip coverage is still 0% for all rows')
 
           structured=[r for r in rows if (r.get('support_levels') or r.get('resistance_levels'))]
           print('SR 2.0 structured rows:',len(structured),'/',len(rows))
           if rows and not structured:
-            raise SystemExit('SR 2.0 produced no structured rows')
+              raise SystemExit('SR 2.0 produced no structured rows')
 
           h = Path('docs/data/hourly.json')
           hj = json.loads(h.read_text(encoding='utf-8')) if h.exists() else {}
           hrows = hj.get('rows') or []
           print('60K rows:', len(hrows), 'lights:', hj.get('entry_light_counts'))
           if not hrows:
-            raise SystemExit('60K radar is empty; abort Pages deploy instead of publishing a blank panel')
+              raise SystemExit('60K radar is empty; abort Pages deploy instead of publishing a blank panel')
 
           s = json.loads(Path('docs/data/system_status.json').read_text(encoding='utf-8'))
           print('system status:', s)
           if s.get('app_version') != APP_VERSION:
-            raise SystemExit(f"canonical system status app_version mismatch: {s.get('app_version')} != {APP_VERSION}")
+              raise SystemExit(f"canonical system status app_version mismatch: {s.get('app_version')} != {APP_VERSION}")
           if not s.get('latest_completed_trade_date'):
-            raise SystemExit('latest_completed_trade_date missing')
+              raise SystemExit('latest_completed_trade_date missing')
           dates=s.get('dates') or {}
           close_date=str(dates.get('close') or '')[:10]
           intraday_date=str(dates.get('intraday') or '')[:10]
           daytrade_date=str(dates.get('daytrade') or '')[:10]
           if close_date and (intraday_date < close_date or daytrade_date < close_date):
-            print(f'warning: root intraday/daytrade lag close after hours: close={close_date} intraday={intraday_date} daytrade={daytrade_date}')
+              raise SystemExit(
+                  'Refusing close publish with stale root intraday/daytrade: '
+                  f'close={close_date} intraday={intraday_date} daytrade={daytrade_date}'
+              )
           PY
       - name: Include Clean Build 2.0 in Pages artifact
         run: |
