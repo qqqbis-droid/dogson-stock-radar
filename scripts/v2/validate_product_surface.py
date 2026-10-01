@@ -28,6 +28,7 @@ def require_once(haystack: str, needle: str, label: str, errors: list[str]):
 def main():
     html = text("index.html")
     app = text("app.js")
+    quick_filter_css = text("quick-filter.css")
     market = text("market-capital-renderer.js")
     sector_rank = text("sector-ranking-panel.js")
     sector_layout = text("sector-summary-layout-v2.js")
@@ -89,6 +90,21 @@ def main():
 
     for needle in ("radarSummary", "positionFilter", "sectorFilter", "RadarUniverseSearch"):
         require(app, needle, "radar interaction", errors)
+
+    # Quick-filter cards are controls, not decorative statistics. They must cover
+    # intraday, close and day-trade views, participate in the same filter pipeline,
+    # load the full index through applyDeepFilter, and support a multi-stage pullback.
+    require(html, "quick-filter.css", "quick filter stylesheet", errors)
+    for needle in ("盤中雷達快篩", "明日作戰快篩", "當沖執行快篩", "data-quick-filter", "quickFilterConfig"):
+        require(app, needle, "radar quick filter", errors)
+    require(app, 'values:["PULLBACK_TEST","PULLBACK_CONFIRMED"]', "close pullback quick-filter union", errors)
+    require(app, "rows=rows.filter(quickMatch)", "quick filter render pipeline", errors)
+    require(app, "if(state.quickFilter)await applyDeepFilter()", "quick filter full-index load", errors)
+    require(app, "state.quickFilter=state.quickFilter===key", "quick filter toggle-off behavior", errors)
+    require(app, "data-quick-filter-clear", "quick filter clear control", errors)
+    for needle in (".quick-filter-grid", ".quick-filter-card.active", "grid-template-columns:repeat(2"):
+        require(quick_filter_css, needle, "quick filter responsive UI", errors)
+
     require(universe, "_outsidePool", "full-market outside-pool state", errors)
     require(universe, "系統不會用假分數補滿", "outside-pool honesty", errors)
 
@@ -139,7 +155,8 @@ def main():
         "market_pulse": True,
         "market_dual_clock": True,
         "radar_summary": True,
-        "filters": ["stage", "action", "position", "sector"],
+        "quick_filters": ["intraday", "close", "daytrade"],
+        "filters": ["quick", "stage", "action", "position", "sector"],
         "full_market_search": True,
         "sector_drilldown": True,
         "sector_attention_reason": True,
