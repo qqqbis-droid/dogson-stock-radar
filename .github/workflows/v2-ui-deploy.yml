@@ -182,6 +182,7 @@ jobs:
           python scripts/v2/validate_single_writer_ui.py
           node --check docs/v2/live-ui-20261001.js
           node --check docs/v2/live-index-source-guard.js
+          node --check docs/v2/sector-member-alias-guard.js
           node --check docs/sw.js
 
       - uses: actions/configure-pages@v5
