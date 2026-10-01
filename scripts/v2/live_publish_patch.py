@@ -79,11 +79,23 @@ def parse_clock(trade_date, value):
 
 
 def source_as_of(payload, trade_date):
+    """Bind V2 decisions to the source market clock, not file-write time.
+
+    ``normalize_intraday_clock.py`` writes the canonical official MIS snapshot
+    timestamp to ``as_of``.  ``updated_at`` may be a few seconds later because
+    subsequent enrichment writes the file again.  Using that write time would
+    make V2 appear newer than its source and fail the exact source lock.
+    """
     if not isinstance(payload, dict) or not trade_date:
         return None
     now = datetime.now(TW)
+
+    explicit = parse_dt(payload.get("as_of"))
+    if explicit and explicit.date().isoformat() == trade_date and explicit <= now + timedelta(minutes=5):
+        return explicit.isoformat(timespec="seconds")
+
     candidates = []
-    for key in ("updated_at", "source_updated_at", "generated_at"):
+    for key in ("source_updated_at", "updated_at", "generated_at"):
         dt = parse_dt(payload.get(key))
         if dt and dt.date().isoformat() == trade_date and dt <= now + timedelta(minutes=5):
             candidates.append(dt)
