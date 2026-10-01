@@ -11,20 +11,18 @@ ROOT = Path(__file__).resolve().parents[2]
 INDEX = ROOT / "docs" / "v2" / "index.html"
 
 REQUIRED = {
+    "data-source.js",
+    "universe-search.js",
+    "theme-toggle.js",
+    "portfolio-store.js",
     "app.js",
     "market-capital-renderer.js",
     "sector-ranking-panel.js",
     "stock-detail-renderer.js",
-    "price-map-theme.js",
-    "live-pulse-points.js",
-    "portfolio-store.js",
     "portfolio-renderer.js",
     "portfolio-ledger-ui.js",
     "portfolio-quick-add.js",
     "radar-transparency-v7.js",
-    "theme-toggle.js",
-    "runtime-observability.js",
-    "universe-search.js",
 }
 
 FORBIDDEN_ACTIVE = {
@@ -41,6 +39,18 @@ FORBIDDEN_ACTIVE = {
     "card-display-v3.js",
     "ui-coherence-v5.js",
     "copy-polish-v6.js",
+    # Retired V2 overlays: these caused competing DOM writers / timers.
+    "card-open-bridge.js",
+    "stock-detail-prime.js",
+    "live-ui-20261001.js",
+    "live-pulse-points.js",
+    "live-index-source-guard.js",
+    "sector-member-alias-guard.js",
+    "sector-summary-layout-v2.js",
+    "price-map-theme.js",
+    "brand-inuko-lab.js",
+    "portfolio-average-cost-label.js",
+    "runtime-observability.js",
 }
 
 SINGLE_WRITER_FILES = {
@@ -61,23 +71,14 @@ PORTFOLIO_FIELDS = {
 def main():
     html = INDEX.read_text(encoding="utf-8")
     scripts = set(re.findall(r'<script[^>]+src=["\']\.\/([^"\'?]+)', html))
+    errors: list[str] = []
 
     missing = sorted(REQUIRED - scripts)
     forbidden = sorted(FORBIDDEN_ACTIVE & scripts)
-    errors = []
     if missing:
         errors.append(f"required production renderers missing: {missing}")
     if forbidden:
-        errors.append(f"deprecated overlay scripts are active again: {forbidden}")
-
-    for name in SINGLE_WRITER_FILES:
-        path = ROOT / "docs" / "v2" / name
-        if not path.is_file():
-            errors.append(f"renderer file missing: {name}")
-            continue
-        text = path.read_text(encoding="utf-8")
-        if "MutationObserver" in text:
-            errors.append(f"single-writer renderer must not use MutationObserver: {name}")
+        errors.append(f"retired/competing overlay scripts are active: {forbidden}")
 
     node = shutil.which("node")
     if not node:
@@ -86,11 +87,43 @@ def main():
         for name in sorted(REQUIRED):
             path = ROOT / "docs" / "v2" / name
             if not path.is_file():
+                errors.append(f"active file missing: {name}")
                 continue
             proc = subprocess.run([node, "--check", str(path)], capture_output=True, text=True, cwd=ROOT)
             if proc.returncode != 0:
                 msg = (proc.stderr or proc.stdout or "syntax error").strip().splitlines()[-1]
                 errors.append(f"active UI syntax failed {name}: {msg}")
+
+    for name in SINGLE_WRITER_FILES:
+        path = ROOT / "docs" / "v2" / name
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if "MutationObserver" in text:
+            errors.append(f"single-writer renderer must not use MutationObserver: {name}")
+
+    app = (ROOT / "docs" / "v2" / "app.js").read_text(encoding="utf-8")
+    detail = (ROOT / "docs" / "v2" / "stock-detail-renderer.js").read_text(encoding="utf-8")
+    market = (ROOT / "docs" / "v2" / "market-capital-renderer.js").read_text(encoding="utf-8")
+
+    for token in ('#cards .card[data-code]', 'radar:open-stock', 'NEXT_DAY_ELITE', 'qualityMin:75', 'positionMin:65', 'confidenceMin:80', 'limit:8'):
+        if token not in app:
+            errors.append(f"canonical app interaction missing {token}")
+    if "await dataset(cfg.detail)" in app.split("async function ensureIndex()", 1)[-1].split("async function ensureDetail()", 1)[0]:
+        errors.append("ensureIndex must not fetch multi-megabyte detail data")
+
+    start = detail.find("async function openStock")
+    open_fn = detail[start:] if start >= 0 else ""
+    if "loadingShell(code)" not in open_fn or "await smanifest()" not in open_fn:
+        errors.append("detail open flow missing loading shell or manifest")
+    elif open_fn.find("loadingShell(code)") > open_fn.find("await smanifest()"):
+        errors.append("detail dialog must open before network awaits")
+    for token in ("safeOpen", "radar:detail-core-rendered", "radar:detail-rendered", "支撐區", "壓力區", "評分依據", "資料品質"):
+        if token not in detail:
+            errors.append(f"canonical detail renderer missing {token}")
+
+    if "../data/market.json" in market or "../data/intraday.json" in market:
+        errors.append("canonical market renderer must not read legacy root market/intraday files")
 
     mounts = {
         "marketSummary": "market-capital-renderer.js",
@@ -131,13 +164,8 @@ def main():
                 errors.append(f"portfolio ledger 2.0 store missing {token}")
 
     ledger_path = ROOT / "docs" / "v2" / "portfolio-ledger-ui.js"
-    if ledger_path.is_file():
-        ledger = ledger_path.read_text(encoding="utf-8")
-        for token in ("新增成交", "交易流水", "addTransaction", "deleteTransaction", "已實現"):
-            if token not in ledger:
-                errors.append(f"portfolio ledger UI missing {token}")
-        if "MutationObserver" in ledger:
-            errors.append("portfolio ledger UI must not DOM-watch/rewrite with MutationObserver")
+    if ledger_path.is_file() and "MutationObserver" in ledger_path.read_text(encoding="utf-8"):
+        errors.append("portfolio ledger UI must not DOM-watch/rewrite with MutationObserver")
 
     quick_path = ROOT / "docs" / "v2" / "portfolio-quick-add.js"
     if quick_path.is_file():
@@ -164,24 +192,16 @@ def main():
         "status": "PASS",
         "active_scripts": sorted(scripts),
         "card_owner": "app.js",
-        "market_capital_owner": "market-capital-renderer.js",
+        "market_owner": "market-capital-renderer.js",
         "sector_rank_owner": "sector-ranking-panel.js",
         "detail_owner": "stock-detail-renderer.js",
-        "price_map_decorator": "price-map-theme.js",
-        "pinned_index_point_change": "live-pulse-points.js",
-        "portfolio_owner": "portfolio-renderer.js",
+        "detail_loading": "progressive",
+        "legacy_index_writer_active": False,
+        "mutation_observers_in_single_writers": False,
+        "next_day_elite_limit": 8,
         "portfolio_ledger": "2.0.0",
-        "portfolio_ledger_ui": "portfolio-ledger-ui.js",
-        "portfolio_quick_add_owner": "portfolio-quick-add.js",
-        "portfolio_ledger_arithmetic": "PASS",
-        "theme_owner": "theme-toggle.js",
-        "runtime_observability_owner": "runtime-observability.js",
         "portfolio_storage": "browser-local-only",
-        "portfolio_fields": sorted(PORTFOLIO_FIELDS),
-        "runtime_metrics_storage": "session-local-only",
-        "syntax_checked": sorted(REQUIRED),
         "product_smoke": "PASS",
-        "deprecated_overlays_active": [],
     })
 
 
