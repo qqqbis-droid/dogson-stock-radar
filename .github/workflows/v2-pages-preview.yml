@@ -54,10 +54,12 @@ jobs:
           node --check docs/v2/app.js
           node --check docs/v2/market-capital-renderer.js
           node --check docs/v2/stock-detail-renderer.js
+          node --check docs/v2/detail-loading-guard-v1.js
           node --check docs/v2/portfolio-renderer.js
           node --check docs/v2/radar-transparency-v7.js
           node --check docs/v2/unified-score-freshness-v1.js
           python scripts/v2/validate_single_writer_ui.py
+          python -m py_compile scripts/v2/build_stock_shards.py
           python -m py_compile scripts/v2/normalize_close_snapshot.py
           python -m py_compile scripts/v2/normalize_close_snapshot_by_close_date.py
           python -m py_compile scripts/v2/enrich_stock_detail_context.py
@@ -102,6 +104,9 @@ jobs:
           test -d "v2src/docs/v2/data/builds/$ACTIVE_BUILD"
           cp -a "v2src/docs/v2/data/builds/$ACTIVE_BUILD" "_site/v2/data/builds/$ACTIVE_BUILD"
 
+          python v2src/scripts/v2/build_stock_shards.py --data-root _site/v2/data
+          test -s "_site/v2/data/builds/$ACTIVE_BUILD/stock-shards/index.json"
+
           test -f _site/index.html
           test -f _site/v2/index.html
           test -f _site/v2/universe-search.js
@@ -119,6 +124,7 @@ jobs:
           echo "V2 shell: single-writer clean-build-v2/docs/v2"
           echo "V2 private portfolio: browser-local only"
           echo "V2 same-origin active data: $ACTIVE_BUILD"
+          echo "V2 per-stock mobile shards: enabled"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
