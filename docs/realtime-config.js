@@ -1,6 +1,6 @@
 // v1.7.5 stable bootstrap: one UI loader, no duplicate hourly fetch and no mid-session reload.
 window.DOGSON_REALTIME_API = window.DOGSON_REALTIME_API || "";
-window.DOGSON_UI_ASSET_VERSION = '1730';
+window.DOGSON_UI_ASSET_VERSION = '1752';
 
 // Hide legacy markup immediately on first-run pages that are not yet controlled by the SW.
 document.documentElement.classList.add('dogson-booting');
@@ -18,10 +18,10 @@ if (!document.getElementById('dogson-boot-v1688')) {
 
 // hourly.js is already loaded by index.html. Do not load a second copy here.
 // ui-filters owns the deterministic UI chain and waits for usable market rows before reveal.
-if (!document.getElementById('dogson-decision-filters') && !window.__DOGSON_UI_LOADER_V1730__) {
+if (!document.getElementById('dogson-decision-filters') && !window.__DOGSON_UI_LOADER_V1752__) {
   const s = document.createElement('script');
   s.id = 'dogson-decision-filters';
-  s.src = './ui-filters.js?v=1751stable4';
+  s.src = './ui-filters.js?v=1752candidate2';
   s.async = false;
   document.head.appendChild(s);
 }
