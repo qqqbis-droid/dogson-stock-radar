@@ -18,8 +18,9 @@ permissions:
   id-token: write
 
 # UI-only deploys overlay validated V2 UI on the latest successful canonical
-# Pages publisher. They never use another UI-only artifact as a data source and
-# never cancel an in-flight Close / Intraday / completed-session publication.
+# Close / Intraday Pages publisher. Completed-session refresh artifacts are
+# deliberately excluded here because a newer workflow timestamp must never
+# override a fresher root market snapshot with older data.
 concurrency:
   group: dogson-pages
   cancel-in-progress: false
@@ -47,11 +48,11 @@ jobs:
           IFS=$'\t' read -r run_id run_name run_updated <<< "$(gh api \
             -H 'Accept: application/vnd.github+json' \
             "/repos/${GITHUB_REPOSITORY}/actions/runs?status=success&per_page=100" \
-            --jq '[.workflow_runs[] | select(.name == "Clean Build 2.0 Latest Completed Session Refresh" or .name == "Radar - Close Update" or .name == "Radar - Intraday Update")] | max_by(.updated_at) | [.id,.name,.updated_at] | @tsv')"
+            --jq '[.workflow_runs[] | select(.name == "Radar - Close Update" or .name == "Radar - Intraday Update")] | max_by(.updated_at) | [.id,.name,.updated_at] | @tsv')"
           test -n "$run_id"
           test "$run_id" != "null"
           case "$run_name" in
-            "Clean Build 2.0 Latest Completed Session Refresh"|"Radar - Close Update"|"Radar - Intraday Update") ;;
+            "Radar - Close Update"|"Radar - Intraday Update") ;;
             *) echo "Unexpected canonical publisher: $run_name" >&2; exit 1 ;;
           esac
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
@@ -106,7 +107,36 @@ jobs:
           bad=[r.get('code') for r in latest if r.get('freshness') in ('STALE','UNKNOWN') or r.get('action_state')=='DATA_STALE']
           if bad:
               raise SystemExit(f'canonical source latest-close semantics regressed: {bad[:10]}')
-          print('Canonical UI source verified:', {'build':m.get('active_build_id'),'bundle_date':bundle_date,'close_date':close_date,'close_rows':len(latest)})
+
+          def load(path):
+              try:
+                  return json.loads(Path(path).read_text(encoding='utf-8'))
+              except Exception:
+                  return {}
+          def td(obj):
+              if not isinstance(obj,dict): return ''
+              for key in ('trade_date','source_trade_date','date'):
+                  s=str(obj.get(key) or '')[:10]
+                  if len(s)==10: return s
+              bridge=obj.get('bridge') or {}
+              s=str(bridge.get('trade_date') or '')[:10]
+              if len(s)==10: return s
+              dates=[]
+              for r in obj.get('rows') or []:
+                  if not isinstance(r,dict): continue
+                  s=str(r.get('quote_date') or r.get('market_trade_date') or r.get('date') or '')[:10]
+                  if len(s)==10: dates.append(s)
+              return max(dates) if dates else ''
+
+          legacy_market=load('docs/data/market.json')
+          legacy_intra=load('docs/data/intraday.json')
+          market_date=td(legacy_market)
+          intra_date=td(legacy_intra)
+          if market_date != bundle_date and intra_date != bundle_date:
+              raise SystemExit(f'canonical source has no same-day index snapshot: bundle={bundle_date} market={market_date} intraday={intra_date}')
+          if close_date and market_date and market_date < close_date and intra_date < close_date:
+              raise SystemExit(f'canonical root data regressed behind close mission: close={close_date} market={market_date} intraday={intra_date}')
+          print('Canonical UI source verified:', {'build':m.get('active_build_id'),'bundle_date':bundle_date,'close_date':close_date,'close_rows':len(latest),'market_date':market_date,'intraday_date':intra_date})
           PY
 
           before_hash="$(sha256sum docs/v2/data/current_manifest.json | awk '{print $1}')"
@@ -150,6 +180,8 @@ jobs:
       - name: Validate single-writer V2 UI without touching data
         run: |
           python scripts/v2/validate_single_writer_ui.py
+          node --check docs/v2/live-ui-20261001.js
+          node --check docs/v2/live-index-source-guard.js
           node --check docs/sw.js
 
       - uses: actions/configure-pages@v5
