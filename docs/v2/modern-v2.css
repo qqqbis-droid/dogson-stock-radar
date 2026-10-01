@@ -1,0 +1,64 @@
+/* Clean Build 2.0 modern presentation layer.
+   CSS-only: no DOM observers, no alternate data writers. */
+.top .brand{display:flex;align-items:center;gap:9px;font-weight:950;letter-spacing:.01em}
+.top .brand .inuko-mark{width:30px;height:30px;flex:0 0 30px;border-radius:9px;background:#183a30 url('./assets/inuko-lab/mark.svg') center/cover no-repeat;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.top .brand .inuko-name{display:flex;flex-direction:column;align-items:flex-start;gap:1px;line-height:1}
+.top .brand .inuko-name b{font-size:1.02rem;line-height:1.08}
+.top .brand .inuko-name em{font-style:normal;font-size:.62rem;line-height:1.1;letter-spacing:.13em;color:#a97112;font-weight:900}
+.top .sub{color:#6f7c75;margin-top:4px}.top .sub .inuko-tag{color:#88620c;font-weight:800}
+
+/* Cards: preserve the current canonical markup, only modernize presentation. */
+#cards.cards{gap:11px}
+#cards .card{border-radius:18px;padding:14px 14px 13px;box-shadow:0 5px 18px rgba(31,43,37,.045);border-left-width:4px;content-visibility:auto;contain-intrinsic-size:190px}
+#cards .card-top{align-items:flex-start}
+#cards .identity{align-items:flex-start;gap:9px}
+#cards .rank{display:inline-flex;align-items:center;min-height:22px;padding:3px 7px;border-radius:7px;background:var(--soft);font-size:.65rem;line-height:1.15;color:var(--muted);white-space:nowrap}
+#cards .code{display:block;font-size:1rem;line-height:1.22;letter-spacing:.005em}
+#cards .identity .muted{margin-top:3px;line-height:1.35}
+#cards .badge.stage{border:1px solid var(--line);background:color-mix(in srgb,var(--soft) 82%,transparent);font-weight:800}
+#cards .quote-strip{margin-top:11px;padding:9px 10px;border-radius:12px;background:var(--soft)}
+#cards .action-line{margin-top:8px;border-radius:11px;padding:8px 9px}
+#cards .score-row{gap:8px;margin-top:9px}
+#cards .score{border:1px solid color-mix(in srgb,var(--line) 70%,transparent);border-radius:11px;padding:8px 9px;background:color-mix(in srgb,var(--soft) 76%,transparent)}
+#cards .score b{font-size:1rem}
+#cards .reason{margin-top:9px;line-height:1.48}
+#cards .blocker{margin-top:7px;padding-top:7px;border-top:1px dashed var(--line);line-height:1.45}
+
+/* Sector summary: direct CSS targeting; no MutationObserver/class patcher required. */
+#sectorList.chips{gap:12px;align-items:stretch}
+#sectorList .capital-chip{min-width:252px;max-width:286px;padding:14px 14px 12px;border-radius:18px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-content:start;box-sizing:border-box}
+#sectorList .capital-chip> b{grid-column:1;align-self:center;font-size:.98rem;line-height:1.25;margin:0}
+#sectorList .capital-chip> strong{grid-column:2;align-self:center;text-align:right;font-size:1.12rem;line-height:1.2;white-space:nowrap}
+#sectorList .capital-chip>div:not(.capital-more):not(.capital-hint):not(.live-sector-preview){grid-column:1/-1;color:var(--muted);font-size:.77rem;line-height:1.42}
+#sectorList .capital-chip>.live-sector-preview{grid-column:1/-1;margin-top:3px!important;font-size:.69rem!important;line-height:1.4!important}
+#sectorList .capital-chip>.capital-hint{grid-column:1/-1;margin-top:5px;padding-top:9px;border-top:1px dashed var(--line);color:var(--green);font-weight:850;font-size:.72rem;line-height:1.25}
+#sectorList .capital-chip>.capital-more{grid-column:1/-1;margin-top:2px;padding-top:10px;border-top:1px solid var(--line);grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+#sectorList .capital-chip>.capital-more:not([hidden]){display:grid}
+#sectorList .capital-chip>.capital-more .mc-row{display:flex;flex-direction:column;justify-content:flex-start;gap:2px;padding:8px 9px;border-radius:10px;background:color-mix(in srgb,var(--soft) 76%,transparent);min-width:0}
+#sectorList .capital-chip>.capital-more .mc-row span{font-size:.66rem;color:var(--muted)}
+#sectorList .capital-chip>.capital-more .mc-row b{font-size:.8rem;line-height:1.25;overflow-wrap:anywhere}
+#sectorList .capital-chip>.capital-more>.capital-hint{grid-column:1/-1;margin-top:2px;font-size:.67rem;line-height:1.4}
+#sectorList .capital-chip .member-list,#sectorList .capital-chip .capital-section-label,#sectorList .capital-chip .live-sector-members{display:none!important}
+#sectorRankExplain{margin-top:12px}
+#sectorRankExplain .sector-rank-panel,#sectorRankExplain .live-sector-rank{padding:13px;border-radius:16px;background:var(--soft);border:1px solid var(--line)}
+#sectorRankExplain .sector-rank-head,#sectorRankExplain .live-sector-rank-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
+#sectorRankExplain .sector-rank-list,#sectorRankExplain .live-sector-rank-list{display:grid;gap:7px}
+#sectorRankExplain .sector-rank-row,#sectorRankExplain .live-sector-rank-row{width:100%;display:grid;grid-template-columns:30px minmax(0,1fr);gap:8px;align-items:center;padding:9px 10px;border-radius:12px;background:var(--card);border:1px solid var(--line);text-align:left;color:var(--ink);box-sizing:border-box}
+#sectorRankExplain .sector-rank-no,#sectorRankExplain .live-sector-rank-row> b:first-child{font-size:.8rem;font-weight:900;color:var(--green);text-align:center}
+#sectorRankExplain .sector-rank-id b,#sectorRankExplain .live-sector-rank-row strong{font-size:.8rem;line-height:1.25}
+#sectorRankExplain .sector-rank-id small,#sectorRankExplain .live-sector-rank-row small{display:block;margin-top:3px;color:var(--muted);font-size:.66rem;line-height:1.3}
+
+/* Detail shell */
+dialog#detailDialog{border-radius:22px;overflow:hidden}
+#detailDialog .dialog-head{padding:14px 16px;background:color-mix(in srgb,var(--card) 94%,transparent);backdrop-filter:blur(10px)}
+#detailBody{padding:16px}
+#detailBody .detail-hero{padding:12px;border-radius:15px;background:var(--soft);margin-bottom:11px}
+#detailBody .sdr-quick>div{border:1px solid color-mix(in srgb,var(--line) 72%,transparent)}
+
+@media(max-width:560px){
+  .top .brand{gap:8px}.top .brand .inuko-mark{width:28px;height:28px;flex-basis:28px}.top .brand .inuko-name b{font-size:1rem}.top .brand .inuko-name em{font-size:.58rem}.top .sub{font-size:.66rem;margin-top:3px}
+  #cards .card{padding:13px;border-radius:16px}
+  #cards .rank{font-size:.61rem;padding:3px 6px}
+  #sectorList .capital-chip{min-width:248px;max-width:268px;padding:13px}
+  #sectorRankExplain .sector-rank-row,#sectorRankExplain .live-sector-rank-row{grid-template-columns:28px minmax(0,1fr);padding:9px 8px}
+}
