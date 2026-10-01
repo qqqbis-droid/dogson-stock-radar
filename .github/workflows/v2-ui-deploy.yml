@@ -18,8 +18,8 @@ permissions:
 
 # Production composition no longer depends on short-lived Pages artifacts.
 # main supplies the stable root site shell; clean-build-v2 supplies a validated,
-# atomic V2 UI + data bundle. This makes UI deploys reproducible even after old
-# Close/Intraday artifacts expire.
+# atomic V2 UI + data bundle. Before publishing, preserve any newer production
+# root/V2 market data so an UI-only release can never roll live data backward.
 concurrency:
   group: dogson-pages
   cancel-in-progress: false
@@ -39,6 +39,37 @@ jobs:
           ref: main
           fetch-depth: 1
 
+      - name: Preserve newest published root market data without rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://qqqbis-droid.github.io/dogson-stock-radar/data"
+          critical=(close.json market.json intraday.json hourly.json daytrade.json)
+          optional=(universe.json status.json system_status.json chip_history.json chip_status.json mis_snapshots.json validation_history.json validation.json decision_history.json)
+          mkdir -p docs/data
+
+          for name in "${critical[@]}"; do
+            tmp="docs/data/${name}.live"
+            if ! curl -fsSL --retry 3 --retry-delay 2 --max-time 25 -H 'Cache-Control: no-cache' "${base}/${name}?ts=$(date +%s%N)" -o "$tmp" || ! test -s "$tmp"; then
+              rm -f "$tmp"
+              echo "ERROR: live critical data unavailable: $name; refusing UI-only deploy to avoid data rollback"
+              exit 1
+            fi
+            mv "$tmp" "docs/data/$name"
+            echo "preserved live critical $name"
+          done
+
+          for name in "${optional[@]}"; do
+            tmp="docs/data/${name}.live"
+            if curl -fsSL --retry 2 --retry-delay 1 --max-time 20 -H 'Cache-Control: no-cache' "${base}/${name}?ts=$(date +%s%N)" -o "$tmp" && test -s "$tmp"; then
+              mv "$tmp" "docs/data/$name"
+              echo "preserved live optional $name"
+            else
+              rm -f "$tmp"
+              echo "WARN: optional live data unavailable: $name; repository copy retained"
+            fi
+          done
+
       - name: Fetch validated V2 branch
         shell: bash
         run: |
@@ -49,6 +80,83 @@ jobs:
           git archive FETCH_HEAD docs/v2 scripts/v2/validate_single_writer_ui.py scripts/v2/validate_product_surface.py scripts/v2/test_portfolio_ledger.js | tar -xf - -C /tmp/v2-source
           test -s /tmp/v2-source/docs/v2/index.html
           test -s /tmp/v2-source/docs/v2/data/current_manifest.json
+
+      - name: Preserve newer published V2 market bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          live_base="https://qqqbis-droid.github.io/dogson-stock-radar/v2/data"
+          rm -rf /tmp/live-v2
+          mkdir -p /tmp/live-v2/data
+
+          if ! curl -fsSL --retry 3 --retry-delay 2 --max-time 25 -H 'Cache-Control: no-cache' \
+            "${live_base}/current_manifest.json?ts=$(date +%s%N)" -o /tmp/live-v2/data/current_manifest.json; then
+            echo 'WARN: live V2 manifest unavailable; canonical branch V2 data will be used'
+            exit 0
+          fi
+
+          use_live="$(python - <<'PY'
+          import json
+          from pathlib import Path
+
+          def load(path):
+              return json.loads(Path(path).read_text(encoding='utf-8'))
+          def stamp(m):
+              ds=m.get('datasets') or {}
+              values=[]
+              for key in ('decision_intraday_detail','stock_detail_intraday','decision_daytrade_detail'):
+                  v=str((ds.get(key) or {}).get('as_of') or '')
+                  if v:
+                      values.append(v)
+              return max(values) if values else str(m.get('generated_at') or '')
+
+          live=load('/tmp/live-v2/data/current_manifest.json')
+          cand=load('/tmp/v2-source/docs/v2/data/current_manifest.json')
+          live_stamp=stamp(live)
+          cand_stamp=stamp(cand)
+          print('yes' if live_stamp and live_stamp > cand_stamp else 'no')
+          print(f'V2 freshness live={live_stamp} candidate={cand_stamp}', file=__import__('sys').stderr)
+          PY
+          )"
+
+          if [ "$use_live" != "yes" ]; then
+            echo 'Canonical branch V2 data is at least as fresh as production; no live V2 preservation needed'
+            exit 0
+          fi
+
+          python - <<'PY' > /tmp/live-v2/urls.txt
+          import json
+          from pathlib import Path
+          m=json.loads(Path('/tmp/live-v2/data/current_manifest.json').read_text(encoding='utf-8'))
+          urls=set()
+          for meta in (m.get('datasets') or {}).values():
+              raw=str((meta or {}).get('url') or '')
+              if raw.startswith('./data/'):
+                  raw=raw[len('./data/'):]
+              else:
+                  raw=raw.lstrip('./')
+              if raw:
+                  urls.add(raw)
+          for raw in sorted(urls):
+              print(raw)
+          PY
+
+          while IFS= read -r rel; do
+            [ -n "$rel" ] || continue
+            mkdir -p "/tmp/live-v2/data/$(dirname "$rel")"
+            curl -fsSL --retry 3 --retry-delay 2 --max-time 30 -H 'Cache-Control: no-cache' \
+              "${live_base}/${rel}?ts=$(date +%s%N)" -o "/tmp/live-v2/data/${rel}"
+            test -s "/tmp/live-v2/data/${rel}"
+          done < /tmp/live-v2/urls.txt
+
+          for name in market-detail.json sector-members.json; do
+            curl -fsSL --retry 2 --retry-delay 1 --max-time 20 -H 'Cache-Control: no-cache' \
+              "${live_base}/${name}?ts=$(date +%s%N)" -o "/tmp/live-v2/data/${name}" || rm -f "/tmp/live-v2/data/${name}"
+          done
+
+          rm -rf /tmp/v2-source/docs/v2/data
+          cp -a /tmp/live-v2/data /tmp/v2-source/docs/v2/data
+          echo 'Preserved newer production V2 market bundle for this UI-only deploy'
 
       - name: Verify canonical V2 Atomic bundle
         shell: bash
