@@ -23,6 +23,8 @@ function ensureHead(){
   meta('description',BRAND.description);
   meta('application-name',BRAND.title);
   meta('apple-mobile-web-app-title',BRAND.title);
+  meta('apple-mobile-web-app-capable','yes');
+  meta('apple-mobile-web-app-status-bar-style','default');
   meta('theme-color',BRAND.theme);
   meta('og:title',`${BRAND.title}｜${BRAND.en}`,true);
   meta('og:description',BRAND.tagline,true);
@@ -30,9 +32,9 @@ function ensureHead(){
   meta('twitter:card','summary');
   meta('twitter:title',`${BRAND.title}｜${BRAND.en}`);
   meta('twitter:description',BRAND.tagline);
-  link('manifest','./manifest.webmanifest?v=20261001-inuko1');
+  link('manifest','./manifest.webmanifest?v=20261001-inuko2');
   link('icon','./assets/inuko-lab/mark.svg',{type:'image/svg+xml'});
-  link('apple-touch-icon','./assets/inuko-lab/mark.svg');
+  link('apple-touch-icon','./assets/inuko-lab/icon-180.png',{sizes:'180x180'});
 }
 function ensureStyle(){
   if(document.getElementById('inukoLabBrandStyle'))return;
