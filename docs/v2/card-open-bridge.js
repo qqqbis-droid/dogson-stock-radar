@@ -14,7 +14,10 @@
   }
 
   function cardFromTarget(target){return target?.closest?.(CARD_SELECTOR)||null}
-  function isControl(target,card){const c=target?.closest?.(CONTROL_SELECTOR);return Boolean(c&&card?.contains(c))}
+  function isControl(target,card){
+    const c=target?.closest?.(CONTROL_SELECTOR);
+    return Boolean(c&&c!==card&&card?.contains(c));
+  }
   function n(text){const m=String(text||'').replace(/,/g,'').match(/-?\d+(?:\.\d+)?/);return m?Number(m[0]):null}
   function isClose(){return document.querySelector('.tab.active')?.dataset?.view==='close'}
   function nextDayActive(){return document.querySelector('[data-quick-filter="NEXT_DAY_READY"]')?.classList.contains('active')===true}
