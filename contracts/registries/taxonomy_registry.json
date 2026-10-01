@@ -10,6 +10,7 @@
     "theme_is_core_score": false,
     "unknown_classification_is_zero": false,
     "official_industry_proxy_max_points_close": 6,
+    "official_industry_can_grant_full_core_score": false,
     "review_days": 180
   }
 }

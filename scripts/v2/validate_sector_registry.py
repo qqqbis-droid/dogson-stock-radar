@@ -16,6 +16,7 @@ CLOSE = ROOT / "docs" / "data" / "close.json"
 
 from scripts.sector_groups import (
     CODE_TO_RECORD,
+    OFFICIAL_INDUSTRY_CAN_GRANT_FULL_CORE_SCORE,
     PRIMARY_GROUP_MIN_CONFIDENCE,
     PRIMARY_GROUP_MIN_PEERS,
     SECONDARY_GROUP_MIN_CONFIDENCE,
@@ -39,7 +40,7 @@ def main():
     errors = []
     warnings = []
     seen = {}
-    evidence_quality = Counter()
+    registry_evidence = Counter()
 
     if not isinstance(registry, dict):
         raise SystemExit("Sector Taxonomy registry must be an object")
@@ -47,6 +48,8 @@ def main():
         errors.append(
             f"version mismatch registry={registry.get('taxonomy_version')} resolver={TAXONOMY_VERSION}"
         )
+    if OFFICIAL_INDUSTRY_CAN_GRANT_FULL_CORE_SCORE:
+        errors.append("official industry may not grant full narrow-sector score")
 
     for grow in registry.get("groups") or []:
         if not isinstance(grow, dict):
@@ -60,7 +63,7 @@ def main():
             conf = None
         refs = [str(x).strip() for x in (grow.get("evidence_urls_or_refs") or []) if str(x).strip()]
         quality = str(grow.get("evidence_quality") or "NONE")
-        evidence_quality[quality] += 1
+        registry_evidence[quality] += 1
         if not group:
             errors.append("group missing name")
             continue
@@ -103,17 +106,23 @@ def main():
 
     universe = load(UNIVERSE, [])
     coverage = Counter()
+    score_sources = Counter()
+    evidence_status = Counter()
     unclassified_codes = []
     if isinstance(universe, list):
         for row in universe:
             if not isinstance(row, dict):
                 continue
-            c = classification_for(
-                row.get("code"), name=row.get("name"), industry=row.get("industry")
-            )
+            c = classification_for(row.get("code"), name=row.get("name"), industry=row.get("industry"))
             coverage[c["classification_status"]] += 1
+            score_sources[c["score_source"]] += 1
+            evidence_status[c["evidence_status"]] += 1
             if c["classification_status"] == "UNCLASSIFIED":
                 unclassified_codes.append(str(row.get("code") or ""))
+            if c["score_source"] == "PRIMARY_GROUP" and not c.get("primary_group"):
+                errors.append(f"{row.get('code')}: PRIMARY_GROUP score source without primary group")
+            if c["score_source"] == "OFFICIAL_PROXY" and c.get("core_sector_score_eligible"):
+                errors.append(f"{row.get('code')}: official proxy incorrectly core-score eligible")
         if universe and unclassified_codes:
             errors.append(
                 f"universe has {len(unclassified_codes)} truly UNCLASSIFIED stocks: "
@@ -121,30 +130,54 @@ def main():
             )
 
     close = load(CLOSE, {})
-    top = (close.get("rows") or [])[:50] if isinstance(close, dict) else []
+    close_rows = (close.get("rows") or []) if isinstance(close, dict) else []
+    top = close_rows[:50]
     top_status = Counter()
+    top_score_sources = Counter()
+    top_evidence = Counter()
     top_unclassified = []
+    top_curated_only = []
     for row in top:
-        c = classification_for(
-            row.get("code"), name=row.get("name"), industry=row.get("industry")
-        )
+        c = classification_for(row.get("code"), name=row.get("name"), industry=row.get("industry"))
         top_status[c["classification_status"]] += 1
+        top_score_sources[c["score_source"]] += 1
+        top_evidence[c["evidence_status"]] += 1
         if c["classification_status"] == "UNCLASSIFIED":
             top_unclassified.append(str(row.get("code") or ""))
+        if c["evidence_status"] == "CURATED_ONLY":
+            top_curated_only.append({
+                "code": str(row.get("code") or ""),
+                "name": row.get("name"),
+                "primary_group": c.get("primary_group"),
+                "confidence": c.get("primary_group_confidence"),
+            })
     if top_unclassified:
         errors.append("top ranking pool contains UNCLASSIFIED: " + ",".join(top_unclassified))
+
+    # Critical score-integrity rule: official-industry evidence is valuable for
+    # identity/fallback display but must never silently become the full narrow
+    # sector component. Any future code that invents such a source fails here.
+    forbidden_full_sources = [k for k in score_sources if k not in {"PRIMARY_GROUP", "OFFICIAL_PROXY", "NONE"}]
+    if forbidden_full_sources:
+        errors.append("unexpected sector score sources: " + ",".join(sorted(forbidden_full_sources)))
 
     stats = taxonomy_stats()
     report = {
         "status": "FAIL" if errors else "PASS",
         "taxonomy_version": TAXONOMY_VERSION,
         "registry_entries": stats.get("registry_entries"),
-        "eligible_primary_codes": stats.get("eligible_primary_codes"),
-        "primary_groups": stats.get("primary_groups"),
+        "eligible_registry_primary_codes": stats.get("eligible_primary_codes"),
+        "registry_primary_groups": stats.get("primary_groups"),
+        "official_industry_can_grant_full_core_score": OFFICIAL_INDUSTRY_CAN_GRANT_FULL_CORE_SCORE,
         "universe_rows": len(universe) if isinstance(universe, list) else 0,
         "universe_status": dict(sorted(coverage.items())),
+        "universe_score_sources": dict(sorted(score_sources.items())),
+        "universe_evidence_status": dict(sorted(evidence_status.items())),
         "top50_status": dict(sorted(top_status.items())),
-        "evidence_quality": dict(sorted(evidence_quality.items())),
+        "top50_score_sources": dict(sorted(top_score_sources.items())),
+        "top50_evidence_status": dict(sorted(top_evidence.items())),
+        "top50_curated_only": top_curated_only,
+        "registry_evidence_quality": dict(sorted(registry_evidence.items())),
         "warnings": warnings,
         "errors": errors,
     }
