@@ -31,6 +31,7 @@ def main():
     market = text("market-capital-renderer.js")
     sector_rank = text("sector-ranking-panel.js")
     detail = text("stock-detail-renderer.js")
+    price_map = text("price-map-theme.js")
     card_bridge = text("card-open-bridge.js")
     portfolio = text("portfolio-renderer.js")
     store = text("portfolio-store.js")
@@ -91,10 +92,15 @@ def main():
     if ".innerHTML" in card_bridge or "showModal" in card_bridge:
         errors.append("stock card bridge must not become a second detail renderer")
 
-    # Stock detail must prioritize action/structure and retain score explanation.
+    # Stock detail keeps canonical S/R data but presents it in the Dogson price-map language.
     for needle in ("支撐區", "壓力區", "評分依據", "資料品質"):
         require(detail, needle, "stock detail", errors)
     require(detail, "radar:open-stock", "stock detail open event", errors)
+    require(html, "price-map-theme.js", "price-map theme script", errors)
+    for needle in ("關鍵價位地圖", "第一防守帶", "深層防守帶", "第一突破帶", "延伸突破帶", "DOGSON PRICE MAP"):
+        require(price_map, needle, "Dogson price map", errors)
+    require(price_map, "沒有可信結構就留白", "price-map no-guess rule", errors)
+    require(price_map, "第二層不額外灌分", "price-map no-score-inflation rule", errors)
 
     # Private portfolio contract and one-share rule.
     for needle in ("entry_reason", "hold_reason", "validation_condition", "failure_condition", "strategy"):
@@ -127,6 +133,7 @@ def main():
         "sector_attention_reason": True,
         "stock_card_click_bridge": True,
         "stock_detail": True,
+        "dogson_price_map": True,
         "score_explanation": True,
         "portfolio_private": True,
         "portfolio_one_share": True,
