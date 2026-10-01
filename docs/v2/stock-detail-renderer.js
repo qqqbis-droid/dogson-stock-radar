@@ -168,11 +168,47 @@ function evidence(view,x){
   return `<div class="sdr-evidence">${tile("現價",sp(x.close),ssigned(x.day_change,2,"%"))}${tile("VWAP",sf(x.vwap,2),`距VWAP ${ssigned(x.vwap_dist,2,"%")}`)}${tile("15分 / 60分",`${ssigned(x.ret15,2,"%")} / ${ssigned(x.ret60,2,"%")}`)}${tile("量速",`${sf(x.pace,2)}x`,`振幅 ${sf(x.amplitude_pct,2)}%`)}${tile("區間位置",`${sf(x.range_position_pct,1)}%`,x.amplitude_regime||"")}${tile("買一 / 賣一",`${sp(x.quote_bid1)} / ${sp(x.quote_ask1)}`)}${tile("多時框",mt.label||"—",mt["60m"]?.label||"")}${tile("相對市場",rel.label||"—",rel.relative_pct?.day!=null?`日 ${ssigned(rel.relative_pct.day,2,"%")}`:"")}${tile("籌碼背景",x.chip_background||"—",`籌碼分 ${sf(x.chip_score)}`)}${tile("族群",x.sector_score_label||x.industry_name||"官方產業代理",`強勢比 ${sf(x.sector_hot_ratio)}%`)}</div>`;
 }
 
-function expPoints(x){const p=sn(x?.points)||0;return `${p>0?"+":""}${Number.isInteger(p)?p:sf(p,1)}`}
+function expPoints(x){const p=sn(x?.points);if(p==null)return"•";return `${p>0?"+":""}${Number.isInteger(p)?p:sf(p,1)}`}
 function expCard(label,obj){
   if(!obj)return"";
   const items=(obj.items||[]).map(it=>`<div class="sdr-exp-item"><span class="sdr-exp-pts">${sesc(expPoints(it))}</span><span>${sesc(it.label||"")}</span>${it.detail?`<span class="sdr-exp-detail">${sesc(it.detail)}</span>`:""}</div>`).join("");
-  return `<div class="sdr-exp-card"><div class="sdr-exp-head"><b>${sesc(label)}</b><strong>${sf(obj.score)}/${sf(obj.max,0)}</strong></div>${items||'<div class="sdr-note">逐項依據待補</div>'}</div>`;
+  return `<div class="sdr-exp-card"><div class="sdr-exp-head"><b>${sesc(label)}</b><strong>${sf(obj.score)}/${sf(obj.max,0)}</strong></div>${items||'<div class="sdr-note">此分項目前沒有可顯示的輸入證據。</div>'}</div>`;
+}
+function eitem(label,value,detail=""){
+  if(value==null||value===""||value==="—")return null;
+  return {points:null,label:String(label),detail:String(detail||value)};
+}
+function einclude(arr,item){if(item)arr.push(item);return arr}
+function intradayItems(kind,e){
+  if(!e)return[];
+  const out=[],mt=e.multi_timeframe||{},rel=e.relative_multiframe||{},rday=rel.relative_pct?.day;
+  if(kind==="price_structure"){
+    einclude(out,eitem("多時框",mt.label,mt["60m"]?.label?`60分：${mt["60m"].label}`:""));
+    einclude(out,eitem("結構來源",e.structure_source));
+    if(sn(e.vwap_dist)!=null)include(out,eitem("距VWAP",ssigned(e.vwap_dist,2,"%")));
+    const breakout=e.break3?"突破近3日高點":e.break12?"突破近12根高點":"尚未出現短線突破";
+    einclude(out,eitem("突破狀態",breakout));
+  }else if(kind==="flow_volume"){
+    if(sn(e.pace)!=null)include(out,eitem("量速",`${sf(e.pace,2)}x`));
+    if(sn(e.vol_x)!=null)include(out,eitem("量比",`${sf(e.vol_x,2)}x`));
+    if(e.structure_volume_verified!==undefined)einclude(out,eitem("結構量確認",e.structure_volume_verified?"已確認":"未確認"));
+    if(sn(e.amplitude_pct)!=null)include(out,eitem("當日振幅",`${sf(e.amplitude_pct,2)}%`));
+  }else if(kind==="relative_strength"){
+    einclude(out,eitem("相對市場",rel.label));
+    if(sn(rday)!=null)include(out,eitem("日相對強弱",ssigned(rday,2,"%")));
+    if(sn(e.ret15)!=null||sn(e.ret60)!=null)einclude(out,eitem("15分 / 60分",`${ssigned(e.ret15,2,"%")} / ${ssigned(e.ret60,2,"%")}`));
+  }else if(kind==="sector"){
+    einclude(out,eitem("族群",e.sector_group||e.industry_name));
+    einclude(out,eitem("族群狀態",e.sector_score_label));
+    if(sn(e.sector_hot_ratio)!=null)include(out,eitem("強勢比",`${sf(e.sector_hot_ratio,1)}%`));
+    if(sn(e.sector_score)!=null)include(out,eitem("族群分",sf(e.sector_score,1)));
+  }else if(kind==="liquidity_risk"){
+    einclude(out,eitem("流動性",e.liquidity_level));
+    if(sn(e.avg_turnover20_mn)!=null)include(out,eitem("20日均成交額",`${sf(e.avg_turnover20_mn,1)} 百萬`));
+    if(sn(e.range_position_pct)!=null)include(out,eitem("區間位置",`${sf(e.range_position_pct,1)}%`));
+    if(sn(e.amplitude_pct)!=null)include(out,eitem("振幅",`${sf(e.amplitude_pct,2)}%`));
+  }
+  return out;
 }
 function explain(view,d,e){
   if(view==="close"){
@@ -181,7 +217,7 @@ function explain(view,d,e){
   }
   if(view==="intraday"){
     const c=e?.intraday_components||{};
-    return `<details class="sdr-explain"><summary>評分依據｜盤中動能怎麼來</summary><div class="sdr-explain-body"><div class="sdr-note">盤中動能100＝價格結構30＋量價動能25＋相對強弱15＋族群20＋流動性／追價風險10。</div>${expCard("價格結構",{score:c.price_structure,max:30,items:[]})}${expCard("量價動能",{score:c.flow_volume,max:25,items:[]})}${expCard("相對強弱",{score:c.relative_strength,max:15,items:[]})}${expCard("族群共振",{score:c.sector,max:20,items:[]})}${expCard("流動性／追價風險",{score:c.liquidity_risk,max:10,items:[]})}</div></details>`;
+    return `<details class="sdr-explain"><summary>評分依據｜盤中動能怎麼來</summary><div class="sdr-explain-body"><div class="sdr-note">盤中動能100＝價格結構30＋量價動能25＋相對強弱15＋族群20＋流動性／追價風險10。下列為同一快照可驗證的 Engine 輸入證據；前端不重新配分。</div>${expCard("價格結構",{score:c.price_structure,max:30,items:intradayItems("price_structure",e)})}${expCard("量價動能",{score:c.flow_volume,max:25,items:intradayItems("flow_volume",e)})}${expCard("相對強弱",{score:c.relative_strength,max:15,items:intradayItems("relative_strength",e)})}${expCard("族群共振",{score:c.sector,max:20,items:intradayItems("sector",e)})}${expCard("流動性／追價風險",{score:c.liquidity_risk,max:10,items:intradayItems("liquidity_risk",e)})}</div></details>`;
   }
   const items=(d.components?.daytrade?.items||[]);
   return `<details class="sdr-explain"><summary>評分依據｜當沖分怎麼來</summary><div class="sdr-explain-body">${items.map(x=>`<div class="sdr-exp-card"><div class="sdr-exp-head"><b>${sesc(x.label||x.key||"分項")}</b><strong>${sf(x.contribution)}/${sf(x.contribution_max,0)}</strong></div></div>`).join("")||'<div class="sdr-note">當沖分項依據待補。</div>'}</div></details>`;
@@ -224,7 +260,6 @@ async function openStock(code,forcedView){
     ui.body.innerHTML=coreHtml(view,cfg,d);
     document.dispatchEvent(new CustomEvent("radar:detail-core-rendered",{detail:{code:String(code),view,build:m.active_build_id}}));
 
-    // Yield a frame before parsing the multi-megabyte secondary datasets.
     await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,24)));
     if(seq!==SDR.seq||!ui.dialog.open)return;
 
