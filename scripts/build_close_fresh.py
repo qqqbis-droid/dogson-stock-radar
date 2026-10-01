@@ -117,4 +117,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# refresh-marker: 2026-09-30-completed-session-only
+# refresh-marker: 2026-10-01-restore-latest-completed-session-after-live-fix
