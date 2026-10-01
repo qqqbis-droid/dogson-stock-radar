@@ -15,6 +15,7 @@ REQUIRED = {
     "market-capital-renderer.js",
     "sector-ranking-panel.js",
     "stock-detail-renderer.js",
+    "price-map-theme.js",
     "portfolio-store.js",
     "portfolio-renderer.js",
     "portfolio-quick-add.js",
@@ -76,7 +77,7 @@ def main():
         if "MutationObserver" in text:
             errors.append(f"single-writer renderer must not use MutationObserver: {name}")
 
-    # Production release gate: every active first-party JS module must parse.
+    # Production release gate: every required first-party JS module must parse.
     node = shutil.which("node")
     if not node:
         errors.append("node executable unavailable; cannot syntax-check active UI")
@@ -158,6 +159,7 @@ def main():
         "market_capital_owner": "market-capital-renderer.js",
         "sector_rank_owner": "sector-ranking-panel.js",
         "detail_owner": "stock-detail-renderer.js",
+        "price_map_decorator": "price-map-theme.js",
         "portfolio_owner": "portfolio-renderer.js",
         "portfolio_quick_add_owner": "portfolio-quick-add.js",
         "theme_owner": "theme-toggle.js",
