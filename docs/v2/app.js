@@ -4,7 +4,7 @@ const state={
   search:"",externalSearch:[],loading:false,searchTimer:null
 };
 
-const NEXT_DAY_ELITE={limit:8,qualityMin:75,positionMin:65,confidenceMin:80};
+const NEXT_DAY_ELITE={qualityMin:75,positionMin:65,confidenceMin:80};
 
 const missionConfig={
   intraday:{label:"🔎 找波段｜現在先盯誰",title:"盤中優先",summary:"decision_intraday_summary",index:"decision_intraday_index",detail:"decision_intraday_detail",scoreKey:"intraday_momentum_score",scoreLabel:"盤中動能",stats:"intraday"},
@@ -25,8 +25,8 @@ const quickFilterConfig={
     {key:"TREND_MONITOR",label:"趨勢追蹤",icon:"↗",note:"結構仍在延續",kind:"bucket",values:["TREND_MONITOR"],tone:"trend"},
     {key:"RISK",label:"風險",icon:"!",note:"先看風險訊號",kind:"bucket",values:["RISK"],tone:"risk"}
   ]},
-  close:{title:"明日作戰快篩",subtitle:"明日候選只留真正值得優先準備的精選名單",items:[
-    {key:"NEXT_DAY_READY",label:"明日候選",icon:"✦",note:"品質≥75・位置≥65・信心≥80・最多8檔",kind:"bucket",values:["NEXT_DAY_READY"],tone:"go"},
+  close:{title:"明日作戰快篩",subtitle:"明日候選依條件全數列入，不設檔數上限",items:[
+    {key:"NEXT_DAY_READY",label:"明日候選",icon:"✦",note:"品質≥75・位置≥65・信心≥80",kind:"bucket",values:["NEXT_DAY_READY"],tone:"go"},
     {key:"LAUNCH",label:"剛啟動",icon:"↗",note:"結構剛轉強",kind:"stage",values:["LAUNCH"],tone:"trend"},
     {key:"PULLBACK",label:"回踩",icon:"↘",note:"等承接確認",kind:"stage",values:["PULLBACK_TEST","PULLBACK_CONFIRMED"],tone:"wait"},
     {key:"RISK",label:"風險",icon:"!",note:"明天先處理風險",kind:"bucket",values:["RISK"],tone:"risk"}
@@ -129,13 +129,11 @@ function quickMatch(d){
 function applyQuickRows(rows){
   const q=activeQuickItem();
   if(!q)return rows;
-  const filtered=rows.filter(quickMatch);
-  if(state.view==="close"&&q.key==="NEXT_DAY_READY")return filtered.slice(0,NEXT_DAY_ELITE.limit);
-  return filtered;
+  return rows.filter(quickMatch);
 }
 function quickValue(item,buckets,stages){
   if(state.view==="close"&&item.key==="NEXT_DAY_READY"){
-    return (rowsForView()||[]).filter(isNextDayElite).slice(0,NEXT_DAY_ELITE.limit).length;
+    return (rowsForView()||[]).filter(isNextDayElite).length;
   }
   const source=item.kind==="stage"?stages:buckets;
   return item.values.reduce((sum,key)=>sum+Number(source?.[key]||0),0);
@@ -220,8 +218,6 @@ async function ensureIndex(){
   const cfg=missionConfig[state.view];
   if(!cfg.index)return;
   if(!state.cache[cfg.index])await dataset(cfg.index);
-  // Never pull the multi-megabyte detail dataset merely to filter/sort cards.
-  // If detail is already cached, enrich metadata opportunistically.
   const detail=cfg.detail?state.cache[cfg.detail]:null;
   if(detail?.items){
     for(const row of state.cache[cfg.index]||[]){
@@ -280,7 +276,8 @@ function renderCards(){
   if(state.filterStage)rows=rows.filter(d=>d.lifecycle_stage===state.filterStage);
   if(state.filterSector)rows=rows.filter(d=>sectorFilterKey(d)===state.filterSector);
   rows=rows.filter(filterAction).filter(positionMatch);
-  const external=q&&!hasNonSearchFilter()?state.externalSearch:[],shown=rows.slice(0,state.visibleCount),shownCount=shown.length+external.length,prefix=activeQuick?`${activeQuick.label} · `:"";
+  const showAllNextDay=state.view==="close"&&state.quickFilter==="NEXT_DAY_READY";
+  const external=q&&!hasNonSearchFilter()?state.externalSearch:[],shown=showAllNextDay?rows:rows.slice(0,state.visibleCount),shownCount=shown.length+external.length,prefix=activeQuick?`${activeQuick.label} · `:"";
   $("#countText").textContent=!indexLoaded&&canLoadFull&&!hasDeepFilter()?`已顯示 ${shown.length} 檔`:`${prefix}${shownCount}/${rows.length+external.length} 檔`;
 
   const rankedHtml=shown.map(d=>{
@@ -291,7 +288,8 @@ function renderCards(){
   $("#cards").innerHTML=(rankedHtml+outsideHtml)||`<div class="empty-state"><b>${esc(emptyMessage(rows,external))}</b><p>原始雷達池 ${originalCount} 檔；空結果會保留並說明，不會自動放寬成假訊號。</p></div>`;
 
   const loadMore=$("#loadMore");
-  if(!indexLoaded&&canLoadFull&&!hasDeepFilter()){loadMore.classList.remove("hidden");loadMore.textContent="查看更多全部候選"}
+  if(showAllNextDay){loadMore.classList.add("hidden")}
+  else if(!indexLoaded&&canLoadFull&&!hasDeepFilter()){loadMore.classList.remove("hidden");loadMore.textContent="查看更多全部候選"}
   else{const hasMore=state.visibleCount<rows.length;loadMore.classList.toggle("hidden",!hasMore);loadMore.textContent="查看更多"}
 }
 
@@ -351,7 +349,6 @@ $("#searchInput")?.addEventListener("input",e=>{
   state.search=e.target.value;
   clearTimeout(state.searchTimer);
   if(!state.search.trim()){state.externalSearch=[];renderCards();return}
-  // Debounce full-index search; do not parse/re-render a large universe on every keystroke.
   state.searchTimer=setTimeout(()=>applyDeepFilter().catch(console.error),220);
 });
 $("#stageFilter")?.addEventListener("change",async e=>{state.filterStage=e.target.value;if(state.filterStage)await applyDeepFilter();else renderCards()});
