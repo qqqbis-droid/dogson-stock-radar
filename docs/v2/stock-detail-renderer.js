@@ -185,28 +185,28 @@ function intradayItems(kind,e){
   if(kind==="price_structure"){
     einclude(out,eitem("多時框",mt.label,mt["60m"]?.label?`60分：${mt["60m"].label}`:""));
     einclude(out,eitem("結構來源",e.structure_source));
-    if(sn(e.vwap_dist)!=null)include(out,eitem("距VWAP",ssigned(e.vwap_dist,2,"%")));
+    if(sn(e.vwap_dist)!=null)einclude(out,eitem("距VWAP",ssigned(e.vwap_dist,2,"%")));
     const breakout=e.break3?"突破近3日高點":e.break12?"突破近12根高點":"尚未出現短線突破";
     einclude(out,eitem("突破狀態",breakout));
   }else if(kind==="flow_volume"){
-    if(sn(e.pace)!=null)include(out,eitem("量速",`${sf(e.pace,2)}x`));
-    if(sn(e.vol_x)!=null)include(out,eitem("量比",`${sf(e.vol_x,2)}x`));
+    if(sn(e.pace)!=null)einclude(out,eitem("量速",`${sf(e.pace,2)}x`));
+    if(sn(e.vol_x)!=null)einclude(out,eitem("量比",`${sf(e.vol_x,2)}x`));
     if(e.structure_volume_verified!==undefined)einclude(out,eitem("結構量確認",e.structure_volume_verified?"已確認":"未確認"));
-    if(sn(e.amplitude_pct)!=null)include(out,eitem("當日振幅",`${sf(e.amplitude_pct,2)}%`));
+    if(sn(e.amplitude_pct)!=null)einclude(out,eitem("當日振幅",`${sf(e.amplitude_pct,2)}%`));
   }else if(kind==="relative_strength"){
     einclude(out,eitem("相對市場",rel.label));
-    if(sn(rday)!=null)include(out,eitem("日相對強弱",ssigned(rday,2,"%")));
+    if(sn(rday)!=null)einclude(out,eitem("日相對強弱",ssigned(rday,2,"%")));
     if(sn(e.ret15)!=null||sn(e.ret60)!=null)einclude(out,eitem("15分 / 60分",`${ssigned(e.ret15,2,"%")} / ${ssigned(e.ret60,2,"%")}`));
   }else if(kind==="sector"){
     einclude(out,eitem("族群",e.sector_group||e.industry_name));
     einclude(out,eitem("族群狀態",e.sector_score_label));
-    if(sn(e.sector_hot_ratio)!=null)include(out,eitem("強勢比",`${sf(e.sector_hot_ratio,1)}%`));
-    if(sn(e.sector_score)!=null)include(out,eitem("族群分",sf(e.sector_score,1)));
+    if(sn(e.sector_hot_ratio)!=null)einclude(out,eitem("強勢比",`${sf(e.sector_hot_ratio,1)}%`));
+    if(sn(e.sector_score)!=null)einclude(out,eitem("族群分",sf(e.sector_score,1)));
   }else if(kind==="liquidity_risk"){
     einclude(out,eitem("流動性",e.liquidity_level));
-    if(sn(e.avg_turnover20_mn)!=null)include(out,eitem("20日均成交額",`${sf(e.avg_turnover20_mn,1)} 百萬`));
-    if(sn(e.range_position_pct)!=null)include(out,eitem("區間位置",`${sf(e.range_position_pct,1)}%`));
-    if(sn(e.amplitude_pct)!=null)include(out,eitem("振幅",`${sf(e.amplitude_pct,2)}%`));
+    if(sn(e.avg_turnover20_mn)!=null)einclude(out,eitem("20日均成交額",`${sf(e.avg_turnover20_mn,1)} 百萬`));
+    if(sn(e.range_position_pct)!=null)einclude(out,eitem("區間位置",`${sf(e.range_position_pct,1)}%`));
+    if(sn(e.amplitude_pct)!=null)einclude(out,eitem("振幅",`${sf(e.amplitude_pct,2)}%`));
   }
   return out;
 }
