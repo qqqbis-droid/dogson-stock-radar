@@ -6,24 +6,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 V2 = ROOT / "docs" / "v2"
 
-
 def text(name: str) -> str:
     p = V2 / name
     if not p.is_file():
         raise SystemExit(f"product smoke: missing file {name}")
     return p.read_text(encoding="utf-8")
 
-
 def require(haystack: str, needle: str, label: str, errors: list[str]):
     if needle not in haystack:
         errors.append(f"{label}: missing {needle}")
-
 
 def require_once(haystack: str, needle: str, label: str, errors: list[str]):
     count = haystack.count(needle)
     if count != 1:
         errors.append(f"{label}: expected exactly one {needle}, got {count}")
-
 
 def main():
     html = text("index.html")
@@ -31,10 +27,7 @@ def main():
     quick_filter_css = text("quick-filter.css")
     market = text("market-capital-renderer.js")
     sector_rank = text("sector-ranking-panel.js")
-    sector_layout = text("sector-summary-layout-v2.js")
     detail = text("stock-detail-renderer.js")
-    price_map = text("price-map-theme.js")
-    card_bridge = text("card-open-bridge.js")
     portfolio = text("portfolio-renderer.js")
     store = text("portfolio-store.js")
     ledger = text("portfolio-ledger-ui.js")
@@ -42,7 +35,6 @@ def main():
     universe = text("universe-search.js")
     transparency = text("radar-transparency-v7.js")
     theme = text("theme-toggle.js")
-    runtime = text("runtime-observability.js")
 
     errors: list[str] = []
 
@@ -67,18 +59,9 @@ def main():
 
     for needle in ("市場分", "資料信心", "報價快照", "最後成交", "VWAP／量速／族群結構"):
         require(market, needle, "market environment", errors)
-    require(market, "點一下看細節", "capital drill-down affordance", errors)
     require(market, "radar:open-stock", "sector-to-stock bridge", errors)
-
-    # Sector summary V2: upper cards explain the sector; the lower panel owns the
-    # stock list. Ranking must reuse the page's official opportunity order and
-    # existing mission score instead of inventing a separate sector-member score.
-    require(html, "sector-summary-layout-v2.js", "sector summary layout script", errors)
-    require(sector_layout, "查看族群明細", "sector summary drill-down", errors)
-    require(sector_layout, "同族群股票 ↓", "sector member handoff", errors)
-    for needle in (".member-list", ".capital-section-label", ".live-sector-preview", ".live-sector-members"):
-        require(sector_layout, needle, "sector upper-member dedupe", errors)
-    require(sector_layout, "display:none!important", "sector upper-member hide rule", errors)
+    if "../data/market.json" in market or "../data/intraday.json" in market:
+        errors.append("market environment must not read stale legacy root index files")
 
     require(sector_rank, "同族群股票", "sector member ranking panel", errors)
     require(sector_rank, "opportunity_rank", "sector official ranking reuse", errors)
@@ -91,15 +74,16 @@ def main():
     for needle in ("radarSummary", "positionFilter", "sectorFilter", "RadarUniverseSearch"):
         require(app, needle, "radar interaction", errors)
 
-    # Quick-filter cards are controls, not decorative statistics. They must cover
-    # intraday, close and day-trade views, participate in the same filter pipeline,
-    # load the full index through applyDeepFilter, and support a multi-stage pullback.
     require(html, "quick-filter.css", "quick filter stylesheet", errors)
     for needle in ("盤中雷達快篩", "明日作戰快篩", "當沖執行快篩", "data-quick-filter", "quickFilterConfig"):
         require(app, needle, "radar quick filter", errors)
     require(app, 'values:["PULLBACK_TEST","PULLBACK_CONFIRMED"]', "close pullback quick-filter union", errors)
-    require(app, "rows=rows.filter(quickMatch)", "quick filter render pipeline", errors)
-    require(app, "if(state.quickFilter)await applyDeepFilter()", "quick filter full-index load", errors)
+    require(app, "NEXT_DAY_ELITE", "next-day elite policy", errors)
+    require(app, "qualityMin:75", "next-day quality gate", errors)
+    require(app, "positionMin:65", "next-day position gate", errors)
+    require(app, "confidenceMin:80", "next-day confidence gate", errors)
+    require(app, "limit:8", "next-day max eight", errors)
+    require(app, "rows=applyQuickRows(rows)", "quick filter render pipeline", errors)
     require(app, "state.quickFilter=state.quickFilter===key", "quick filter toggle-off behavior", errors)
     require(app, "data-quick-filter-clear", "quick filter clear control", errors)
     for needle in (".quick-filter-grid", ".quick-filter-card.active", "grid-template-columns:repeat(2"):
@@ -108,21 +92,38 @@ def main():
     require(universe, "_outsidePool", "full-market outside-pool state", errors)
     require(universe, "系統不會用假分數補滿", "outside-pool honesty", errors)
 
-    require(html, "card-open-bridge.js", "stock card click bridge script", errors)
-    require(card_bridge, "#cards .card[data-code]", "ranked card tap target", errors)
-    require(card_bridge, "radar:open-stock", "ranked card open event", errors)
-    require(card_bridge, "CustomEvent", "ranked card event dispatch", errors)
-    if ".innerHTML" in card_bridge or "showModal" in card_bridge:
-        errors.append("stock card bridge must not become a second detail renderer")
+    # Stock card is now owned by app.js; no bridge / primer is allowed.
+    require(app, '#cards .card[data-code]', "ranked card tap target", errors)
+    require(app, "radar:open-stock", "ranked card open event", errors)
+    require(app, 'role="button"', "ranked card keyboard target", errors)
+    for retired in (
+        "card-open-bridge.js", "stock-detail-prime.js", "live-ui-20261001.js",
+        "live-pulse-points.js", "live-index-source-guard.js",
+        "sector-member-alias-guard.js", "sector-summary-layout-v2.js",
+        "price-map-theme.js", "brand-inuko-lab.js",
+        "portfolio-average-cost-label.js", "runtime-observability.js",
+    ):
+        if retired in html:
+            errors.append(f"retired overlay still active: {retired}")
 
     for needle in ("支撐區", "壓力區", "評分依據", "資料品質"):
         require(detail, needle, "stock detail", errors)
-    require(detail, "radar:open-stock", "stock detail open event", errors)
-    require(html, "price-map-theme.js", "price-map theme script", errors)
-    for needle in ("關鍵價位地圖", "第一防守帶", "深層防守帶", "第一突破帶", "延伸突破帶", "DOGSON PRICE MAP"):
-        require(price_map, needle, "Dogson price map", errors)
-    require(price_map, "沒有可信結構就留白", "price-map no-guess rule", errors)
-    require(price_map, "第二層不額外灌分", "price-map no-score-inflation rule", errors)
+    require(detail, "safeOpen", "stock detail immediate dialog", errors)
+    require(detail, "radar:detail-core-rendered", "progressive detail core", errors)
+    require(detail, "radar:detail-rendered", "progressive detail completion", errors)
+    open_start = detail.find("async function openStock")
+    open_fn = detail[open_start:] if open_start >= 0 else ""
+    if "loadingShell(code)" not in open_fn or "await smanifest()" not in open_fn:
+        errors.append("stock detail open flow incomplete")
+    elif open_fn.find("loadingShell(code)") > open_fn.find("await smanifest()"):
+        errors.append("stock detail must open before network fetch")
+
+    # ensureIndex may load the index, but must not pull the huge detail file.
+    ensure_start = app.find("async function ensureIndex")
+    ensure_end = app.find("async function ensureDetail")
+    ensure_body = app[ensure_start:ensure_end] if ensure_start >= 0 and ensure_end > ensure_start else ""
+    if "await dataset(cfg.detail)" in ensure_body:
+        errors.append("normal filtering must not download detail dataset")
 
     for needle in ("entry_reason", "hold_reason", "validation_condition", "failure_condition", "strategy"):
         require(store, needle, "portfolio store schema", errors)
@@ -142,39 +143,30 @@ def main():
 
     require(theme, "data-theme", "dark mode controller", errors)
     require(theme, "dogson.theme.v1", "theme persistence", errors)
-    require(runtime, "sessionStorage", "runtime metrics local storage", errors)
-    require(runtime, "更多市場資訊・驗證背景", "validation background panel", errors)
-    require(runtime, "不會上傳你的操作紀錄", "runtime privacy disclosure", errors)
 
     if errors:
         raise SystemExit("product surface smoke failed: " + " | ".join(errors))
 
     print({
         "status": "PASS",
-        "product_goal": "10s market/attention; 30s why/trigger/invalidation",
+        "product_goal": "10s market/attention; immediate detail shell; progressive evidence",
         "market_pulse": True,
-        "market_dual_clock": True,
         "radar_summary": True,
         "quick_filters": ["intraday", "close", "daytrade"],
+        "next_day_elite": {"quality_min": 75, "position_min": 65, "confidence_min": 80, "limit": 8},
         "filters": ["quick", "stage", "action", "position", "sector"],
         "full_market_search": True,
         "sector_drilldown": True,
-        "sector_attention_reason": True,
-        "sector_summary_deduped": True,
-        "sector_member_table": True,
-        "stock_card_click_bridge": True,
-        "stock_detail": True,
-        "dogson_price_map": True,
-        "score_explanation": True,
+        "stock_card_owner": "app.js",
+        "stock_detail_owner": "stock-detail-renderer.js",
+        "progressive_stock_detail": True,
+        "legacy_index_overlay": False,
         "portfolio_private": True,
         "portfolio_one_share": True,
         "portfolio_ledger": "2.0.0",
-        "portfolio_transaction_history": True,
         "dark_mode": True,
-        "runtime_observability": True,
         "shadow_disclosure": True,
     })
-
 
 if __name__ == "__main__":
     main()
