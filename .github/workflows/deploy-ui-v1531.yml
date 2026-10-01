@@ -20,7 +20,7 @@ permissions:
 # safe for a fresh UI run to replace an older Pages publisher in the same group.
 concurrency:
   group: dogson-pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
