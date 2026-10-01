@@ -11,6 +11,7 @@ on:
       - "scripts/run_bridge_intraday_fast.py"
       - "scripts/run_bridge_intraday_deep_fastmis.py"
       - "scripts/normalize_intraday_clock.py"
+      - "scripts/enrich_sr_structure.py"
       - "scripts/validate_intraday_fast_publish.py"
       - "scripts/publish_v2_companions.py"
       - "scripts/verify_v2_intraday.py"
@@ -112,6 +113,9 @@ jobs:
       - name: Build 60m lifecycle + entry-position lights
         if: ${{ steps.lane.outputs.mode == 'audit' }}
         run: python scripts/build_hourly.py
+
+      - name: Enrich support resistance structure 2.0
+        run: python scripts/enrich_sr_structure.py
 
       - name: Archive signals + resolve real outcomes
         if: ${{ steps.lane.outputs.mode == 'audit' }}
