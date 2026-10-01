@@ -60,16 +60,18 @@ def main():
     for needle in ("市場分", "資料信心", "報價快照", "最後成交", "VWAP／量速／族群結構"):
         require(market, needle, "market environment", errors)
     require(market, "radar:open-stock", "sector-to-stock bridge", errors)
+    require(market, "[data-stock-code]", "canonical sector stock click target", errors)
     if "../data/market.json" in market or "../data/intraday.json" in market:
         errors.append("market environment must not read stale legacy root index files")
 
-    require(sector_rank, "同族群股票", "sector member ranking panel", errors)
+    require(sector_rank, "同族群優先股", "inline sector member ranking", errors)
+    require(sector_rank, "sector-rank-inline", "inline sector placement", errors)
+    require(sector_rank, "data-stock-code", "sector ranked stock canonical bridge", errors)
     require(sector_rank, "opportunity_rank", "sector official ranking reuse", errors)
     require(sector_rank, "intraday_momentum_score", "intraday sector ranking semantics", errors)
     require(sector_rank, "swing_quality_score", "close sector ranking semantics", errors)
     require(sector_rank, "daytrade_score", "daytrade sector ranking semantics", errors)
     require(sector_rank, "系統不會用假分數補滿", "sector ranking no-fake-score rule", errors)
-    require(sector_rank, "radar:open-stock", "sector ranked stock bridge", errors)
 
     for needle in ("radarSummary", "positionFilter", "sectorFilter", "RadarUniverseSearch"):
         require(app, needle, "radar interaction", errors)
@@ -82,7 +84,10 @@ def main():
     require(app, "qualityMin:75", "next-day quality gate", errors)
     require(app, "positionMin:65", "next-day position gate", errors)
     require(app, "confidenceMin:80", "next-day confidence gate", errors)
-    require(app, "limit:8", "next-day max eight", errors)
+    require(app, "showAllNextDay", "uncapped next-day render path", errors)
+    for capped in ("limit:8", "NEXT_DAY_ELITE.limit", "slice(0,NEXT_DAY_ELITE.limit)"):
+        if capped in app:
+            errors.append(f"next-day candidate must be uncapped: found {capped}")
     require(app, "rows=applyQuickRows(rows)", "quick filter render pipeline", errors)
     require(app, "state.quickFilter=state.quickFilter===key", "quick filter toggle-off behavior", errors)
     require(app, "data-quick-filter-clear", "quick filter clear control", errors)
@@ -92,7 +97,6 @@ def main():
     require(universe, "_outsidePool", "full-market outside-pool state", errors)
     require(universe, "系統不會用假分數補滿", "outside-pool honesty", errors)
 
-    # Stock card is now owned by app.js; no bridge / primer is allowed.
     require(app, '#cards .card[data-code]', "ranked card tap target", errors)
     require(app, "radar:open-stock", "ranked card open event", errors)
     require(app, 'role="button"', "ranked card keyboard target", errors)
@@ -111,6 +115,8 @@ def main():
     require(detail, "safeOpen", "stock detail immediate dialog", errors)
     require(detail, "radar:detail-core-rendered", "progressive detail core", errors)
     require(detail, "radar:detail-rendered", "progressive detail completion", errors)
+    require(detail, "intradayItems", "intraday score evidence", errors)
+    require(detail, "前端不重新配分", "intraday no-rescore disclosure", errors)
     open_start = detail.find("async function openStock")
     open_fn = detail[open_start:] if open_start >= 0 else ""
     if "loadingShell(code)" not in open_fn or "await smanifest()" not in open_fn:
@@ -118,7 +124,6 @@ def main():
     elif open_fn.find("loadingShell(code)") > open_fn.find("await smanifest()"):
         errors.append("stock detail must open before network fetch")
 
-    # ensureIndex may load the index, but must not pull the huge detail file.
     ensure_start = app.find("async function ensureIndex")
     ensure_end = app.find("async function ensureDetail")
     ensure_body = app[ensure_start:ensure_end] if ensure_start >= 0 and ensure_end > ensure_start else ""
@@ -153,10 +158,10 @@ def main():
         "market_pulse": True,
         "radar_summary": True,
         "quick_filters": ["intraday", "close", "daytrade"],
-        "next_day_elite": {"quality_min": 75, "position_min": 65, "confidence_min": 80, "limit": 8},
+        "next_day_elite": {"quality_min": 75, "position_min": 65, "confidence_min": 80, "limit": "unlimited"},
         "filters": ["quick", "stage", "action", "position", "sector"],
         "full_market_search": True,
-        "sector_drilldown": True,
+        "sector_drilldown": "inline",
         "stock_card_owner": "app.js",
         "stock_detail_owner": "stock-detail-renderer.js",
         "progressive_stock_detail": True,
