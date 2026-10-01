@@ -9,6 +9,7 @@ on:
       - "scripts/sector_groups.py"
       - "scripts/chip_data.py"
       - "scripts/build_hourly.py"
+      - "scripts/enrich_sr_structure.py"
       - "scripts/sync_live_data.py"
       - "scripts/build_validation.py"
       - "scripts/build_completion.py"
@@ -148,6 +149,8 @@ jobs:
 
       - name: Build 60m lifecycle + entry-position lights
         run: python scripts/build_hourly.py
+      - name: Enrich support resistance structure 2.0
+        run: python scripts/enrich_sr_structure.py
       - name: Archive signals + resolve real outcomes
         run: python scripts/build_validation.py --mode close
       - name: Build canonical data status
@@ -166,6 +169,11 @@ jobs:
           print('chip covered rows:', len(covered), '/', len(rows))
           if rows and not covered:
             raise SystemExit('chip coverage is still 0% for all rows')
+
+          structured=[r for r in rows if (r.get('support_levels') or r.get('resistance_levels'))]
+          print('SR 2.0 structured rows:',len(structured),'/',len(rows))
+          if rows and not structured:
+            raise SystemExit('SR 2.0 produced no structured rows')
 
           h = Path('docs/data/hourly.json')
           hj = json.loads(h.read_text(encoding='utf-8')) if h.exists() else {}
