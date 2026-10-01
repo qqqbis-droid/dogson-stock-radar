@@ -1,9 +1,9 @@
-const SRP={build:null,cache:new Map(),activeGroup:'',activeView:''};
+const SRP={build:null,cache:new Map(),activeGroup:'',activeView:'',activeHost:null};
 const SRP_CFG={
-  intraday:{index:'decision_intraday_index',detail:'decision_intraday_detail',score:'intraday_momentum_score',label:'盤中動能'},
-  close:{index:'decision_close_index',detail:'decision_close_detail',score:'swing_quality_score',label:'波段品質'},
-  portfolio:{index:'decision_close_index',detail:'decision_close_detail',score:'swing_quality_score',label:'波段品質'},
-  daytrade:{index:'decision_daytrade_index',detail:'decision_daytrade_detail',score:'daytrade_score',label:'當沖分'}
+  intraday:{index:'decision_intraday_index',score:'intraday_momentum_score',label:'盤中動能'},
+  close:{index:'decision_close_index',score:'swing_quality_score',label:'波段品質'},
+  portfolio:{index:'decision_close_index',score:'swing_quality_score',label:'波段品質'},
+  daytrade:{index:'decision_daytrade_index',score:'daytrade_score',label:'當沖分'}
 };
 const SRP_ALIAS={'ASIC／IC設計服務':'ASIC／IC設計服務／IP','伺服器電源':'電源／UPS','記憶體／儲存IC':'記憶體IC'};
 const SRP_BUCKET={TRIGGER_READY:'觸發就緒',WAIT_TRIGGER:'等待觸發',TREND_MONITOR:'趨勢追蹤',WAIT_PULLBACK:'等待回踩',RESEARCH_ONLY:'研究觀察',NEXT_DAY_READY:'明日候選',BREAKOUT_WATCH:'突破觀察',PULLBACK_WATCH:'回踩觀察',TREND_QUALITY:'趨勢品質',RESEARCH:'研究觀察',RISK:'風險優先',ACTIONABLE_NOW:'可執行',NO_TRADE:'不交易',STALE:'資料失效'};
@@ -17,23 +17,42 @@ async function srpManifest(){const m=await srpJson(`./data/current_manifest.json
 async function srpDataset(m,key){const meta=m.datasets?.[key];if(!meta)return null;const ck=`${m.active_build_id}:${key}`;if(SRP.cache.has(ck))return SRP.cache.get(ck);const x=await srpJson(meta.url);SRP.cache.set(ck,x);return x}
 async function srpMembers(){const ck=`${SRP.build}:sector-members`;if(SRP.cache.has(ck))return SRP.cache.get(ck);try{const x=await srpJson(`./data/sector-members.json?t=${Date.now()}`);if(x?.build_id&&SRP.build&&x.build_id!==SRP.build)return null;SRP.cache.set(ck,x);return x}catch{return null}}
 function style(){if(document.getElementById('sectorRankingPanelStyle'))return;const s=document.createElement('style');s.id='sectorRankingPanelStyle';s.textContent=`
-#sectorRankExplain[hidden]{display:none}.sector-rank-panel{margin-top:9px;padding:9px 10px;border-radius:10px;background:var(--soft);border:1px solid var(--line)}.sector-rank-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:6px}.sector-rank-head b{font-size:.82rem}.sector-rank-head span{font-size:.68rem;color:var(--muted)}.sector-rank-note{font-size:.7rem;color:var(--muted);line-height:1.45;margin-bottom:6px}.sector-rank-list{display:grid;gap:5px}.sector-rank-row{display:grid;grid-template-columns:auto 1fr auto;gap:7px;align-items:center;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:7px 8px;cursor:pointer;text-align:left;color:var(--ink)}.sector-rank-no{font-weight:800;color:var(--green);min-width:22px}.sector-rank-id b{font-size:.76rem}.sector-rank-id small{display:block;color:var(--muted);font-size:.65rem;margin-top:2px}.sector-rank-score{text-align:right;font-size:.72rem}.sector-rank-score b{display:block;font-size:.82rem}.sector-rank-empty{font-size:.72rem;color:var(--muted);padding:7px 0}
+#sectorRankExplain{display:none!important}.sector-rank-inline{grid-column:1/-1;margin-top:7px;padding-top:8px;border-top:1px dashed var(--line);min-width:0}.sector-rank-inline .sector-rank-panel{padding:9px;border-radius:12px;background:color-mix(in srgb,var(--soft) 78%,transparent);border:1px solid var(--line)}.sector-rank-inline .sector-rank-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:4px}.sector-rank-inline .sector-rank-head b{font-size:.74rem}.sector-rank-inline .sector-rank-head span{font-size:.61rem;color:var(--muted)}.sector-rank-inline .sector-rank-note{font-size:.61rem;color:var(--muted);line-height:1.4;margin-bottom:7px}.sector-rank-inline .sector-rank-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.sector-rank-inline .sector-rank-row{display:grid;grid-template-columns:20px minmax(0,1fr);gap:4px 6px;align-items:start;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:8px 7px;cursor:pointer;text-align:left;color:var(--ink);min-width:0}.sector-rank-inline .sector-rank-no{grid-row:1/3;font-weight:850;color:var(--green);font-size:.72rem;text-align:center}.sector-rank-inline .sector-rank-id{min-width:0}.sector-rank-inline .sector-rank-id b{display:block;font-size:.68rem;line-height:1.25;overflow-wrap:anywhere}.sector-rank-inline .sector-rank-id small{display:block;color:var(--muted);font-size:.56rem;margin-top:2px;line-height:1.32}.sector-rank-inline .sector-rank-score{grid-column:2;display:flex;gap:4px;align-items:baseline;color:var(--muted);font-size:.54rem}.sector-rank-inline .sector-rank-score b{font-size:.68rem;color:var(--ink)}.sector-rank-inline .sector-rank-empty{font-size:.65rem;color:var(--muted);padding:5px 0}@media(max-width:380px){.sector-rank-inline .sector-rank-list{grid-template-columns:1fr}}
 `;document.head.appendChild(s)}
-function groupFromChip(chip){const t=chip?.querySelector('b')?.textContent?.trim()||'';return t.replace(/^[^\p{L}\p{N}]+/u,'').trim()}
+function groupFromChip(chip){const t=chip?.querySelector(':scope > b')?.textContent?.trim()||'';return t.replace(/^[^\p{L}\p{N}]+/u,'').trim()}
 function memberSet(members,view,group){const key=view==='intraday'||view==='daytrade'?'intraday':'close',target=SRP_ALIAS[group]||group;const rows=members?.[key]?.groups?.[target]||[];return new Set(rows.map(x=>String(x.code)))}
 function sortRows(rows){return [...rows].sort((a,b)=>{const ar=srpNum(a.opportunity_rank),br=srpNum(b.opportunity_rank);if(ar!=null||br!=null)return (ar??1e9)-(br??1e9);return String(a.code).localeCompare(String(b.code))})}
-async function render(group,view=srpView()){
-  style();const box=document.getElementById('sectorRankExplain');if(!box)return;SRP.activeGroup=group;SRP.activeView=view;if(!group){box.hidden=true;box.innerHTML='';return}
-  box.hidden=false;box.innerHTML='<div class="sector-rank-panel"><div class="sector-rank-empty">讀取同族群股票…</div></div>';
+function clearInline(except=null){document.querySelectorAll('.sector-rank-inline').forEach(x=>{if(x!==except)x.remove()})}
+function hostBox(host){let box=host?.querySelector(':scope > .sector-rank-inline');if(!box&&host){box=document.createElement('div');box.className='sector-rank-inline';host.appendChild(box)}return box}
+async function render(group,view=srpView(),host=SRP.activeHost){
+  style();if(!host||!host.isConnected)return;const box=hostBox(host);if(!box)return;clearInline(box);SRP.activeGroup=group;SRP.activeView=view;SRP.activeHost=host;if(!group){box.remove();return}
+  box.innerHTML='<div class="sector-rank-panel"><div class="sector-rank-empty">讀取同族群股票…</div></div>';
   try{
-    const cfg=SRP_CFG[view]||SRP_CFG.intraday,m=await srpManifest(),[idx,detail,members]=await Promise.all([srpDataset(m,cfg.index),srpDataset(m,cfg.detail),srpMembers()]);
-    if(SRP.activeGroup!==group||SRP.activeView!==view)return;
-    const allowed=memberSet(members,view,group),all=Array.isArray(idx)?idx:[],items=detail?.items||{},rows=sortRows(all.filter(x=>allowed.has(String(x.code))));
+    const cfg=SRP_CFG[view]||SRP_CFG.intraday,m=await srpManifest(),[idx,members]=await Promise.all([srpDataset(m,cfg.index),srpMembers()]);
+    if(SRP.activeGroup!==group||SRP.activeView!==view||SRP.activeHost!==host||!host.isConnected)return;
+    const allowed=memberSet(members,view,group),all=Array.isArray(idx)?idx:[],rows=sortRows(all.filter(x=>allowed.has(String(x.code))));
     const ranked=rows.filter(x=>srpNum(x.scores?.[cfg.score])!=null).slice(0,5);
     const unrankedCount=Math.max(0,allowed.size-rows.filter(x=>srpNum(x.scores?.[cfg.score])!=null).length);
-    const body=ranked.length?ranked.map((x,i)=>{const s=x.scores||{},d=items[String(x.code)]||{},q=d.quote||x.quote||{},score=s[cfg.score]??d.scores?.[cfg.score],price=q.price??x.price??x.close,change=q.day_change_pct??q.change_pct??x.day_change_pct??x.change_pct,bucket=SRP_BUCKET[x.opportunity_bucket]||x.opportunity_bucket||'觀察';return `<button type="button" class="sector-rank-row" data-sector-rank-code="${srpEsc(x.code)}"><span class="sector-rank-no">${i+1}</span><span class="sector-rank-id"><b>${srpEsc(x.code)} ${srpEsc(x.name||d.name||'')}</b><small>股價 ${srpFmt(price,2)} · ${srpPct(change)} · ${srpEsc(bucket)}</small></span><span class="sector-rank-score"><span>${srpEsc(cfg.label)}</span><b>${srpFmt(score,1)}</b></span></button>`}).join(''):`<div class="sector-rank-empty">${srpEsc(group)} 目前沒有具完整 ${srpEsc(cfg.label)} 的排名股；系統不會用假分數補滿。</div>`;
-    box.innerHTML=`<div class="sector-rank-panel"><div class="sector-rank-head"><b>${srpEsc(group)}｜同族群股票</b><span>前 ${ranked.length}/${allowed.size} 檔</span></div><div class="sector-rank-note">依目前頁面正式排序顯示；點股票可直接查看完整個股。${unrankedCount?` 另有 ${unrankedCount} 檔缺完整執行分，不硬排名。`:''}</div><div class="sector-rank-list">${body}</div></div>`;
-  }catch(err){console.warn('sector-ranking-panel',err);box.innerHTML='<div class="sector-rank-panel"><div class="sector-rank-empty">同族群股票目前無法載入；不影響原本族群資金資料。</div></div>'}
+    const body=ranked.length?ranked.map((x,i)=>{const s=x.scores||{},q=x.quote||{},score=s[cfg.score],price=q.price??x.price??x.close,change=q.day_change_pct??q.change_pct??x.day_change_pct??x.change_pct,bucket=SRP_BUCKET[x.opportunity_bucket]||x.opportunity_bucket||'觀察';return `<button type="button" class="sector-rank-row" data-stock-code="${srpEsc(x.code)}"><span class="sector-rank-no">${i+1}</span><span class="sector-rank-id"><b>${srpEsc(x.code)} ${srpEsc(x.name||'')}</b><small>${srpFmt(price,2)} · ${srpPct(change)} · ${srpEsc(bucket)}</small></span><span class="sector-rank-score"><span>${srpEsc(cfg.label)}</span><b>${srpFmt(score,1)}</b></span></button>`}).join(''):`<div class="sector-rank-empty">${srpEsc(group)} 目前沒有具完整 ${srpEsc(cfg.label)} 的排名股；系統不會用假分數補滿。</div>`;
+    box.innerHTML=`<div class="sector-rank-panel"><div class="sector-rank-head"><b>同族群優先股</b><span>前 ${ranked.length}/${allowed.size} 檔</span></div><div class="sector-rank-note">直接接在 ${srpEsc(group)} 下方；點股票可看完整個股。${unrankedCount?` 另有 ${unrankedCount} 檔缺完整執行分。`:''}</div><div class="sector-rank-list">${body}</div></div>`;
+  }catch(err){console.warn('sector-ranking-panel',err);box.innerHTML='<div class="sector-rank-panel"><div class="sector-rank-empty">同族群股票目前無法載入；不影響族群資金資料。</div></div>'}
 }
-function boot(){style();document.addEventListener('click',e=>{const row=e.target.closest?.('[data-sector-rank-code]');if(row){document.dispatchEvent(new CustomEvent('radar:open-stock',{detail:{code:row.dataset.sectorRankCode}}));return}const chip=e.target.closest?.('[data-capital-expand]');if(chip){const group=groupFromChip(chip);setTimeout(()=>render(group,srpView()),0)}});document.addEventListener('radar:view-rendered',()=>{const box=document.getElementById('sectorRankExplain');if(box){box.hidden=true;box.innerHTML=''};SRP.activeGroup='';SRP.activeView=srpView()});document.addEventListener('radar:data-reloaded',()=>{SRP.build=null;SRP.cache.clear();if(SRP.activeGroup)render(SRP.activeGroup,srpView())})}
+function boot(){
+  style();
+  document.addEventListener('click',e=>{
+    const chip=e.target.closest?.('[data-capital-expand]');
+    if(!chip||e.target.closest?.('[data-stock-code]'))return;
+    const group=groupFromChip(chip);
+    setTimeout(()=>{
+      if(chip.getAttribute('aria-expanded')!=='true'){
+        chip.querySelector(':scope > .sector-rank-inline')?.remove();
+        if(SRP.activeHost===chip){SRP.activeHost=null;SRP.activeGroup=''}
+        return;
+      }
+      render(group,srpView(),chip);
+    },0);
+  });
+  document.addEventListener('radar:view-rendered',()=>{clearInline();SRP.activeGroup='';SRP.activeView=srpView();SRP.activeHost=null});
+  document.addEventListener('radar:data-reloaded',()=>{SRP.build=null;SRP.cache.clear();if(SRP.activeGroup&&SRP.activeHost?.isConnected)render(SRP.activeGroup,srpView(),SRP.activeHost)});
+}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
