@@ -1,15 +1,15 @@
 {
   "shadow_summary_schema_version": "1.0.0",
-  "generated_at": "2026-10-01T15:40:47+08:00",
-  "total_report_files": 13,
+  "generated_at": "2026-10-01T23:22:11+08:00",
+  "total_report_files": 14,
   "distinct_trading_days": 5,
   "first_trade_date": "2026-09-23",
   "latest_trade_date": "2026-10-01",
-  "latest_build_id": "cb2-legacy-20261001-8fec1f5afd",
-  "latest_status": "PASS",
+  "latest_build_id": "cb2-legacy-20261001-8ab195f24e",
+  "latest_status": "WARN",
   "daily_status_counts": {
-    "PASS": 2,
-    "WARN": 3
+    "PASS": 1,
+    "WARN": 4
   },
   "unresolved_safety_violations": 0,
   "minimum_coverage_ratio": {
@@ -19,16 +19,16 @@
   },
   "payload": {
     "latest_initial_bytes": {
-      "intraday": 109054,
-      "close": 117119,
-      "portfolio": 74714,
-      "daytrade": 122095
+      "intraday": 109075,
+      "close": 117250,
+      "portfolio": 74824,
+      "daytrade": 123134
     },
     "max_initial_bytes": {
-      "intraday": 109054,
-      "close": 117119,
-      "portfolio": 74714,
-      "daytrade": 122095
+      "intraday": 109075,
+      "close": 117250,
+      "portfolio": 74824,
+      "daytrade": 123134
     },
     "note": "Static transfer-size observability only; browser interaction SLO remains a separate measured gate."
   },
