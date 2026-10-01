@@ -31,6 +31,7 @@ def main():
     market = text("market-capital-renderer.js")
     sector_rank = text("sector-ranking-panel.js")
     detail = text("stock-detail-renderer.js")
+    card_bridge = text("card-open-bridge.js")
     portfolio = text("portfolio-renderer.js")
     store = text("portfolio-store.js")
     quick = text("portfolio-quick-add.js")
@@ -82,6 +83,14 @@ def main():
     require(universe, "_outsidePool", "full-market outside-pool state", errors)
     require(universe, "系統不會用假分數補滿", "outside-pool honesty", errors)
 
+    # Ranked stock cards must stay tappable without creating a second detail writer.
+    require(html, "card-open-bridge.js", "stock card click bridge script", errors)
+    require(card_bridge, "#cards .card[data-code]", "ranked card tap target", errors)
+    require(card_bridge, "radar:open-stock", "ranked card open event", errors)
+    require(card_bridge, "CustomEvent", "ranked card event dispatch", errors)
+    if ".innerHTML" in card_bridge or "showModal" in card_bridge:
+        errors.append("stock card bridge must not become a second detail renderer")
+
     # Stock detail must prioritize action/structure and retain score explanation.
     for needle in ("支撐區", "壓力區", "評分依據", "資料品質"):
         require(detail, needle, "stock detail", errors)
@@ -116,6 +125,7 @@ def main():
         "full_market_search": True,
         "sector_drilldown": True,
         "sector_attention_reason": True,
+        "stock_card_click_bridge": True,
         "stock_detail": True,
         "score_explanation": True,
         "portfolio_private": True,
