@@ -147,6 +147,13 @@ def main():
         if "MutationObserver" in quick:
             errors.append("portfolio quick-add must not watch/rewrite stock detail DOM")
 
+    if node:
+        ledger_test = ROOT / "scripts" / "v2" / "test_portfolio_ledger.js"
+        proc = subprocess.run([node, str(ledger_test)], capture_output=True, text=True, cwd=ROOT)
+        if proc.returncode != 0:
+            msg = (proc.stderr or proc.stdout or "ledger arithmetic test failed").strip().splitlines()[-1]
+            errors.append(f"portfolio ledger arithmetic failed: {msg}")
+
     if errors:
         raise SystemExit("single-writer UI gate failed: " + " | ".join(errors))
 
@@ -166,6 +173,7 @@ def main():
         "portfolio_ledger": "2.0.0",
         "portfolio_ledger_ui": "portfolio-ledger-ui.js",
         "portfolio_quick_add_owner": "portfolio-quick-add.js",
+        "portfolio_ledger_arithmetic": "PASS",
         "theme_owner": "theme-toggle.js",
         "runtime_observability_owner": "runtime-observability.js",
         "portfolio_storage": "browser-local-only",
