@@ -144,6 +144,63 @@ def market_intraday(intra, build_id, generated_at):
     }
 
 
+def _node_date(node, fallback_date=None):
+    if not isinstance(node, dict):
+        return fallback_date
+    raw = str(node.get("date") or node.get("trade_date") or "").strip()
+    if len(raw) >= 10 and raw[4:5] == "-":
+        return raw[:10]
+    if len(raw) == 8 and raw.isdigit():
+        return f"{raw[:4]}-{raw[4:6]}-{raw[6:8]}"
+    return fallback_date
+
+
+def _quote_node(symbol, target, intra, close, fallback):
+    live_map = intra.get("market_intraday") if isinstance(intra, dict) and isinstance(intra.get("market_intraday"), dict) else {}
+    live = live_map.get(symbol) if isinstance(live_map.get(symbol), dict) else None
+    intra_date = trade_date_of(intra)
+    close_market = close.get("market") if isinstance(close, dict) and isinstance(close.get("market"), dict) else {}
+    key = "taiex" if symbol == "^TWII" else "otc"
+    close_node = close_market.get(key) if isinstance(close_market.get(key), dict) else None
+    close_date = trade_date_of(close)
+    fallback_node = fallback.get(key) if isinstance(fallback, dict) and isinstance(fallback.get(key), dict) else None
+    fallback_date = str((fallback or {}).get("trade_date") or "")[:10] or None
+    candidates = [
+        ("MIS_INTRADAY", live, intra_date),
+        ("CLOSE_SNAPSHOT", close_node, close_date),
+        ("MARKET_SNAPSHOT", fallback_node, fallback_date),
+    ]
+    for source, node, default_date in candidates:
+        if not isinstance(node, dict):
+            continue
+        d = _node_date(node, default_date)
+        px = num(node.get("close") if node.get("close") is not None else node.get("price"))
+        if d == target and px is not None:
+            return {
+                "symbol": symbol,
+                "close": px,
+                "change_pct": num(node.get("change_pct") if node.get("change_pct") is not None else node.get("day_change_pct")),
+                "date": d,
+                "source": source,
+            }
+    return {"symbol":symbol,"close":None,"change_pct":None,"date":target,"source":"NO_SAME_DAY_INDEX"}
+
+
+def index_quote(close, intra, fallback, build_id, generated_at, target_date):
+    target = target_date or trade_date_of(intra) or trade_date_of(close) or str((fallback or {}).get("trade_date") or "")[:10] or None
+    phase, fresh = intraday_phase(target)
+    ta = _quote_node("^TWII", target, intra, close, fallback) if target else {"symbol":"^TWII","close":None,"change_pct":None,"date":None,"source":"NO_SAME_DAY_INDEX"}
+    ot = _quote_node("^TWOII", target, intra, close, fallback) if target else {"symbol":"^TWOII","close":None,"change_pct":None,"date":None,"source":"NO_SAME_DAY_INDEX"}
+    as_of = source_time(intra, target) if trade_date_of(intra) == target else source_time(close, target, "13:30:00")
+    complete = ta.get("close") is not None and ot.get("close") is not None
+    return {
+        "schema_version":"2.0.0","build_id":build_id,"dataset":"index_quote","trade_date":target,"session_phase":phase,
+        "as_of":as_of,"known_at":as_of,"generated_at":generated_at,"freshness":fresh if complete else "UNKNOWN","complete":complete,
+        "source_status":{"sources":[ta.get("source"),ot.get("source")],"fallback":False,"fallback_source":None,"fallback_build_id":None,"fallback_reason":None,"last_success_at":as_of},
+        "taiex":ta,"otc":ot,
+    }
+
+
 def capital_base(build_id, context, td, phase, fresh, as_of, generated_at, rows, source, method):
     return {"schema_version":"2.0.0","build_id":build_id,"dataset":"capital_context","context":context,"trade_date":td,"session_phase":phase,"as_of":as_of,"known_at":as_of,"generated_at":generated_at,"freshness":fresh,"complete":bool(rows),"source_status":source_status(source,as_of),"method":method,"rows":rows}
 
@@ -193,16 +250,18 @@ def main():
     legacy=Path(args.legacy_root); root=Path(args.root); manifest_path=root/"current_manifest.json"; manifest=load(manifest_path)
     if not isinstance(manifest,dict) or not manifest.get("active_build_id"): raise SystemExit("market/capital restore: manifest missing active_build_id")
     close=load(legacy/"close.json",{}) or {}; intra=load(legacy/"intraday.json",{}) or {}; fallback=load(legacy/"market.json",{}) or {}; generated=datetime.now(TW).isoformat(timespec="seconds"); bid=manifest["active_build_id"]
-    mc=market_close(close,fallback,bid,generated); mi=market_intraday(intra,bid,generated); cc=capital_close(close,bid,generated); ci=capital_intraday(intra,bid,generated)
-    register(root,manifest,"market_close_context","market-close-context.json",mc); register(root,manifest,"market_intraday_context","market-intraday-context.json",mi); register(root,manifest,"capital_close_context","capital-close-context.json",cc); register(root,manifest,"capital_intraday_context","capital-intraday-context.json",ci)
+    mc=market_close(close,fallback,bid,generated); mi=market_intraday(intra,bid,generated); cc=capital_close(close,bid,generated); ci=capital_intraday(intra,bid,generated); iq=index_quote(close,intra,fallback,bid,generated,manifest.get("trade_date"))
+    register(root,manifest,"market_close_context","market-close-context.json",mc); register(root,manifest,"market_intraday_context","market-intraday-context.json",mi); register(root,manifest,"capital_close_context","capital-close-context.json",cc); register(root,manifest,"capital_intraday_context","capital-intraday-context.json",ci); register(root,manifest,"index_quote","index-quote.json",iq)
     patch_scores(root,manifest,mc.get("market_score"),mi.get("market_score"))
     warnings=manifest.setdefault("health",{}).setdefault("warnings",[])
     msg="Market/Capital Context 已分離：盤中/當沖使用即時15分與族群成交動能；盤後使用收盤15分與法人估算金額。"
     if msg not in warnings: warnings.append(msg)
     msg2="盤中市場環境使用雙時鐘：MIS報價快線約5分鐘；VWAP/量速/族群結構約10分鐘，UI須分別標示。"
     if msg2 not in warnings: warnings.append(msg2)
+    msg3="加權/櫃買點位只使用與 Atomic Build 同交易日的 index_quote；不同日期不得回填舊 market.json。"
+    if msg3 not in warnings: warnings.append(msg3)
     write(manifest_path,manifest)
-    print("restored market/capital contexts",{"build":bid,"intraday_score":mi.get("market_score"),"close_score":mc.get("market_score"),"intraday_sectors":len(ci["rows"]),"close_sectors":len(cc["rows"])})
+    print("restored market/capital contexts",{"build":bid,"intraday_score":mi.get("market_score"),"close_score":mc.get("market_score"),"intraday_sectors":len(ci["rows"]),"close_sectors":len(cc["rows"]),"index_quote_complete":iq.get("complete")})
 
 
 if __name__ == "__main__":
