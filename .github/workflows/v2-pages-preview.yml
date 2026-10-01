@@ -56,6 +56,7 @@ jobs:
           node --check docs/v2/stock-detail-renderer.js
           node --check docs/v2/portfolio-renderer.js
           node --check docs/v2/radar-transparency-v7.js
+          node --check docs/v2/unified-score-freshness-v1.js
           python scripts/v2/validate_single_writer_ui.py
           python -m py_compile scripts/v2/normalize_close_snapshot.py
           python -m py_compile scripts/v2/normalize_close_snapshot_by_close_date.py
@@ -110,6 +111,7 @@ jobs:
           test -f _site/v2/stock-detail-renderer.js
           test -f _site/v2/portfolio-renderer.js
           test -f _site/v2/radar-transparency-v7.js
+          test -f _site/v2/unified-score-freshness-v1.js
           test -f _site/v2/data/current_manifest.json
           test -f "_site/v2/data/builds/$ACTIVE_BUILD/market-summary.json"
           echo "Production root source: main/docs"
