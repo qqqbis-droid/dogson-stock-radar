@@ -77,9 +77,10 @@ jobs:
           git fetch origin clean-build-v2 --depth=1
           rm -rf /tmp/v2-source
           mkdir -p /tmp/v2-source
-          git archive FETCH_HEAD docs/v2 scripts/v2/validate_single_writer_ui.py scripts/v2/validate_product_surface.py scripts/v2/test_portfolio_ledger.js | tar -xf - -C /tmp/v2-source
+          git archive FETCH_HEAD docs/v2 scripts/v2/validate_single_writer_ui.py scripts/v2/validate_product_surface.py scripts/v2/test_portfolio_ledger.js scripts/v2/build_stock_shards.py | tar -xf - -C /tmp/v2-source
           test -s /tmp/v2-source/docs/v2/index.html
           test -s /tmp/v2-source/docs/v2/data/current_manifest.json
+          test -s /tmp/v2-source/scripts/v2/build_stock_shards.py
 
       - name: Preserve newer published V2 market bundle
         shell: bash
@@ -213,6 +214,23 @@ jobs:
           print('Validated V2 production source:', {'build':build,'trade_date':trade_date,'datasets':len(ds)})
           PY
 
+      - name: Build mobile-safe single-stock shards
+        shell: bash
+        run: |
+          set -euo pipefail
+          python /tmp/v2-source/scripts/v2/build_stock_shards.py --data-root /tmp/v2-source/docs/v2/data
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('/tmp/v2-source/docs/v2/data')
+          m=json.loads((root/'current_manifest.json').read_text(encoding='utf-8'))
+          p=root/'builds'/m['active_build_id']/'stock-shards'/'index.json'
+          x=json.loads(p.read_text(encoding='utf-8'))
+          if x.get('build_id') != m['active_build_id'] or int(x.get('total_files') or 0) <= 0:
+              raise SystemExit('single-stock shard build is invalid')
+          print('Mobile stock shards:', x)
+          PY
+
       - name: Compose production Pages site
         shell: bash
         run: |
@@ -223,6 +241,7 @@ jobs:
           cp /tmp/v2-source/scripts/v2/validate_single_writer_ui.py scripts/v2/validate_single_writer_ui.py
           cp /tmp/v2-source/scripts/v2/validate_product_surface.py scripts/v2/validate_product_surface.py
           cp /tmp/v2-source/scripts/v2/test_portfolio_ledger.js scripts/v2/test_portfolio_ledger.js
+          cp /tmp/v2-source/scripts/v2/build_stock_shards.py scripts/v2/build_stock_shards.py
 
           # Legacy service worker must never intercept V2/data requests.
           python - <<'PY'
@@ -249,9 +268,11 @@ jobs:
           python scripts/v2/validate_single_writer_ui.py
           python scripts/v2/validate_product_surface.py
           node scripts/v2/test_portfolio_ledger.js
+          python -m py_compile scripts/v2/build_stock_shards.py
           node --check docs/v2/app.js
           node --check docs/v2/market-pulse-v2.js
           node --check docs/v2/stock-detail-renderer.js
+          node --check docs/v2/detail-loading-guard-v1.js
           node --check docs/v2/price-map-v2-lite.js
           node --check docs/sw.js
 
