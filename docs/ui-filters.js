@@ -1,9 +1,9 @@
 (()=>{
-  if(window.__DOGSON_UI_LOADER_V1730__) return;
-  window.__DOGSON_UI_LOADER_V1730__ = true;
+  if(window.__DOGSON_UI_LOADER_V1752__) return;
+  window.__DOGSON_UI_LOADER_V1752__ = true;
   const src=document.currentScript?.src||location.href;
   const base=new URL('.',src);
-  const version='1730';
+  const version='1752';
   let revealed=false;
   let modulesReady=false;
   let readyWaitStarted=0;
@@ -79,6 +79,7 @@
     ['ui-layout-v162.js','dogson-ui-layout-v162',version],
     ['ui-card-v164.js','dogson-ui-card-v164',version],
     ['ui-card-v166.js','dogson-ui-card-v166',version],
+    ['ui-interactions-v163.js','dogson-ui-interactions-v163',version],
     ['ui-fold-v167.js','dogson-ui-fold-v167',version],
     ['ui-entry-v1679.js','dogson-ui-entry-v1679',version],
     ['ui-freshness-v1688.js','dogson-ui-freshness-v1688',version],
@@ -91,7 +92,9 @@
     ['ui-accuracy-guard-v1702.js','dogson-ui-accuracy-guard-v1702','1750peer2'],
     ['ui-runtime-safety-v1720.js','dogson-ui-runtime-safety-v1720',version],
     ['ui-filter-v1730.js','dogson-ui-filter-v1730',version],
-    ['ui-shell-v1751.js','dogson-shell-v1751','1751shell2']
+    ['ui-candidate-v1752.js','dogson-ui-candidate-v1752','1752candidate2'],
+    ['ui-shell-v1751.js','dogson-shell-v1751','1751shell2'],
+    ['ui-card-open-v1752.js','dogson-card-open-v1752','1752card2']
   ];
 
   window.addEventListener('dogson:data-ready',()=>{if(modulesReady)waitForStableReveal()});
