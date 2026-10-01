@@ -9,7 +9,16 @@ function patch(){
     if(/^成本\s/.test(t.trim())) el.textContent=t.replace(/^\s*成本\s+/,'平均成本 ');
   });
 }
+function loadBrand(){
+  if(document.querySelector('script[data-inuko-brand-loader]'))return;
+  const s=document.createElement('script');
+  s.src='./brand-inuko-lab.js?v=20261001a';
+  s.dataset.inukoBrandLoader='1';
+  s.defer=true;
+  document.head.appendChild(s);
+}
 function boot(){
+  loadBrand();
   patch();
   const detail=document.getElementById('portfolioDetailBody');
   const cards=document.getElementById('portfolioCards');
