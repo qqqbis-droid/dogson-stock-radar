@@ -6,6 +6,7 @@ on:
     paths:
       - "docs/**"
       - "scripts/build_system_status.py"
+      - "scripts/enrich_sr_structure.py"
       - ".github/workflows/deploy-ui-v1531.yml"
   workflow_dispatch:
 
@@ -139,6 +140,22 @@ jobs:
               echo "WARN: optional live data unavailable: $name; repository copy retained"
             fi
           done
+
+      - name: Enrich support resistance structure 2.0 from preserved live data
+        run: |
+          python scripts/enrich_sr_structure.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for name in ('close','intraday','daytrade'):
+              obj=json.loads(Path(f'docs/data/{name}.json').read_text(encoding='utf-8'))
+              rows=[r for r in (obj.get('rows') or []) if isinstance(r,dict)]
+              structured=[r for r in rows if (r.get('support_levels') or r.get('resistance_levels'))]
+              full=[r for r in rows if len(r.get('support_levels') or [])>=2 and len(r.get('resistance_levels') or [])>=2]
+              print(f'SR2 {name}: structured={len(structured)}/{len(rows)} full_S1S2R1R2={len(full)}')
+              if rows and not structured:
+                  raise SystemExit(f'SR2 produced no structured rows for {name}')
+          PY
 
       - name: Rebuild and verify canonical data truth
         run: |
