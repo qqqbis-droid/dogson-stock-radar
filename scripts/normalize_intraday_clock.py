@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# Manual end-to-end truth-gate audit trigger; no runtime behavior change.
 """Normalize intraday/daytrade mission date and source clock from quote metadata.
 
 Live session: `as_of` follows the official MIS snapshot clock so freshness can be
