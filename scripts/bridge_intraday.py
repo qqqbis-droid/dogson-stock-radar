@@ -164,6 +164,72 @@ def _snapshot_bars(x, snaps, trade_date):
     return merged, len(bridge), monotonic_volume
 
 
+
+def _fnum(v):
+    try:
+        if v in (None, "", "-", "--"):
+            return None
+        x = float(v)
+        return x if x == x else None
+    except Exception:
+        return None
+
+
+def _apply_live_truth_guard(rows, trade_date):
+    """Fail closed when the current order book disproves the structural price.
+
+    The order book is NOT promoted to a fake last trade.  It is only used as an
+    independent consistency witness.  A live score requires a same-session
+    structure and a price that is not materially detached from the current book.
+    """
+    guarded = 0
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        qd = str(row.get("quote_date") or "")[:10]
+        if qd != str(trade_date)[:10]:
+            continue
+        structure_date = str(row.get("structure_date") or row.get("date") or "")[:10]
+        structure_same_day = bool(structure_date and structure_date == str(trade_date)[:10])
+        px = _fnum(row.get("close"))
+        bid = _fnum(row.get("quote_bid1"))
+        ask = _fnum(row.get("quote_ask1"))
+        book = (bid + ask) / 2.0 if bid and ask else (bid or ask)
+        gap = abs(px / book - 1.0) * 100.0 if px and book else None
+        has_trade = bool(row.get("quote_has_trade")) and _fnum(row.get("quote_close")) is not None
+        # 2% is deliberately much wider than a normal spread.  This gate is for
+        # detecting stale-session price bases, not microstructure noise.
+        book_consistent = gap is None or gap <= 2.0
+        valid = bool(structure_same_day and (has_trade or book_consistent))
+        row["quote_price_validated"] = valid
+        row["quote_structure_gap_pct"] = round(gap, 2) if gap is not None else None
+        row["structure_date_verified"] = structure_same_day
+        if valid:
+            row.pop("live_truth_blocker", None)
+            continue
+        guarded += 1
+        reasons = []
+        if not structure_same_day:
+            reasons.append(f"5分結構日期 {structure_date or '未知'} ≠ 報價日 {trade_date}")
+        if gap is not None and gap > 2.0:
+            reasons.append(f"結構價與五檔差距 {gap:.1f}%")
+        if not has_trade:
+            reasons.append("本輪未驗證到真實成交價")
+        row["live_truth_blocker"] = "；".join(reasons) or "盤中價格/結構一致性未通過"
+        # Do not let stale structure produce a directional score or lifecycle.
+        row["intraday_score"] = None
+        row["intraday_momentum_score"] = None
+        row["intraday_components"] = None
+        row["category"] = "觀察"
+        risks = list(row.get("stage_risks") or [])
+        msg = "即時價格與5分結構尚未同時驗證，暫停盤中方向判定"
+        if msg not in risks:
+            risks.insert(0, msg)
+        row["stage_risks"] = risks[:5]
+        row["stage_signals"] = []
+    print("LIVE_TRUTH_GUARD", guarded, "/", len(rows))
+    return rows
+
 def main():
     obj = bd.load_json("intraday.json", {})
     rows = obj.get("rows") or []
@@ -282,6 +348,7 @@ def main():
                 except Exception:
                     pass
         row["structure_time"] = t.get("time")
+        row["structure_date"] = str(t.get("date") or "")[:10] or None
         row["structure_close"] = t.get("close")
         row["structure_source"] = "Yahoo歷史5分K + TWSE MIS官方快照橋接"
         row["structure_bridge_bars"] = nbar
@@ -300,6 +367,7 @@ def main():
     rotation = bd.build_sector_rotation(out_rows)
     intraday_market = bd.build_intraday_market(out_rows, market_live, rotation, close_market)
     out_rows = bd.add_component_scores(out_rows, intraday_market, preliminary_intraday=True)
+    out_rows = _apply_live_truth_guard(out_rows, trade_date)
 
     # v1.5.21：最後以「完成MIS橋接後」的最新狀態和上一輪正式頁面比較。
     previous_obj = {}
