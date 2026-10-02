@@ -18,7 +18,7 @@ recently completed an actual source check. These are deliberately separate.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 import json
 from pathlib import Path
 
@@ -32,6 +32,7 @@ _ORIGINAL_MIS = bd.official_mis_snapshot
 _ORIGINAL_DOWNLOAD_DAILY = bd.download_daily
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "docs" / "data"
+TAIPEI_TZ = timezone(timedelta(hours=8))
 
 
 def _frame_latest_date(frame) -> date | None:
@@ -139,6 +140,29 @@ def _max_source_date(rows: list[dict], key: str):
     return max(vals) if vals else None
 
 
+def _normalize_chip_checked_at(raw):
+    """Return a truthful +08:00 timestamp for the source-check wall clock.
+
+    Historical chip_status used ``UTC now + 8h`` while retaining a ``+00:00``
+    suffix.  That wall clock is already Taipei time, so converting it as UTC
+    would add eight hours a second time in browsers. Reinterpret that legacy
+    value with +08:00; properly offset timestamps are converted normally.
+    """
+    if not raw:
+        return None
+    text = str(raw).strip()
+    try:
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=TAIPEI_TZ).isoformat()
+        if dt.utcoffset() == timedelta(0):
+            # chip_data.py historically stored a Taipei wall clock with +00:00.
+            return dt.replace(tzinfo=TAIPEI_TZ).isoformat()
+        return dt.astimezone(TAIPEI_TZ).isoformat()
+    except Exception:
+        return text
+
+
 def stamp_chip_provenance():
     """Attach actual source-check time to every close row and chip_status.
 
@@ -157,7 +181,7 @@ def stamp_chip_provenance():
     except Exception:
         status = {}
 
-    checked_at = status.get("last_checked_at") or status.get("updated_at")
+    checked_at = _normalize_chip_checked_at(status.get("last_checked_at") or status.get("updated_at"))
     health = _chip_check_health(status, rows)
     source_dates = {
         "chip": _max_source_date(rows, "chip_date"),
