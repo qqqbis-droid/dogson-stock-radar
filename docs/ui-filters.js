@@ -94,7 +94,8 @@
     ['ui-filter-v1730.js','dogson-ui-filter-v1730',version],
     ['ui-candidate-v1752.js','dogson-ui-candidate-v1752','1752candidate2'],
     ['ui-shell-v1751.js','dogson-shell-v1751','1751shell2'],
-    ['ui-card-open-v1752.js','dogson-card-open-v1752','1752card2']
+    ['ui-card-open-v1752.js','dogson-card-open-v1752','1752card2'],
+    ['ui-copy-clean-v1.js','dogson-ui-copy-clean-v1','1']
   ];
 
   window.addEventListener('dogson:data-ready',()=>{if(modulesReady)waitForStableReveal()});
