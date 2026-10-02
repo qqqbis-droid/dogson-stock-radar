@@ -8,10 +8,9 @@ on:
       - 'docs/v2/*.html'
       - 'docs/v2/*.js'
       - 'docs/v2/*.css'
-      - 'docs/v2/data/current_manifest.json'
-      - 'docs/v2/data/market-detail.json'
-      - 'docs/v2/data/sector-members.json'
       - 'scripts/v2/*.py'
+      - 'contracts/**'
+      - 'requirements-contract.txt'
       - 'vercel.json'
       - '.github/workflows/v2-pages-preview.yml'
 
@@ -27,34 +26,40 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - name: Checkout Clean Build 2.0 shell
         uses: actions/checkout@v4
         with:
           ref: clean-build-v2
           path: v2src
+
       - name: Checkout production main shell
         uses: actions/checkout@v4
         with:
           ref: main
           path: mainsrc
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Validate V2 single-writer browser modules and data gates
+          cache: 'pip'
+
+      - name: Validate V2 browser modules and contracts
         working-directory: v2src
         run: |
+          set -euo pipefail
           node --check docs/v2/data-source.js
           node --check docs/v2/universe-search.js
           node --check docs/v2/portfolio-store.js
           node --check docs/v2/app.js
           node --check docs/v2/market-capital-renderer.js
           node --check docs/v2/stock-detail-renderer.js
-          node --check docs/v2/detail-loading-guard-v1.js
+          node --check docs/v2/detail-loading-guard-v2.js
           node --check docs/v2/portfolio-renderer.js
           node --check docs/v2/radar-transparency-v7.js
           node --check docs/v2/unified-score-freshness-v1.js
@@ -66,68 +71,159 @@ jobs:
           python -m py_compile scripts/v2/validate_mission_evidence.py
           python -m py_compile scripts/v2/rebuild_close_rank_views.py
           python -m py_compile scripts/v2/build_radar_stats.py
-      - name: Compose Pages artifact without replacing production root
+
+      - name: Install production and V2 dependencies
         run: |
           set -euo pipefail
-          mkdir -p _site
-          cp -a mainsrc/docs/. _site/
+          python -m pip install --disable-pip-version-check -r mainsrc/requirements.txt
+          python -m pip install --disable-pip-version-check -r v2src/requirements-contract.txt
 
+      - name: Hydrate live production data and repair latest completed close
+        working-directory: mainsrc
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TZ: Asia/Taipei
+        run: |
+          set -euo pipefail
+          # GitHub Pages deployments replace the whole artifact. Start from the
+          # data that is actually live, never from stale JSON committed months ago.
+          python scripts/sync_live_data.py || true
+
+          # A UI-only push must still carry the newest completed cash-session
+          # background. This wrapper explicitly removes today's partial daily bar.
+          python scripts/build_close_fresh.py
+          python scripts/build_hourly.py
+          python scripts/enrich_sr_structure.py
+          python scripts/build_system_status.py
+
+          # During cash-market hours, repair the quote layer too so a UI deploy
+          # cannot roll the current intraday mission backward while refreshing close.
+          if python - <<'PY'
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          now=datetime.now(ZoneInfo('Asia/Taipei'))
+          raise SystemExit(0 if now.weekday()<5 and (9 <= now.hour < 14) else 1)
+          PY
+          then
+            echo 'Market hours: refresh official MIS fast quote layer.'
+            python scripts/run_bridge_intraday_fast.py || true
+            python scripts/build_daytrade.py
+            python scripts/normalize_intraday_clock.py
+            python scripts/enrich_sr_structure.py
+            python scripts/build_system_status.py
+          else
+            echo 'Outside market hours: preserve the latest validated live intraday/daytrade snapshot.'
+          fi
+
+      - name: Install V2 shell over hydrated production root
+        run: |
+          set -euo pipefail
+          rm -rf mainsrc/docs/v2 mainsrc/scripts/v2 mainsrc/contracts
+          mkdir -p mainsrc/docs/v2 mainsrc/scripts
+          rsync -a --exclude 'data/' v2src/docs/v2/ mainsrc/docs/v2/
+          cp -a v2src/scripts/v2 mainsrc/scripts/v2
+          cp -a v2src/contracts mainsrc/contracts
+          cp v2src/requirements-contract.txt mainsrc/requirements-contract.txt
+          mkdir -p mainsrc/docs/v2/data
+
+      - name: Rebuild V2 Atomic Bundle from hydrated current sources
+        working-directory: mainsrc
+        env:
+          TZ: Asia/Taipei
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/dogson-pages-v2-preview
+          python -m scripts.v2.shadow_cycle \
+            --legacy-root docs/data \
+            --output docs/v2/data \
+            --reports /tmp/dogson-pages-v2-preview/reports
+          python scripts/v2/live_publish_patch.py --legacy-root docs/data --root docs/v2/data
+          python scripts/v2/enrich_zones.py --legacy-root docs/data --output docs/v2/data
+          python scripts/v2/enrich_stock_detail_context.py --legacy-root docs/data --root docs/v2/data
+          python scripts/v2/restore_market_capital_context.py --legacy-root docs/data --root docs/v2/data
+          python scripts/v2/normalize_close_snapshot_by_close_date.py --root docs/v2/data
+          python scripts/v2/stamp_version_contract.py --root docs/v2/data
+          python scripts/v2/validate_bundle.py --root docs/v2/data
+          python scripts/v2/validate_market_capital_context.py --root docs/v2/data
+          python scripts/v2/build_stock_shards.py --data-root docs/v2/data
+          test -s docs/v2/data/current_manifest.json
+
+      - name: Gate against mission-date rollback
+        working-directory: mainsrc
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          def load(path):
+              return json.loads(Path(path).read_text(encoding='utf-8'))
+
+          def effective_date(obj):
+              dates=[]
+              if isinstance(obj,dict):
+                  for k in ('trade_date','source_trade_date','date'):
+                      s=str(obj.get(k) or '')[:10]
+                      if len(s)==10: dates.append(s)
+                  b=obj.get('bridge') or {}
+                  s=str(b.get('trade_date') or '')[:10]
+                  if len(s)==10: dates.append(s)
+                  for r in obj.get('rows') or []:
+                      if not isinstance(r,dict): continue
+                      s=str(r.get('quote_date') or r.get('market_trade_date') or r.get('date') or '')[:10]
+                      if len(s)==10: dates.append(s)
+              return max(dates) if dates else ''
+
+          root_close=effective_date(load('docs/data/close.json'))
+          root_intra=effective_date(load('docs/data/intraday.json'))
+          root_day=effective_date(load('docs/data/daytrade.json'))
+          m=load('docs/v2/data/current_manifest.json')
+          ds=m.get('datasets') or {}
+          v2_close=str((ds.get('decision_close_summary') or {}).get('as_of') or '')[:10]
+          v2_intra=str((ds.get('decision_intraday_summary') or {}).get('as_of') or '')[:10]
+          v2_day=str((ds.get('decision_daytrade_summary') or {}).get('as_of') or '')[:10]
+          print('mission-date gate:', {
+              'root_close':root_close,'v2_close':v2_close,
+              'root_intraday':root_intra,'v2_intraday':v2_intra,
+              'root_daytrade':root_day,'v2_daytrade':v2_day,
+              'bundle':m.get('active_build_id')
+          })
+          errors=[]
+          if root_close and v2_close != root_close: errors.append(f'close {v2_close} != {root_close}')
+          if root_intra and v2_intra != root_intra: errors.append(f'intraday {v2_intra} != {root_intra}')
+          if root_day and v2_day != root_day: errors.append(f'daytrade {v2_day} != {root_day}')
+          if errors:
+              raise SystemExit('Refusing Pages data rollback: ' + '; '.join(errors))
+          PY
+
+      - name: Prepare Pages artifact without stale-data replacement
+        working-directory: mainsrc
+        run: |
+          set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-          p = Path('_site/sw.js')
-          s = p.read_text(encoding='utf-8')
-          guarded = "  const url=new URL(req.url);\n  if(url.pathname.includes('/v2/'))return;\n  if(url.pathname.includes('/data/'))"
-          needle = "  const url=new URL(req.url);\n  if(url.pathname.includes('/data/'))"
+          p=Path('docs/sw.js')
+          s=p.read_text(encoding='utf-8')
+          guarded="  const url=new URL(req.url);\n  if(url.pathname.includes('/v2/'))return;\n  if(url.pathname.includes('/data/'))"
+          needle="  const url=new URL(req.url);\n  if(url.pathname.includes('/data/'))"
           if guarded not in s:
               if needle not in s:
                   raise SystemExit('legacy sw fetch handler shape changed; refusing unsafe patch')
-              s = s.replace(needle, guarded, 1)
-              p.write_text(s, encoding='utf-8')
+              p.write_text(s.replace(needle,guarded,1),encoding='utf-8')
           PY
-          grep -q "url.pathname.includes('/v2/')" _site/sw.js
+          grep -q "url.pathname.includes('/v2/')" docs/sw.js
+          test -f docs/index.html
+          test -f docs/v2/index.html
+          test -f docs/v2/detail-loading-guard-v2.js
+          test -f docs/v2/data/current_manifest.json
+          ACTIVE_BUILD=$(python -c 'import json;print(json.load(open("docs/v2/data/current_manifest.json"))["active_build_id"])')
+          test -d "docs/v2/data/builds/$ACTIVE_BUILD"
+          test -s "docs/v2/data/builds/$ACTIVE_BUILD/stock-shards/index.json"
+          echo "Deploying hydrated production root + rebuilt V2: $ACTIVE_BUILD"
 
-          rm -rf _site/v2
-          mkdir -p _site/v2
-          rsync -a --exclude 'data/' v2src/docs/v2/ _site/v2/
-
-          mkdir -p _site/v2/data/builds
-          cp v2src/docs/v2/data/current_manifest.json _site/v2/data/current_manifest.json
-          test -f v2src/docs/v2/data/market-detail.json && cp v2src/docs/v2/data/market-detail.json _site/v2/data/market-detail.json
-          test -f v2src/docs/v2/data/sector-members.json && cp v2src/docs/v2/data/sector-members.json _site/v2/data/sector-members.json
-          ACTIVE_BUILD=$(python - <<'PY'
-          import json
-          from pathlib import Path
-          m=json.loads(Path('v2src/docs/v2/data/current_manifest.json').read_text(encoding='utf-8'))
-          print(m['active_build_id'])
-          PY
-          )
-          test -d "v2src/docs/v2/data/builds/$ACTIVE_BUILD"
-          cp -a "v2src/docs/v2/data/builds/$ACTIVE_BUILD" "_site/v2/data/builds/$ACTIVE_BUILD"
-
-          python v2src/scripts/v2/build_stock_shards.py --data-root _site/v2/data
-          test -s "_site/v2/data/builds/$ACTIVE_BUILD/stock-shards/index.json"
-
-          test -f _site/index.html
-          test -f _site/v2/index.html
-          test -f _site/v2/universe-search.js
-          test -f _site/v2/portfolio-store.js
-          test -f _site/v2/app.js
-          test -f _site/v2/market-capital-renderer.js
-          test -f _site/v2/stock-detail-renderer.js
-          test -f _site/v2/portfolio-renderer.js
-          test -f _site/v2/radar-transparency-v7.js
-          test -f _site/v2/unified-score-freshness-v1.js
-          test -f _site/v2/data/current_manifest.json
-          test -f "_site/v2/data/builds/$ACTIVE_BUILD/market-summary.json"
-          echo "Production root source: main/docs"
-          echo "Legacy SW: V2 bypass enabled"
-          echo "V2 shell: single-writer clean-build-v2/docs/v2"
-          echo "V2 private portfolio: browser-local only"
-          echo "V2 same-origin active data: $ACTIVE_BUILD"
-          echo "V2 per-stock mobile shards: enabled"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: mainsrc/docs
       - id: deployment
         uses: actions/deploy-pages@v4
