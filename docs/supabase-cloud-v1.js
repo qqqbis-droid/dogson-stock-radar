@@ -4,7 +4,7 @@ const PROJECT_URL='https://itttysaxjsntjzuonlnf.supabase.co';
 const PUBLISHABLE_KEY='sb_publishable_4sR9sM3jVG2A1Z7IJHXH0w_48kV9KZW';
 const SCHEMA_VERSION='2.0.0';
 const SDK_WAIT_MS=12000;
-const state={client:null,session:null,accounts:[],account:null,revision:0,ledger:null,syncing:false,timer:null,status:'local',message:'僅本機'};
+const state={client:null,session:null,accounts:[],account:null,revision:0,ledger:null,syncing:false,timer:null,dirty:false,status:'local',message:'僅本機'};
 const originalSavePortfolioData=typeof savePortfolioData==='function'?savePortfolioData:null;
 const originalShowPortfolioEditor=typeof showPortfolioEditor==='function'?showPortfolioEditor:null;
 const legacyAtBoot=typeof loadPortfolio==='function'?loadPortfolio():{};
@@ -108,20 +108,21 @@ async function selectAccount(accountId,allowLegacyMigration){
  const account=state.accounts.find(a=>a.id===accountId)||state.accounts[0];if(!account)return;
  state.account=account;localStorage.setItem(activeKey(state.session.user.id),account.id);setMessage(`讀取 ${account.name}…`,'loading');renderBar();
  const {data,error}=await state.client.from('inuko_portfolio_ledgers').select('account_id,revision,schema_version,ledger,updated_at').eq('account_id',account.id).single();if(error)throw error;
- state.revision=Number(data.revision||0);state.ledger=data.ledger&&typeof data.ledger==='object'?data.ledger:{};
+ state.revision=Number(data.revision||0);state.ledger=data.ledger&&typeof data.ledger==='object'?data.ledger:{};state.dirty=false;
  const cloudPortfolio=safePortfolio(state.ledger.portfolio||state.ledger.holdings);
  const shouldMigrate=allowLegacyMigration&&account.account_kind==='main'&&state.revision===0&&Object.keys(cloudPortfolio).length===0&&localHasData();
- if(shouldMigrate){portfolioData=safePortfolio(legacyAtBoot);persistLocal();setMessage('正在把原本本機庫存搬上主帳戶…','loading');await flushSave(true);return}
+ if(shouldMigrate){portfolioData=safePortfolio(legacyAtBoot);persistLocal();state.dirty=true;setMessage('正在把原本本機庫存搬上主帳戶…','loading');await flushSave(true);return}
  portfolioData=cloudPortfolio;persistLocal();
  try{localStorage.setItem(cacheKey(state.session.user.id,account.id),JSON.stringify(portfolioData))}catch{}
  setMessage(`${account.name} 已同步 · r${state.revision}`,'ready');if(typeof render==='function')render();updatePortfolioCopy();
 }
 function scheduleSave(){
- if(!state.session||!state.account)return;clearTimeout(state.timer);setMessage('有變更，準備同步…','pending');state.timer=setTimeout(()=>{flushSave(false).catch(err=>setMessage(err?.message||'同步失敗','error'))},650);
+ if(!state.session||!state.account)return;state.dirty=true;clearTimeout(state.timer);setMessage('有變更，準備同步…','pending');state.timer=setTimeout(()=>{flushSave(false).catch(err=>setMessage(err?.message||'同步失敗','error'))},650);
 }
 async function flushSave(manual){
  if(!state.session||!state.account){if(manual)setMessage('尚未登入，資料仍保存在本機','local');return}
  if(state.syncing){if(manual)setMessage('同步進行中…','loading');return}
+ if(!manual&&!state.dirty)return;
  clearTimeout(state.timer);state.timer=null;state.syncing=true;setMessage('同步中…','loading');
  try{
    const currentPortfolio=safePortfolio(portfolioData);
@@ -129,9 +130,9 @@ async function flushSave(manual){
    const {data,error}=await state.client.rpc('inuko_save_portfolio_ledger',{p_account_id:state.account.id,p_expected_revision:state.revision,p_schema_version:SCHEMA_VERSION,p_ledger:nextLedger});if(error)throw error;
    const row=Array.isArray(data)?data[0]:data;
    if(!row?.saved){state.revision=Number(row?.new_revision||state.revision);setMessage('另一裝置已有較新版本，重新載入…','conflict');await selectAccount(state.account.id,false);return}
-   state.revision=Number(row.new_revision||state.revision+1);state.ledger=nextLedger;persistLocal();
+   state.revision=Number(row.new_revision||state.revision+1);state.ledger=nextLedger;state.dirty=false;persistLocal();
    setMessage(`${state.account.name} 已同步 · r${state.revision}`,'saved');
-   state.client.rpc('inuko_create_daily_snapshot',{p_account_id:state.account.id}).catch(()=>{});
+   Promise.resolve(state.client.rpc('inuko_create_daily_snapshot',{p_account_id:state.account.id})).catch(()=>{});
  }finally{state.syncing=false}
 }
 function patchPortfolioHooks(){
