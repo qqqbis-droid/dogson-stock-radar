@@ -72,6 +72,41 @@ def decision_rows(root, manifest, key):
     return []
 
 
+def verify_chip_source_dates(root, manifest):
+    datasets = manifest.get("datasets") or {}
+    for context in ("close", "intraday", "daytrade"):
+        key = f"stock_detail_{context}"
+        meta = datasets.get(key) or {}
+        rows = decision_rows(root, manifest, key)
+        with_chip = [
+            x for x in rows
+            if x.get("chip_score") is not None or x.get("chip_background") not in (None, "")
+        ]
+        missing = [str(x.get("code") or "?") for x in with_chip if not str(x.get("chip_date") or "")[:10]]
+        future = []
+        trade_date = str(manifest.get("trade_date") or meta.get("as_of") or "")[:10]
+        for x in with_chip:
+            chip_date = str(x.get("chip_date") or "")[:10]
+            if chip_date and trade_date and chip_date > trade_date:
+                future.append(str(x.get("code") or "?"))
+        if missing:
+            raise SystemExit(f"{key} chip evidence missing chip_date: {missing[:10]} count={len(missing)}")
+        if future:
+            raise SystemExit(f"{key} chip_date newer than trading date: {future[:10]} count={len(future)}")
+        print(key, "chip source dates verified", len(with_chip))
+
+    # The freshness strip must use stock evidence source dates.  A manifest
+    # context timestamp is a build/knowledge time and must never masquerade as
+    # the date of foreign/trust/SBL/margin data.
+    ui_path = Path("docs/v2/detail-loading-guard-v2.js")
+    ui = ui_path.read_text(encoding="utf-8")
+    if "capital_close_context?.as_of" in ui:
+        raise SystemExit("V2 freshness strip regressed: build/context as_of used as chip date")
+    if "e?.chip_date" not in ui:
+        raise SystemExit("V2 freshness strip does not consume stock evidence chip_date")
+    print("V2 chip-date truth contract verified")
+
+
 def main():
     src = load("docs/data/intraday.json")
     day = load("docs/data/daytrade.json")
@@ -111,6 +146,7 @@ def main():
         if not p.is_file() or p.stat().st_size == 0:
             raise SystemExit(f"{key} missing from active build: {p}")
 
+    verify_chip_source_dates(root, m)
     verify_ranked_zones(root, m, "zone_intraday")
 
     # enrich_zones.py intentionally strips zones from DATA_STALE daytrade rows so
@@ -141,7 +177,7 @@ def main():
     else:
         run_mission_gate("daytrade")
     run_py("scripts/v2/validate_single_writer_ui.py")
-    print("V2 stock detail/evidence + S1/S2/R1/R2 + single-writer UI verified")
+    print("V2 stock detail/evidence + chip-date truth + S1/S2/R1/R2 + single-writer UI verified")
 
 
 if __name__ == "__main__":
