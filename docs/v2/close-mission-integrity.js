@@ -12,6 +12,7 @@
   const price=v=>n(v)==null?'—':Number(v).toLocaleString('zh-TW',{maximumFractionDigits:Number(v)<100?2:Number(v)<1000?1:0});
   const activeView=()=>$('.tab.active')?.dataset?.view||'intraday';
   const range=z=>z?`${price(z.low)}–${price(z.high)}`:'—';
+  const v2CloseMode=()=>!document.querySelector('[data-h60-mode="hourly60"]')?.classList.contains('active');
 
   async function json(url){
     const r=await fetch(url,{cache:'no-store'});
@@ -73,6 +74,9 @@
       }
       const next=host.querySelector('[data-quick-filter="NEXT_DAY_READY"] small');
       if(next)next.textContent=`品質≥${TH.quality}・位置≥${TH.position}・信心≥${TH.confidence}・不設檔數上限`;
+      // 60K mode writes its own count label. Restore the V2 label as soon as
+      // the user switches back so the two missions never leak into each other.
+      if(v2CloseMode()&&$('#countText'))$('#countText').textContent=`V2盤後 · ${idx.length.toLocaleString('zh-TW')} 檔`;
     }catch(err){console.warn('close count integrity repair',err)}
   }
 
@@ -156,7 +160,7 @@
   document.addEventListener('radar:data-reloaded',async()=>{manifestCache=null;indexCache=null;detailCache=null;await manifest(true).catch(()=>null);scheduleCounts(180);scheduleCounts(1000)});
   document.addEventListener('radar:open-stock',()=>{scheduleDetail(180);scheduleDetail(700)});
   document.addEventListener('click',e=>{
-    if(e.target?.closest?.('.tab,[data-quick-filter],[data-quick-filter-clear]')){scheduleCounts(220);scheduleCounts(950)}
+    if(e.target?.closest?.('.tab,[data-quick-filter],[data-quick-filter-clear],[data-h60-mode]')){scheduleCounts(220);scheduleCounts(950)}
     if(e.target?.closest?.('.card[data-code],.h60-screen-card[data-code]')){scheduleDetail(220);scheduleDetail(850)}
   });
   const body=$('#detailBody');if(body)new MutationObserver(()=>scheduleDetail(120)).observe(body,{childList:true,subtree:true});
