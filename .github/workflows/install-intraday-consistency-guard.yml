@@ -1,0 +1,58 @@
+name: Install Intraday Consistency Guard
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/install-intraday-consistency-guard.yml"
+      - "scripts/patch_intraday_consistency_guard.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dogson-live-patch
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply live price / structure consistency guard
+        run: python scripts/patch_intraday_consistency_guard.py
+      - name: Verify guard contract
+        run: |
+          python -m py_compile scripts/bridge_intraday.py scripts/bridge_intraday_fast.py
+          python - <<'PY'
+          from pathlib import Path
+          for name in ('scripts/bridge_intraday.py','scripts/bridge_intraday_fast.py'):
+              s=Path(name).read_text(encoding='utf-8')
+              for x in [
+                  'def _apply_live_truth_guard(rows, trade_date):',
+                  'quote_price_validated',
+                  'quote_structure_gap_pct',
+                  'structure_date_verified',
+                  'out_rows = _apply_live_truth_guard(out_rows, trade_date)',
+              ]:
+                  assert x in s, (name,x)
+          s=Path('scripts/bridge_intraday.py').read_text(encoding='utf-8')
+          assert 'row["structure_date"] = str(t.get("date") or "")[:10] or None' in s
+          print('intraday consistency guard contract OK')
+          PY
+      - name: Commit production guard
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/bridge_intraday.py scripts/bridge_intraday_fast.py
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Fail closed on stale intraday price structure"
+            git push
+          fi
