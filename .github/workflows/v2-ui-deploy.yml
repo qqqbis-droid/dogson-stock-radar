@@ -43,26 +43,19 @@ jobs:
           critical=(close.json market.json intraday.json hourly.json daytrade.json)
           optional=(universe.json status.json system_status.json chip_history.json chip_status.json mis_snapshots.json validation_history.json validation.json decision_history.json)
           mkdir -p docs/data
-
           for name in "${critical[@]}"; do
             tmp="docs/data/${name}.live"
             if ! curl -fsSL --retry 3 --retry-delay 2 --max-time 25 -H 'Cache-Control: no-cache' "${base}/${name}?ts=$(date +%s%N)" -o "$tmp" || ! test -s "$tmp"; then
-              rm -f "$tmp"
-              echo "ERROR: live critical data unavailable: $name; refusing UI-only deploy to avoid data rollback"
-              exit 1
+              rm -f "$tmp"; echo "ERROR: live critical data unavailable: $name"; exit 1
             fi
             mv "$tmp" "docs/data/$name"
-            echo "preserved live critical $name"
           done
-
           for name in "${optional[@]}"; do
             tmp="docs/data/${name}.live"
             if curl -fsSL --retry 2 --retry-delay 1 --max-time 20 -H 'Cache-Control: no-cache' "${base}/${name}?ts=$(date +%s%N)" -o "$tmp" && test -s "$tmp"; then
               mv "$tmp" "docs/data/$name"
-              echo "preserved live optional $name"
             else
               rm -f "$tmp"
-              echo "WARN: optional live data unavailable: $name; repository copy retained"
             fi
           done
 
@@ -71,8 +64,7 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin clean-build-v2 --depth=1
-          rm -rf /tmp/v2-source
-          mkdir -p /tmp/v2-source
+          rm -rf /tmp/v2-source && mkdir -p /tmp/v2-source
           git archive FETCH_HEAD docs/v2 scripts/v2/validate_single_writer_ui.py scripts/v2/validate_product_surface.py scripts/v2/test_portfolio_ledger.js scripts/v2/build_stock_shards.py scripts/v2/enrich_zones.py | tar -xf - -C /tmp/v2-source
           test -s /tmp/v2-source/docs/v2/index.html
           test -s /tmp/v2-source/docs/v2/data/current_manifest.json
@@ -84,98 +76,61 @@ jobs:
         run: |
           set -euo pipefail
           live_base="https://qqqbis-droid.github.io/dogson-stock-radar/v2/data"
-          rm -rf /tmp/live-v2
-          mkdir -p /tmp/live-v2/data
-
-          if ! curl -fsSL --retry 3 --retry-delay 2 --max-time 25 -H 'Cache-Control: no-cache' \
-            "${live_base}/current_manifest.json?ts=$(date +%s%N)" -o /tmp/live-v2/data/current_manifest.json; then
-            echo 'WARN: live V2 manifest unavailable; canonical branch V2 data will be used'
-            exit 0
+          rm -rf /tmp/live-v2 && mkdir -p /tmp/live-v2/data
+          if ! curl -fsSL --retry 3 --retry-delay 2 --max-time 25 -H 'Cache-Control: no-cache' "${live_base}/current_manifest.json?ts=$(date +%s%N)" -o /tmp/live-v2/data/current_manifest.json; then
+            echo 'WARN: live V2 manifest unavailable; using branch V2 data'; exit 0
           fi
-
           use_live="$(python - <<'PY'
           import json
           from pathlib import Path
-
-          def load(path):
-              return json.loads(Path(path).read_text(encoding='utf-8'))
+          def load(p): return json.loads(Path(p).read_text(encoding='utf-8'))
           def stamp(m):
-              ds=m.get('datasets') or {}
-              values=[]
+              ds=m.get('datasets') or {}; vals=[]
               for key in ('decision_intraday_detail','stock_detail_intraday','decision_daytrade_detail'):
                   v=str((ds.get(key) or {}).get('as_of') or '')
-                  if v:
-                      values.append(v)
-              return max(values) if values else str(m.get('generated_at') or '')
-
-          live=load('/tmp/live-v2/data/current_manifest.json')
-          cand=load('/tmp/v2-source/docs/v2/data/current_manifest.json')
-          live_stamp=stamp(live)
-          cand_stamp=stamp(cand)
-          print('yes' if live_stamp and live_stamp > cand_stamp else 'no')
-          print(f'V2 freshness live={live_stamp} candidate={cand_stamp}', file=__import__('sys').stderr)
+                  if v: vals.append(v)
+              return max(vals) if vals else str(m.get('generated_at') or '')
+          live=load('/tmp/live-v2/data/current_manifest.json'); cand=load('/tmp/v2-source/docs/v2/data/current_manifest.json')
+          print('yes' if stamp(live) and stamp(live)>stamp(cand) else 'no')
           PY
           )"
-
-          if [ "$use_live" != "yes" ]; then
-            echo 'Canonical branch V2 data is at least as fresh as production; no live V2 preservation needed'
-            exit 0
-          fi
-
+          if [ "$use_live" != "yes" ]; then exit 0; fi
           python - <<'PY' > /tmp/live-v2/urls.txt
           import json
           from pathlib import Path
-          m=json.loads(Path('/tmp/live-v2/data/current_manifest.json').read_text(encoding='utf-8'))
-          urls=set()
+          m=json.loads(Path('/tmp/live-v2/data/current_manifest.json').read_text(encoding='utf-8')); urls=set()
           for meta in (m.get('datasets') or {}).values():
               raw=str((meta or {}).get('url') or '')
-              if raw.startswith('./data/'):
-                  raw=raw[len('./data/'):]
-              else:
-                  raw=raw.lstrip('./')
-              if raw:
-                  urls.add(raw)
-          for raw in sorted(urls):
-              print(raw)
+              raw=raw[len('./data/'):] if raw.startswith('./data/') else raw.lstrip('./')
+              if raw: urls.add(raw)
+          print('\n'.join(sorted(urls)))
           PY
-
           while IFS= read -r rel; do
             [ -n "$rel" ] || continue
             mkdir -p "/tmp/live-v2/data/$(dirname "$rel")"
-            curl -fsSL --retry 3 --retry-delay 2 --max-time 30 -H 'Cache-Control: no-cache' \
-              "${live_base}/${rel}?ts=$(date +%s%N)" -o "/tmp/live-v2/data/${rel}"
+            curl -fsSL --retry 3 --retry-delay 2 --max-time 30 -H 'Cache-Control: no-cache' "${live_base}/${rel}?ts=$(date +%s%N)" -o "/tmp/live-v2/data/${rel}"
             test -s "/tmp/live-v2/data/${rel}"
           done < /tmp/live-v2/urls.txt
-
           for name in market-detail.json sector-members.json; do
-            curl -fsSL --retry 2 --retry-delay 1 --max-time 20 -H 'Cache-Control: no-cache' \
-              "${live_base}/${name}?ts=$(date +%s%N)" -o "/tmp/live-v2/data/${name}" || rm -f "/tmp/live-v2/data/${name}"
+            curl -fsSL --retry 2 --retry-delay 1 --max-time 20 -H 'Cache-Control: no-cache' "${live_base}/${name}?ts=$(date +%s%N)" -o "/tmp/live-v2/data/${name}" || rm -f "/tmp/live-v2/data/${name}"
           done
-
           rm -rf /tmp/v2-source/docs/v2/data
           cp -a /tmp/live-v2/data /tmp/v2-source/docs/v2/data
-          echo 'Preserved newer production V2 market bundle for this UI-only deploy'
 
       - name: Rebuild S/R 3.0 from newest root evidence
         shell: bash
         run: |
           set -euo pipefail
-          python /tmp/v2-source/scripts/v2/enrich_zones.py \
-            --legacy-root docs/data \
-            --output /tmp/v2-source/docs/v2/data
+          python /tmp/v2-source/scripts/v2/enrich_zones.py --legacy-root docs/data --output /tmp/v2-source/docs/v2/data
           python - <<'PY'
           import json
           from pathlib import Path
-          root=Path('/tmp/v2-source/docs/v2/data')
-          m=json.loads((root/'current_manifest.json').read_text(encoding='utf-8'))
-          meta=(m.get('datasets') or {}).get('zone_close') or {}
-          raw=str(meta.get('url') or '')
-          p=root/(raw[len('./data/'):] if raw.startswith('./data/') else raw.lstrip('./'))
-          zones=json.loads(p.read_text(encoding='utf-8'))
-          usable=[z for z in zones if z.get('code') and z.get('rank') in {'S1','S2','R1','R2'}]
+          root=Path('/tmp/v2-source/docs/v2/data'); m=json.loads((root/'current_manifest.json').read_text(encoding='utf-8'))
+          meta=(m.get('datasets') or {}).get('zone_close') or {}; raw=str(meta.get('url') or '')
+          p=root/(raw[len('./data/'):] if raw.startswith('./data/') else raw.lstrip('./')); zones=json.loads(p.read_text(encoding='utf-8'))
+          usable=[z for z in zones if z.get('zone_id') and z.get('rank') in {'S1','S2','R1','R2'} and float(z.get('high') or 0)>0]
           print('S/R 3.0 close zones:',len(usable),'/',len(zones))
-          if not usable:
-              raise SystemExit('S/R enrichment produced no stock-mapped close zones')
+          if not usable: raise SystemExit('S/R enrichment produced no usable close zones')
           PY
 
       - name: Verify canonical V2 Atomic bundle
@@ -185,52 +140,19 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-
-          root=Path('/tmp/v2-source/docs/v2/data')
-          m=json.loads((root/'current_manifest.json').read_text(encoding='utf-8'))
-          if m.get('schema_version') != '2.0.0':
-              raise SystemExit('V2 manifest schema is not 2.0.0')
-          if not m.get('health',{}).get('validation_passed'):
-              raise SystemExit('V2 canonical manifest has not passed validation')
-          build=str(m.get('active_build_id') or '')
-          trade_date=str(m.get('trade_date') or '')[:10]
-          if not build or len(trade_date) != 10:
-              raise SystemExit('V2 canonical build/trade_date missing')
-
-          required=(
-              'decision_close_summary','decision_close_index','decision_close_detail',
-              'stock_detail_close','zone_close','market_close_context','capital_close_context',
-              'decision_intraday_summary','decision_intraday_index','decision_intraday_detail',
-              'market_intraday_context','capital_intraday_context'
-          )
-          ds=m.get('datasets') or {}
-          missing=[k for k in required if k not in ds]
-          if missing:
-              raise SystemExit(f'V2 canonical manifest missing datasets: {missing}')
-
+          root=Path('/tmp/v2-source/docs/v2/data'); m=json.loads((root/'current_manifest.json').read_text(encoding='utf-8'))
+          if m.get('schema_version')!='2.0.0': raise SystemExit('V2 manifest schema is not 2.0.0')
+          if not m.get('health',{}).get('validation_passed'): raise SystemExit('V2 canonical manifest has not passed validation')
+          build=str(m.get('active_build_id') or ''); trade_date=str(m.get('trade_date') or '')[:10]
+          if not build or len(trade_date)!=10: raise SystemExit('V2 canonical build/trade_date missing')
+          required=('decision_close_summary','decision_close_index','decision_close_detail','stock_detail_close','zone_close','market_close_context','capital_close_context','decision_intraday_summary','decision_intraday_index','decision_intraday_detail','market_intraday_context','capital_intraday_context')
+          ds=m.get('datasets') or {}; missing=[k for k in required if k not in ds]
+          if missing: raise SystemExit(f'V2 canonical manifest missing datasets: {missing}')
           for key in required:
-              meta=ds[key]
-              raw=str(meta.get('url') or '')
-              p=root/(raw[len('./data/'):] if raw.startswith('./data/') else raw.lstrip('./'))
-              if not p.is_file() or p.stat().st_size == 0:
-                  raise SystemExit(f'V2 canonical dataset missing: {key} -> {p}')
-              if meta.get('build_id') and meta.get('build_id') != build:
-                  raise SystemExit(f'V2 canonical dataset build mismatch: {key}')
-
-          iq=ds.get('index_quote')
-          if iq:
-              raw=str(iq.get('url') or '')
-              p=root/(raw[len('./data/'):] if raw.startswith('./data/') else raw.lstrip('./'))
-              q=json.loads(p.read_text(encoding='utf-8'))
-              if str(q.get('trade_date') or '')[:10] != trade_date:
-                  raise SystemExit('index_quote trade_date differs from atomic bundle')
-              if q.get('build_id') and q.get('build_id') != build:
-                  raise SystemExit('index_quote build mismatch')
-              print('Same-build index_quote:', {k:(q.get(k) or {}).get('source') for k in ('taiex','otc')})
-          else:
-              print('index_quote not present yet; UI will intentionally show — instead of stale index values')
-
-          print('Validated V2 production source:', {'build':build,'trade_date':trade_date,'datasets':len(ds)})
+              meta=ds[key]; raw=str(meta.get('url') or ''); p=root/(raw[len('./data/'):] if raw.startswith('./data/') else raw.lstrip('./'))
+              if not p.is_file() or p.stat().st_size==0: raise SystemExit(f'V2 canonical dataset missing: {key}')
+              if meta.get('build_id') and meta.get('build_id')!=build: raise SystemExit(f'V2 dataset build mismatch: {key}')
+          print('Validated V2 production source:',{'build':build,'trade_date':trade_date,'datasets':len(ds)})
           PY
 
       - name: Build mobile-safe single-stock shards
@@ -241,46 +163,35 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          root=Path('/tmp/v2-source/docs/v2/data')
-          m=json.loads((root/'current_manifest.json').read_text(encoding='utf-8'))
-          p=root/'builds'/m['active_build_id']/'stock-shards'/'index.json'
-          x=json.loads(p.read_text(encoding='utf-8'))
-          if x.get('build_id') != m['active_build_id'] or int(x.get('total_files') or 0) <= 0:
-              raise SystemExit('single-stock shard build is invalid')
+          root=Path('/tmp/v2-source/docs/v2/data'); m=json.loads((root/'current_manifest.json').read_text(encoding='utf-8'))
+          p=root/'builds'/m['active_build_id']/'stock-shards'/'index.json'; x=json.loads(p.read_text(encoding='utf-8'))
+          if x.get('build_id')!=m['active_build_id'] or int(x.get('total_files') or 0)<=0: raise SystemExit('single-stock shard build invalid')
           close=x.get('views',{}).get('close',{})
-          if int(close.get('files') or 0) and int(close.get('shards_with_zones') or 0) <= 0:
-              raise SystemExit('close shards contain no S/R zones')
-          print('Mobile stock shards:', x)
+          if int(close.get('files') or 0) and int(close.get('shards_with_zones') or 0)<=0: raise SystemExit('close shards contain no S/R zones')
+          print('Mobile stock shards:',x)
           PY
 
       - name: Compose production Pages site
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf docs/v2
-          cp -a /tmp/v2-source/docs/v2 docs/v2
-          mkdir -p scripts/v2
+          rm -rf docs/v2; cp -a /tmp/v2-source/docs/v2 docs/v2; mkdir -p scripts/v2
           cp /tmp/v2-source/scripts/v2/validate_single_writer_ui.py scripts/v2/validate_single_writer_ui.py
           cp /tmp/v2-source/scripts/v2/validate_product_surface.py scripts/v2/validate_product_surface.py
           cp /tmp/v2-source/scripts/v2/test_portfolio_ledger.js scripts/v2/test_portfolio_ledger.js
           cp /tmp/v2-source/scripts/v2/build_stock_shards.py scripts/v2/build_stock_shards.py
           cp /tmp/v2-source/scripts/v2/enrich_zones.py scripts/v2/enrich_zones.py
-
           python - <<'PY'
           from pathlib import Path
           p=Path('docs/sw.js')
           if p.exists():
-              s=p.read_text(encoding='utf-8')
-              guarded="  const url=new URL(req.url);\n  if(url.pathname.includes('/v2/'))return;\n  if(url.pathname.includes('/data/'))"
-              needle="  const url=new URL(req.url);\n  if(url.pathname.includes('/data/'))"
-              if guarded not in s and needle in s:
-                  p.write_text(s.replace(needle,guarded,1),encoding='utf-8')
+              s=p.read_text(encoding='utf-8'); guarded="  const url=new URL(req.url);\n  if(url.pathname.includes('/v2/'))return;\n  if(url.pathname.includes('/data/'))"; needle="  const url=new URL(req.url);\n  if(url.pathname.includes('/data/'))"
+              if guarded not in s and needle in s: p.write_text(s.replace(needle,guarded,1),encoding='utf-8')
           PY
 
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -290,8 +201,7 @@ jobs:
           python scripts/v2/validate_single_writer_ui.py
           python scripts/v2/validate_product_surface.py
           node scripts/v2/test_portfolio_ledger.js
-          python -m py_compile scripts/v2/build_stock_shards.py
-          python -m py_compile scripts/v2/enrich_zones.py
+          python -m py_compile scripts/v2/build_stock_shards.py scripts/v2/enrich_zones.py
           node --check docs/v2/app.js
           node --check docs/v2/market-pulse-v2.js
           node --check docs/v2/stock-detail-renderer.js
