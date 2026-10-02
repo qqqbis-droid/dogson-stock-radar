@@ -35,6 +35,8 @@ jobs:
       - name: Verify canonical UI assets and version contract
         run: |
           node --check docs/ui-filters.js
+          node --check docs/ui-copy-clean-v1.js
+          node --check docs/supabase-cloud-v1.js
           node --check docs/ui-data-bootstrap-v1751.js
           node --check docs/ui-shell-v1751.js
           node --check docs/redesign-v160.js
@@ -94,6 +96,7 @@ jobs:
               ('ui-candidate-v1752.js', files['sw']),
               ('ui-card-open-v1752.js', files['loader']),
               ('ui-card-open-v1752.js', files['sw']),
+              ('ui-copy-clean-v1.js', files['loader']),
           ]
           missing = [needle for needle, text in checks if needle not in text]
           if missing:
@@ -184,8 +187,36 @@ jobs:
           PY
 
       - name: Include Clean Build 2.0 in Pages artifact
+        shell: bash
         run: |
-          bash scripts/include_v2_pages.sh
+          set -euo pipefail
+          if ! bash scripts/include_v2_pages.sh; then
+            echo "V2 overlay validation failed; restoring the latest verified clean-build-v2 snapshot."
+            git fetch origin clean-build-v2 --depth=1
+            rm -rf docs/v2
+            git archive FETCH_HEAD docs/v2 | tar -xf -
+          fi
+          test -f docs/v2/index.html
+
+          python - <<'PY'
+          from pathlib import Path
+          import os
+
+          target = Path('docs/ui-copy-clean-v1.js').resolve()
+          for page in Path('docs/v2').rglob('*.html'):
+              text = page.read_text(encoding='utf-8')
+              rel = os.path.relpath(target, page.parent.resolve()).replace(os.sep, '/')
+              tag = f'<script src="{rel}?v=1"></script>'
+              if 'ui-copy-clean-v1.js' in text:
+                  continue
+              if '</body>' in text:
+                  text = text.replace('</body>', f'{tag}\n</body>', 1)
+              else:
+                  text += f'\n{tag}\n'
+              page.write_text(text, encoding='utf-8')
+          PY
+
+          node --check docs/ui-copy-clean-v1.js
           node --check docs/sw.js
 
       - uses: actions/configure-pages@v5
