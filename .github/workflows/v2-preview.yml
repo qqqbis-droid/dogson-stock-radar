@@ -42,6 +42,8 @@ jobs:
           node --check docs/v2/data-source.js
           node --check docs/v2/hourly60-addon.js
           node --check docs/v2/hourly60-screener.js
+          node --check docs/v2/close-mission-integrity.js
+          node --check docs/v2/card-open-bridge.js
           node --check docs/v2/universe-search.js
           node --check docs/v2/portfolio-store.js
           node --check docs/v2/app.js
