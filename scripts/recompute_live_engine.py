@@ -9,7 +9,7 @@ truthfully from the official snapshot layer:
 - decision price: same-day real last trade only (never bid/ask as a fake trade)
 - live VWAP: structure turnover + MIS cumulative-volume delta, using a clearly
   labelled trade/book proxy only for the *incremental turnover estimate*
-- 15-minute momentum: same-day last-trade snapshot history sampled every fast run
+- 15-minute momentum: same-day last-trade history anchored to exchange trade time
 - order-book microstructure: bid/ask midpoint and spread as validation/context
 - intraday market/sector/100-point score: rebuilt after the live fields change
 
@@ -30,7 +30,7 @@ import build_data as bd
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "docs" / "data"
 SNAP_FILE = DATA / "mis_snapshots.json"
-VERSION = "1.0"
+VERSION = "1.1"
 
 
 def _num(v):
@@ -151,20 +151,18 @@ def _append_engine_history(store, rows, trade_date):
 
 def _refresh_ret15(row, history):
     cur = _num(row.get("quote_close")) if bool(row.get("quote_has_trade")) else None
-    snap_now = _clock_minutes(
-        row.get("quote_snapshot_time") or row.get("quote_exchange_time") or row.get("quote_time")
-    )
-    if cur is None or cur <= 0 or snap_now is None:
+    trade_now = _clock_minutes(row.get("quote_time"))
+    if cur is None or cur <= 0 or trade_now is None:
         row["ret15_live_source"] = "structure_fallback_no_same_day_trade"
         return False
 
     candidates = []
     for item in history or []:
         px = _num(item.get("last_trade"))
-        tm = _clock_minutes(item.get("snapshot_time"))
+        tm = _clock_minutes(item.get("trade_time"))
         if px is None or px <= 0 or tm is None:
             continue
-        age = snap_now - tm
+        age = trade_now - tm
         if 9.0 <= age <= 24.0:
             candidates.append((abs(age - 15.0), age, px, item))
 
@@ -175,9 +173,10 @@ def _refresh_ret15(row, history):
     _, age, past, item = min(candidates, key=lambda x: x[0])
     row["structure_ret15"] = row.get("structure_ret15", row.get("ret15"))
     row["ret15"] = round((cur / past - 1.0) * 100.0, 2)
-    row["ret15_live_source"] = "MIS last-trade snapshot history"
+    row["ret15_live_source"] = "MIS last-trade history by exchange trade time"
     row["ret15_live_window_min"] = round(age, 1)
     row["ret15_reference_price"] = round(past, 4)
+    row["ret15_reference_trade_time"] = item.get("trade_time")
     row["ret15_reference_snapshot_time"] = item.get("snapshot_time")
     return True
 
