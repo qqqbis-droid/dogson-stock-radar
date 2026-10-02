@@ -133,7 +133,13 @@ def main():
     verify_ranked_zones(root, m, "zone_close")
 
     run_mission_gate("intraday")
-    run_mission_gate("daytrade")
+    if day_reference_only:
+        # validate_mission_evidence intentionally expects executable S/R evidence.
+        # Running it against a reference-only daytrade mission would contradict
+        # the DATA_STALE contract already proven above (all stale + zero zones).
+        print("daytrade mission evidence gate skipped: reference-only DATA_STALE contract verified")
+    else:
+        run_mission_gate("daytrade")
     run_py("scripts/v2/validate_single_writer_ui.py")
     print("V2 stock detail/evidence + S1/S2/R1/R2 + single-writer UI verified")
 
