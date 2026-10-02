@@ -69,6 +69,12 @@
     const cloud=document.createElement("script");
     cloud.src=`./portfolio-cloud.js?v=20261002cloud1`;
     cloud.defer=true;
+    cloud.onload=()=>{
+      const snapshots=document.createElement("script");
+      snapshots.src=`./portfolio-snapshot-v1.js?v=20261002cloud1`;
+      snapshots.defer=true;
+      document.head.appendChild(snapshots);
+    };
     document.head.appendChild(cloud);
   };
   document.head.appendChild(cloudConfig);
