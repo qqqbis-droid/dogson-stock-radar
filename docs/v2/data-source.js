@@ -29,4 +29,12 @@
   };
 
   window.__DOGSON_DATA_FALLBACK_BASE__ = RAW_DATA_BASE;
+
+  // V2 keeps Stage/Lifecycle and the legacy 60-minute technical lifecycle as
+  // separate evidence layers. Load the renderer add-on after this fetch bridge
+  // is installed so it uses the same Atomic Build data path and fallback rules.
+  const h60=document.createElement("script");
+  h60.src=`./hourly60-addon.js?v=20261002h60a`;
+  h60.defer=true;
+  document.head.appendChild(h60);
 })();
