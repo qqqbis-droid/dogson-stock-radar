@@ -67,6 +67,29 @@ jobs:
           python -m py_compile scripts/v2/validate_mission_evidence.py
           python -m py_compile scripts/v2/rebuild_close_rank_views.py
           python -m py_compile scripts/v2/build_radar_stats.py
+          python -m py_compile scripts/v2/enrich_zones.py
+          python -m py_compile scripts/v2/build_stock_shards.py
+      - name: S/R 3.0 structural gate
+        run: |
+          python - <<'PY'
+          from scripts.v2.enrich_zones import fused_levels
+
+          row={
+            'close':100,'ma5':99.2,'ma10':98.7,'ma20':97.8,
+            'low':98.9,'high':102.0,
+            'dynamic_profile':{'atr14_pct':2.8},
+            'support':{'low':97.0,'high':98.1,'center':97.55,'strength':4,'basis':'成交密集區＋20MA＋前波低點','evidence_count':3},
+            'resistance':{'low':102.4,'high':103.6,'center':103.0,'strength':4,'basis':'前波高點＋大量成交區','evidence_count':2},
+          }
+          h={'ma20_60':99.0,'ma60_60':97.6,'ma240_60':94.5}
+          s=fused_levels(row,'SUPPORT',h)
+          r=fused_levels(row,'RESISTANCE',h)
+          assert s and r, (s,r)
+          assert s[0]['rank']=='S1' and r[0]['rank']=='R1'
+          assert all(x.get('confidence') is not None for x in s+r)
+          assert all(x.get('validation_condition') and x.get('invalidation_condition') for x in s+r)
+          print('S/R 3.0 synthetic:',s,r)
+          PY
       - name: Upload preview artifact
         uses: actions/upload-artifact@v4
         with:
