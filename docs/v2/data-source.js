@@ -43,7 +43,7 @@
   // candidates, so PRE_CROSS / EARLY / STABLE_CONT / ACCEL_CONT remain usable
   // as an independent full-market technical screen.
   const h60screen=document.createElement("script");
-  h60screen.src=`./hourly60-screener.js?v=20261002h60screen1`;
+  h60screen.src=`./hourly60-screener.js?v=20261002h60screen2`;
   h60screen.defer=true;
   document.head.appendChild(h60screen);
 
