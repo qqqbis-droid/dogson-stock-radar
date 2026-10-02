@@ -1,6 +1,7 @@
 const CACHE='dogson-free-v1752';
 const UI_VERSION='1752';
-const MARKET_UI_REV='1752candidate2';
+const MARKET_UI_REV='1752copy1';
+const SW_REV='1752copy1';
 
 const UI_HEAD=`
 <link id="dogson-dashboard-css" rel="stylesheet" href="./redesign-v160.css?v=${UI_VERSION}">
@@ -32,10 +33,10 @@ function transformHtml(html){
   }
   return html
     .replace('<meta name="theme-color" content="#0b0d12">','<meta name="theme-color" content="#f5f6f3">')
-    .replaceAll('./sw.js?v=1530',`./sw.js?v=${UI_VERSION}`)
+    .replaceAll('./sw.js?v=1530',`./sw.js?v=${SW_REV}`)
     .replaceAll('./realtime-config.js?v=151','./realtime-config.js?v=1751stable4')
     .replaceAll('./realtime.js?v=151',`./realtime.js?v=${UI_VERSION}`)
-    .replaceAll('dogsonSwReloaded1530',`dogsonSwReloaded${UI_VERSION}`)
+    .replaceAll('dogsonSwReloaded1530',`dogsonSwReloaded${SW_REV}`)
     .replaceAll('location.reload();','void 0;');
 }
 
@@ -43,7 +44,7 @@ function htmlResponse(html,res){const headers=new Headers(res.headers);headers.d
 async function transformResponse(res){const type=res.headers.get('content-type')||'';if(!res.ok||!type.includes('text/html'))return res;const html=transformHtml(await res.text());return htmlResponse(html,res);}
 
 const STATIC_ASSETS=[
-  './manifest.webmanifest','./hourly.js?v=1530','./realtime-config.js?v=1751stable4','./realtime.js?v=1752','./supabase-cloud-v1.js?v=1',`./ui-filters.js?v=${MARKET_UI_REV}`,
+  './manifest.webmanifest','./hourly.js?v=1530','./realtime-config.js?v=1751stable4','./realtime.js?v=1752','./supabase-cloud-v1.js?v=1','./ui-copy-clean-v1.js?v=1',`./ui-filters.js?v=${MARKET_UI_REV}`,
   './redesign-v160.css?v=1752','./redesign-v160-dark.css?v=1752','./contrast-v160.css?v=1752','./redesign-v162.css?v=1752','./redesign-v162-fix.css?v=1752','./redesign-v163.css?v=1752','./redesign-v164.css?v=1752','./redesign-v165.css?v=1752','./redesign-v166.css?v=1752','./redesign-v1679.css?v=1752','./redesign-v1685.css?v=1752','./redesign-v1686.css?v=1752','./redesign-v1690.css?v=1752',
   './ui-data-bootstrap-v1751.js?v=1751data3','./redesign-v160.js?v=1752','./ui-polish-v160.js?v=1752','./ui-layout-v162.js?v=1752','./ui-card-v164.js?v=1752','./ui-card-v166.js?v=1752','./ui-interactions-v163.js?v=1752','./ui-fold-v167.js?v=1752','./ui-entry-v1679.js?v=1752','./ui-freshness-v1688.js?v=1752','./ui-system-status-v1700.js?v=1751light1','./ui-dual-decision-v1690.js?v=1752','./ui-load-more-v1681.js?v=1752','./ui-market-v1685.js?v=1750peer1','./ui-market-ticker-v1686.js?v=1752','./ui-page-architecture-v1701.js?v=1750','./ui-accuracy-guard-v1702.js?v=1750peer2','./ui-runtime-safety-v1720.js?v=1752','./ui-filter-v1730.js?v=1752','./ui-candidate-v1752.js?v=1752candidate2','./ui-shell-v1751.js?v=1751shell2','./ui-card-open-v1752.js?v=1752card2'
 ];
