@@ -28,6 +28,9 @@
     return nativeFetch(remote, options);
   };
 
+  // INUKO is the product brand. Keep the legacy alias temporarily so older
+  // browser add-ons do not break while they are being retired.
+  window.__INUKO_DATA_FALLBACK_BASE__ = RAW_DATA_BASE;
   window.__DOGSON_DATA_FALLBACK_BASE__ = RAW_DATA_BASE;
 
   // V2 keeps Stage/Lifecycle and the legacy 60-minute technical lifecycle as
@@ -55,4 +58,18 @@
   closeIntegrity.src=`./close-mission-integrity.js?v=20261002closefix1`;
   closeIntegrity.defer=true;
   document.head.appendChild(closeIntegrity);
+
+  // Portfolio Cloud is additive: until the public Supabase URL + anon/publishable
+  // key are configured it stays dormant and the current local ledger continues
+  // to work. A service-role key must never be shipped to the browser.
+  const cloudConfig=document.createElement("script");
+  cloudConfig.src=`./cloud-config.js?v=20261002cloud1`;
+  cloudConfig.defer=true;
+  cloudConfig.onload=()=>{
+    const cloud=document.createElement("script");
+    cloud.src=`./portfolio-cloud.js?v=20261002cloud1`;
+    cloud.defer=true;
+    document.head.appendChild(cloud);
+  };
+  document.head.appendChild(cloudConfig);
 })();
