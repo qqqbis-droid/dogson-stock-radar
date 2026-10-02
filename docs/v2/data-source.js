@@ -46,4 +46,13 @@
   h60screen.src=`./hourly60-screener.js?v=20261002h60screen1`;
   h60screen.defer=true;
   document.head.appendChild(h60screen);
+
+  // Close Mission Integrity is a defensive display adapter. It never re-scores
+  // stocks: it reconstructs quick-filter counts from the actual close decision
+  // datasets when radar_stats is absent, and turns existing Zone/Engine evidence
+  // into the missing blocker/upgrade/invalidation text.
+  const closeIntegrity=document.createElement("script");
+  closeIntegrity.src=`./close-mission-integrity.js?v=20261002closefix1`;
+  closeIntegrity.defer=true;
+  document.head.appendChild(closeIntegrity);
 })();
