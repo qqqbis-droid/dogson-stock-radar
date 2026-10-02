@@ -31,10 +31,19 @@
   window.__DOGSON_DATA_FALLBACK_BASE__ = RAW_DATA_BASE;
 
   // V2 keeps Stage/Lifecycle and the legacy 60-minute technical lifecycle as
-  // separate evidence layers. The add-on can fall back to the canonical root
-  // hourly Engine so UI-only data preservation can never hide the 60K card.
+  // separate evidence layers. The detail add-on can fall back to the canonical
+  // root hourly Engine so UI-only data preservation can never hide the 60K card.
   const h60=document.createElement("script");
   h60.src=`./hourly60-addon.js?v=20261002h60b`;
   h60.defer=true;
   document.head.appendChild(h60);
+
+  // The post-close 60K screener is a separate mission mode. It reads the
+  // canonical root hourly.json directly, rather than filtering only V2 Stage
+  // candidates, so PRE_CROSS / EARLY / STABLE_CONT / ACCEL_CONT remain usable
+  // as an independent full-market technical screen.
+  const h60screen=document.createElement("script");
+  h60screen.src=`./hourly60-screener.js?v=20261002h60screen1`;
+  h60screen.defer=true;
+  document.head.appendChild(h60screen);
 })();
