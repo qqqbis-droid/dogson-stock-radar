@@ -23,8 +23,10 @@ def _save_json(name, obj):
 bd.save_json = _save_json
 
 import bridge_intraday_fast as fast  # noqa: E402
+import recompute_live_engine as live_engine  # noqa: E402
 
 fast.bd.save_json = _save_json
 
 if __name__ == "__main__":
     fast.main()
+    live_engine.main()
