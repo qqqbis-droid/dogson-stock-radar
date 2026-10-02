@@ -4,17 +4,23 @@
 
 The close mission is intentionally different from intraday/daytrade: while the
 cash market is still open, Yahoo daily bars may already expose today's partial
-bar.  A close build must never treat that partial bar as a completed session.
+bar. A close build must never treat that partial bar as a completed session.
 
 This wrapper therefore enforces the same completed-session cutoff on both MIS
-and every Yahoo daily frame before ``build_data.build_close()`` sees them.  MIS
+and every Yahoo daily frame before ``build_data.build_close()`` sees them. MIS
 is still preferred when it is current; stale MIS may be ignored, but the daily
 fallback is capped to the latest completed session as well.
+
+It also stamps chip provenance after the chip fetch finishes.  ``chip_date``
+means the source trading date; ``chip_checked_at`` means when our system most
+recently completed an actual source check.  These are deliberately separate.
 """
 
 from __future__ import annotations
 
 from datetime import date
+import json
+from pathlib import Path
 
 import pandas as pd
 
@@ -23,6 +29,8 @@ import build_data as bd
 
 _ORIGINAL_MIS = bd.official_mis_snapshot
 _ORIGINAL_DOWNLOAD_DAILY = bd.download_daily
+ROOT = Path(__file__).resolve().parents[1]
+DATA = ROOT / "docs" / "data"
 
 
 def _frame_latest_date(frame) -> date | None:
@@ -106,15 +114,98 @@ def guarded_mis_snapshot(uni):
     return snap
 
 
+def _chip_check_health(status: dict, rows: list[dict]) -> str:
+    """Summarise source-check health without pretending stale data is current."""
+    if not status or not status.get("updated_at"):
+        return "UNCHECKED"
+
+    diagnostics = [str(x).lower() for x in (status.get("diagnostics") or [])]
+    errors = [
+        x for x in diagnostics
+        if " failed:" in x or " parser failed" in x or "response date mismatch" in x
+    ]
+    covered = sum(float(r.get("chip_coverage_pct") or 0) > 0 for r in rows)
+    if rows and covered == 0:
+        return "ERROR"
+    if errors:
+        return "PARTIAL"
+    return "CHECKED"
+
+
+def _max_source_date(rows: list[dict], key: str):
+    vals = [str(r.get(key) or "")[:10] for r in rows]
+    vals = [x for x in vals if len(x) == 10]
+    return max(vals) if vals else None
+
+
+def stamp_chip_provenance():
+    """Attach actual source-check time to every close row and chip_status.
+
+    chip_date/foreign_date/... remain the dates of the data itself.  The check
+    timestamp is never used as a substitute for those source dates.
+    """
+    close_path = DATA / "close.json"
+    status_path = DATA / "chip_status.json"
+    if not close_path.exists():
+        return
+
+    obj = json.loads(close_path.read_text(encoding="utf-8"))
+    rows = [r for r in (obj.get("rows") or []) if isinstance(r, dict)]
+    try:
+        status = json.loads(status_path.read_text(encoding="utf-8")) if status_path.exists() else {}
+    except Exception:
+        status = {}
+
+    checked_at = status.get("last_checked_at") or status.get("updated_at")
+    health = _chip_check_health(status, rows)
+    source_dates = {
+        "chip": _max_source_date(rows, "chip_date"),
+        "foreign": _max_source_date(rows, "foreign_date"),
+        "trust": _max_source_date(rows, "trust_date"),
+        "sbl": _max_source_date(rows, "sbl_date"),
+        "margin": _max_source_date(rows, "margin_date"),
+    }
+
+    for row in rows:
+        row["chip_checked_at"] = checked_at
+        row["chip_check_health"] = health
+        row["chip_check_latest_attempt_date"] = str(checked_at or "")[:10] or None
+
+    obj["rows"] = rows
+    obj["chip_provenance"] = {
+        "last_checked_at": checked_at,
+        "check_health": health,
+        "source_dates": source_dates,
+        "semantics": {
+            "source_date": "資料本身所屬交易日",
+            "last_checked_at": "系統最後一次實際向籌碼來源完成查詢的時間",
+        },
+    }
+    close_path.write_text(json.dumps(obj, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+
+    if status_path.exists():
+        status["last_checked_at"] = checked_at
+        status["check_health"] = health
+        status["latest_source_dates"] = source_dates
+        status["date_semantics"] = {
+            "source_date": "資料本身所屬交易日",
+            "last_checked_at": "系統最後一次實際向籌碼來源完成查詢的時間",
+        }
+        status_path.write_text(json.dumps(status, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+
+    print("chip provenance:", "checked_at=", checked_at, "health=", health, "source_dates=", source_dates)
+
+
 def main():
     # Patch the daily source first so every downstream fallback, including
     # index_state and the all-stock close build, is bound to completed sessions.
     bd.download_daily = completed_daily
     bd.official_mis_snapshot = guarded_mis_snapshot
     bd.build_close()
+    stamp_chip_provenance()
 
 
 if __name__ == "__main__":
     main()
 
-# refresh-marker: 2026-10-01-rerun-after-pages-concurrency-repair
+# refresh-marker: 2026-10-02-chip-source-date-vs-check-time
