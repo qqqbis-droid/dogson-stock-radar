@@ -16,10 +16,6 @@ permissions:
   pages: write
   id-token: write
 
-# Production composition no longer depends on short-lived Pages artifacts.
-# main supplies the stable root site shell; clean-build-v2 supplies a validated,
-# atomic V2 UI + data bundle. Before publishing, preserve any newer production
-# root/V2 market data so an UI-only release can never roll live data backward.
 concurrency:
   group: dogson-pages
   cancel-in-progress: false
@@ -77,10 +73,11 @@ jobs:
           git fetch origin clean-build-v2 --depth=1
           rm -rf /tmp/v2-source
           mkdir -p /tmp/v2-source
-          git archive FETCH_HEAD docs/v2 scripts/v2/validate_single_writer_ui.py scripts/v2/validate_product_surface.py scripts/v2/test_portfolio_ledger.js scripts/v2/build_stock_shards.py | tar -xf - -C /tmp/v2-source
+          git archive FETCH_HEAD docs/v2 scripts/v2/validate_single_writer_ui.py scripts/v2/validate_product_surface.py scripts/v2/test_portfolio_ledger.js scripts/v2/build_stock_shards.py scripts/v2/enrich_zones.py | tar -xf - -C /tmp/v2-source
           test -s /tmp/v2-source/docs/v2/index.html
           test -s /tmp/v2-source/docs/v2/data/current_manifest.json
           test -s /tmp/v2-source/scripts/v2/build_stock_shards.py
+          test -s /tmp/v2-source/scripts/v2/enrich_zones.py
 
       - name: Preserve newer published V2 market bundle
         shell: bash
@@ -159,6 +156,28 @@ jobs:
           cp -a /tmp/live-v2/data /tmp/v2-source/docs/v2/data
           echo 'Preserved newer production V2 market bundle for this UI-only deploy'
 
+      - name: Rebuild S/R 3.0 from newest root evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python /tmp/v2-source/scripts/v2/enrich_zones.py \
+            --legacy-root docs/data \
+            --output /tmp/v2-source/docs/v2/data
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('/tmp/v2-source/docs/v2/data')
+          m=json.loads((root/'current_manifest.json').read_text(encoding='utf-8'))
+          meta=(m.get('datasets') or {}).get('zone_close') or {}
+          raw=str(meta.get('url') or '')
+          p=root/(raw[len('./data/'):] if raw.startswith('./data/') else raw.lstrip('./'))
+          zones=json.loads(p.read_text(encoding='utf-8'))
+          usable=[z for z in zones if z.get('code') and z.get('rank') in {'S1','S2','R1','R2'}]
+          print('S/R 3.0 close zones:',len(usable),'/',len(zones))
+          if not usable:
+              raise SystemExit('S/R enrichment produced no stock-mapped close zones')
+          PY
+
       - name: Verify canonical V2 Atomic bundle
         shell: bash
         run: |
@@ -228,6 +247,9 @@ jobs:
           x=json.loads(p.read_text(encoding='utf-8'))
           if x.get('build_id') != m['active_build_id'] or int(x.get('total_files') or 0) <= 0:
               raise SystemExit('single-stock shard build is invalid')
+          close=x.get('views',{}).get('close',{})
+          if int(close.get('files') or 0) and int(close.get('shards_with_zones') or 0) <= 0:
+              raise SystemExit('close shards contain no S/R zones')
           print('Mobile stock shards:', x)
           PY
 
@@ -242,8 +264,8 @@ jobs:
           cp /tmp/v2-source/scripts/v2/validate_product_surface.py scripts/v2/validate_product_surface.py
           cp /tmp/v2-source/scripts/v2/test_portfolio_ledger.js scripts/v2/test_portfolio_ledger.js
           cp /tmp/v2-source/scripts/v2/build_stock_shards.py scripts/v2/build_stock_shards.py
+          cp /tmp/v2-source/scripts/v2/enrich_zones.py scripts/v2/enrich_zones.py
 
-          # Legacy service worker must never intercept V2/data requests.
           python - <<'PY'
           from pathlib import Path
           p=Path('docs/sw.js')
@@ -269,10 +291,12 @@ jobs:
           python scripts/v2/validate_product_surface.py
           node scripts/v2/test_portfolio_ledger.js
           python -m py_compile scripts/v2/build_stock_shards.py
+          python -m py_compile scripts/v2/enrich_zones.py
           node --check docs/v2/app.js
           node --check docs/v2/market-pulse-v2.js
           node --check docs/v2/stock-detail-renderer.js
           node --check docs/v2/detail-loading-guard-v1.js
+          node --check docs/v2/detail-loading-guard-v2.js
           node --check docs/v2/price-map-v2-lite.js
           node --check docs/sw.js
 
