@@ -21,6 +21,8 @@ html.dogson-booting .wrap,html.dogson-booting .footer{opacity:0!important;pointe
 html.dogson-booting body::before{content:'🐶 犬子老師・飆股雷達';position:fixed;z-index:99998;left:0;right:0;top:42%;transform:translateY(-50%);text-align:center;color:#234d40;font:900 20px/1.4 -apple-system,BlinkMacSystemFont,'PingFang TC',sans-serif;letter-spacing:.02em}
 html.dogson-booting body::after{content:'正在載入介面與資料…';position:fixed;z-index:99999;left:0;right:0;top:calc(42% + 42px);text-align:center;color:#718078;font:700 13px/1.4 -apple-system,BlinkMacSystemFont,'PingFang TC',sans-serif}
 </style>
+<script id="inuko-supabase-sdk" src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2" defer></script>
+<script id="inuko-cloud-sync" src="./supabase-cloud-v1.js?v=1" defer></script>
 <script id="dogson-decision-filters" src="./ui-filters.js?v=${MARKET_UI_REV}" defer></script>`;
 
 function transformHtml(html){
@@ -41,7 +43,7 @@ function htmlResponse(html,res){const headers=new Headers(res.headers);headers.d
 async function transformResponse(res){const type=res.headers.get('content-type')||'';if(!res.ok||!type.includes('text/html'))return res;const html=transformHtml(await res.text());return htmlResponse(html,res);}
 
 const STATIC_ASSETS=[
-  './manifest.webmanifest','./hourly.js?v=1530','./realtime-config.js?v=1751stable4','./realtime.js?v=1752',`./ui-filters.js?v=${MARKET_UI_REV}`,
+  './manifest.webmanifest','./hourly.js?v=1530','./realtime-config.js?v=1751stable4','./realtime.js?v=1752','./supabase-cloud-v1.js?v=1',`./ui-filters.js?v=${MARKET_UI_REV}`,
   './redesign-v160.css?v=1752','./redesign-v160-dark.css?v=1752','./contrast-v160.css?v=1752','./redesign-v162.css?v=1752','./redesign-v162-fix.css?v=1752','./redesign-v163.css?v=1752','./redesign-v164.css?v=1752','./redesign-v165.css?v=1752','./redesign-v166.css?v=1752','./redesign-v1679.css?v=1752','./redesign-v1685.css?v=1752','./redesign-v1686.css?v=1752','./redesign-v1690.css?v=1752',
   './ui-data-bootstrap-v1751.js?v=1751data3','./redesign-v160.js?v=1752','./ui-polish-v160.js?v=1752','./ui-layout-v162.js?v=1752','./ui-card-v164.js?v=1752','./ui-card-v166.js?v=1752','./ui-interactions-v163.js?v=1752','./ui-fold-v167.js?v=1752','./ui-entry-v1679.js?v=1752','./ui-freshness-v1688.js?v=1752','./ui-system-status-v1700.js?v=1751light1','./ui-dual-decision-v1690.js?v=1752','./ui-load-more-v1681.js?v=1752','./ui-market-v1685.js?v=1750peer1','./ui-market-ticker-v1686.js?v=1752','./ui-page-architecture-v1701.js?v=1750','./ui-accuracy-guard-v1702.js?v=1750peer2','./ui-runtime-safety-v1720.js?v=1752','./ui-filter-v1730.js?v=1752','./ui-candidate-v1752.js?v=1752candidate2','./ui-shell-v1751.js?v=1751shell2','./ui-card-open-v1752.js?v=1752card2'
 ];
