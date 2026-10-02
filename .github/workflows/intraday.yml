@@ -10,6 +10,7 @@ on:
       - "scripts/bridge_intraday_fast.py"
       - "scripts/run_bridge_intraday_fast.py"
       - "scripts/run_bridge_intraday_deep_fastmis.py"
+      - "scripts/recompute_live_engine.py"
       - "scripts/normalize_intraday_clock.py"
       - "scripts/enrich_sr_structure.py"
       - "scripts/validate_intraday_fast_publish.py"
