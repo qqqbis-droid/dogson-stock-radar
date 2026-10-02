@@ -6,6 +6,7 @@ on:
     paths:
       - 'scripts/v2/**'
       - 'docs/v2/**'
+      - 'supabase/**'
       - 'contracts/**'
       - 'requirements-contract.txt'
       - '.github/workflows/v2-preview.yml'
@@ -13,6 +14,7 @@ on:
     paths:
       - 'scripts/v2/**'
       - 'docs/v2/**'
+      - 'supabase/**'
       - 'contracts/**'
 
 jobs:
@@ -40,6 +42,8 @@ jobs:
       - name: Syntax and single-writer UI gate
         run: |
           node --check docs/v2/data-source.js
+          node --check docs/v2/cloud-config.js
+          node --check docs/v2/portfolio-cloud.js
           node --check docs/v2/hourly60-addon.js
           node --check docs/v2/hourly60-screener.js
           node --check docs/v2/close-mission-integrity.js
@@ -63,12 +67,31 @@ jobs:
           grep -q "data-h60-preset=\"unheated\"" docs/v2/hourly60-screener.js
           grep -q "function isUnheatedStart" docs/v2/hourly60-screener.js
           grep -q "hourly60-screener.js?v=20261002h60screen2" docs/v2/data-source.js
+          grep -q "portfolio-cloud.js?v=20261002cloud1" docs/v2/data-source.js
+          grep -q "INUKO_CLOUD_CONFIG" docs/v2/cloud-config.js
+          grep -q "inuko_ensure_default_accounts" docs/v2/portfolio-cloud.js
           python scripts/v2/validate_single_writer_ui.py
           python -m py_compile scripts/v2/validate_mission_evidence.py
           python -m py_compile scripts/v2/rebuild_close_rank_views.py
           python -m py_compile scripts/v2/build_radar_stats.py
           python -m py_compile scripts/v2/enrich_zones.py
           python -m py_compile scripts/v2/build_stock_shards.py
+      - name: Portfolio Cloud security gate
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          cfg=Path('docs/v2/cloud-config.js').read_text(encoding='utf-8')
+          js=Path('docs/v2/portfolio-cloud.js').read_text(encoding='utf-8')
+          sql=Path('supabase/migrations/20261002_0001_inuko_portfolio_cloud.sql').read_text(encoding='utf-8')
+          assert 'service_role:' not in cfg.lower()
+          assert 'service_role=' not in cfg.lower()
+          assert 'enable row level security' in sql.lower()
+          for table in ('inuko_brokerage_accounts','inuko_portfolio_ledgers','inuko_fee_profiles','inuko_portfolio_snapshots'):
+              assert table in sql
+          assert 'auth.uid() = user_id' in sql
+          assert 'persistSession:true' in js
+          print('INUKO Portfolio Cloud browser/RLS gate OK')
+          PY
       - name: S/R 3.0 structural gate
         run: |
           python - <<'PY'
