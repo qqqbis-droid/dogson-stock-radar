@@ -156,6 +156,47 @@ def make_zone(value, side, decision, ordinal):
     }
 
 
+def reference_only_marker(decision):
+    """Schema-valid, non-executable marker for a fully frozen daytrade mission.
+
+    Older Pages gates require zone_daytrade to be non-empty.  Emitting a real
+    support/resistance level after the market is closed would be unsafe, so use
+    one EXPIRED/BROKEN zero-strength marker that is never referenced by a stock
+    decision.  Stock shards therefore receive no daytrade zones.
+    """
+    return {
+        "schema_version": "2.0.0",
+        "build_id": decision["build_id"],
+        "dataset": "zone",
+        "trade_date": decision.get("trade_date"),
+        "session_phase": decision.get("session_phase"),
+        "as_of": decision.get("as_of"),
+        "known_at": decision.get("known_at"),
+        "generated_at": decision.get("generated_at"),
+        "freshness": decision.get("freshness"),
+        "complete": True,
+        "source_status": deepcopy(decision.get("source_status") or {"sources": [], "fallback": False}),
+        "zone_id": f"{decision['build_id']}:DAYTRADE:REFERENCE_ONLY",
+        "side": "SUPPORT",
+        "rank": "S1",
+        "label": "市場已收盤・當沖結構停用",
+        "low": 0.0,
+        "high": 0.0,
+        "center": 0.0,
+        "distance_pct": None,
+        "strength": 0.0,
+        "confidence": 0.0,
+        "evidence": ["REFERENCE_ONLY", "DATA_STALE", "NON_EXECUTABLE"],
+        "evidence_count": 3,
+        "structure_state": "BROKEN",
+        "validation_condition": None,
+        "invalidation_condition": "市場非 LIVE；此記錄只是停用標記，不是可執行支撐／壓力",
+        "created_at": decision.get("generated_at"),
+        "last_tested_at": None,
+        "role_state": "EXPIRED",
+    }
+
+
 def source_map(payload):
     return {str(r.get("code")): r for r in rows_of(payload) if isinstance(r, dict) and r.get("code")}
 
@@ -176,7 +217,8 @@ def enrich_context(*, legacy_root, output_root, manifest, context, source_file):
 
     zones = []
     zone_by_id = {}
-    for code, decision in (detail.get("items") or {}).items():
+    decisions = detail.get("items") or {}
+    for code, decision in decisions.items():
         row = raw.get(str(code), {})
         live_unverified = context in {"intraday", "daytrade"} and (decision.get("action_state") == "DATA_STALE" or "DATA_QUALITY_RISK" in (decision.get("risk_overlays") or []))
         if live_unverified:
@@ -200,8 +242,17 @@ def enrich_context(*, legacy_root, output_root, manifest, context, source_file):
                 zone_by_id[zone["zone_id"]] = zone
                 zones.append(zone)
 
+    # All daytrade decisions are deliberately DATA_STALE after market close.
+    # Keep their stock-level zone references empty.  A single schema-valid
+    # expired marker satisfies older bundle-level non-empty checks without ever
+    # surfacing as a stock support/resistance signal.
+    if context == "daytrade" and not zones and decisions:
+        decision_values = [x for x in decisions.values() if isinstance(x, dict)]
+        if decision_values and all(str(x.get("action_state") or "") == "DATA_STALE" for x in decision_values):
+            zones.append(reference_only_marker(decision_values[0]))
+
     summary_by_code = {str(x.get("code")): x for x in summary if isinstance(x, dict)}
-    for code, full in (detail.get("items") or {}).items():
+    for code, full in decisions.items():
         short = summary_by_code.get(str(code))
         if short is not None:
             short["support_zone_ids"] = list(full.get("support_zone_ids") or [])
