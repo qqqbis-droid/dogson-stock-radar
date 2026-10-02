@@ -83,6 +83,19 @@ def code_of_zone(zone: dict[str, Any]) -> str:
     return ""
 
 
+def context_of_zone(zone: dict[str, Any]) -> str:
+    for key in ("decision_context_id", "context_id"):
+        value = zone.get(key)
+        if value:
+            return str(value)
+    zone_id = str(zone.get("zone_id") or "")
+    if ":SUPPORT:" in zone_id:
+        return zone_id.split(":SUPPORT:", 1)[0]
+    if ":RESISTANCE:" in zone_id:
+        return zone_id.split(":RESISTANCE:", 1)[0]
+    return ""
+
+
 def selected_zones(
     decision: dict[str, Any],
     code: str,
@@ -97,26 +110,46 @@ def selected_zones(
 
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for zone_id in wanted:
-        zone = by_id.get(zone_id)
-        if zone is None:
-            continue
-        dedupe = str(zone.get("zone_id") or zone_id)
+
+    def add(zone: dict[str, Any], fallback: str = "") -> None:
+        dedupe = str(zone.get("zone_id") or fallback or id(zone))
         if dedupe not in seen:
             seen.add(dedupe)
             out.append(zone)
 
-    # Defensive fallback for legacy zone bundles whose decision references are
-    # missing/incomplete. Still only include this stock's rows.
-    if len(out) < len(set(wanted)):
+    # Primary path: explicit decision -> zone ids.
+    for zone_id in wanted:
+        zone = by_id.get(zone_id)
+        if zone is not None:
+            add(zone, zone_id)
+
+    # Defensive path 1: context id. Older/preserved Atomic bundles can retain the
+    # zones while losing the copied support_zone_ids/resistance_zone_ids fields.
+    context_ids = {
+        str(x)
+        for x in (decision.get("decision_context_id"), decision.get("context_id"))
+        if x
+    }
+    if not out or len(out) < len(set(wanted)):
         for zone in zones:
-            if code_of_zone(zone) != code:
-                continue
-            dedupe = str(zone.get("zone_id") or id(zone))
-            if dedupe not in seen:
-                seen.add(dedupe)
-                out.append(zone)
-    return out
+            if context_ids and context_of_zone(zone) in context_ids:
+                add(zone)
+
+    # Defensive path 2: stock code. Zone 3.0 stores code explicitly so a
+    # UI-only bundle-preservation step can never turn a valid price map blank.
+    if not out or len(out) < len(set(wanted)):
+        for zone in zones:
+            if code_of_zone(zone) == code:
+                add(zone)
+
+    # Never mix another stock's zones into this shard.
+    filtered = []
+    for zone in out:
+        zcode = code_of_zone(zone)
+        if zcode and zcode != code:
+            continue
+        filtered.append(zone)
+    return filtered
 
 
 def main() -> None:
@@ -139,7 +172,6 @@ def main() -> None:
     shard_root = build_dir / "stock-shards"
     if shard_root.exists():
         import shutil
-
         shutil.rmtree(shard_root)
     shard_root.mkdir(parents=True, exist_ok=True)
 
@@ -150,7 +182,6 @@ def main() -> None:
     for view, (detail_key, zone_key, evidence_key) in VIEW_CONFIG.items():
         metas = [datasets.get(detail_key), datasets.get(zone_key), datasets.get(evidence_key)]
         if any(not isinstance(meta, dict) for meta in metas):
-            # Daytrade can legitimately be absent in some close-only builds.
             if view == "daytrade":
                 stats["views"][view] = {"files": 0, "bytes": 0, "skipped": True}
                 continue
@@ -169,31 +200,31 @@ def main() -> None:
         decisions = keyed_items(detail_obj)
         evidence = keyed_items(evidence_obj)
         zones = zone_items(zone_obj)
-        by_id = {
-            str(z.get("zone_id")): z
-            for z in zones
-            if z.get("zone_id") is not None
-        }
+        by_id = {str(z.get("zone_id")): z for z in zones if z.get("zone_id") is not None}
 
         view_dir = shard_root / view
         view_dir.mkdir(parents=True, exist_ok=True)
         view_files = 0
         view_bytes = 0
+        shards_with_zones = 0
 
         for code, decision in decisions.items():
             if not isinstance(decision, dict):
                 continue
             if decision.get("build_id") not in (None, build_id):
                 raise SystemExit(f"decision build mismatch: {view} {code}")
+            picked = selected_zones(decision, code, zones, by_id)
+            if picked:
+                shards_with_zones += 1
             payload = {
-                "schema_version": "1.0.0",
+                "schema_version": "1.1.0",
                 "build_id": build_id,
                 "view": view,
                 "code": code,
                 "as_of": decision.get("as_of") or detail_meta.get("as_of"),
                 "known_at": decision.get("known_at") or detail_meta.get("known_at"),
                 "decision": decision,
-                "zones": selected_zones(decision, code, zones, by_id),
+                "zones": picked,
                 "evidence": evidence.get(code),
             }
             encoded = (json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
@@ -204,7 +235,14 @@ def main() -> None:
             view_files += 1
             view_bytes += len(encoded)
 
-        stats["views"][view] = {"files": view_files, "bytes": view_bytes, "skipped": False}
+        stats["views"][view] = {
+            "files": view_files,
+            "bytes": view_bytes,
+            "skipped": False,
+            "shards_with_zones": shards_with_zones,
+        }
+        if view == "close" and view_files and not shards_with_zones:
+            raise SystemExit("close shards lost every support/resistance zone")
         total_files += view_files
         total_bytes += view_bytes
 
