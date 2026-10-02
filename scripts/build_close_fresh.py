@@ -11,9 +11,9 @@ and every Yahoo daily frame before ``build_data.build_close()`` sees them. MIS
 is still preferred when it is current; stale MIS may be ignored, but the daily
 fallback is capped to the latest completed session as well.
 
-It also stamps chip provenance after the chip fetch finishes.  ``chip_date``
+It also stamps chip provenance after the chip fetch finishes. ``chip_date``
 means the source trading date; ``chip_checked_at`` means when our system most
-recently completed an actual source check.  These are deliberately separate.
+recently completed an actual source check. These are deliberately separate.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ from pathlib import Path
 import pandas as pd
 
 import build_data as bd
+import sync_chip_provenance
 
 
 _ORIGINAL_MIS = bd.official_mis_snapshot
@@ -141,7 +142,7 @@ def _max_source_date(rows: list[dict], key: str):
 def stamp_chip_provenance():
     """Attach actual source-check time to every close row and chip_status.
 
-    chip_date/foreign_date/... remain the dates of the data itself.  The check
+    chip_date/foreign_date/... remain the dates of the data itself. The check
     timestamp is never used as a substitute for those source dates.
     """
     close_path = DATA / "close.json"
@@ -203,6 +204,9 @@ def main():
     bd.official_mis_snapshot = guarded_mis_snapshot
     bd.build_close()
     stamp_chip_provenance()
+    # Live missions are allowed to reuse the latest completed chip background,
+    # but they inherit only the real source/check clocks, never a newer fake one.
+    sync_chip_provenance.main()
 
 
 if __name__ == "__main__":
