@@ -15,6 +15,11 @@ git archive FETCH_HEAD docs/v2 scripts/v2 contracts requirements-contract.txt | 
 
 python -m pip install --disable-pip-version-check -r requirements-contract.txt
 
+# Intraday/daytrade reuse the latest completed EOD chip background. Copy only
+# provenance/source dates from close so the UI can distinguish source date from
+# the last actual source check; never invent a newer chip clock.
+python scripts/sync_chip_provenance.py
+
 rm -rf /tmp/dogson-pages-v2-fast
 python -m scripts.v2.shadow_cycle \
   --legacy-root docs/data \
@@ -36,6 +41,7 @@ node --check docs/v2/app.js
 node --check docs/v2/market-capital-renderer.js
 node --check docs/v2/stock-detail-renderer.js
 node --check docs/v2/radar-transparency-v7.js
+node --check docs/v2/chip-freshness-provenance.js
 python scripts/v2/validate_single_writer_ui.py
 python -m py_compile scripts/v2/enrich_stock_detail_context.py
 python -m py_compile scripts/v2/restore_market_capital_context.py
