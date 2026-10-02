@@ -4,6 +4,8 @@
 
 The production gate also proves Support/Resistance 2.0 is real data, not merely
 UI capability: active zone datasets must contain genuine S2 and R2 records.
+Reference-only daytrade decisions are intentionally allowed to publish without
+zones, matching enrich_zones.py's DATA_STALE safety policy.
 """
 import json
 import subprocess
@@ -46,12 +48,28 @@ def verify_ranked_zones(root, manifest, key):
     print(key, "zone ranks", dict(ranks))
     # We deliberately do not require every stock to have S2/R2; a second level
     # is omitted when the engine cannot find an independent trustworthy cluster.
-    # But a production dataset with zero second levels means enrichment regressed.
+    # But an active production dataset with zero second levels means enrichment regressed.
     if ranks.get("S1", 0) == 0 or ranks.get("R1", 0) == 0:
         raise SystemExit(f"{key} missing primary S1/R1 zones: {dict(ranks)}")
     if ranks.get("S2", 0) < 10 or ranks.get("R2", 0) < 10:
         raise SystemExit(f"{key} S/R 2.0 regression; too few genuine S2/R2 zones: {dict(ranks)}")
     return ranks
+
+
+def decision_rows(root, manifest, key):
+    p = resolve(root, manifest["datasets"][key]["url"])
+    payload = load(p)
+    if isinstance(payload, list):
+        return [x for x in payload if isinstance(x, dict)]
+    if isinstance(payload, dict):
+        items = payload.get("items")
+        if isinstance(items, dict):
+            return [x for x in items.values() if isinstance(x, dict)]
+        for name in ("rows", "data", "stocks", "results"):
+            rows = payload.get(name)
+            if isinstance(rows, list):
+                return [x for x in rows if isinstance(x, dict)]
+    return []
 
 
 def main():
@@ -94,9 +112,24 @@ def main():
             raise SystemExit(f"{key} missing from active build: {p}")
 
     verify_ranked_zones(root, m, "zone_intraday")
-    verify_ranked_zones(root, m, "zone_daytrade")
+
+    # enrich_zones.py intentionally strips zones from DATA_STALE daytrade rows so
+    # post-close/reference-only data cannot look executable. Mirror that safety
+    # contract here instead of demanding fabricated S/R zones after market close.
+    day_decisions = decision_rows(root, m, "decision_daytrade_detail")
+    day_reference_only = bool(day_decisions) and all(
+        str(x.get("action_state") or "") == "DATA_STALE" for x in day_decisions
+    )
+    if day_reference_only:
+        day_zones = load(resolve(root, m["datasets"]["zone_daytrade"]["url"]))
+        if day_zones:
+            raise SystemExit("reference-only daytrade must not publish executable zones")
+        print("zone_daytrade skipped: all daytrade decisions are DATA_STALE/reference-only")
+    else:
+        verify_ranked_zones(root, m, "zone_daytrade")
+
     # Close is also checked here because the same deployment publishes the
-    # cross-mission detail panel.  It must not silently fall back to legacy-only.
+    # cross-mission detail panel. It must not silently fall back to legacy-only.
     verify_ranked_zones(root, m, "zone_close")
 
     run_mission_gate("intraday")
