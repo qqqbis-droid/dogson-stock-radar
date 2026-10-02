@@ -113,8 +113,15 @@
       @media(max-width:520px){.uf-card{padding:7px 6px}.uf-card strong{font-size:.75rem}.uf-ds{grid-template-columns:minmax(0,1fr) auto}.uf-ds b{grid-column:2}}
     `;document.head.appendChild(s);
   }
+  function loadChipProvenance(){
+    if(document.querySelector('script[data-chip-provenance]'))return;
+    const s=document.createElement('script');
+    s.src='./chip-freshness-provenance.js?v=20261002a';
+    s.dataset.chipProvenance='1';
+    document.head.appendChild(s);
+  }
   function boot(){
-    style();ensurePanel();load();
+    style();ensurePanel();loadChipProvenance();load();
     document.getElementById('tabs')?.addEventListener('click',()=>setTimeout(()=>{render();normalizeScoreExplain()},0));
     document.getElementById('detailBody')&&new MutationObserver(normalizeScoreExplain).observe(document.getElementById('detailBody'),{childList:true,subtree:true});
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
