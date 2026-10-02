@@ -9,7 +9,7 @@
   const POS={GREEN:'🟢 位置舒服',YELLOW:'🟡 等回踩／確認',ORANGE:'🟠 偏延伸不追',RED:'🔴 過熱／失效'};
   const DIR={UP:'↗',FLAT:'→',DOWN:'↘'};
   const storeKey='dogson-v2-close-mode';
-  const state={mode:'v2',payload:null,category:'',position:'',sector:'',search:'',sort:'combined'};
+  const state={mode:'v2',payload:null,category:'',preset:'',position:'',sector:'',search:'',sort:'combined'};
   let mounted=false,loading=false;
 
   const $=s=>document.querySelector(s);
@@ -24,6 +24,20 @@
     return source.filter(r=>r&&CAT[r.category60]&&r.data_status!=='UNAVAILABLE');
   };
 
+  // 犬子版「未過熱啟動」：只使用目前 Engine 已有且可驗證的欄位。
+  // 不以缺失的 MFI / EMA9 假造結果；等正式資料源加入後再升級條件。
+  function isUnheatedStart(r){
+    const lifecycle=r.category60==='PRE_CROSS'||r.category60==='EARLY';
+    const position=r.entry_light==='GREEN'||r.entry_light==='YELLOW';
+    const dist=n(r.daily_dist20),rsi=n(r.daily_rsi),vol=n(r.vol_ratio60day),p20=n(r.price_vs20_60_pct);
+    const dailyPosition=dist!=null&&dist>=0&&dist<=7;
+    const neutralRsi=rsi!=null&&rsi>=40&&rsi<=65;
+    const healthyVolume=vol!=null&&vol>=1.0&&vol<=1.8;
+    const sixtyPosition=p20!=null&&p20>=-1.5&&p20<=5;
+    const slope=r.dir20==='UP'&&(r.dir60==='UP'||r.dir60==='FLAT');
+    return Boolean(r.is_candidate&&lifecycle&&position&&dailyPosition&&neutralRsi&&healthyVolume&&sixtyPosition&&slope);
+  }
+
   function style(){
     if($('#hourly60ScreenerStyle'))return;
     const s=document.createElement('style');
@@ -35,9 +49,11 @@
       #h60Screener{display:none}
       #radarPanel.h60-screen-active #radarSummary,#radarPanel.h60-screen-active .toolbar,#radarPanel.h60-screen-active #cards,#radarPanel.h60-screen-active #loadMore{display:none!important}
       .h60-screen-head{margin-bottom:10px}.h60-screen-meta{font-size:.68rem;color:var(--muted);line-height:1.45;margin:5px 2px 10px}
-      .h60-cat-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-bottom:8px}
+      .h60-cat-row{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin-bottom:8px}
       .h60-cat-row button{border:1px solid var(--line);border-radius:10px;background:var(--card);padding:8px 5px;color:var(--text);font-size:.68rem;font-weight:800;line-height:1.25}
       .h60-cat-row button.active{outline:2px solid rgba(47,104,82,.28);background:var(--soft)}
+      .h60-cat-row button.unheated{background:color-mix(in srgb,#f4b942 12%,var(--card));border-color:color-mix(in srgb,#f4b942 38%,var(--line))}
+      .h60-cat-row button.unheated.active{background:color-mix(in srgb,#f4b942 22%,var(--card));outline-color:rgba(190,128,28,.34)}
       .h60-cat-row strong{display:block;font-size:.84rem;margin-top:2px}
       .h60-tools{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:7px;margin-bottom:10px}
       .h60-tools input,.h60-tools select{min-width:0;width:100%;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--text);padding:9px;font-size:.72rem}
@@ -51,6 +67,8 @@
       .h60-card-price b{font-size:1.12rem}.h60-card-price span{font-size:.67rem;color:var(--muted)}
       .h60-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:9px}
       .h60-metrics div{background:var(--soft);border-radius:9px;padding:7px}.h60-metrics span{display:block;color:var(--muted);font-size:.61rem}.h60-metrics b{display:block;margin-top:2px;font-size:.76rem}
+      .h60-unheated-evidence{margin-top:8px;padding:7px 8px;border-radius:9px;background:color-mix(in srgb,#f4b942 10%,var(--soft));font-size:.63rem;color:var(--muted);line-height:1.45}
+      .h60-unheated-evidence b{color:var(--text)}
       .h60-card-foot{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:9px;font-size:.65rem;color:var(--muted)}
       .h60-empty{padding:26px 10px;text-align:center;color:var(--muted);font-size:.78rem}
       @media(max-width:620px){.h60-cat-row{grid-template-columns:repeat(2,minmax(0,1fr))}.h60-cat-row button:first-child{grid-column:span 2}.h60-tools{grid-template-columns:1fr 1fr}.h60-tools input{grid-column:span 2}.h60-metrics{grid-template-columns:1fr 1fr}}
@@ -73,8 +91,10 @@
     bar.insertAdjacentElement('afterend',sc);
     bar.addEventListener('click',e=>{const b=e.target.closest('[data-h60-mode]');if(b)setMode(b.dataset.h60Mode)});
     sc.addEventListener('click',e=>{
+      const preset=e.target.closest('[data-h60-preset]');
+      if(preset){state.preset=preset.dataset.h60Preset;state.category='';render();return}
       const cat=e.target.closest('[data-h60-cat]');
-      if(cat){state.category=cat.dataset.h60Cat;render();return}
+      if(cat){state.category=cat.dataset.h60Cat;state.preset='';render();return}
       const card=e.target.closest('.h60-screen-card[data-code]');
       if(card){document.dispatchEvent(new CustomEvent('radar:open-stock',{detail:{code:card.dataset.code,source:'hourly60-screener'}}))}
     });
@@ -113,6 +133,7 @@
 
   function filtered(){
     let out=rows().filter(r=>{
+      if(state.preset==='unheated'&&!isUnheatedStart(r))return false;
       if(state.category&&r.category60!==state.category)return false;
       if(state.position&&r.entry_light!==state.position)return false;
       const sec=String(r.sector_group||r.industry_name||'').trim();
@@ -131,7 +152,8 @@
 
   function renderCats(){
     const all=rows(),counts={};all.forEach(r=>counts[r.category60]=(counts[r.category60]||0)+1);
-    const btns=[`<button type="button" data-h60-cat="" class="${state.category?'':'active'}">全部60K<strong>${all.length}</strong></button>`];
+    const unheated=all.filter(isUnheatedStart).length;
+    const btns=[`<button type="button" data-h60-cat="" class="${state.category||state.preset?'':'active'}">全部60K<strong>${all.length}</strong></button>`,`<button type="button" data-h60-preset="unheated" class="unheated ${state.preset==='unheated'?'active':''}">✨ 未過熱啟動<strong>${unheated}</strong></button>`];
     for(const [key,v] of Object.entries(CAT))btns.push(`<button type="button" data-h60-cat="${key}" class="${state.category===key?'active':''}">${v.icon} ${v.label}<strong>${counts[key]||0}</strong></button>`);
     const host=$('#h60Cats');if(host)host.innerHTML=btns.join('');
   }
@@ -141,13 +163,18 @@
     const sec=String(r.sector_group||r.industry_name||'分類待補');
     const dirs=`20T${DIR[r.dir20]||'—'} · 60T${DIR[r.dir60]||'—'} · 240T${DIR[r.dir240]||'—'}`;
     const cross=r.category60==='PRE_CROSS'?'20T 接近 60T':n(r.cross_age)==null?'金叉根數待補':`金叉 ${fmt(r.cross_age,0)} 根`;
-    return `<article class="h60-screen-card card" data-code="${esc(r.code)}" tabindex="0" role="button" aria-label="開啟 ${esc(r.code)} ${esc(r.name)} 詳情"><div class="h60-card-top"><div><div class="h60-card-code">${esc(r.code)} · ${esc(sec)}</div><div class="h60-card-name">${esc(r.name||'')}</div></div><div class="h60-life">${life.icon} ${life.label}</div></div><div class="h60-card-price"><b>${fmt(r.price,2)}</b><span>${esc(POS[r.entry_light]||r.entry_light_label||'位置待補')}</span></div><div class="h60-metrics"><div><span>60K結構分</span><b>${fmt(r.score60,0)}</b></div><div><span>綜合分</span><b>${fmt(r.combined_score,1)}</b></div><div><span>距20T</span><b>${pct(r.price_vs20_60_pct,2)}</b></div><div><span>金叉狀態</span><b>${esc(cross)}</b></div></div><div class="h60-card-foot"><span>${esc(dirs)}</span><span>20/60差 ${pct(r.gap20_60_pct,2)}</span><span>籌碼 ${esc(String(r.chip_date||'—').slice(5).replace('-','/'))}</span></div></article>`;
+    const launch=isUnheatedStart(r)?`<div class="h60-unheated-evidence"><b>✨ 未過熱啟動</b> · RSI ${fmt(r.daily_rsi,1)} · 量比 ${fmt(r.vol_ratio60day,2)}x · 日K距20MA ${pct(r.daily_dist20,1)}</div>`:'';
+    return `<article class="h60-screen-card card" data-code="${esc(r.code)}" tabindex="0" role="button" aria-label="開啟 ${esc(r.code)} ${esc(r.name)} 詳情"><div class="h60-card-top"><div><div class="h60-card-code">${esc(r.code)} · ${esc(sec)}</div><div class="h60-card-name">${esc(r.name||'')}</div></div><div class="h60-life">${life.icon} ${life.label}</div></div><div class="h60-card-price"><b>${fmt(r.price,2)}</b><span>${esc(POS[r.entry_light]||r.entry_light_label||'位置待補')}</span></div><div class="h60-metrics"><div><span>60K結構分</span><b>${fmt(r.score60,0)}</b></div><div><span>綜合分</span><b>${fmt(r.combined_score,1)}</b></div><div><span>距20T</span><b>${pct(r.price_vs20_60_pct,2)}</b></div><div><span>金叉狀態</span><b>${esc(cross)}</b></div></div>${launch}<div class="h60-card-foot"><span>${esc(dirs)}</span><span>20/60差 ${pct(r.gap20_60_pct,2)}</span><span>籌碼 ${esc(String(r.chip_date||'—').slice(5).replace('-','/'))}</span></div></article>`;
   }
 
   function renderCards(){
     if(state.mode!=='hourly60')return;
     const list=filtered(),host=$('#h60Cards'),meta=$('#h60Meta');
-    if(meta){const d=String(state.payload?.trade_date||'—');const u=String(state.payload?.updated_at||'');meta.textContent=`60分K Engine 資料日 ${d}${u?` · 更新 ${u.replace('T',' ').slice(0,16)}`:''} · 目前 ${list.length} 檔。這是獨立60K技術篩選，不等同 V2 Stage。`}
+    if(meta){
+      const d=String(state.payload?.trade_date||'—'),u=String(state.payload?.updated_at||'');
+      const presetText=state.preset==='unheated'?' · 未過熱啟動＝金叉前夕/剛啟動＋日K距20MA 0～7%＋RSI 40～65＋量比1.0～1.8＋位置不過熱。':'';
+      meta.textContent=`60分K Engine 資料日 ${d}${u?` · 更新 ${u.replace('T',' ').slice(0,16)}`:''} · 目前 ${list.length} 檔。這是獨立60K技術篩選，不等同 V2 Stage。${presetText}`;
+    }
     if($('#countText'))$('#countText').textContent=`60分K · ${list.length} 檔`;
     if(host)host.innerHTML=list.length?list.map(card).join(''):'<div class="h60-empty">目前沒有符合這組 60分K 條件的股票。</div>';
   }
