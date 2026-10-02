@@ -1,0 +1,52 @@
+name: Install V2 Intraday Truth Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["clean-build-v2"]
+    paths:
+      - ".github/workflows/install-v2-intraday-truth-gate.yml"
+      - "scripts/v2/patch_intraday_truth_gate.py"
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: clean-build-v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply V2 intraday truth gate
+        run: python scripts/v2/patch_intraday_truth_gate.py
+      - name: Verify V2 truth contract
+        run: |
+          python -m py_compile scripts/v2/build_legacy_bundle.py scripts/v2/enrich_zones.py scripts/v2/live_publish_patch.py
+          python - <<'PY'
+          from pathlib import Path
+          checks={
+            'scripts/v2/build_legacy_bundle.py':['def intraday_truth_reason(row, trade_date):','apply_intraday_truth_gate','verified_live_price'],
+            'scripts/v2/enrich_zones.py':['live_unverified = context in {"intraday", "daytrade"}','decision["support_zone_ids"] = []'],
+            'scripts/v2/live_publish_patch.py':['structure_date = str(row.get("structure_date") or row.get("date") or "")[:10]','if row.get("quote_price_validated") is False:'],
+          }
+          for name,needles in checks.items():
+            s=Path(name).read_text(encoding='utf-8')
+            for n in needles: assert n in s,(name,n)
+          print('V2 intraday truth gate contract OK')
+          PY
+      - name: Commit V2 truth gate
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/v2/build_legacy_bundle.py scripts/v2/enrich_zones.py scripts/v2/live_publish_patch.py
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Fail closed on unverified V2 intraday structure"
+            git push origin HEAD:clean-build-v2
+          fi
