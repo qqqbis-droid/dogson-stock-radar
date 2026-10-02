@@ -7,6 +7,7 @@ spends ~90 seconds on the legacy sequential 3-round MIS sampler.
 """
 import build_data as bd
 import bridge_intraday_fast as fast
+import recompute_live_engine as live_engine
 
 
 def fast_snapshot(_universe_df, _codes):
@@ -24,3 +25,4 @@ deep.bd.intraday_stock_snapshot = fast_snapshot
 
 if __name__ == "__main__":
     deep.main()
+    live_engine.main()
