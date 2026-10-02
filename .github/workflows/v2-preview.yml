@@ -50,11 +50,14 @@ jobs:
           node --check docs/v2/app.js
           node --check docs/v2/market-capital-renderer.js
           node --check docs/v2/stock-detail-renderer.js
+          node --check docs/v2/support-resistance-classic.js
           node --check docs/v2/portfolio-renderer.js
           node --check docs/v2/radar-transparency-v7.js
           grep -q "sector_intraday" docs/v2/sector-ranking-panel.js
           grep -q "sector_close" docs/v2/sector-ranking-panel.js
           grep -q "sectorCandidateSet" docs/v2/sector-ranking-panel.js
+          grep -q "srbox sr-classic" docs/v2/support-resistance-classic.js
+          grep -q "support-resistance-classic.js" docs/v2/index.html
           python scripts/v2/validate_single_writer_ui.py
           python -m py_compile scripts/v2/validate_mission_evidence.py
           python -m py_compile scripts/v2/rebuild_close_rank_views.py
