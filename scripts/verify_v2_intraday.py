@@ -4,8 +4,8 @@
 
 The production gate also proves Support/Resistance 2.0 is real data, not merely
 UI capability: active zone datasets must contain genuine S2 and R2 records.
-Reference-only daytrade decisions are intentionally allowed to publish without
-zones, matching enrich_zones.py's DATA_STALE safety policy.
+Reference-only daytrade decisions may publish one explicit disabled marker for
+legacy bundle compatibility, but never an executable stock zone.
 """
 import json
 import subprocess
@@ -95,7 +95,7 @@ def verify_chip_source_dates(root, manifest):
             raise SystemExit(f"{key} chip_date newer than trading date: {future[:10]} count={len(future)}")
         print(key, "chip source dates verified", len(with_chip))
 
-    # The freshness strip must use stock evidence source dates.  A manifest
+    # The freshness strip must use stock evidence source dates. A manifest
     # context timestamp is a build/knowledge time and must never masquerade as
     # the date of foreign/trust/SBL/margin data.
     ui_path = Path("docs/v2/detail-loading-guard-v2.js")
@@ -105,6 +105,25 @@ def verify_chip_source_dates(root, manifest):
     if "e?.chip_date" not in ui:
         raise SystemExit("V2 freshness strip does not consume stock evidence chip_date")
     print("V2 chip-date truth contract verified")
+
+
+def _is_disabled_reference_marker(zone):
+    if not isinstance(zone, dict):
+        return False
+    evidence = zone.get("evidence") or []
+    try:
+        strength = float(zone.get("strength") or 0)
+        confidence = float(zone.get("confidence") or 0)
+    except Exception:
+        return False
+    return (
+        zone.get("role_state") == "EXPIRED"
+        and zone.get("structure_state") == "BROKEN"
+        and "REFERENCE_ONLY" in evidence
+        and "NON_EXECUTABLE" in evidence
+        and strength == 0
+        and confidence == 0
+    )
 
 
 def main():
@@ -149,18 +168,30 @@ def main():
     verify_chip_source_dates(root, m)
     verify_ranked_zones(root, m, "zone_intraday")
 
-    # enrich_zones.py intentionally strips zones from DATA_STALE daytrade rows so
-    # post-close/reference-only data cannot look executable. Mirror that safety
-    # contract here instead of demanding fabricated S/R zones after market close.
+    # After market close every daytrade row is DATA_STALE/reference-only. Stock
+    # decisions must have no zone references. For compatibility with an older
+    # bundle-level non-empty gate, enrich_zones may publish exactly one disabled
+    # EXPIRED/BROKEN marker; it must never be executable or attached to a stock.
     day_decisions = decision_rows(root, m, "decision_daytrade_detail")
     day_reference_only = bool(day_decisions) and all(
         str(x.get("action_state") or "") == "DATA_STALE" for x in day_decisions
     )
     if day_reference_only:
         day_zones = load(resolve(root, m["datasets"]["zone_daytrade"]["url"]))
-        if day_zones:
-            raise SystemExit("reference-only daytrade must not publish executable zones")
-        print("zone_daytrade skipped: all daytrade decisions are DATA_STALE/reference-only")
+        if not isinstance(day_zones, list):
+            raise SystemExit("reference-only zone_daytrade must be a list")
+        executable = [z for z in day_zones if not _is_disabled_reference_marker(z)]
+        if executable:
+            raise SystemExit("reference-only daytrade published executable zones")
+        if len(day_zones) > 1:
+            raise SystemExit("reference-only daytrade must publish at most one disabled marker")
+        referenced = [
+            str(x.get("code") or "?") for x in day_decisions
+            if (x.get("support_zone_ids") or x.get("resistance_zone_ids"))
+        ]
+        if referenced:
+            raise SystemExit(f"reference-only daytrade decisions still reference zones: {referenced[:10]}")
+        print("zone_daytrade reference-only contract verified; executable zones=0")
     else:
         verify_ranked_zones(root, m, "zone_daytrade")
 
@@ -170,9 +201,9 @@ def main():
 
     run_mission_gate("intraday")
     if day_reference_only:
-        # validate_mission_evidence intentionally expects executable S/R evidence.
-        # Running it against a reference-only daytrade mission would contradict
-        # the DATA_STALE contract already proven above (all stale + zero zones).
+        # validate_mission_evidence expects executable S/R evidence. Running it
+        # against a frozen mission would contradict the contract proven above:
+        # all decisions stale, no stock zone references, no executable zones.
         print("daytrade mission evidence gate skipped: reference-only DATA_STALE contract verified")
     else:
         run_mission_gate("daytrade")
