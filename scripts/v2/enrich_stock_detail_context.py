@@ -74,9 +74,56 @@ DAYTRADE = (
     "daytrade_score", "daytrade_state", "daytrade_headline", "daytrade_components", "daytrade_reasons",
     "daytrade_risks", "daytrade_turnover_acceleration", "daytrade_dynamic_mode", "source_intraday_score",
 )
+HOURLY60 = (
+    "category60", "is_candidate", "data_status", "exclusion_reason", "score60", "combined_score",
+    "entry_light", "entry_light_emoji", "entry_light_label", "entry_light_reason",
+    "price", "ma20_60", "ma60_60", "ma240_60", "dir20", "dir60", "dir240",
+    "s20_5", "s60_5", "s240_5", "slope_diff", "gap20_60_pct", "cross_age",
+    "price_vs20_60_pct", "above240", "overhead240_pct", "orderly", "vol_ratio60day",
+)
 
 
-def compact(row, context):
+def hourly_map(legacy_root: Path):
+    path = legacy_root / "hourly.json"
+    if not path.exists():
+        return {}, {"available": False, "trade_date": None, "updated_at": None}
+    try:
+        payload = load(path)
+    except Exception:
+        return {}, {"available": False, "trade_date": None, "updated_at": None}
+    rows = payload.get("all_rows") if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        rows = payload.get("rows") if isinstance(payload, dict) else []
+    by_code = {
+        str(row.get("code")): row
+        for row in (rows or [])
+        if isinstance(row, dict) and row.get("code")
+    }
+    meta = {
+        "available": bool(by_code),
+        "trade_date": payload.get("trade_date") if isinstance(payload, dict) else None,
+        "updated_at": payload.get("updated_at") if isinstance(payload, dict) else None,
+        "method": payload.get("method") if isinstance(payload, dict) else None,
+        "entry_light_rule": payload.get("entry_light_rule") if isinstance(payload, dict) else None,
+    }
+    return by_code, meta
+
+
+def compact_hourly(row, meta):
+    if not isinstance(row, dict):
+        return None
+    out = {key: row.get(key) for key in HOURLY60 if key in row}
+    out["trade_date"] = meta.get("trade_date")
+    out["updated_at"] = meta.get("updated_at")
+    out["engine"] = "legacy_hourly60_lifecycle"
+    out["semantics"] = {
+        "lifecycle": "60分K生命週期分類；不取代 V2 Stage",
+        "entry_light": "位置／延伸風險；不代表買賣指令",
+    }
+    return out
+
+
+def compact(row, context, h60=None, hmeta=None):
     keys = list(COMMON)
     if context == "close":
         keys += list(CLOSE)
@@ -84,7 +131,9 @@ def compact(row, context):
         keys += list(INTRADAY)
     else:
         keys += list(INTRADAY) + list(DAYTRADE)
-    return {key: row.get(key) for key in keys if key in row}
+    out = {key: row.get(key) for key in keys if key in row}
+    out["hourly60"] = compact_hourly(h60, hmeta or {}) if h60 else None
+    return out
 
 
 def enrich(*, legacy_root: Path, root: Path):
@@ -93,6 +142,7 @@ def enrich(*, legacy_root: Path, root: Path):
     build_id = manifest["active_build_id"]
     build_dir = root / "builds" / build_id
     counts = {}
+    hmap, hmeta = hourly_map(legacy_root)
 
     for context, source_name, decision_key in (
         ("close", "close.json", "decision_close_detail"),
@@ -101,15 +151,20 @@ def enrich(*, legacy_root: Path, root: Path):
     ):
         payload = load(legacy_root / source_name)
         rows = rows_of(payload)
-        items = {str(row.get("code")): compact(row, context) for row in rows if isinstance(row, dict) and row.get("code")}
+        items = {
+            str(row.get("code")): compact(row, context, hmap.get(str(row.get("code"))), hmeta)
+            for row in rows if isinstance(row, dict) and row.get("code")
+        }
         trade_date = trade_date_of(payload, rows)
         decision_meta = (manifest.get("datasets") or {}).get(decision_key) or {}
         obj = {
-            "schema_version": "1.0.0",
+            "schema_version": "1.1.0",
             "build_id": build_id,
             "context": context.upper(),
             "trade_date": trade_date,
             "as_of": decision_meta.get("as_of"),
+            "hourly60_trade_date": hmeta.get("trade_date"),
+            "hourly60_updated_at": hmeta.get("updated_at"),
             "items": items,
         }
         filename = f"stock-detail-{context}.json"
@@ -129,8 +184,11 @@ def enrich(*, legacy_root: Path, root: Path):
     note = "個股詳情已分任務補入同 Atomic Build 的盤中／盤後／當沖證據快照；評分解釋只呈現 Engine 已算出的分項，不由前端重算。"
     if note not in warnings:
         warnings.append(note)
+    hnote = "60分K生命週期與進場位置燈號已從既有 hourly Engine 帶回 V2 個股證據；只顯示 Engine 結果，不由前端重新判定。"
+    if hnote not in warnings:
+        warnings.append(hnote)
     write(manifest_path, manifest)
-    print("stock detail evidence OK", counts)
+    print("stock detail evidence OK", counts, "hourly60", len(hmap), hmeta.get("trade_date"))
 
 
 def main():
