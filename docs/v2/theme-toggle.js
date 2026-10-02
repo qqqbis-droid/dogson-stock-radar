@@ -1,6 +1,7 @@
-const THEME_KEY='dogson.theme.v1';
+const THEME_KEY='inuko.theme.v1';
+const LEGACY_THEME_KEY='dogson.theme.v1';
 const THEMES=new Set(['light','dark']);
-function getTheme(){const saved=localStorage.getItem(THEME_KEY);return THEMES.has(saved)?saved:'light'}
+function getTheme(){const saved=localStorage.getItem(THEME_KEY)||localStorage.getItem(LEGACY_THEME_KEY);return THEMES.has(saved)?saved:'light'}
 function applyTheme(theme){
   const value=THEMES.has(theme)?theme:'light';
   document.documentElement.dataset.theme=value;
@@ -39,4 +40,15 @@ function boot(){
   }
   applyTheme(getTheme());
 }
+function loadScript(src,id){
+  return new Promise((resolve,reject)=>{if(id&&document.getElementById(id)){resolve();return}const s=document.createElement('script');if(id)s.id=id;s.src=src;s.async=false;s.onload=resolve;s.onerror=()=>reject(new Error(`load failed: ${src}`));document.head.appendChild(s)})
+}
+async function bootInukoCloud(){
+  try{
+    await loadScript('./cloud-config.js?v=20261002cloud1','inukoCloudConfigScript');
+    await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js','inukoSupabaseSdk');
+    await loadScript('./portfolio-cloud-v1.js?v=20261002cloud1','inukoPortfolioCloudScript');
+  }catch(err){console.warn('INUKO cloud bootstrap unavailable',err)}
+}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+bootInukoCloud();
