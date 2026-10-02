@@ -185,6 +185,58 @@ def adapt_close_rows(payload, build_id, market_score, generated_at):
     return out, trade_date
 
 
+
+def intraday_truth_reason(row, trade_date):
+    """Return a blocker when the live price/structure chain is not trustworthy."""
+    if row.get("quote_price_validated") is False:
+        return str(row.get("live_truth_blocker") or "即時價格與5分結構尚未同時驗證")
+    structure_date = str(row.get("structure_date") or row.get("date") or "")[:10]
+    if structure_date and structure_date != trade_date:
+        return f"5分結構日期 {structure_date} ≠ 報價日 {trade_date}"
+    px = num(row.get("close"))
+    bid = num(row.get("quote_bid1"))
+    ask = num(row.get("quote_ask1"))
+    book = (bid + ask) / 2.0 if bid is not None and ask is not None else (bid if bid is not None else ask)
+    has_trade = bool(row.get("quote_has_trade")) and num(row.get("quote_close")) is not None
+    if not has_trade and px is not None and book not in (None, 0):
+        gap = abs(px / book - 1.0) * 100.0
+        if gap > 2.0:
+            return f"結構價與即時五檔差距 {gap:.1f}%；本輪未驗證到真實成交價"
+    return None
+
+
+def apply_intraday_truth_gate(decision, row, *, mission):
+    reason = intraday_truth_reason(row, decision["trade_date"])
+    if not reason:
+        return decision
+    decision["lifecycle_stage"] = "OBSERVE"
+    decision["action_state"] = "DATA_STALE"
+    decision["actionable"] = False
+    decision["opportunity_bucket"] = "STALE" if mission == "daytrade_execution" else "RESEARCH_ONLY"
+    decision["risk_overlays"] = list(dict.fromkeys(list(decision.get("risk_overlays") or []) + ["DATA_QUALITY_RISK"]))
+    decision["blockers"] = list(dict.fromkeys([reason, "盤中分數與支撐壓力暫停，等同交易日價格／結構重新驗證"] + list(decision.get("blockers") or [])))[:3]
+    decision["why_now"] = ["即時五檔已更新，但成交價／5分結構尚未同時驗證"]
+    scores = decision.setdefault("scores", {})
+    scores["intraday_momentum_score"] = None
+    if mission == "daytrade_execution":
+        scores["daytrade_score"] = None
+    components = decision.setdefault("components", {})
+    components["intraday"] = None
+    if mission == "daytrade_execution":
+        components["daytrade"] = None
+    quote = decision.setdefault("quote", {})
+    verified_trade = num(row.get("quote_close")) if bool(row.get("quote_has_trade")) else None
+    quote["price"] = verified_trade
+    decision["data_confidence"] = min(num(decision.get("data_confidence"), 0) or 0, 40)
+    decision["component_coverage"] = min(num(decision.get("component_coverage"), 0) or 0, 40)
+    decision["complete"] = False
+    missing = list(decision.get("missing_fields") or [])
+    for field in ("verified_live_price", "fresh_5m_structure"):
+        if field not in missing:
+            missing.append(field)
+    decision["missing_fields"] = missing
+    return decision
+
 def adapt_intraday_rows(payload, build_id, market_score, generated_at):
     rows = rows_of(payload)
     trade_date = trade_date_of(payload, rows)
@@ -195,7 +247,9 @@ def adapt_intraday_rows(payload, build_id, market_score, generated_at):
         if not row.get("code"):
             continue
         d = adapt_legacy_stock(row, build_id=build_id, trade_date=trade_date, session_phase=phase, mission="intraday_swing", market_score=market_score)
-        out.append(patch_context(d, row=row, payload="intraday.json", freshness=freshness, phase=phase, known_at=known_at, generated_at=generated_at, mission="intraday_swing"))
+        d = patch_context(d, row=row, payload="intraday.json", freshness=freshness, phase=phase, known_at=known_at, generated_at=generated_at, mission="intraday_swing")
+        d = apply_intraday_truth_gate(d, row, mission="intraday_swing")
+        out.append(d)
     return out, trade_date
 
 
@@ -232,6 +286,7 @@ def adapt_daytrade_rows(payload, build_id, market_score, generated_at):
         d["blockers"] = [] if actionable else [str(row.get("daytrade_headline") or "尚未形成可執行條件")]
         d = patch_context(d, row=row, payload="daytrade.json", freshness=freshness, phase=phase, known_at=known_at, generated_at=generated_at, mission="daytrade_execution")
         d["opportunity_bucket"] = "ACTIONABLE_NOW" if actionable else ("WAIT_TRIGGER" if action == "WAIT_TRIGGER" and freshness == "LIVE" else ("STALE" if freshness != "LIVE" else "NO_TRADE"))
+        d = apply_intraday_truth_gate(d, row, mission="daytrade_execution")
         out.append(d)
     return out, trade_date
 

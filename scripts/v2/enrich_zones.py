@@ -178,6 +178,11 @@ def enrich_context(*, legacy_root, output_root, manifest, context, source_file):
     zone_by_id = {}
     for code, decision in (detail.get("items") or {}).items():
         row = raw.get(str(code), {})
+        live_unverified = context in {"intraday", "daytrade"} and (decision.get("action_state") == "DATA_STALE" or "DATA_QUALITY_RISK" in (decision.get("risk_overlays") or []))
+        if live_unverified:
+            decision["support_zone_ids"] = []
+            decision["resistance_zone_ids"] = []
+            continue
         support_zones = [
             make_zone(value, "SUPPORT", decision, i)
             for i, value in enumerate(levels_for(row, "SUPPORT"), start=1)

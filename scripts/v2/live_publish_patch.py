@@ -113,6 +113,11 @@ def fresh_structure_codes(payload, trade_date, now, max_age_minutes=20):
         qd = str(row.get("quote_date") or row.get("date") or "")[:10]
         if not code or qd != trade_date:
             continue
+        structure_date = str(row.get("structure_date") or row.get("date") or "")[:10]
+        if structure_date and structure_date != trade_date:
+            continue
+        if row.get("quote_price_validated") is False:
+            continue
         st = parse_clock(trade_date, row.get("structure_time"))
         if not st:
             continue
