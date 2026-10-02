@@ -155,13 +155,15 @@
   function freshnessHtml(shard,d,e,m){
     const quoteTime=e?.quote_snapshot_time||hm(m?.datasets?.index_quote?.as_of);
     const structureTime=hm(shard.known_at||d.known_at||m?.generated_at);
-    const chipAsOf=m?.datasets?.capital_close_context?.as_of||null;
+    const chipAsOf=e?.chip_date||e?.foreign_date||e?.trust_date||e?.sbl_date||e?.margin_date||null;
     const chipDate=md(chipAsOf);
     const baseDate=m?.trade_date||e?.quote_date||'';
-    const chipStale=chipAsOf&&baseDate&&String(chipAsOf).slice(0,10)!==String(baseDate).slice(0,10);
+    const chipSourceDate=chipAsOf?String(chipAsOf).slice(0,10):'';
+    const baseSourceDate=baseDate?String(baseDate).slice(0,10):'';
+    const chipStale=!!(chipSourceDate&&baseSourceDate&&chipSourceDate!==baseSourceDate);
     const qd=localStamp(e?.quote_date,quoteTime);
     const age=qd&&!Number.isNaN(qd.getTime())?Math.max(0,Math.floor((Date.now()-qd.getTime())/60000)):null;
-    return `<div class="isd-fresh-strip"><div class="isd-fresh-line"><span>報價 <b>${esc(quoteTime||'—')}</b></span><span>結構 <b>${esc(structureTime||'—')}</b></span><span class="${chipStale?'stale':''}">籌碼 <b>${esc(chipDate)}</b>${chipStale?' ⚠️':''}</span></div><div class="isd-fresh-age">${age==null?'更新時間待確認':age<=0?'剛剛更新':`${age} 分鐘前更新`}；三種資料各看自己的時間，不用 Build 時間代替。</div></div>`;
+    return `<div class="isd-fresh-strip"><div class="isd-fresh-line"><span>報價 <b>${esc(quoteTime||'—')}</b></span><span>結構 <b>${esc(structureTime||'—')}</b></span><span class="${chipStale?'stale':''}">籌碼 <b>${esc(chipDate)}</b>${chipStale?' ⚠️':''}</span></div><div class="isd-fresh-age">${age==null?'更新時間待確認':age<=0?'剛剛更新':`${age} 分鐘前更新`}；三種資料各看自己的來源時間，籌碼日期不再用 Build／context 時間代替。</div></div>`;
   }
 
   function qualityHtml(shard,d,m){
