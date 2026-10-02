@@ -60,6 +60,9 @@ jobs:
           grep -q "isd-zone" docs/v2/price-map-v2-lite.js
           grep -q "price-map-v2-lite.js?v=20261002inuko1" docs/v2/index.html
           ! grep -q "DOGSON PRICE MAP" docs/v2/price-map-v2-lite.js
+          grep -q "data-h60-preset=\"unheated\"" docs/v2/hourly60-screener.js
+          grep -q "function isUnheatedStart" docs/v2/hourly60-screener.js
+          grep -q "hourly60-screener.js?v=20261002h60screen2" docs/v2/data-source.js
           python scripts/v2/validate_single_writer_ui.py
           python -m py_compile scripts/v2/validate_mission_evidence.py
           python -m py_compile scripts/v2/rebuild_close_rank_views.py
