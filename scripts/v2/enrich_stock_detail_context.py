@@ -51,6 +51,10 @@ COMMON = (
     "current_turnover", "recent_turnover", "previous_turnover", "quote_bid1", "quote_ask1", "quote_volume_lots",
     "quote_date", "quote_time", "quote_snapshot_time", "quote_source", "quote_carried", "quote_has_trade",
     "amplitude_pct", "range_position_pct", "amplitude_regime", "stage_reason", "structure_confidence", "structure_time",
+    # Source dates are evidence, not build metadata.  Keep them beside the chip
+    # metrics so the UI can truthfully disclose whether EOD capital data is from
+    # the current trading day or a prior completed session.
+    "chip_date", "foreign_date", "trust_date", "dealer_date", "sbl_date", "margin_date",
     "chip_background", "chip_score", "chip_coverage_pct", "sector_score", "sector_score_source", "sector_score_label",
     "sector_hot_count", "industry_hot_count", "sector_hot_ratio", "liquidity_level",
     "support", "resistance", "reasons", "overheat_reasons", "stage_signals", "stage_risks",
