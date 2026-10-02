@@ -7,7 +7,7 @@
   };
   const DIR={UP:'↗',FLAT:'→',DOWN:'↘'};
   const cache=new Map();
-  let timer=null;
+  let timer=null,rootHourlyPromise=null;
 
   const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const num=v=>v==null||v===''||!Number.isFinite(Number(v))?null:Number(v);
@@ -51,9 +51,37 @@
     const r=await fetch(meta.url,{cache:'no-store'});
     if(!r.ok)throw new Error(`${key} ${r.status}`);
     const obj=await r.json();
-    cache.clear();
     cache.set(ck,obj);
     return obj;
+  }
+
+  async function rootHourly(){
+    if(rootHourlyPromise)return rootHourlyPromise;
+    rootHourlyPromise=(async()=>{
+      const r=await fetch(`../data/hourly.json?t=${Date.now()}`,{cache:'no-store'});
+      if(!r.ok)throw new Error(`root hourly ${r.status}`);
+      const obj=await r.json();
+      const rows=Array.isArray(obj?.all_rows)?obj.all_rows:(Array.isArray(obj?.rows)?obj.rows:[]);
+      const items={};
+      for(const row of rows){
+        const code=String(row?.code||'').trim();
+        if(code)items[code]={...row,trade_date:row.trade_date||obj.trade_date,updated_at:row.updated_at||obj.updated_at};
+      }
+      return {obj,items};
+    })().catch(err=>{rootHourlyPromise=null;throw err});
+    return rootHourlyPromise;
+  }
+
+  async function hourlyFor(code,view){
+    try{
+      const obj=await dataset(view);
+      const embedded=obj?.items?.[code]?.hourly60;
+      if(embedded)return embedded;
+    }catch(err){
+      console.warn('hourly60 embedded evidence unavailable',err);
+    }
+    const root=await rootHourly();
+    return root?.items?.[code]||null;
   }
 
   function activeView(){
@@ -123,8 +151,7 @@
     const code=currentCode(),view=activeView();
     if(!code||!view||body.querySelector('[data-hourly60-v2]'))return;
     try{
-      const obj=await dataset(view);
-      const h=obj?.items?.[code]?.hourly60;
+      const h=await hourlyFor(code,view);
       if(h)insert(card(h));
     }catch(err){
       console.warn('hourly60 v2 addon',err);
