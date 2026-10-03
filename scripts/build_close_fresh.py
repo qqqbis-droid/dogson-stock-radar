@@ -26,6 +26,7 @@ import pandas as pd
 
 import build_data as bd
 import sync_chip_provenance
+import daily_history_capture
 
 
 _ORIGINAL_MIS = bd.official_mis_snapshot
@@ -64,6 +65,7 @@ def completed_daily(syms, period="6mo"):
                 out[sym] = trimmed
         except Exception as exc:
             print("completed daily filter", sym, exc)
+    daily_history_capture.capture_frames(out)
     return out
 
 
@@ -236,4 +238,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# refresh-marker: 2026-10-02-chip-source-date-vs-check-time
+# refresh-marker: 2026-10-04-persist-completed-daily-history
