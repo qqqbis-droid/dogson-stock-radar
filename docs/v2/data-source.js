@@ -101,4 +101,19 @@
     document.head.appendChild(cloud);
   };
   document.head.appendChild(cloudConfig);
+
+  // Brokerage statements estimate open-position P&L after the fees/tax that
+  // would be charged if the position were sold now. Load this adapter after the
+  // regular portfolio fee/store modules finish booting so their cloud/account
+  // behavior stays unchanged while displayed costs and estimated P&L match the
+  // broker-style whole-TWD charge convention.
+  window.addEventListener('load',()=>{
+    setTimeout(()=>{
+      if(document.getElementById('inukoBrokerMatchScript'))return;
+      const broker=document.createElement('script');
+      broker.id='inukoBrokerMatchScript';
+      broker.src='./portfolio-broker-match.js?v=20261003broker1';
+      document.head.appendChild(broker);
+    },0);
+  },{once:true});
 })();
