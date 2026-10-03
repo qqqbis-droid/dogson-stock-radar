@@ -1,0 +1,2 @@
+INUKO portfolio holdings intelligence release 20261004b
+Direct V2 loader enabled from clean-build-v2.
