@@ -9,6 +9,7 @@ window.__INUKO_V2_SAFETY_UI_FIX__=true;
 const BACKUP_KEY='inuko.portfolio.safetyBackups.v1';
 const MAX_BACKUPS=5;
 let scheduled=false;
+let keepLocalBusy=false;
 
 function cleanLedger(x){
   if(!x||typeof x!=='object')return null;
@@ -95,7 +96,8 @@ function patchConflictPanel(){
   const localBtn=panel.querySelector('[data-cloud-keep="local"]');
   const cloudBtn=panel.querySelector('[data-cloud-keep="cloud"]');
   if(localBtn&&cloudBtn){
-    localBtn.textContent='保留這台裝置並同步到雲端';
+    localBtn.textContent=keepLocalBusy?'正在同步最新本機資料…':'保留這台裝置並同步到雲端';
+    localBtn.disabled=keepLocalBusy;
     localBtn.classList.remove('text-btn');
     localBtn.classList.add('refresh-btn');
     localBtn.style.fontWeight='800';
@@ -116,7 +118,7 @@ function patchConflictPanel(){
       tip.className='inuko-conflict-safe-copy';
       tip.style.margin='8px 0 2px';
       tip.style.fontWeight='700';
-      tip.textContent='剛在這台裝置新增或修改的資料，要保留請選第一個綠色按鈕。只有確定要丟掉本機未同步內容時，才改用雲端。';
+      tip.textContent='剛在這台裝置新增或修改的資料，要保留請選第一個綠色按鈕。系統會以按下按鈕當下的最新本機資料為準。';
       actions?.insertAdjacentElement('beforebegin',tip);
     }
   }
@@ -157,10 +159,45 @@ function schedulePatch(){
   requestAnimationFrame(()=>{scheduled=false;patchAll()});
 }
 
+async function keepLatestLocalAndSync(){
+  if(keepLocalBusy)return;
+  const cloud=window.INUKOPortfolioCloud;
+  if(!cloud?.state||typeof cloud.sync!=='function'){
+    status('雲端同步尚未就緒；本機資料沒有被改動。');
+    return;
+  }
+  keepLocalBusy=true;
+  saveSafetyBackup('before-keep-latest-local');
+  schedulePatch();
+  try{
+    // Critical race fix: discard only the stale conflict marker, never import the old
+    // state.conflict.local snapshot. cloud.sync() re-reads RadarPortfolioStore at call time.
+    cloud.state.conflict=null;
+    cloud.state.message='正在將這台裝置目前最新的資料同步到雲端…';
+    await cloud.sync();
+    if(cloud.state.conflict){
+      status('雲端在同步期間又出現較新版本；已保留這台裝置目前資料，沒有覆蓋。請再確認一次。');
+    }else{
+      saveSafetyBackup('after-keep-latest-local');
+      status('已把這台裝置目前最新資料同步到雲端。');
+    }
+  }catch(err){
+    console.error('INUKO safe local sync failed',err);
+    status('同步沒有完成，但這台裝置目前資料仍保留。');
+  }finally{
+    keepLocalBusy=false;
+    setTimeout(schedulePatch,50);
+  }
+}
+
 function installSafetyHandlers(){
   document.addEventListener('click',e=>{
     const localBtn=e.target?.closest?.('[data-cloud-keep="local"]');
-    if(localBtn){saveSafetyBackup('before-keep-local');return}
+    if(localBtn){
+      e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
+      keepLatestLocalAndSync();
+      return;
+    }
 
     const cloudBtn=e.target?.closest?.('[data-cloud-keep="cloud"]');
     if(cloudBtn){
