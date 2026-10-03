@@ -105,8 +105,11 @@ function cooldownUntil(){return Number(localStorage.getItem(LOGIN_COOLDOWN_KEY)|
 function refreshLoginButton(){
   const btn=document.querySelector('[data-cloud-login] button[type="submit"]');if(!btn)return;
   const remain=Math.max(0,cooldownUntil()-Date.now());
-  if(remain>0){btn.disabled=true;btn.textContent=`請稍候 ${Math.ceil(remain/1000)} 秒`}
-  else{btn.disabled=false;btn.textContent='寄登入連結';localStorage.removeItem(LOGIN_COOLDOWN_KEY);if(cooldownTimer){clearInterval(cooldownTimer);cooldownTimer=null}}
+  const disabled=remain>0;
+  const label=disabled?`請稍候 ${Math.ceil(remain/1000)} 秒`:'寄登入連結';
+  if(btn.disabled!==disabled)btn.disabled=disabled;
+  if((btn.textContent||'').trim()!==label)btn.textContent=label;
+  if(!disabled){localStorage.removeItem(LOGIN_COOLDOWN_KEY);if(cooldownTimer){clearInterval(cooldownTimer);cooldownTimer=null}}
 }
 function armCooldown(){
   localStorage.setItem(LOGIN_COOLDOWN_KEY,String(Date.now()+LOGIN_COOLDOWN_MS));
