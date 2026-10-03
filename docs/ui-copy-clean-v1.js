@@ -5,14 +5,22 @@ window.__DOGSON_COPY_CLEAN_V1__=true;
 
 const SKIP=new Set(['SCRIPT','STYLE','NOSCRIPT','PRE','CODE','TEXTAREA']);
 const ATTRS=['title','aria-label','placeholder'];
+const LOGIN_COOLDOWN_KEY='inuko.cloud.login.cooldownUntil';
+const LOGIN_COOLDOWN_MS=60_000;
+let cooldownTimer=null;
 
 function rewrite(input){
   let s=String(input??'');
   if(!s)return s;
 
-  // Known system-facing sentences are rewritten as complete plain-language copy first.
   s=s
     .replace(/Portfolio Ledger 2\.0[\s\S]*?掛單與取消單不要加入。?/gi,'沒有登入時，資料只存在這台裝置。只記錄真的買到或賣掉的交易；沒成交或取消的委託不用記。')
+    .replace(/INUKO Cloud 私人庫存/gi,'雲端庫存')
+    .replace(/用 Email 驗證連結登入。庫存、成交流水與未來手續費設定會依帳號保存。?/gi,'輸入電子郵件後，我們會寄登入連結給你。登入後，庫存與交易紀錄會跟著帳號保存。')
+    .replace(/雲端同步失敗：\s*email rate limit exceeded\s*。?\s*本機資料仍保留。?/gi,'登入信寄送太頻繁，請稍後再試。資料仍保留在這台裝置。')
+    .replace(/email rate limit exceeded/gi,'登入信寄送太頻繁，請稍後再試')
+    .replace(/For security purposes, you can only request this after[^。\n]*/gi,'登入信剛寄過，請稍後再試')
+    .replace(/分數表示條件同步程度，不代表上漲機率；排名是注意力順序。資料過期或未通過[^。]*Gate[^。]*。?/gi,'分數代表條件符合程度，不代表上漲機率；排名只是查看順序。資料過期或不完整時，系統會暫停顯示可執行判斷。')
     .replace(/狀態列只讀\s*canonical metadata；盤中日期以超短操盤卡的\s*as_of\s*為準。?/gi,'這裡顯示各項資料的更新時間。')
     .replace(/等待獨立\s*daytrade\s*即時資料[^。]*。?/gi,'等今天的即時資料更新後再判斷。')
     .replace(/即時資料已達可驗證門檻/g,'今天的即時資料已完整')
@@ -23,7 +31,6 @@ function rewrite(input){
     .replace(/Radar\s*v\d+(?:\.\d+)+\s*[・·]\s*/gi,'')
     .replace(/最近完整交易日([^｜\n]*)｜\s*MIS覆蓋/gi,'最近完整交易日$1｜盤中資料完整度');
 
-  // System / implementation vocabulary should never be required to use the site.
   const replacements=[
     [/MIS覆蓋/gi,'盤中資料完整度'],
     [/\bMIS\b/gi,'盤中資料'],
@@ -51,6 +58,8 @@ function rewrite(input){
     [/Clean\s*Build\s*2\.0/gi,'新版'],
     [/\bmission\b/gi,'資料用途'],
     [/\bcontext\b/gi,'參考資料'],
+    [/\bGate\b/g,'資料條件'],
+    [/\bEmail\b/g,'電子郵件'],
     [/盤中結構/g,'盤中資料'],
     [/盤後波段/g,'盤後資料'],
     [/雙軸判讀|兩軸判讀/g,'綜合判斷'],
@@ -60,7 +69,6 @@ function rewrite(input){
   ];
   for(const [pattern,to] of replacements)s=s.replace(pattern,to);
 
-  // Internal revision/version labels add no value to normal users.
   s=s.replace(/\s*[·・]\s*r\d+\b/gi,'');
   s=s.replace(/(^|[（(｜|·・\s])v\d+(?:\.\d+)+(?!\d)/gi,(m,prefix)=>prefix);
   s=s.replace(/[ \t]{2,}/g,' ').replace(/\s+([，。；：！？｜])/g,'$1');
@@ -85,14 +93,47 @@ function cleanTree(root){
   const walker=document.createTreeWalker(root,NodeFilter.SHOW_ELEMENT|NodeFilter.SHOW_TEXT);
   let node;while((node=walker.nextNode())){if(node.nodeType===Node.TEXT_NODE)cleanText(node);else cleanElement(node)}
 }
+
+function cloudPanel(){return document.querySelector('#inukoCloudPanel')}
+function showCloudMessage(text){
+  const panel=cloudPanel();if(!panel)return;
+  let msg=panel.querySelector('.inuko-cloud-user,.inuko-cloud-copy');
+  if(!msg){msg=document.createElement('div');msg.className='inuko-cloud-user';panel.appendChild(msg)}
+  msg.textContent=text;
+}
+function cooldownUntil(){return Number(localStorage.getItem(LOGIN_COOLDOWN_KEY)||0)}
+function refreshLoginButton(){
+  const btn=document.querySelector('[data-cloud-login] button[type="submit"]');if(!btn)return;
+  const remain=Math.max(0,cooldownUntil()-Date.now());
+  if(remain>0){btn.disabled=true;btn.textContent=`請稍候 ${Math.ceil(remain/1000)} 秒`}
+  else{btn.disabled=false;btn.textContent='寄登入連結';localStorage.removeItem(LOGIN_COOLDOWN_KEY);if(cooldownTimer){clearInterval(cooldownTimer);cooldownTimer=null}}
+}
+function armCooldown(){
+  localStorage.setItem(LOGIN_COOLDOWN_KEY,String(Date.now()+LOGIN_COOLDOWN_MS));
+  refreshLoginButton();
+  if(cooldownTimer)clearInterval(cooldownTimer);
+  cooldownTimer=setInterval(refreshLoginButton,1000);
+}
+function installCloudLoginGuard(){
+  document.addEventListener('submit',e=>{
+    const form=e.target?.closest?.('[data-cloud-login]');if(!form)return;
+    const remain=cooldownUntil()-Date.now();
+    if(remain>0){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();showCloudMessage(`登入信剛寄過，請 ${Math.ceil(remain/1000)} 秒後再試。`);refreshLoginButton();return}
+    armCooldown();
+  },true);
+  refreshLoginButton();
+}
+
 function start(){
   cleanTree(document.documentElement);
+  installCloudLoginGuard();
   const observer=new MutationObserver(records=>{
     for(const record of records){
       if(record.type==='characterData')cleanText(record.target);
       else if(record.type==='attributes')cleanElement(record.target);
       else for(const node of record.addedNodes)cleanTree(node);
     }
+    refreshLoginButton();
   });
   observer.observe(document.documentElement,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:ATTRS});
   window.addEventListener('dogson:ui-ready',()=>cleanTree(document.documentElement));
