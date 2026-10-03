@@ -126,8 +126,13 @@ function installCloudLoginGuard(){
   },true);
   refreshLoginButton();
 }
+function loadV2UserState(){
+  if(!/\/v2(?:\/|$)/.test(location.pathname)||document.getElementById('inuko-v2-user-state'))return;
+  const s=document.createElement('script');s.id='inuko-v2-user-state';s.src=new URL('../inuko-v2-user-state-v1.js?v=20261003a',location.href).href;s.defer=true;document.head.appendChild(s);
+}
 
 function start(){
+  loadV2UserState();
   cleanTree(document.documentElement);
   installCloudLoginGuard();
   const observer=new MutationObserver(records=>{
