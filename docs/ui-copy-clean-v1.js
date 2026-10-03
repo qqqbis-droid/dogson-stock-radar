@@ -130,9 +130,14 @@ function loadV2UserState(){
   if(!/\/v2(?:\/|$)/.test(location.pathname)||document.getElementById('inuko-v2-user-state'))return;
   const s=document.createElement('script');s.id='inuko-v2-user-state';s.src=new URL('../inuko-v2-user-state-v1.js?v=20261003a',location.href).href;s.defer=true;document.head.appendChild(s);
 }
+function loadPortfolioIntel(){
+  if(!/\/v2(?:\/|$)/.test(location.pathname)||document.getElementById('inuko-portfolio-intel-script'))return;
+  const s=document.createElement('script');s.id='inuko-portfolio-intel-script';s.src=new URL('../inuko-portfolio-intel-v1.js?v=20261004a',location.href).href;s.defer=true;document.head.appendChild(s);
+}
 
 function start(){
   loadV2UserState();
+  loadPortfolioIntel();
   cleanTree(document.documentElement);
   installCloudLoginGuard();
   const observer=new MutationObserver(records=>{
