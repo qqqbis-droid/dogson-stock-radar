@@ -206,7 +206,7 @@ jobs:
           for page in Path('docs/v2').rglob('*.html'):
               text = page.read_text(encoding='utf-8')
               rel = os.path.relpath(target, page.parent.resolve()).replace(os.sep, '/')
-              tag = f'<script src="{rel}?v=1"></script>'
+              tag = f'<script src="{rel}?v=20261003loadfix1"></script>'
               if 'ui-copy-clean-v1.js' in text:
                   continue
               if '</body>' in text:
