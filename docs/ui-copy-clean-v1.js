@@ -12,6 +12,7 @@ function rewrite(input){
 
   // Known system-facing sentences are rewritten as complete plain-language copy first.
   s=s
+    .replace(/Portfolio Ledger 2\.0[\s\S]*?掛單與取消單不要加入。?/gi,'沒有登入時，資料只存在這台裝置。只記錄真的買到或賣掉的交易；沒成交或取消的委託不用記。')
     .replace(/狀態列只讀\s*canonical metadata；盤中日期以超短操盤卡的\s*as_of\s*為準。?/gi,'這裡顯示各項資料的更新時間。')
     .replace(/等待獨立\s*daytrade\s*即時資料[^。]*。?/gi,'等今天的即時資料更新後再判斷。')
     .replace(/即時資料已達可驗證門檻/g,'今天的即時資料已完整')
