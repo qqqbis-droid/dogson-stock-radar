@@ -5,6 +5,7 @@
 (() => {
   const RAW_DATA_BASE = "https://raw.githubusercontent.com/qqqbis-droid/dogson-stock-radar/clean-build-v2/docs/v2/data/";
   const nativeFetch = window.fetch.bind(window);
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
   function resolveDataFallback(input) {
     const value = typeof input === "string" ? input : input?.url;
@@ -14,19 +15,41 @@
     return `${RAW_DATA_BASE}${value.slice(marker.length)}`;
   }
 
+  async function fetchRetry(input, options, tries = 3) {
+    let lastError = null;
+    for (let attempt = 0; attempt < tries; attempt++) {
+      try {
+        const response = await nativeFetch(input, options);
+        if (response.ok) return response;
+        lastError = new Error(`HTTP ${response.status}`);
+      } catch (error) {
+        lastError = error;
+      }
+      if (attempt < tries - 1) await sleep(500 * (attempt + 1));
+    }
+    throw lastError || new Error("資料讀取失敗");
+  }
+
   window.fetch = async (input, init = {}) => {
     const remote = resolveDataFallback(input);
     if (!remote) return nativeFetch(input, init);
 
     const options = { ...init, cache: "no-store" };
     try {
-      const local = await nativeFetch(input, options);
-      if (local.ok) return local;
+      return await fetchRetry(input, options, 3);
     } catch (_) {
-      // Fall through to the remote validated public bundle.
+      return fetchRetry(remote, options, 2);
     }
-    return nativeFetch(remote, options);
   };
+
+  function polishVisibleCopy() {
+    const privacy = document.querySelector('.portfolio-privacy');
+    if (privacy) privacy.textContent = '🔒 沒有登入時，資料只存在這台裝置。只記錄真的買到或賣掉的交易；沒成交或取消的委託不用記。';
+    const footer = document.querySelector('footer');
+    if (footer) footer.textContent = '分數只代表條件符合程度，不代表一定會上漲；排名只是注意順序。資料過期或不完整時，系統不提供操作建議。';
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', polishVisibleCopy, { once: true });
+  else polishVisibleCopy();
 
   // INUKO is the product brand. Keep the legacy alias temporarily so older
   // browser add-ons do not break while they are being retired.
