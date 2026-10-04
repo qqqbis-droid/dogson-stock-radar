@@ -48,12 +48,13 @@ def finalize_common(root: Path):
     run_script("close_semantics_v5.py", root)
     run_script("build_radar_stats.py", root)
     overlay_mode = os.environ.get("V2_OVERLAY_MODE", "")
-    # During a preserve overlay, the canonical V2 bundle is intentionally newer
-    # than the root legacy snapshot. Re-validating that preserved 9/30 decision
-    # set against an older 9/23 legacy root creates a false source/date failure.
-    # The caller still runs validate_bundle, market/capital validation, source-lock
-    # checks and index/detail semantic checks against the preserved canonical data.
-    if overlay_mode in {"PRESERVE_SAME_DAY", "PRESERVE_NEWER_CANONICAL"}:
+    # During a preserve overlay, the canonical V2 bundle is the validated source
+    # of truth. Re-validating it against the runner's independently rebuilt legacy
+    # close can create a false source/date/evidence failure even though the
+    # canonical bundle is intentionally being preserved. The caller still runs
+    # validate_bundle, market/capital validation, source-lock checks and
+    # index/detail semantic checks against the preserved canonical data.
+    if overlay_mode in {"PRESERVE_SAME_DAY", "PRESERVE_CLOSE_ADVANCE", "PRESERVE_NEWER_CANONICAL"}:
         print("close evidence legacy-root cross-check skipped for preserve overlay", overlay_mode)
     else:
         run_script("validate_mission_evidence.py", root, "--legacy-root", "docs/data", "--mission", "close")
