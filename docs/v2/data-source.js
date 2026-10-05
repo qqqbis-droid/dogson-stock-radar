@@ -117,11 +117,18 @@
   // broker-style whole-TWD charge convention.
   window.addEventListener('load',()=>{
     setTimeout(()=>{
-      if(document.getElementById('inukoBrokerMatchScript'))return;
-      const broker=document.createElement('script');
-      broker.id='inukoBrokerMatchScript';
-      broker.src='./portfolio-broker-match.js?v=20261003broker1';
-      document.head.appendChild(broker);
+      if(!document.getElementById('inukoBrokerMatchScript')){
+        const broker=document.createElement('script');
+        broker.id='inukoBrokerMatchScript';
+        broker.src='./portfolio-broker-match.js?v=20261003broker1';
+        document.head.appendChild(broker);
+      }
+      if(!document.getElementById('inukoPortfolioPriorityLadderScript')){
+        const ladder=document.createElement('script');
+        ladder.id='inukoPortfolioPriorityLadderScript';
+        ladder.src='./portfolio-priority-ladder-v1.js?v=20261005ladder1';
+        document.head.appendChild(ladder);
+      }
     },0);
   },{once:true});
 })();
