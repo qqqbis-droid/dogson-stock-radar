@@ -45,16 +45,129 @@ def trade_date_of(payload, rows):
     return max(dates) if dates else None
 
 
+def num(value):
+    try:
+        value = float(value)
+        return value if value == value else None
+    except (TypeError, ValueError):
+        return None
+
+
+def history_bars(payload):
+    if isinstance(payload, dict):
+        raw = payload.get("bars") or payload.get("items") or payload.get("history") or payload.get("data") or []
+    elif isinstance(payload, list):
+        raw = payload
+    else:
+        raw = []
+    out = []
+    for item in raw:
+        if isinstance(item, (list, tuple)) and len(item) >= 5:
+            date = str(item[0] or "")[:10]
+            o, h, l, c = (num(item[i]) for i in range(1, 5))
+            v = num(item[5]) if len(item) > 5 else None
+        elif isinstance(item, dict):
+            date = str(item.get("trade_date") or item.get("date") or item.get("quote_date") or "")[:10]
+            o = num(item.get("open"))
+            h = num(item.get("high"))
+            l = num(item.get("low"))
+            c = num(item.get("close"))
+            v = num(item.get("volume"))
+        else:
+            continue
+        if len(date) == 10 and c is not None and h is not None and l is not None:
+            out.append({"date": date, "open": o, "high": h, "low": l, "close": c, "volume": v})
+    out.sort(key=lambda x: x["date"])
+    return out
+
+
+def avg(values):
+    xs = [float(v) for v in values if num(v) is not None]
+    return sum(xs) / len(xs) if xs else None
+
+
+def atr14(bars):
+    if len(bars) < 15:
+        return None
+    tr = []
+    for i in range(1, len(bars)):
+        b, prev = bars[i], bars[i - 1]
+        tr.append(max(b["high"] - b["low"], abs(b["high"] - prev["close"]), abs(b["low"] - prev["close"])))
+    return avg(tr[-14:])
+
+
+def detect_launch_context(history_root: Path, code: str):
+    path = history_root / f"{code}.json"
+    if not path.exists():
+        return None
+    try:
+        bars = history_bars(load(path))
+    except Exception:
+        return None
+    if len(bars) < 35:
+        return None
+
+    current = bars[-1]["close"]
+    atr = atr14(bars)
+    start = max(20, len(bars) - 95)
+    candidates = []
+    for i in range(start, len(bars)):
+        pre = bars[i - 20:i]
+        b = bars[i]
+        ph = max(x["high"] for x in pre)
+        pl = min(x["low"] for x in pre)
+        volumes = [x["volume"] for x in pre if x.get("volume") is not None and x["volume"] > 0]
+        av = avg(volumes)
+        vr = (b.get("volume") / av) if av and b.get("volume") else None
+        width = ((ph - pl) / pl * 100) if pl > 0 else None
+        break_pct = ((b["close"] - ph) / ph * 100) if ph > 0 else None
+        closes_above = b["close"] > ph * 1.003
+        volume_ok = vr is not None and vr >= 1.15
+        tight = width is not None and width <= 25
+        positive = b.get("open") is None or b["close"] >= b["open"]
+        if not (closes_above and volume_ok and tight and positive):
+            continue
+        follow = bars[i + 1:]
+        min_after = min((x["close"] for x in follow), default=b["close"])
+        if current < ph * 0.96 or min_after < ph * 0.90:
+            continue
+        score = (2 if vr >= 1.5 else 1.2 if vr >= 1.25 else 0.6)
+        score += (1.6 if width <= 15 else 1 if width <= 20 else 0.5)
+        score += 1 if break_pct is not None and break_pct >= 2 else 0.5
+        if i >= len(bars) - 25:
+            score += 0.6
+        candidates.append({
+            "date": b["date"], "index": i, "price": ph, "break_close": b["close"],
+            "volume_ratio": vr, "width_pct": width, "break_pct": break_pct,
+            "score": score, "atr": atr,
+        })
+
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: (-x["index"], -x["score"]))
+    latest = candidates[0]
+    cluster = [x for x in candidates if latest["index"] - x["index"] <= 18]
+    origin = sorted(cluster, key=lambda x: (x["index"], -x["score"]))[0] if cluster else latest
+    return {
+        "price": origin["price"],
+        "breakout": origin["break_close"],
+        "date": origin["date"],
+        "volume_ratio": origin["volume_ratio"],
+        "width_pct": origin["width_pct"],
+        "break_pct": origin["break_pct"],
+        "atr": origin["atr"],
+        "kind": "日K帶量突破基準",
+        "source": "20日平台上緣＋帶量突破",
+        "fallback": False,
+    }
+
+
 COMMON = (
     "code", "name", "market", "industry_name", "sector_group", "close", "high", "low", "day_change",
     "volume", "avg_volume20", "avg_turnover20", "avg_turnover20_mn", "vol_x", "vwap", "vwap_dist", "pace", "ret15", "ret60",
     "current_turnover", "recent_turnover", "previous_turnover", "quote_bid1", "quote_ask1", "quote_volume_lots",
     "quote_date", "quote_time", "quote_snapshot_time", "quote_source", "quote_carried", "quote_has_trade",
     "amplitude_pct", "range_position_pct", "amplitude_regime", "stage_reason", "structure_confidence", "structure_time",
-    # Source dates are evidence, not build metadata. Keep them beside the chip
-    # metrics so the UI can truthfully disclose whether EOD capital data is from
-    # the current trading day or a prior completed session. chip_checked_at is
-    # a separate provenance clock: it tells when our system last queried sources.
     "chip_date", "foreign_date", "trust_date", "dealer_date", "sbl_date", "margin_date",
     "chip_checked_at", "chip_check_health", "chip_check_latest_attempt_date",
     "chip_background", "chip_score", "chip_coverage_pct", "sector_score", "sector_score_source", "sector_score_label",
@@ -123,7 +236,7 @@ def compact_hourly(row, meta):
     return out
 
 
-def compact(row, context, h60=None, hmeta=None):
+def compact(row, context, h60=None, hmeta=None, launch=None):
     keys = list(COMMON)
     if context == "close":
         keys += list(CLOSE)
@@ -133,6 +246,8 @@ def compact(row, context, h60=None, hmeta=None):
         keys += list(INTRADAY) + list(DAYTRADE)
     out = {key: row.get(key) for key in keys if key in row}
     out["hourly60"] = compact_hourly(h60, hmeta or {}) if h60 else None
+    if launch:
+        out["launch_context"] = launch
     return out
 
 
@@ -143,6 +258,7 @@ def enrich(*, legacy_root: Path, root: Path):
     build_dir = root / "builds" / build_id
     counts = {}
     hmap, hmeta = hourly_map(legacy_root)
+    history_root = legacy_root / "history"
 
     for context, source_name, decision_key in (
         ("close", "close.json", "decision_close_detail"),
@@ -151,14 +267,20 @@ def enrich(*, legacy_root: Path, root: Path):
     ):
         payload = load(legacy_root / source_name)
         rows = rows_of(payload)
-        items = {
-            str(row.get("code")): compact(row, context, hmap.get(str(row.get("code"))), hmeta)
-            for row in rows if isinstance(row, dict) and row.get("code")
-        }
+        items = {}
+        launches = 0
+        for row in rows:
+            if not isinstance(row, dict) or not row.get("code"):
+                continue
+            code = str(row.get("code"))
+            launch = detect_launch_context(history_root, code) if context == "close" and history_root.exists() else None
+            if launch:
+                launches += 1
+            items[code] = compact(row, context, hmap.get(code), hmeta, launch)
         trade_date = trade_date_of(payload, rows)
         decision_meta = (manifest.get("datasets") or {}).get(decision_key) or {}
         obj = {
-            "schema_version": "1.1.0",
+            "schema_version": "1.2.0",
             "build_id": build_id,
             "context": context.upper(),
             "trade_date": trade_date,
@@ -178,7 +300,7 @@ def enrich(*, legacy_root: Path, root: Path):
             "known_at": decision_meta.get("known_at"),
             "build_id": build_id,
         }
-        counts[context] = len(items)
+        counts[context] = {"items": len(items), "launch_context": launches}
 
     warnings = manifest.setdefault("health", {}).setdefault("warnings", [])
     note = "個股詳情已分任務補入同 Atomic Build 的盤中／盤後／當沖證據快照；評分解釋只呈現 Engine 已算出的分項，不由前端重算。"
@@ -187,6 +309,9 @@ def enrich(*, legacy_root: Path, root: Path):
     hnote = "60分K生命週期與進場位置燈號已從既有 hourly Engine 帶回 V2 個股證據；只顯示 Engine 結果，不由前端重新判定。"
     if hnote not in warnings:
         warnings.append(hnote)
+    lnote = "盤後個股詳情已預存最近有效日K平台帶量突破起漲基準；即使前端歷史K檔暫時不可用，也不直接退回20MA。"
+    if lnote not in warnings:
+        warnings.append(lnote)
     write(manifest_path, manifest)
     print("stock detail evidence OK", counts, "hourly60", len(hmap), hmeta.get("trade_date"))
 
