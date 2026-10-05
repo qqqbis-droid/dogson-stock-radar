@@ -82,19 +82,27 @@
   closeIntegrity.defer=true;
   document.head.appendChild(closeIntegrity);
 
-  // Portfolio Cloud is additive: until the public Supabase URL + anon/publishable
+  // Portfolio Cloud is additive: until the public Supabase URL + publishable
   // key are configured it stays dormant and the current local ledger continues
   // to work. A service-role key must never be shipped to the browser.
   const cloudConfig=document.createElement("script");
-  cloudConfig.src=`./cloud-config.js?v=20261002cloud1`;
+  cloudConfig.src=`./cloud-config.js?v=20261005cloudsafe2`;
   cloudConfig.defer=true;
   cloudConfig.onload=()=>{
     const cloud=document.createElement("script");
-    cloud.src=`./portfolio-cloud.js?v=20261002cloud1`;
+    cloud.src=`./portfolio-cloud.js?v=20261005cloudsafe2`;
     cloud.defer=true;
     cloud.onload=()=>{
+      // Conflict resolution must never restore a stale local snapshot. This
+      // safety layer snapshots the current local ledger before destructive
+      // choices and syncs the latest local ledger at click time.
+      const safety=document.createElement("script");
+      safety.src=`./portfolio-cloud-safety-v2.js?v=20261005cloudsafe2`;
+      safety.defer=true;
+      document.head.appendChild(safety);
+
       const snapshots=document.createElement("script");
-      snapshots.src=`./portfolio-snapshot-v1.js?v=20261002cloud1`;
+      snapshots.src=`./portfolio-snapshot-v1.js?v=20261005cloudsafe2`;
       snapshots.defer=true;
       document.head.appendChild(snapshots);
     };
