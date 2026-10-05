@@ -1,1 +1,1 @@
-2026-10-05T16:35:00+08:00 rerun latest completed close; publish 10/05 close independently while intraday/chips keep their own freshness gates
+2026-10-05T17:56:00+08:00 rerun latest completed close after structural-zone schema fix ca0e2143; validate full canonical bundle and deploy
