@@ -99,6 +99,7 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
+          from scripts.v2.enrich_zones import fused_levels, source_map
 
           root=Path('docs/v2/data')
           load=lambda p: json.loads(Path(p).read_text(encoding='utf-8'))
@@ -125,9 +126,11 @@ jobs:
           stock=load(paths['stock_detail_close'])
           zones=load(paths['zone_close'])
           raw_close=load(Path('docs/data/close.json'))
+          raw_hourly=load(Path('docs/data/hourly.json'))
           ditems=(detail.get('items') or {}) if isinstance(detail,dict) else {}
           sitems=(stock.get('items') or {}) if isinstance(stock,dict) else {}
-          raw={str(r.get('code')):r for r in (raw_close.get('rows') or []) if isinstance(r,dict) and r.get('code')}
+          raw=source_map(raw_close)
+          hourly=source_map(raw_hourly)
 
           if not ditems:
               raise SystemExit('close evidence gate: decision_close_detail empty')
@@ -137,19 +140,31 @@ jobs:
           if not isinstance(zones,list) or not zones:
               raise SystemExit('close evidence gate: zone_close empty')
 
-          missing_zone=[]
+          zone_ids={str(z.get('zone_id')) for z in zones if isinstance(z,dict) and z.get('zone_id')}
+          mismatch=[]
+          broken_refs=[]
           missing_explain=[]
           for code,row in ditems.items():
               src=raw.get(str(code)) or {}
-              if src.get('support') not in (None,'',[]) and not row.get('support_zone_ids'):
-                  missing_zone.append(f'{code}:support')
-              if src.get('resistance') not in (None,'',[]) and not row.get('resistance_zone_ids'):
-                  missing_zone.append(f'{code}:resistance')
+              h=hourly.get(str(code)) or {}
+              expected_support=fused_levels(src,'SUPPORT',h)
+              expected_resistance=fused_levels(src,'RESISTANCE',h)
+              support_ids=list(row.get('support_zone_ids') or [])
+              resistance_ids=list(row.get('resistance_zone_ids') or [])
+              if len(support_ids)!=len(expected_support):
+                  mismatch.append(f'{code}:support expected={len(expected_support)} actual={len(support_ids)}')
+              if len(resistance_ids)!=len(expected_resistance):
+                  mismatch.append(f'{code}:resistance expected={len(expected_resistance)} actual={len(resistance_ids)}')
+              for zid in [*support_ids,*resistance_ids]:
+                  if str(zid) not in zone_ids:
+                      broken_refs.append(f'{code}:{zid}')
               exp=row.get('score_explanations') or {}
               if exp.get('version')!='score-explain-v4-resistance-aware':
                   missing_explain.append(code)
-          if missing_zone:
-              raise SystemExit(f'close evidence gate: source zones were not migrated {missing_zone[:20]}')
+          if mismatch:
+              raise SystemExit(f'close evidence gate: zone engine/output mismatch {mismatch[:20]}')
+          if broken_refs:
+              raise SystemExit(f'close evidence gate: dangling zone references {broken_refs[:20]}')
           if missing_explain:
               raise SystemExit(f'close evidence gate: score explanations missing {missing_explain[:20]}')
 
