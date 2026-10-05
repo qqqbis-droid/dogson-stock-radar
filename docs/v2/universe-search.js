@@ -16,6 +16,7 @@ window.RadarUniverseSearch={search:searchUniverse,clear(){US.rows=null;US.promis
   const zoneText=z=>{if(!z)return'—';const lo=num(z.low),hi=num(z.high),c=num(z.center);if(lo!=null&&hi!=null&&Math.abs(lo-hi)>1e-9)return`${fmtPrice(lo)}–${fmtPrice(hi)}`;return fmtPrice(c??lo??hi)};
   const activeView=()=>document.querySelector('.tab.active')?.dataset?.view||'intraday';
   const setText=(el,text)=>{if(el&&el.textContent!==text)el.textContent=text};
+  const rowsOf=x=>Array.isArray(x)?x:(x?.items&&typeof x.items==='object'?Object.values(x.items):[]);
 
   async function json(url){const r=await fetch(`${url}${url.includes('?')?'&':'?'}hotfix=${Date.now()}`,{cache:'no-store'});if(!r.ok)throw new Error(`${url} ${r.status}`);return r.json()}
   async function loadDecisionContext(force=false){
@@ -27,10 +28,15 @@ window.RadarUniverseSearch={search:searchUniverse,clear(){US.rows=null;US.promis
       const manifest=await json('./data/current_manifest.json');
       const key=missionIndex[view],meta=manifest?.datasets?.[key];
       let rows=[];
-      if(meta){const data=await json(meta.url);rows=Array.isArray(data)?data:(data?.items?Object.values(data.items):[])}
+      if(meta)rows=rowsOf(await json(meta.url));
       state.manifest=manifest;state.view=view;state.index=new Map(rows.filter(x=>x?.code).map(x=>[String(x.code),x]));
       state.zones=new Map();
       if(view==='close'){
+        const sm=manifest?.datasets?.decision_close_summary;
+        if(sm){
+          const summary=rowsOf(await json(sm.url));
+          for(const row of summary){if(!row?.code)continue;const code=String(row.code);state.index.set(code,{...(state.index.get(code)||{}),...row})}
+        }
         const zm=manifest?.datasets?.zone_close;
         if(zm){const zs=await json(zm.url);state.zones=new Map((Array.isArray(zs)?zs:[]).filter(z=>z?.zone_id).map(z=>[String(z.zone_id),z]))}
       }
@@ -106,7 +112,7 @@ window.RadarUniverseSearch={search:searchUniverse,clear(){US.rows=null;US.promis
       if(cells[0])setText(cells[0].querySelector('strong'),zoneText(s));
       if(cells[1])setText(cells[1].querySelector('strong'),zoneText(r));
       const action=actionText(d,s,r);if(action)setText(strip.querySelector('.ahd-card-action span'),action);
-      if(s){setText(strip.querySelector('.ahd-card-fail span'),`有效跌破 S1 ${fmtPrice(s.low??s.center)}：連續對應K收破，或跌破後反抽站不回且量價轉弱。`)}
+      if(s)setText(strip.querySelector('.ahd-card-fail span'),`有效跌破 S1 ${fmtPrice(s.low??s.center)}：連續對應K收破，或跌破後反抽站不回且量價轉弱。`);
     }
   }
   function scheduleZoneSync(){clearTimeout(state.zoneTimer);state.zoneTimer=setTimeout(async()=>{if(activeView()==='close'){await loadDecisionContext();syncCardZones()}},40)}
