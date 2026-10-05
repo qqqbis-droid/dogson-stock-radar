@@ -1,1 +1,1 @@
-2026-09-30 deploy product hardening phase 2: shadow progress + private portfolio reason lifecycle
+2026-10-06 holdings launch-context + shard S/R hotfix
