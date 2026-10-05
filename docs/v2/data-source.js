@@ -126,7 +126,7 @@
       if(!document.getElementById('inukoPortfolioPriorityLadderScript')){
         const ladder=document.createElement('script');
         ladder.id='inukoPortfolioPriorityLadderScript';
-        ladder.src='./portfolio-priority-ladder-v1.js?v=20261005ladder1';
+        ladder.src='./portfolio-priority-ladder-v1.js?v=20261006srfix1';
         document.head.appendChild(ladder);
       }
     },0);
