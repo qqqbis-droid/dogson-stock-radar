@@ -14,7 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "docs" / "data"
 TW = ZoneInfo("Asia/Taipei")
 MIN_ROWS = 300
-MIN_BRIDGED_ROWS = 200
+MIN_SNAPSHOT_ROWS = 300
+MIN_SNAPSHOT_RATIO = 0.70
 MAX_QUOTE_AGE_MIN = 12
 MAX_STRUCTURE_AGE_MIN = 20
 
@@ -98,6 +99,7 @@ def main() -> None:
     actionable_session = now.weekday() < 5 and time(9, 5) <= now.time() <= time(13, 35)
     today = now.date().isoformat()
     errors = []
+    warnings = []
 
     if len(irows) < MIN_ROWS:
         errors.append(f"intraday rows too small: {len(irows)} < {MIN_ROWS}")
@@ -114,6 +116,8 @@ def main() -> None:
 
     bdate = ymd(bridge.get("trade_date"))
     bridged = int(bridge.get("bridged_rows") or 0)
+    official_snapshot_rows = int(bridge.get("official_snapshot_rows") or bridge.get("quoted_rows") or 0)
+    snapshot_ratio = (official_snapshot_rows / len(irows)) if irows else 0.0
     quote_time = bridge.get("latest_quote_time")
     structure_time = bridge.get("latest_structure_time")
     quote_age = age_minutes(quote_time, now)
@@ -126,8 +130,11 @@ def main() -> None:
             errors.append(f"active-session intraday date must be today {today}, got {idate or 'missing'}")
         if bdate != today:
             errors.append(f"active-session MIS bridge date must be today {today}, got {bdate or 'missing'}")
-        if bridged < MIN_BRIDGED_ROWS:
-            errors.append(f"MIS bridged rows too small: {bridged} < {MIN_BRIDGED_ROWS}")
+        min_snapshot = max(MIN_SNAPSHOT_ROWS, int(len(irows) * MIN_SNAPSHOT_RATIO))
+        if official_snapshot_rows < min_snapshot:
+            errors.append(f"MIS official snapshot coverage too small: {official_snapshot_rows} < {min_snapshot}")
+        if bridged == 0:
+            warnings.append("本輪沒有可驗證的新鮮5分結構；允許發布即時報價，但V2逐檔Gate必須維持不可執行")
 
     if actionable_session:
         if quote_age is None:
@@ -151,6 +158,8 @@ def main() -> None:
         "daytrade_rows": len(drows),
         "bridge_date": bdate or None,
         "bridged_rows": bridged,
+        "official_snapshot_rows": official_snapshot_rows,
+        "snapshot_coverage_pct": round(snapshot_ratio * 100, 1),
         "latest_quote_time": quote_time,
         "latest_structure_time": structure_time,
         "quote_age_minutes": round(quote_age, 2) if quote_age is not None else None,
@@ -158,6 +167,7 @@ def main() -> None:
         "max_quote_age_minutes": MAX_QUOTE_AGE_MIN,
         "max_structure_age_minutes": MAX_STRUCTURE_AGE_MIN,
         "publishable": not errors,
+        "warnings": warnings,
         "errors": errors,
     }
     print(json.dumps(report, ensure_ascii=False, indent=2))

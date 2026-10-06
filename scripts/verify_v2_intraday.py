@@ -107,6 +107,42 @@ def verify_chip_source_dates(root, manifest):
     print("V2 chip-date truth contract verified")
 
 
+def _reference_only(rows, mission):
+    if not rows:
+        return False
+    for x in rows:
+        if bool(x.get("actionable")):
+            return False
+        bucket = str(x.get("opportunity_bucket") or "")
+        action = str(x.get("action_state") or "")
+        overlays = set(str(v) for v in (x.get("risk_overlays") or []))
+        missing = set(str(v) for v in (x.get("missing_fields") or []))
+        structure_blocked = (
+            "DATA_QUALITY_RISK" in overlays
+            or "fresh_5m_structure" in missing
+            or action == "DATA_STALE"
+        )
+        expected = "RESEARCH_ONLY" if mission == "intraday" else "STALE"
+        if bucket != expected or not structure_blocked:
+            return False
+    return True
+
+
+def _verify_reference_only_zones(root, manifest, zone_key, decisions):
+    zones = load(resolve(root, manifest["datasets"][zone_key]["url"]))
+    if not isinstance(zones, list):
+        raise SystemExit(f"{zone_key} reference-only payload must be a list")
+    executable = [z for z in zones if not _is_disabled_reference_marker(z)]
+    if executable:
+        raise SystemExit(f"{zone_key} reference-only mission published executable zones")
+    referenced = [
+        str(x.get("code") or "?") for x in decisions
+        if (x.get("support_zone_ids") or x.get("resistance_zone_ids"))
+    ]
+    if referenced:
+        raise SystemExit(f"{zone_key} reference-only decisions still reference zones: {referenced[:10]}")
+    print(zone_key, "quote/reference-only contract verified; executable zones=0")
+
 def _is_disabled_reference_marker(zone):
     if not isinstance(zone, dict):
         return False
@@ -166,32 +202,21 @@ def main():
             raise SystemExit(f"{key} missing from active build: {p}")
 
     verify_chip_source_dates(root, m)
-    verify_ranked_zones(root, m, "zone_intraday")
+    intraday_decisions = decision_rows(root, m, "decision_intraday_detail")
+    intraday_reference_only = _reference_only(intraday_decisions, "intraday")
+    if intraday_reference_only:
+        _verify_reference_only_zones(root, m, "zone_intraday", intraday_decisions)
+    else:
+        verify_ranked_zones(root, m, "zone_intraday")
 
-    # After market close every daytrade row is DATA_STALE/reference-only. Stock
+    # Quote-only / structure-gated daytrade is reference-only even while the
     # decisions must have no zone references. For compatibility with an older
     # bundle-level non-empty gate, enrich_zones may publish exactly one disabled
     # EXPIRED/BROKEN marker; it must never be executable or attached to a stock.
     day_decisions = decision_rows(root, m, "decision_daytrade_detail")
-    day_reference_only = bool(day_decisions) and all(
-        str(x.get("action_state") or "") == "DATA_STALE" for x in day_decisions
-    )
+    day_reference_only = _reference_only(day_decisions, "daytrade")
     if day_reference_only:
-        day_zones = load(resolve(root, m["datasets"]["zone_daytrade"]["url"]))
-        if not isinstance(day_zones, list):
-            raise SystemExit("reference-only zone_daytrade must be a list")
-        executable = [z for z in day_zones if not _is_disabled_reference_marker(z)]
-        if executable:
-            raise SystemExit("reference-only daytrade published executable zones")
-        if len(day_zones) > 1:
-            raise SystemExit("reference-only daytrade must publish at most one disabled marker")
-        referenced = [
-            str(x.get("code") or "?") for x in day_decisions
-            if (x.get("support_zone_ids") or x.get("resistance_zone_ids"))
-        ]
-        if referenced:
-            raise SystemExit(f"reference-only daytrade decisions still reference zones: {referenced[:10]}")
-        print("zone_daytrade reference-only contract verified; executable zones=0")
+        _verify_reference_only_zones(root, m, "zone_daytrade", day_decisions)
     else:
         verify_ranked_zones(root, m, "zone_daytrade")
 
@@ -199,7 +224,10 @@ def main():
     # cross-mission detail panel. It must not silently fall back to legacy-only.
     verify_ranked_zones(root, m, "zone_close")
 
-    run_mission_gate("intraday")
+    if intraday_reference_only:
+        print("intraday mission evidence gate skipped: quote-only LIVE contract verified")
+    else:
+        run_mission_gate("intraday")
     if day_reference_only:
         # validate_mission_evidence expects executable S/R evidence. Running it
         # against a frozen mission would contradict the contract proven above:
