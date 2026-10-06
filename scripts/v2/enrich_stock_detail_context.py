@@ -176,7 +176,7 @@ COMMON = (
 )
 CLOSE = (
     "ma5", "ma10", "ma20", "ma60", "ma5_slope5_pct", "ma10_slope5_pct", "ma20_slope5_pct", "ma60_slope5_pct",
-    "dist20", "ret5", "ret20", "rsi", "macd_h", "macd_acc", "kd_k", "kd_d", "kd_cross_up",
+    "dist20", "ret3", "ret5", "ret10", "ret20", "rsi", "macd_h", "macd_acc", "kd_k", "kd_d", "kd_cross_up",
     "sar", "sar_state", "sar_flip_age", "break3", "break20", "trend", "trend60",
     "platform_high20", "platform_low20", "platform_width20_pct", "breakout_pct", "recent_breakout_age",
     "recent_breakout_volume_x", "recent_breakout_width_pct", "failed_breakout", "close_position_pct", "upper_wick_pct", "body_pct",
@@ -190,6 +190,12 @@ CLOSE = (
     "margin_1d_pct", "margin_3d_pct", "margin_5d_pct", "margin_status",
     "chip_model_version", "chip_score_v2_raw", "chip_score_v2", "chip_score_legacy", "chip_score_delta",
     "chip_confidence_v2", "chip_verdict_v2", "chip_summary_v2", "chip_components_v2",
+    "sector_model_version", "sector_score_v2", "sector_confidence_v2", "sector_verdict_v2",
+    "sector_summary_v2", "sector_components_v2", "sector_member_count_v2",
+    "liquidity_model_version", "liquidity_score_v2", "liquidity_confidence_v2", "liquidity_verdict_v2",
+    "liquidity_summary_v2", "liquidity_components_v2", "liquidity_alerts_v2",
+    "median_turnover20", "min_turnover20", "turnover_cv20", "turnover_days_ge30m20", "turnover_days_ge80m20",
+    "turnover_today", "turnover_vs_median20", "price_impact_median20",
     "swing_components", "sector_detail",
 )
 INTRADAY = (
