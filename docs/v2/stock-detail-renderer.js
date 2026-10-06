@@ -76,13 +76,34 @@ function style(){
 .sdr-note{font-size:.72rem;color:var(--muted);line-height:1.45;margin-top:7px}.sdr-explain{margin:12px 0 10px;border:1px solid var(--line);border-radius:10px;background:var(--soft)}.sdr-explain summary{padding:10px 11px;cursor:pointer;font-weight:750;font-size:.86rem;list-style:none}.sdr-explain summary::-webkit-details-marker{display:none}.sdr-explain summary:after{content:'＋';float:right}.sdr-explain[open] summary:after{content:'－'}.sdr-explain-body{padding:0 10px 10px}.sdr-exp-card{padding:8px 9px;border-top:1px dashed var(--line)}.sdr-exp-card:first-child{border-top:0}.sdr-exp-head{display:flex;justify-content:space-between;gap:10px;font-size:.82rem}.sdr-exp-item{display:grid;grid-template-columns:36px 1fr;gap:3px 7px;padding-top:5px;font-size:.78rem}.sdr-exp-pts{font-weight:800}.sdr-exp-detail{grid-column:2;color:var(--muted);font-size:.7rem;line-height:1.35}
 .sr2-grid{display:grid;gap:9px}.sr2-card{border:1px solid var(--line);border-radius:14px;padding:11px 12px;background:var(--card)}.sr2-card.support{border-left:4px solid var(--green)}.sr2-card.resistance{border-left:4px solid var(--red)}.sr2-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.sr2-name{font-size:.78rem;font-weight:850}.sr2-state{font-size:.66rem;padding:3px 7px;border-radius:999px;background:var(--soft);color:var(--muted)}.sr2-main{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;margin:7px 0 4px}.sr2-price{font-size:1.45rem;font-weight:900}.sr2-distance{text-align:right;font-size:.78rem;font-weight:750}.sr2-band{font-size:.7rem;color:var(--muted)}.sr2-evidence{margin-top:7px;font-size:.72rem;line-height:1.45}.sr2-strength{margin-top:5px;font-size:.69rem;color:var(--muted)}.sr2-rule{margin-top:7px;padding-top:7px;border-top:1px dashed var(--line);font-size:.68rem;line-height:1.5;color:var(--muted)}
 .sdr-extra-loading{margin:12px 0;padding:10px 11px;border-radius:10px;background:var(--soft);font-size:.72rem;color:var(--muted)}
-.chip2-card{margin-top:9px;border:1px solid var(--line);border-radius:12px;padding:10px 11px;background:var(--card)}.chip2-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline}.chip2-head b{font-size:.86rem}.chip2-head strong{font-size:1rem}.chip2-summary{margin-top:3px;font-size:.75rem;line-height:1.45;color:var(--muted)}.chip2-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.chip2-meta span{font-size:.66rem;padding:3px 6px;border-radius:999px;background:var(--soft);color:var(--muted)}.chip2-card details{margin-top:7px;border-top:1px dashed var(--line);padding-top:6px}.chip2-card summary{cursor:pointer;list-style:none;font-size:.72rem;font-weight:800;color:var(--muted)}.chip2-card summary::-webkit-details-marker{display:none}.chip2-card summary:after{content:'＋';float:right}.chip2-card details[open] summary:after{content:'－'}.chip2-grid{display:grid;gap:5px;margin-top:6px}.chip2-row{display:grid;grid-template-columns:74px 58px 1fr;gap:7px;align-items:start;font-size:.7rem;line-height:1.42}.chip2-row b{font-size:.7rem}.chip2-row strong{text-align:right}.chip2-row span{color:var(--muted)}
+.tech2-card,.chip2-card{margin-top:9px;border:1px solid var(--line);border-radius:12px;padding:10px 11px;background:var(--card)}.tech2-head,.chip2-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline}.tech2-head b,.chip2-head b{font-size:.86rem}.tech2-head strong,.chip2-head strong{font-size:1rem}.tech2-summary,.chip2-summary{margin-top:3px;font-size:.75rem;line-height:1.45;color:var(--muted)}.tech2-meta,.chip2-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.tech2-meta span,.chip2-meta span{font-size:.66rem;padding:3px 6px;border-radius:999px;background:var(--soft);color:var(--muted)}.tech2-card details,.chip2-card details{margin-top:7px;border-top:1px dashed var(--line);padding-top:6px}.tech2-card summary,.chip2-card summary{cursor:pointer;list-style:none;font-size:.72rem;font-weight:800;color:var(--muted)}.tech2-card summary::-webkit-details-marker,.chip2-card summary::-webkit-details-marker{display:none}.tech2-card summary:after,.chip2-card summary:after{content:'＋';float:right}.tech2-card details[open] summary:after,.chip2-card details[open] summary:after{content:'－'}.tech2-grid,.chip2-grid{display:grid;gap:5px;margin-top:6px}.tech2-row,.chip2-row{display:grid;grid-template-columns:76px 58px 1fr;gap:7px;align-items:start;font-size:.7rem;line-height:1.42}.tech2-row b,.chip2-row b{font-size:.7rem}.tech2-row strong,.chip2-row strong{text-align:right}.tech2-row span,.chip2-row span{color:var(--muted)}
 @media(max-width:520px){.sdr-quick{grid-template-columns:repeat(3,1fr)}.sr2-price{font-size:1.3rem}}
 `;
   document.head.appendChild(st);
 }
 
 function tile(label,value,sub=""){return `<div><span>${sesc(label)}</span><b>${sesc(value??"—")}</b>${sub?`<small>${sesc(sub)}</small>`:""}</div>`}
+function hourlyConfirm(x){
+  if(!x||x.data_status!=="OK")return "60分資料待補";
+  const cat=String(x.category60||"");
+  if(cat==="EARLY")return "60分初升確認";
+  if(cat==="PRE_CROSS")return "60分金叉前夕";
+  if(["STABLE_CONT","ACCEL_CONT"].includes(cat))return "60分趨勢確認";
+  if(x.dir20==="DOWN")return "60分短線修正";
+  if(x.dir20==="UP"&&["UP","FLAT"].includes(x.dir60))return "60分偏多";
+  return "60分中性";
+}
+function tech2Section(x){
+  if(!x||sn(x.technical_score_v2)==null)return"";
+  const score=sn(x.technical_score_v2),conf=sn(x.technical_confidence_v2),legacy=sn(x.technical_score_legacy),delta=sn(x.technical_score_delta),parts=x.technical_components_v2||{};
+  const order=["trend","breakout","volume_price","momentum","relative","risk_quality"];
+  const rows=order.map(k=>{const p=parts[k];if(!p)return"";return `<div class="tech2-row"><b>${sesc(p.label||k)}</b><strong>${sf(p.score,1)}/${sf(p.max,0)}</strong><span>${sesc(p.detail||"")}</span></div>`}).join("");
+  const deltaText=legacy!=null&&delta!=null?`舊制 ${sf(legacy,1)}/50 → 新制 ${sf(score,1)}/50（${ssigned(delta,1)}）`:"";
+  const sar=x.sar!=null?`SAR ${x.sar_state==="BULL"?"多":"空"} ${sp(x.sar)}`:"";
+  const kd=x.kd_k!=null&&x.kd_d!=null?`KD ${sf(x.kd_k,0)}/${sf(x.kd_d,0)}`:"";
+  const h60=hourlyConfirm(x);
+  return `<div class="tech2-card"><div class="tech2-head"><b>犬子技術 2.0 · ${sesc(x.technical_verdict_v2||"")}</b><strong>${sf(score,1)}/50</strong></div><div class="tech2-summary">${sesc(x.technical_summary_v2||"技術結構待確認")}｜生命週期：${sesc(x.technical_lifecycle_v2||"—")}</div><div class="tech2-meta"><span>資料信心 ${sf(conf,0)}%</span><span>${sesc(h60)}（不計分）</span>${sar?`<span>${sesc(sar)}</span>`:""}${kd?`<span>${sesc(kd)}</span>`:""}${deltaText?`<span>${sesc(deltaText)}</span>`:""}</div><details><summary>查看 6 項技術結構</summary><div class="tech2-grid">${rows||'<div class="sdr-note">技術分項待補。</div>'}</div></details></div>`;
+}
 function chip2Section(x){
   if(!x||sn(x.chip_score_v2_raw)==null)return"";
   const raw=sn(x.chip_score_v2_raw),pts=sn(x.chip_score_v2),conf=sn(x.chip_confidence_v2),legacy=sn(x.chip_score_legacy),delta=sn(x.chip_score_delta),parts=x.chip_components_v2||{};
@@ -173,7 +194,7 @@ function zoneSection(supports,resistances,px){
 
 function evidence(view,x){
   if(!x)return'<div class="detail-note warn">同一 Atomic Build 的個股證據尚未建立，已停止補猜。</div>';
-  if(view==="close")return `<div class="sdr-evidence">${tile("收盤",sp(x.close),ssigned(x.day_change,2,"%"))}${tile("5 / 10 / 20MA",`${sf(x.ma5,2)} / ${sf(x.ma10,2)} / ${sf(x.ma20,2)}`,`距20日線 ${ssigned(x.dist20,1,"%")}`)}${tile("量比",`${sf(x.vol_x,2)}x`,`20日均量 ${sf(x.avg_volume20,0)}`)}${tile("RSI / MACD",`${sf(x.rsi,1)} / ${ssigned(x.macd_h,2)}`)}${tile("外資今日",slots(x.foreign_net_latest),x.foreign_streak!=null?`連續 ${Number(x.foreign_streak)>0?"+":""}${sf(x.foreign_streak,0)} 日`:(x.foreign_3buy?"外資連3買":"非連3買"))}${tile("外資3日占量",ssigned(x.foreign_3d_volume_pct,1,"%"),slots(x.foreign_3d_net))}${tile("借券3日",ssigned(x.sbl_3change_pct,1,"%"),x.sbl_3down?"借券下降":"未連續下降")}${tile("融資3日",ssigned(x.margin_3d_pct,1,"%"),x.margin_status||"")}${tile("族群",x.sector_score_label||x.industry_name||"官方產業代理",`強勢比 ${sf(x.sector_hot_ratio)}%`)}</div>${chip2Section(x)}`;
+  if(view==="close")return `<div class="sdr-evidence">${tile("收盤",sp(x.close),ssigned(x.day_change,2,"%"))}${tile("5 / 10 / 20MA",`${sf(x.ma5,2)} / ${sf(x.ma10,2)} / ${sf(x.ma20,2)}`,`距20日線 ${ssigned(x.dist20,1,"%")}`)}${tile("量比",`${sf(x.vol_x,2)}x`,`20日均量 ${sf(x.avg_volume20,0)}`)}${tile("RSI / MACD",`${sf(x.rsi,1)} / ${ssigned(x.macd_h,2)}`)}${tile("外資今日",slots(x.foreign_net_latest),x.foreign_streak!=null?`連續 ${Number(x.foreign_streak)>0?"+":""}${sf(x.foreign_streak,0)} 日`:(x.foreign_3buy?"外資連3買":"非連3買"))}${tile("外資3日占量",ssigned(x.foreign_3d_volume_pct,1,"%"),slots(x.foreign_3d_net))}${tile("借券3日",ssigned(x.sbl_3change_pct,1,"%"),x.sbl_3down?"借券下降":"未連續下降")}${tile("融資3日",ssigned(x.margin_3d_pct,1,"%"),x.margin_status||"")}${tile("族群",x.sector_score_label||x.industry_name||"官方產業代理",`強勢比 ${sf(x.sector_hot_ratio)}%`)}</div>${tech2Section(x)}${chip2Section(x)}`;
   const rel=x.relative_multiframe||{},mt=x.multi_timeframe||{};
   return `<div class="sdr-evidence">${tile("現價",sp(x.close),ssigned(x.day_change,2,"%"))}${tile("VWAP",sf(x.vwap,2),`距VWAP ${ssigned(x.vwap_dist,2,"%")}`)}${tile("15分 / 60分",`${ssigned(x.ret15,2,"%")} / ${ssigned(x.ret60,2,"%")}`)}${tile("量速",`${sf(x.pace,2)}x`,`振幅 ${sf(x.amplitude_pct,2)}%`)}${tile("區間位置",`${sf(x.range_position_pct,1)}%`,x.amplitude_regime||"")}${tile("買一 / 賣一",`${sp(x.quote_bid1)} / ${sp(x.quote_ask1)}`)}${tile("多時框",mt.label||"—",mt["60m"]?.label||"")}${tile("相對市場",rel.label||"—",rel.relative_pct?.day!=null?`日 ${ssigned(rel.relative_pct.day,2,"%")}`:"")}${tile("籌碼背景",x.chip_background||"—",`籌碼分 ${sf(x.chip_score)}`)}${tile("族群",x.sector_score_label||x.industry_name||"官方產業代理",`強勢比 ${sf(x.sector_hot_ratio)}%`)}</div>`;
 }
@@ -222,9 +243,9 @@ function intradayItems(kind,e){
 }
 function explain(view,d,e){
   if(view==="close"){
-    const x=d.score_explanations||{},chipCard=e?.chip_model_version?"":expCard("籌碼",x.chip);
-    const note=e?.chip_model_version?"籌碼採犬子2.0：內部先算100分，再固定折算為盤後25分；資料信心獨立，不把缺資料當利空。":"籌碼25分。";
-    return `<details class="sdr-explain"><summary>評分依據｜為什麼是這個分數</summary><div class="sdr-explain-body"><div class="sdr-note">波段品質＝技術50＋籌碼25＋族群15＋流動性10；進場位置另計100。 ${sesc(note)}</div>${expCard("技術",x.technical)}${chipCard}${expCard("族群",x.sector)}${expCard("流動性",x.liquidity)}${expCard("進場位置",x.entry_position)}<div class="sdr-note">分數代表條件同步程度，不代表上漲機率。</div></div></details>`;
+    const x=d.score_explanations||{},techCard=e?.technical_model_version?"":expCard("技術",x.technical),chipCard=e?.chip_model_version?"":expCard("籌碼",x.chip);
+    const notes=[];if(e?.technical_model_version)notes.push("技術採犬子2.0：趨勢、型態、量價、動能、相對強弱、結構風險共50分；60分K只作確認，不重複計分。");if(e?.chip_model_version)notes.push("籌碼採犬子2.0：內部先算100分，再固定折算為盤後25分；資料信心獨立。");
+    return `<details class="sdr-explain"><summary>評分依據｜為什麼是這個分數</summary><div class="sdr-explain-body"><div class="sdr-note">波段品質＝技術50＋籌碼25＋族群15＋流動性10；進場位置另計100。 ${sesc(notes.join(" "))}</div>${techCard}${chipCard}${expCard("族群",x.sector)}${expCard("流動性",x.liquidity)}${expCard("進場位置",x.entry_position)}<div class="sdr-note">分數代表條件同步程度，不代表上漲機率。</div></div></details>`;
   }
   if(view==="intraday"){
     const c=e?.intraday_components||{};
