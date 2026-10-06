@@ -177,11 +177,17 @@ jobs:
 
           chip2=[r for r in rows if r.get('chip_model_version')=='inuko-chip-v2.0' and isinstance(r.get('chip_components_v2'),dict)]
           tech2=[r for r in rows if r.get('technical_model_version')=='inuko-tech-v2.0' and isinstance(r.get('technical_components_v2'),dict)]
-          print('chip2 rows:',len(chip2),'/',len(rows),'tech2 rows:',len(tech2),'/',len(rows))
+          sector2=[r for r in rows if r.get('sector_model_version')=='inuko-sector-v2.0' and isinstance(r.get('sector_components_v2'),dict)]
+          liquidity2=[r for r in rows if r.get('liquidity_model_version')=='inuko-liquidity-v2.0' and isinstance(r.get('liquidity_components_v2'),dict)]
+          print('chip2 rows:',len(chip2),'/',len(rows),'tech2 rows:',len(tech2),'/',len(rows),'sector2 rows:',len(sector2),'/',len(rows),'liquidity2 rows:',len(liquidity2),'/',len(rows))
           if rows and len(chip2) != len(rows):
               raise SystemExit(f'chip score 2.0 missing from {len(rows)-len(chip2)} close rows')
           if rows and len(tech2) != len(rows):
               raise SystemExit(f'technical score 2.0 missing from {len(rows)-len(tech2)} close rows')
+          if rows and len(sector2) != len(rows):
+              raise SystemExit(f'sector score 2.0 missing from {len(rows)-len(sector2)} close rows')
+          if rows and len(liquidity2) != len(rows):
+              raise SystemExit(f'liquidity score 2.0 missing from {len(rows)-len(liquidity2)} close rows')
 
           def fnum(v):
               try:
@@ -204,6 +210,24 @@ jobs:
               cscore=fnum(r.get('chip_score_v2'))
               if craw is None or cscore is None or any(v is None for v in cvals) or abs(sum(cvals)-craw)>0.11 or abs(craw/4.0-cscore)>0.11:
                   bad_math.append(f'{code}:chip:{cvals}->{craw}/100->{cscore}/25')
+
+              sparts=r.get('sector_components_v2') or {}
+              svals=[fnum((sparts.get(k) or {}).get('score')) for k in ('breadth','leaders','persistence','capital_resonance','structure','taxonomy')]
+              sscore=fnum(r.get('sector_score_v2'))
+              if sscore is None or any(v is None for v in svals) or abs(sum(svals)-sscore)>0.11:
+                  bad_math.append(f'{code}:sector:{svals}->{sscore}/15')
+
+              lparts=r.get('liquidity_components_v2') or {}
+              lvals=[fnum((lparts.get(k) or {}).get('score')) for k in ('avg_turnover','stability','price_impact','continuity','crowding')]
+              lscore=fnum(r.get('liquidity_score_v2'))
+              if lscore is None or any(v is None for v in lvals) or abs(sum(lvals)-lscore)>0.11:
+                  bad_math.append(f'{code}:liquidity:{lvals}->{lscore}/10')
+
+              sw=r.get('swing_components') or {}
+              expected=(fnum(r.get('technical_score_v2')),fnum(r.get('chip_score_v2')),sscore,lscore)
+              actual=tuple(fnum(sw.get(k)) for k in ('technical','chip','sector','liquidity'))
+              if any(v is None for v in expected+actual) or any(abs(a-b)>0.11 for a,b in zip(expected,actual)):
+                  bad_math.append(f'{code}:swing_components:{actual}->{expected}')
           print('score v2 math checked:',len(rows),'bad=',len(bad_math))
           if bad_math:
               raise SystemExit(f'score v2 explanation math mismatch {bad_math[:20]}')
@@ -211,7 +235,7 @@ jobs:
           formula=obj.get('score_formula') or {}
           if float(formula.get('technical') or 0) != 50 or float(formula.get('chip') or 0) != 25:
               raise SystemExit(f'fixed score contract drifted: {formula}')
-          if formula.get('technical_model') != 'inuko-tech-v2.0' or formula.get('chip_model') != 'inuko-chip-v2.0':
+          if formula.get('technical_model') != 'inuko-tech-v2.0' or formula.get('chip_model') != 'inuko-chip-v2.0' or formula.get('sector_model') != 'inuko-sector-v2.0' or formula.get('liquidity_model') != 'inuko-liquidity-v2.0':
               raise SystemExit(f'v2 score model metadata missing: {formula}')
 
           structured=[r for r in rows if (r.get('support_levels') or r.get('resistance_levels'))]
