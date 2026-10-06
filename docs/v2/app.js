@@ -141,7 +141,7 @@ function quickValue(item,buckets,stages){
 }
 
 const LIVE_POLL_MS=45000;
-function isLiveAutoView(){return state.view==="intraday"||state.view==="daytrade"}
+function isLiveAutoView(){return ["intraday","close","portfolio","daytrade"].includes(state.view)}
 function manifestMissionMeta(manifest,view=state.view){const cfg=missionConfig[view];return cfg?.summary?manifest?.datasets?.[cfg.summary]:null}
 function manifestMissionKey(manifest,view=state.view){const meta=manifestMissionMeta(manifest,view);return `${manifest?.active_build_id||""}|${meta?.as_of||""}`}
 async function applyFreshManifest(manifest,{source="manual"}={}){
