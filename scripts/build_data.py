@@ -2479,10 +2479,25 @@ def _apply_sector_score_v2(r, group_rows, source, label):
         "taxonomy": _sector_v2_component("族群定義可信度", taxonomy, 1, f"{source or '待分類'}｜{label or '—'}｜樣本 {total} 檔"),
     }
     score15 = round(sum(x["score"] for x in components.values()), 1)
+    cap = 15.0
+    cap_note = None
     if "官方產業" in str(source or ""):
-        score15 = min(9.0, score15)
+        cap = 9.0
+        cap_note = "官方大產業代理最高9/15，避免過寬分類被誤判成精準族群共振"
     elif str(source or "") == "待分類":
-        score15 = min(4.5, score15)
+        cap = 4.5
+        cap_note = "待分類族群最高4.5/15"
+    if score15 > cap and score15 > 0:
+        scale = cap / score15
+        for item in components.values():
+            item["score"] = round(float(item["score"]) * scale, 1)
+        # absorb one-decimal rounding drift into taxonomy so displayed parts sum exactly.
+        drift = round(cap - sum(float(x["score"]) for x in components.values()), 1)
+        if abs(drift) >= .1:
+            components["taxonomy"]["score"] = round(max(0.0, min(float(components["taxonomy"]["max"]), float(components["taxonomy"]["score"]) + drift)), 1)
+        score15 = round(sum(float(x["score"]) for x in components.values()), 1)
+        if cap_note:
+            components["taxonomy"]["detail"] = f'{components["taxonomy"]["detail"]}｜{cap_note}'
 
     confidence = 100.0 if narrow and total >= 5 else 92.0 if narrow and total >= 3 else 78.0 if narrow and total >= 2 else 70.0 if total >= 8 else 58.0 if total >= 3 else 40.0
     if "官方產業" in str(source or ""):
