@@ -705,6 +705,43 @@ def build_chip_signals(codes: Iterable[str], market_map: dict, cache_dir: Path) 
         foreign_3buy = len(foreign_vals) >= 3 and all(v > 0 for v in foreign_vals[:3])
         sbl_3down = len(sbl_vals) >= 4 and (sbl_vals[0] < sbl_vals[1] < sbl_vals[2] < sbl_vals[3])
 
+        def signed_streak(vals):
+            if not vals:
+                return None
+            first = vals[0]
+            if first == 0:
+                return 0
+            sign = 1 if first > 0 else -1
+            n = 0
+            for value in vals:
+                if value == 0 or (1 if value > 0 else -1) != sign:
+                    break
+                n += 1
+            return sign * n
+
+        foreign_5d_net = sum(foreign_vals[:5]) if len(foreign_vals) >= 5 else None
+        foreign_20d_net = sum(foreign_vals[:20]) if len(foreign_vals) >= 20 else None
+        foreign_buy_days_10 = sum(v > 0 for v in foreign_vals[:10]) if len(foreign_vals) >= 5 else None
+        foreign_streak = signed_streak(foreign_vals[:10])
+        trust_3d_net = sum(trust_vals[:3]) if len(trust_vals) >= 3 else None
+        trust_5d_net = sum(trust_vals[:5]) if len(trust_vals) >= 5 else None
+        trust_buy_days_10 = sum(v > 0 for v in trust_vals[:10]) if len(trust_vals) >= 5 else None
+        trust_streak = signed_streak(trust_vals[:10])
+
+        sbl_1d_pct = None
+        if len(sbl_vals) >= 2 and sbl_vals[1] not in (None, 0):
+            sbl_1d_pct = (sbl_vals[0] / sbl_vals[1] - 1) * 100
+        sbl_5d_pct = None
+        if len(sbl_vals) >= 6 and sbl_vals[5] not in (None, 0):
+            sbl_5d_pct = (sbl_vals[0] / sbl_vals[5] - 1) * 100
+
+        margin_1d_pct = None
+        if len(margin_vals) >= 2 and margin_vals[1] not in (None, 0):
+            margin_1d_pct = (margin_vals[0] / margin_vals[1] - 1) * 100
+        margin_5d_pct = None
+        if len(margin_vals) >= 6 and margin_vals[5] not in (None, 0):
+            margin_5d_pct = (margin_vals[0] / margin_vals[5] - 1) * 100
+
         margin_3d_pct = None
         if len(margin_vals) >= 4 and margin_vals[3] not in (None, 0):
             margin_3d_pct = (margin_vals[0] / margin_vals[3] - 1) * 100
@@ -727,12 +764,24 @@ def build_chip_signals(codes: Iterable[str], market_map: dict, cache_dir: Path) 
             "foreign_3buy": foreign_3buy if len(foreign_vals) >= 3 else None,
             "foreign_net_latest": foreign_vals[0] if foreign_vals else None,
             "foreign_3d_net": sum(foreign_vals[:3]) if len(foreign_vals) >= 3 else None,
+            "foreign_5d_net": foreign_5d_net,
+            "foreign_20d_net": foreign_20d_net,
+            "foreign_buy_days_10": foreign_buy_days_10,
+            "foreign_streak": foreign_streak,
             "sbl_3down": sbl_3down if len(sbl_vals) >= 4 else None,
             "sbl_balance_latest": sbl_vals[0] if sbl_vals else None,
+            "sbl_1d_pct": sbl_1d_pct,
             "sbl_3change_pct": ((sbl_vals[0] / sbl_vals[3] - 1) * 100) if len(sbl_vals) >= 4 and sbl_vals[3] else None,
+            "sbl_5d_pct": sbl_5d_pct,
             "trust_net_latest": trust_vals[0] if trust_vals else None,
+            "trust_3d_net": trust_3d_net,
+            "trust_5d_net": trust_5d_net,
+            "trust_buy_days_10": trust_buy_days_10,
+            "trust_streak": trust_streak,
             "margin_balance_latest": margin_vals[0] if margin_vals else None,
+            "margin_1d_pct": margin_1d_pct,
             "margin_3d_pct": margin_3d_pct,
+            "margin_5d_pct": margin_5d_pct,
             "margin_status": margin_status,
             "chip_combo": (foreign_3buy and sbl_3down) if (len(foreign_vals) >= 3 and len(sbl_vals) >= 4) else None,
             "chip_history_days": min(len(hs), 40),
