@@ -120,7 +120,7 @@
   }
 
   function closeEvidence(e){
-    return `<div class="isd-grid">${metric('收盤',price(e.close))}${metric('漲跌',pct(e.day_change))}${metric('量比',num(e.vol_x)==null?'—':`${fmt(e.vol_x,1)}x`)}${metric('距20MA',pct(e.dist20))}${metric('RSI',fmt(e.rsi,1))}${metric('MACD柱',fmt(e.macd_h,2))}${metric('外資今日',num(e.foreign_net_latest)==null?'—':`${fmt(e.foreign_net_latest/1000,1)}張`)}${metric('投信今日',num(e.trust_net_latest)==null?'—':`${fmt(e.trust_net_latest/1000,1)}張`)}${metric('借券3日',pct(e.sbl_3change_pct))}${metric('融資3日',pct(e.margin_3d_pct))}</div>`;
+    return `<div class="isd-grid">${metric('收盤',price(e.close))}${metric('漲跌',pct(e.day_change))}${metric('量比',num(e.vol_x)==null?'—':`${fmt(e.vol_x,1)}x`)}${metric('距20MA',pct(e.dist20))}${metric('RSI',fmt(e.rsi,1))}${metric('MACD柱',fmt(e.macd_h,2))}${metric('外資今日',num(e.foreign_net_latest)==null?'—':`${fmt(e.foreign_net_latest/1000,1)}張`)}${metric('投信今日',num(e.trust_net_latest)==null?'—':`${fmt(e.trust_net_latest/1000,1)}張`)}${metric('借券3日',pct(e.sbl_3change_pct))}${metric('融資3日',pct(e.margin_3d_pct))}${metric('族群 2.0',num(e.sector_score_v2)==null?'—':`${fmt(e.sector_score_v2,1)}/15`,e.sector_summary_v2||'')}${metric('流動性 2.0',num(e.liquidity_score_v2)==null?'—':`${fmt(e.liquidity_score_v2,1)}/10`,e.liquidity_summary_v2||'')}</div>`;
   }
 
   function evidenceHtml(e,view){
@@ -158,14 +158,22 @@
     if(view==='close'&&e){
       const hasTech2=e.technical_model_version==='inuko-tech-v2.0'&&e.technical_components_v2;
       const hasChip2=e.chip_model_version==='inuko-chip-v2.0'&&e.chip_components_v2;
-      if(hasTech2||hasChip2){
+      const hasSector2=e.sector_model_version==='inuko-sector-v2.0'&&e.sector_components_v2;
+      const hasLiquidity2=e.liquidity_model_version==='inuko-liquidity-v2.0'&&e.liquidity_components_v2;
+      if(hasTech2||hasChip2||hasSector2||hasLiquidity2){
         const tech=hasTech2?v2BreakdownCard('技術 2.0',e.technical_score_v2,50,e.technical_components_v2,['trend','breakout','volume_price','momentum','relative','risk_quality'],'technical'):'';
         const chip=hasChip2?v2BreakdownCard('籌碼 2.0',e.chip_score_v2,25,e.chip_components_v2,['foreign','trust','sbl','margin','consensus','price_chip','sector_inst'],'chip'):'';
-        const rest=x?['sector','liquidity','entry_position'].map(k=>{
+        const sector=hasSector2?v2BreakdownCard(`族群 2.0 · ${e.sector_verdict_v2||''}`,e.sector_score_v2,15,e.sector_components_v2,['breadth','leaders','persistence','capital_resonance','structure','taxonomy'],'technical'):'';
+        const liquidity=hasLiquidity2?v2BreakdownCard(`流動性 2.0 · ${e.liquidity_verdict_v2||''}`,e.liquidity_score_v2,10,e.liquidity_components_v2,['avg_turnover','stability','price_impact','continuity','crowding'],'technical'):'';
+        const fallbackKeys=[];
+        if(!hasSector2)fallbackKeys.push('sector');
+        if(!hasLiquidity2)fallbackKeys.push('liquidity');
+        fallbackKeys.push('entry_position');
+        const rest=x?fallbackKeys.map(k=>{
           const p=x[k]; if(!p)return'';
           return `<div class="isd-exp-card"><div class="isd-exp-head"><b>${esc({sector:'族群',liquidity:'流動性',entry_position:'進場位置'}[k]||k)}</b><strong>${fmt(p.score)}/${fmt(p.max,0)}</strong></div>${(p.items||[]).map(i=>`<div class="isd-exp-item"><b>${num(i.points)>0?'+':''}${fmt(i.points)}</b><span>${esc(i.label||'')}</span>${i.detail?`<span class="isd-exp-detail">${esc(i.detail)}</span>`:''}</div>`).join('')}</div>`;
         }).join(''):'';
-        return `<details class="isd-explain"><summary>評分依據｜為什麼是這個分數</summary><div class="isd-exp"><div class="isd-muted">波段品質＝技術50＋籌碼25＋族群15＋流動性10；進場位置另計100。技術使用2.0六分項，籌碼使用2.0七分項；60分K只作確認，不重複計分。</div>${tech}${chip}${rest}<div class="isd-muted">技術／籌碼以 2.0 evidence 為準；舊制加分清單不再拿來解釋新版分數。</div></div></details>`;
+        return `<details class="isd-explain"><summary>評分依據｜為什麼是這個分數</summary><div class="isd-exp"><div class="isd-muted">波段品質＝技術50＋籌碼25＋族群15＋流動性10；進場位置另計100。技術6分項、籌碼7分項、族群6分項、流動性5分項各自計分，不重複灌分。</div>${tech}${chip}${sector}${liquidity}${rest}<div class="isd-muted">族群只評估整體共振；個股相對族群強弱留在技術2.0。法人族群共振留在籌碼2.0。流動性採飽和式評分，不因單日爆量或超大型成交額無限加分。</div></div></details>`;
       }
     }
 
