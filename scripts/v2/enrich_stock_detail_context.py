@@ -176,8 +176,14 @@ COMMON = (
 )
 CLOSE = (
     "ma5", "ma10", "ma20", "dist20", "ret5", "ret20", "rsi", "macd_h", "macd_acc", "break3", "break20", "trend",
-    "foreign_3buy", "foreign_net_latest", "foreign_3d_net", "sbl_3down", "sbl_3change_pct", "trust_net_latest",
-    "margin_3d_pct", "margin_status", "swing_components", "sector_detail",
+    "foreign_3buy", "foreign_net_latest", "foreign_3d_net", "foreign_5d_net", "foreign_20d_net",
+    "foreign_buy_days_10", "foreign_streak", "foreign_3d_volume_pct",
+    "trust_net_latest", "trust_3d_net", "trust_5d_net", "trust_buy_days_10", "trust_streak",
+    "sbl_3down", "sbl_1d_pct", "sbl_3change_pct", "sbl_5d_pct",
+    "margin_1d_pct", "margin_3d_pct", "margin_5d_pct", "margin_status",
+    "chip_model_version", "chip_score_v2_raw", "chip_score_v2", "chip_score_legacy", "chip_score_delta",
+    "chip_confidence_v2", "chip_verdict_v2", "chip_summary_v2", "chip_components_v2",
+    "swing_components", "sector_detail",
 )
 INTRADAY = (
     "intraday_score", "intraday_components", "technical_score", "trend5", "break3", "break12",
