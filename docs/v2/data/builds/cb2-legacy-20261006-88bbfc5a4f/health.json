@@ -1,1 +1,0 @@
-{"build_id":"cb2-legacy-20261006-88bbfc5a4f","validation_passed":true,"warnings":["Phase 4 Migration Adapter：沿用 v1.x 公開市場資料，未升級的預測門檻仍為 Shadow。","公開 Preview 不包含私人庫存資料。","來源交易日不完全一致；各物件保留自己的 trade_date，禁止跨日合成可執行訊號。"],"errors":[],"source_dates":["2026-10-05","2026-10-06"],"counts":{"close":734,"intraday":724,"daytrade":724}}
