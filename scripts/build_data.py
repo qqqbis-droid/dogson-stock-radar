@@ -3245,6 +3245,7 @@ def add_component_scores(rows, market, preliminary_intraday=False):
 
 
 # Inuko sector + liquidity 2.0 official deployment trigger
+# Inuko sector/liquidity score 2.0 official deployment trigger
 # Inuko chip score 2.0 deployment trigger: official close rebuild
 def build_close():
     uni = get_universe()
