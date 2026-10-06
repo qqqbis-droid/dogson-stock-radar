@@ -427,6 +427,62 @@ def macd_hist(s):
     return m - sig
 
 
+def stochastic_kd(df, n=9):
+    low_n = df["Low"].rolling(n).min()
+    high_n = df["High"].rolling(n).max()
+    denom = (high_n - low_n).replace(0, np.nan)
+    rsv = ((df["Close"] - low_n) / denom * 100).clip(0, 100).fillna(50)
+    k = rsv.ewm(alpha=1/3, adjust=False).mean()
+    d = k.ewm(alpha=1/3, adjust=False).mean()
+    return k, d
+
+
+def parabolic_sar(df, step=.02, max_step=.20):
+    """Return PSAR series plus bull/bear state without leaking future bars."""
+    if df is None or len(df) < 3:
+        return pd.Series(index=getattr(df, "index", None), dtype=float), []
+    high = pd.to_numeric(df["High"], errors="coerce").to_numpy(dtype=float)
+    low = pd.to_numeric(df["Low"], errors="coerce").to_numpy(dtype=float)
+    close = pd.to_numeric(df["Close"], errors="coerce").to_numpy(dtype=float)
+    psar = np.full(len(df), np.nan, dtype=float)
+    states = [True] * len(df)
+    bull = bool(close[1] >= close[0])
+    ep = high[0] if bull else low[0]
+    sar = low[0] if bull else high[0]
+    af = step
+    psar[0] = sar
+    states[0] = bull
+    for i in range(1, len(df)):
+        sar = sar + af * (ep - sar)
+        if bull:
+            sar = min(sar, low[i-1])
+            if i >= 2:
+                sar = min(sar, low[i-2])
+            if low[i] < sar:
+                bull = False
+                sar = ep
+                ep = low[i]
+                af = step
+            elif high[i] > ep:
+                ep = high[i]
+                af = min(max_step, af + step)
+        else:
+            sar = max(sar, high[i-1])
+            if i >= 2:
+                sar = max(sar, high[i-2])
+            if high[i] > sar:
+                bull = True
+                sar = ep
+                ep = high[i]
+                af = step
+            elif low[i] < ep:
+                ep = low[i]
+                af = min(max_step, af + step)
+        psar[i] = sar
+        states[i] = bull
+    return pd.Series(psar, index=df.index), states
+
+
 def true_range(df):
     pc = df["Close"].shift(1)
     return pd.concat([
@@ -624,7 +680,8 @@ def close_technical(x):
     if len(x) < 35:
         return None
     c, h, l, v = x["Close"], x["High"], x["Low"], x["Volume"]
-    ma5, ma10, ma20 = c.rolling(5).mean(), c.rolling(10).mean(), c.rolling(20).mean()
+    o = x["Open"]
+    ma5, ma10, ma20, ma60 = c.rolling(5).mean(), c.rolling(10).mean(), c.rolling(20).mean(), c.rolling(60).mean()
     vx = v / v.rolling(20).mean().shift(1).replace(0, np.nan)
     ret1 = (c/c.shift(1)-1)*100
     ret5 = (c/c.shift(5)-1)*100
@@ -632,6 +689,8 @@ def close_technical(x):
     dist = (c/ma20-1)*100
     rr = rsi(c)
     mh = macd_hist(c)
+    kk, dd = stochastic_kd(x)
+    psar_series, psar_states = parabolic_sar(x)
     p3 = h.shift(1).rolling(3).max()
     p20 = h.shift(1).rolling(20).max()
     # v1.5.30: causal self baselines. Average volume excludes the current day;
@@ -640,6 +699,54 @@ def close_technical(x):
     breakout_mask = (c > p20) & p20.notna()
     hist_breakout_vol = v.iloc[:-1][breakout_mask.iloc[:-1]].dropna().tail(20)
 
+    def slope_pct(series, bars=5):
+        try:
+            if len(series) <= bars or pd.isna(series.iloc[-1]) or pd.isna(series.iloc[-1-bars]) or float(series.iloc[-1-bars]) == 0:
+                return None
+            return (float(series.iloc[-1]) / float(series.iloc[-1-bars]) - 1) * 100
+        except Exception:
+            return None
+
+    pre20 = x.iloc[-21:-1] if len(x) >= 21 else x.iloc[:-1]
+    platform_high = float(pre20["High"].max()) if len(pre20) else None
+    platform_low = float(pre20["Low"].min()) if len(pre20) else None
+    platform_width_pct = ((platform_high / platform_low - 1) * 100) if platform_high and platform_low else None
+    breakout_pct = ((float(c.iloc[-1]) / platform_high - 1) * 100) if platform_high else None
+    day_range = max(float(h.iloc[-1] - l.iloc[-1]), 1e-9)
+    close_position_pct = (float(c.iloc[-1] - l.iloc[-1]) / day_range) * 100
+    upper_wick_pct = (float(h.iloc[-1] - max(o.iloc[-1], c.iloc[-1])) / day_range) * 100
+    body_pct = (abs(float(c.iloc[-1] - o.iloc[-1])) / day_range) * 100
+    failed_breakout = bool(platform_high and float(h.iloc[-1]) > platform_high * 1.003 and float(c.iloc[-1]) < platform_high)
+
+    recent_breakout_age = None
+    recent_breakout_volume_x = None
+    recent_breakout_width_pct = None
+    for age in range(0, min(20, max(0, len(x) - 20))):
+        i = len(x) - 1 - age
+        if i < 20:
+            break
+        pre = x.iloc[i-20:i]
+        ph = float(pre["High"].max())
+        pl = float(pre["Low"].min())
+        av = float(pre["Volume"].mean()) if len(pre) else 0
+        cc = float(c.iloc[i])
+        vv = float(v.iloc[i])
+        if ph > 0 and pl > 0 and cc > ph * 1.003:
+            recent_breakout_age = age
+            recent_breakout_volume_x = vv / av if av > 0 else None
+            recent_breakout_width_pct = (ph / pl - 1) * 100
+            break
+
+    psar_value = float(psar_series.iloc[-1]) if len(psar_series) and pd.notna(psar_series.iloc[-1]) else None
+    psar_bull = bool(psar_states[-1]) if psar_states else None
+    psar_flip_age = None
+    if psar_states:
+        cur_state = psar_states[-1]
+        for age in range(1, min(30, len(psar_states))):
+            if psar_states[-1-age] != cur_state:
+                psar_flip_age = age - 1
+                break
+
     row = {
         "close": float(c.iloc[-1]),
         "high": float(h.iloc[-1]),
@@ -647,6 +754,11 @@ def close_technical(x):
         "ma5": float(ma5.iloc[-1]),
         "ma10": float(ma10.iloc[-1]),
         "ma20": float(ma20.iloc[-1]),
+        "ma60": float(ma60.iloc[-1]) if pd.notna(ma60.iloc[-1]) else None,
+        "ma5_slope5_pct": round(slope_pct(ma5, 5), 3) if slope_pct(ma5, 5) is not None else None,
+        "ma10_slope5_pct": round(slope_pct(ma10, 5), 3) if slope_pct(ma10, 5) is not None else None,
+        "ma20_slope5_pct": round(slope_pct(ma20, 5), 3) if slope_pct(ma20, 5) is not None else None,
+        "ma60_slope5_pct": round(slope_pct(ma60, 5), 3) if slope_pct(ma60, 5) is not None else None,
         "vol_x": float(vx.iloc[-1]) if pd.notna(vx.iloc[-1]) else 0,
         "day_change": float(ret1.iloc[-1]) if pd.notna(ret1.iloc[-1]) else 0,
         "ret5": float(ret5.iloc[-1]) if pd.notna(ret5.iloc[-1]) else 0,
@@ -655,9 +767,27 @@ def close_technical(x):
         "rsi": float(rr.iloc[-1]),
         "macd_h": float(mh.iloc[-1]),
         "macd_acc": float(mh.iloc[-1]-mh.iloc[-2]),
+        "kd_k": round(float(kk.iloc[-1]), 2) if pd.notna(kk.iloc[-1]) else None,
+        "kd_d": round(float(dd.iloc[-1]), 2) if pd.notna(dd.iloc[-1]) else None,
+        "kd_cross_up": bool(kk.iloc[-1] > dd.iloc[-1] and kk.iloc[-2] <= dd.iloc[-2]) if len(kk) >= 2 and pd.notna(kk.iloc[-2]) and pd.notna(dd.iloc[-2]) else False,
+        "sar": round(psar_value, 3) if psar_value is not None else None,
+        "sar_state": "BULL" if psar_bull is True else "BEAR" if psar_bull is False else None,
+        "sar_flip_age": psar_flip_age,
         "break3": bool(c.iloc[-1] > p3.iloc[-1]) if pd.notna(p3.iloc[-1]) else False,
         "break20": bool(c.iloc[-1] > p20.iloc[-1]) if pd.notna(p20.iloc[-1]) else False,
         "trend": bool(c.iloc[-1] > ma5.iloc[-1] > ma10.iloc[-1] > ma20.iloc[-1]),
+        "trend60": bool(pd.notna(ma60.iloc[-1]) and c.iloc[-1] > ma20.iloc[-1] > ma60.iloc[-1]),
+        "platform_high20": round(platform_high, 3) if platform_high is not None else None,
+        "platform_low20": round(platform_low, 3) if platform_low is not None else None,
+        "platform_width20_pct": round(platform_width_pct, 2) if platform_width_pct is not None else None,
+        "breakout_pct": round(breakout_pct, 2) if breakout_pct is not None else None,
+        "recent_breakout_age": recent_breakout_age,
+        "recent_breakout_volume_x": round(recent_breakout_volume_x, 2) if recent_breakout_volume_x is not None else None,
+        "recent_breakout_width_pct": round(recent_breakout_width_pct, 2) if recent_breakout_width_pct is not None else None,
+        "failed_breakout": failed_breakout,
+        "close_position_pct": round(close_position_pct, 1),
+        "upper_wick_pct": round(upper_wick_pct, 1),
+        "body_pct": round(body_pct, 1),
         "volume": float(v.iloc[-1]),
         "volume_3d": float(v.tail(3).sum()) if len(v) >= 3 else None,
         "volume_5d": float(v.tail(5).sum()) if len(v) >= 5 else None,
@@ -730,6 +860,7 @@ def close_technical(x):
         "vol_x_p90": round(float(hist_vx.quantile(.90)), 3) if len(hist_vx) >= 10 else None,
     }
     row["technical_score"] = max(0, min(50, round(score, 1)))
+    row["technical_score_legacy"] = row["technical_score"]
     row["reasons"] = reasons
     row["overheat_reasons"] = over
     row.update(daily_sr(x))
@@ -1268,9 +1399,11 @@ def index_state(symbol, label, snap=None):
         else:
             change = float((c.iloc[-1]/c.iloc[-2]-1)*100)
         ret5 = float((c.iloc[-1]/c.iloc[-6]-1)*100) if len(c) >= 6 else None
+        ret20 = float((c.iloc[-1]/c.iloc[-21]-1)*100) if len(c) >= 21 else None
         return {
             "label": label, "symbol": symbol, "close": round(close, 2),
             "change_pct": round(change, 2), "ret5": round(ret5, 2) if ret5 is not None else None,
+            "ret20": round(ret20, 2) if ret20 is not None else None,
             "ma5": round(ma5, 2), "ma10": round(ma10, 2), "ma20": round(ma20, 2),
             "trend": bool(close > ma5 > ma10 > ma20),
             "above20": bool(close > ma20),
@@ -1995,6 +2128,222 @@ def _intraday_score_parts(r, market, sector_score_10):
 
 
 
+
+def _tech_component(label, score, max_score, detail):
+    score = max(0.0, min(float(max_score), float(score)))
+    return {"label": label, "score": round(score, 1), "max": float(max_score), "detail": str(detail or "")}
+
+
+def _apply_technical_score_v2(r, group_rows, market):
+    """犬子技術評分2.0：技術品質50分，進場位置另計，不重複懲罰過熱。"""
+    close = _chip_num(r.get("close")) or 0.0
+    ma5 = _chip_num(r.get("ma5"))
+    ma10 = _chip_num(r.get("ma10"))
+    ma20 = _chip_num(r.get("ma20"))
+    ma60 = _chip_num(r.get("ma60"))
+    s5 = _chip_num(r.get("ma5_slope5_pct"))
+    s10 = _chip_num(r.get("ma10_slope5_pct"))
+    s20 = _chip_num(r.get("ma20_slope5_pct"))
+    s60 = _chip_num(r.get("ma60_slope5_pct"))
+    volx = _chip_num(r.get("vol_x")) or 0.0
+    ret1 = _chip_num(r.get("day_change")) or 0.0
+    ret5 = _chip_num(r.get("ret5"))
+    ret20 = _chip_num(r.get("ret20"))
+    rsi_v = _chip_num(r.get("rsi"))
+    macd_h = _chip_num(r.get("macd_h"))
+    macd_acc = _chip_num(r.get("macd_acc"))
+    k = _chip_num(r.get("kd_k"))
+    d = _chip_num(r.get("kd_d"))
+    width = _chip_num(r.get("platform_width20_pct"))
+    breakout_age = r.get("recent_breakout_age")
+    breakout_vx = _chip_num(r.get("recent_breakout_volume_x"))
+    breakout_width = _chip_num(r.get("recent_breakout_width_pct"))
+    close_pos = _chip_num(r.get("close_position_pct"))
+    upper_wick = _chip_num(r.get("upper_wick_pct"))
+    failed_breakout = bool(r.get("failed_breakout"))
+
+    # A. 趨勢結構 14：只看趨勢品質，不因離均線太遠扣分。
+    trend = 0.0
+    if ma20 is not None and close > ma20: trend += 2.0
+    if None not in (ma5, ma10, ma20) and ma5 > ma10 > ma20: trend += 3.0
+    if None not in (ma20, ma60) and ma20 > ma60: trend += 2.0
+    if s20 is not None:
+        trend += 3.0 if s20 > .20 else 2.0 if s20 > 0 else 0.0
+    if s60 is not None:
+        trend += 2.0 if s60 > .10 else 1.0 if s60 >= 0 else 0.0
+    if ma60 is not None and close > ma60: trend += 1.0
+    if str(r.get("sar_state") or "") == "BULL": trend += 1.0
+    trend = min(14.0, trend)
+
+    # B. 突破 / 型態 10：平台品質＋近期有效突破；不是只有今天創20日高才有分。
+    breakout = 0.0
+    if width is not None:
+        breakout += 3.0 if width <= 12 else 2.0 if width <= 18 else 1.0 if width <= 25 else 0.0
+    if bool(r.get("break20")):
+        breakout += 3.0
+    elif bool(r.get("break3")):
+        breakout += 1.5
+    if breakout_age is not None and int(breakout_age) <= 10:
+        breakout += 2.0 if int(breakout_age) <= 3 else 1.0
+        if breakout_vx is not None:
+            breakout += 1.5 if breakout_vx >= 1.5 else 1.0 if breakout_vx >= 1.2 else 0.0
+        if breakout_width is not None and breakout_width <= 18:
+            breakout += .5
+    breakout = min(10.0, breakout)
+
+    # C. 量價品質 8：量價方向、收盤位置、量縮回測。
+    vp = 0.0
+    if ret1 > 0:
+        if volx >= 1.3: vp += 3.0
+        elif volx >= .8: vp += 2.0
+        else: vp += 1.0
+        if close_pos is not None:
+            vp += 2.0 if close_pos >= 75 else 1.0 if close_pos >= 55 else 0.0
+        if bool(r.get("break20")) and volx >= 1.2: vp += 2.0
+    elif ret1 < 0:
+        if volx <= .8 and ma20 is not None and close >= ma20 * .985:
+            vp += 4.0  # 量縮回測
+        elif volx < 1.0:
+            vp += 2.0
+        if close_pos is not None and close_pos >= 55: vp += 1.0
+    else:
+        vp += 2.0 if volx <= 1.1 else 1.0
+    if str(r.get("sar_state") or "") == "BULL" and ret1 >= 0: vp += 1.0
+    vp = min(8.0, vp)
+
+    # D. 動能 7：RSI/MACD/KD 合併成一桶，避免三個相關指標重複灌分。
+    momentum = 0.0
+    if rsi_v is not None:
+        momentum += 2.5 if 55 <= rsi_v <= 72 else 1.5 if 50 <= rsi_v < 55 or 72 < rsi_v <= 78 else .5 if rsi_v >= 45 else 0.0
+    if macd_h is not None:
+        if macd_h > 0 and (macd_acc or 0) > 0: momentum += 2.5
+        elif macd_h > 0: momentum += 1.5
+        elif (macd_acc or 0) > 0: momentum += .5
+    if k is not None and d is not None:
+        if k > d and k < 85: momentum += 1.5
+        elif bool(r.get("kd_cross_up")): momentum += 1.0
+        elif k > d: momentum += .5
+    if str(r.get("sar_state") or "") == "BULL": momentum += .5
+    momentum = min(7.0, momentum)
+
+    # E. 相對強弱 6：1/5/20日對市場 + 5/20日對同族群。
+    side = "otc" if str(r.get("market") or "") == "上櫃" else "taiex"
+    bench = (market or {}).get(side) or {}
+    rel1 = ret1 - float(bench.get("change_pct") or 0.0) if bench.get("change_pct") is not None else None
+    rel5 = ret5 - float(bench.get("ret5") or 0.0) if ret5 is not None and bench.get("ret5") is not None else None
+    rel20 = ret20 - float(bench.get("ret20") or 0.0) if ret20 is not None and bench.get("ret20") is not None else None
+    peer5 = [_chip_num(x.get("ret5")) for x in (group_rows or []) if str(x.get("code")) != str(r.get("code"))]
+    peer20 = [_chip_num(x.get("ret20")) for x in (group_rows or []) if str(x.get("code")) != str(r.get("code"))]
+    peer5 = [x for x in peer5 if x is not None]
+    peer20 = [x for x in peer20 if x is not None]
+    med5 = float(np.median(peer5)) if len(peer5) >= 2 else None
+    med20 = float(np.median(peer20)) if len(peer20) >= 2 else None
+    sector_rel5 = ret5 - med5 if ret5 is not None and med5 is not None else None
+    sector_rel20 = ret20 - med20 if ret20 is not None and med20 is not None else None
+    relative = 0.0
+    for value, weight in ((rel1, 1.5), (rel5, 1.5), (rel20, 1.5)):
+        if value is None: continue
+        relative += weight if value >= 1.0 else weight*.7 if value >= .3 else weight*.35 if value >= 0 else 0.0
+    for value, weight in ((sector_rel5, .75), (sector_rel20, .75)):
+        if value is None: continue
+        relative += weight if value >= 1.0 else weight*.65 if value >= 0 else 0.0
+    relative = min(6.0, relative)
+    r["technical_relative_v2"] = {
+        "market_1d_pct": round(rel1, 2) if rel1 is not None else None,
+        "market_5d_pct": round(rel5, 2) if rel5 is not None else None,
+        "market_20d_pct": round(rel20, 2) if rel20 is not None else None,
+        "sector_5d_pct": round(sector_rel5, 2) if sector_rel5 is not None else None,
+        "sector_20d_pct": round(sector_rel20, 2) if sector_rel20 is not None else None,
+    }
+
+    # F. 結構風險品質 5：5代表乾淨。只看假突破/出貨型K，不把「漲太多」重複扣在技術分。
+    riskq = 5.0
+    risk_flags = []
+    if failed_breakout:
+        riskq -= 2.0; risk_flags.append("假突破")
+    if upper_wick is not None and upper_wick >= 45 and volx >= 1.4:
+        riskq -= 1.5; risk_flags.append("爆量長上影")
+    if close_pos is not None and close_pos <= 25 and volx >= 1.5:
+        riskq -= 1.0; risk_flags.append("爆量收低")
+    if ret1 <= -4 and volx >= 1.3:
+        riskq -= 1.0; risk_flags.append("帶量長黑")
+    if volx > 6 and (close_pos is None or close_pos < 60):
+        riskq -= .5; risk_flags.append("極端爆量")
+    riskq = max(0.0, riskq)
+
+    components = {
+        "trend": _tech_component("趨勢結構", trend, 14, f"20MA斜率 {s20:+.2f}%" if s20 is not None else "20MA斜率待補"),
+        "breakout": _tech_component("突破／型態", breakout, 10, f"20日平台寬 {width:.1f}%" if width is not None else "平台資料待補"),
+        "volume_price": _tech_component("量價品質", vp, 8, f"量比 {volx:.2f}x｜收盤位置 {close_pos:.0f}%" if close_pos is not None else f"量比 {volx:.2f}x"),
+        "momentum": _tech_component("動能狀態", momentum, 7, f"RSI {rsi_v:.0f}｜K/D {k:.0f}/{d:.0f}" if None not in (rsi_v,k,d) else "動能資料待補"),
+        "relative": _tech_component("相對強弱", relative, 6, f"對市場 5日 {rel5:+.1f}%" if rel5 is not None else "市場相對強弱待補"),
+        "risk_quality": _tech_component("結構風險品質", riskq, 5, "、".join(risk_flags) if risk_flags else "未見明顯假突破／出貨型K"),
+    }
+    total = round(sum(x["score"] for x in components.values()), 1)
+
+    dist20 = _chip_num(r.get("dist20"))
+    if failed_breakout and ma20 is not None and close < ma20:
+        lifecycle = "假突破／結構失效"
+    elif ma20 is not None and close < ma20 and (s20 or 0) <= 0:
+        lifecycle = "轉弱"
+    elif bool(r.get("break20")) or (breakout_age is not None and int(breakout_age) <= 3):
+        lifecycle = "剛啟動"
+    elif ret1 < 0 and volx <= .9 and ma20 is not None and close >= ma20*.985:
+        lifecycle = "回踩測試"
+    elif (dist20 is not None and dist20 >= 12) or (rsi_v is not None and rsi_v > 78):
+        lifecycle = "高檔鈍化"
+    elif trend >= 10 and breakout >= 4:
+        lifecycle = "趨勢延伸"
+    elif width is not None and width <= 18 and close >= (r.get("platform_high20") or close)*.94:
+        lifecycle = "蓄勢"
+    else:
+        lifecycle = "蓄勢"
+
+    if total >= 42:
+        verdict = "技術強"
+    elif total >= 35:
+        verdict = "偏強"
+    elif total >= 27:
+        verdict = "中性"
+    elif total >= 20:
+        verdict = "偏弱"
+    else:
+        verdict = "轉弱"
+
+    if lifecycle == "剛啟動" and components["volume_price"]["score"] >= 5:
+        summary = "平台／突破與量價同步，屬早期發動"
+    elif lifecycle == "回踩測試":
+        summary = "趨勢未壞，正在量縮回踩確認"
+    elif lifecycle == "高檔鈍化":
+        summary = "趨勢仍強，但位置已延伸；強不等於可追"
+    elif components["relative"]["score"] >= 4.5 and trend >= 10:
+        summary = "趨勢與相對強弱同步領先"
+    elif lifecycle in {"轉弱", "假突破／結構失效"}:
+        summary = "結構轉弱，先等重新站回關鍵均線／平台"
+    else:
+        summary = "技術結構仍需更多共振"
+
+    relative_inputs = sum(v is not None for v in (rel1, rel5, rel20, sector_rel5, sector_rel20))
+    confidence = 70.0
+    if ma60 is not None and s60 is not None: confidence += 10
+    if width is not None and breakout_age is not None: confidence += 5
+    if None not in (rsi_v, macd_h, k, d): confidence += 5
+    confidence += min(10, relative_inputs * 2)
+    confidence = min(100.0, confidence)
+
+    legacy = _chip_num(r.get("technical_score_legacy"))
+    r["technical_model_version"] = "inuko-tech-v2.0"
+    r["technical_score_v2"] = total
+    r["technical_score_delta"] = round(total - legacy, 1) if legacy is not None else None
+    r["technical_confidence_v2"] = round(confidence, 0)
+    r["technical_components_v2"] = components
+    r["technical_lifecycle_v2"] = lifecycle
+    r["technical_verdict_v2"] = verdict
+    r["technical_summary_v2"] = summary
+    r["technical_score"] = total
+    return total, confidence
+
+
 def _swing_liquidity_score(r):
     """盤後波段延續的流動性 0~10；不和進場位置混在一起。"""
     level = str(r.get("liquidity_level") or "未知")
@@ -2446,18 +2795,9 @@ def add_component_scores(rows, market, preliminary_intraday=False):
     _calibration = (_validation.get("calibration") or {}) if isinstance(_validation, dict) else {}
     _calibration_active = bool(_calibration.get("active"))
     _candidate_weights = _calibration.get("active_weights") or {}
-    if _calibration_active:
-        _other = {}
-        for _k in ("technical", "sector", "liquidity"):
-            try:
-                _other[_k] = max(0.0, float(_candidate_weights.get(_k, _baseline_swing_weights[_k])))
-            except Exception:
-                _other[_k] = _baseline_swing_weights[_k]
-        _other_sum = sum(_other.values()) or 75.0
-        _swing_weights = {k: v / _other_sum * 75.0 for k, v in _other.items()}
-        _swing_weights["chip"] = 25.0
-    else:
-        _swing_weights = dict(_baseline_swing_weights)
+    # v2 scoring contracts: top-level module weights are fixed and comparable
+    # across dates. Historical calibration may evolve sub-models, not 50/25/15/10.
+    _swing_weights = dict(_baseline_swing_weights)
 
     for r in rows:
         key = str(r.get("sector_group") or "").strip()
@@ -2510,6 +2850,7 @@ def add_component_scores(rows, market, preliminary_intraday=False):
 
         if not preliminary_intraday:
             _apply_chip_score_v2(r, group_rows, market.get("trade_date"))
+            _apply_technical_score_v2(r, group_rows, market)
         cs = float(r.get("chip_score", 12.5))
         chip_cov = float(r.get("chip_confidence_v2", r.get("chip_coverage_pct") or 0))
         liq_adjust = float(r.get("liquidity_adjust", 0))
@@ -2711,7 +3052,7 @@ def build_close():
         "market": market,
         "sector_funds": sector_funds,
         "sector_funds_note": "外資＋投信官方淨買賣股數 × 各交易日收盤價估算金額；張數保留；未含自營商；估算金額僅供力度比較，不額外計入個股100分",
-        "score_formula": {"mode": "swing_direct_100", "technical": 50, "chip": 25, "chip_model": "inuko-chip-v2.0", "chip_raw_max": 100, "sector": 15, "liquidity": 10, "total": 100, "normalized": False, "entry_position": 100, "market_separate": 15},
+        "score_formula": {"mode": "swing_direct_100", "technical": 50, "technical_model": "inuko-tech-v2.0", "chip": 25, "chip_model": "inuko-chip-v2.0", "chip_raw_max": 100, "sector": 15, "liquidity": 10, "total": 100, "normalized": False, "entry_position": 100, "market_separate": 15},
         "rows": rows,
     })
     dump("market.json", market)
@@ -2721,7 +3062,7 @@ def build_close():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "close_updated_at": now_tw().isoformat(timespec="seconds"),
         "daily_count": len(rows),
-        "version": "1.5.31-free",
+        "version": "1.6.0-free",
     })
     dump("status.json", status)
 
