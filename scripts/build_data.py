@@ -2371,6 +2371,267 @@ def _apply_technical_score_v2(r, group_rows, market):
     return total, confidence
 
 
+def _sector_v2_component(label, score, max_score, detail):
+    score = max(0.0, min(float(max_score), float(score)))
+    return {"label": label, "score": round(score, 1), "max": float(max_score), "detail": str(detail or "")}
+
+
+def _apply_sector_score_v2(r, group_rows, source, label):
+    """犬子族群評分2.0：只評估族群本身，不重複個股相對強弱或法人籌碼。"""
+    members = [x for x in (group_rows or []) if isinstance(x, dict)]
+    total = len(members)
+
+    def f(x, key):
+        return _chip_num(x.get(key))
+
+    def pct_count(fn):
+        if not members:
+            return 0.0
+        return sum(1 for x in members if fn(x)) / len(members) * 100.0
+
+    up_pct = pct_count(lambda x: (f(x, "day_change") or 0) > 0)
+    above20_pct = pct_count(lambda x: f(x, "close") is not None and f(x, "ma20") is not None and f(x, "close") > f(x, "ma20"))
+    break20_pct = pct_count(lambda x: bool(x.get("break20")))
+    ma20_up_pct = pct_count(lambda x: (f(x, "ma20_slope5_pct") or -999) > 0)
+    ret20_pos_pct = pct_count(lambda x: (f(x, "ret20") or 0) > 0)
+
+    # A. 族群廣度 4：今日上漲、站20MA、創20日高。
+    breadth = 0.0
+    breadth += 1.5 if up_pct >= 70 else 1.2 if up_pct >= 60 else .8 if up_pct >= 50 else .4 if up_pct >= 40 else 0.0
+    breadth += 1.5 if above20_pct >= 70 else 1.2 if above20_pct >= 60 else .8 if above20_pct >= 50 else .4 if above20_pct >= 40 else 0.0
+    breadth += 1.0 if break20_pct >= 25 else .7 if break20_pct >= 15 else .4 if break20_pct >= 8 else .2 if break20_pct > 0 else 0.0
+
+    # B. 領頭股強度 3：至少有真正突破/趨勢且流動性足夠的核心股。
+    leaders = []
+    for x in members:
+        ret5 = f(x, "ret5") or 0.0
+        close = f(x, "close")
+        ma20 = f(x, "ma20")
+        avg_turn = f(x, "avg_turnover20") or 0.0
+        age = x.get("recent_breakout_age")
+        recent_break = age is not None and int(age) <= 3
+        if ret5 >= 3 and close is not None and ma20 is not None and close > ma20 and avg_turn >= 80_000_000 and (bool(x.get("break20")) or recent_break or bool(x.get("trend"))):
+            leaders.append(x)
+    leader_count = len(leaders)
+    leader_pct = (leader_count / total * 100.0) if total else 0.0
+    if leader_count >= 3 and leader_pct >= 25:
+        leader_score = 3.0
+    elif leader_count >= 2:
+        leader_score = 2.6
+    elif leader_count == 1:
+        leader_score = 1.8
+    elif above20_pct >= 60:
+        leader_score = .8
+    else:
+        leader_score = 0.0
+
+    # C. 持續性 3：3/5/10日，不因單日全面反彈就直接滿分。
+    persistence = 0.0
+    persistence_detail = []
+    for key, tag in (("ret3", "3日"), ("ret5", "5日"), ("ret10", "10日")):
+        vals = [f(x, key) for x in members]
+        vals = [v for v in vals if v is not None]
+        if not vals:
+            persistence_detail.append(f"{tag}待補")
+            continue
+        med = float(np.median(vals))
+        pos = sum(v > 0 for v in vals) / len(vals) * 100.0
+        pts = 1.0 if med >= 1.0 and pos >= 60 else .75 if med > 0 and pos >= 55 else .4 if med > 0 or pos >= 50 else 0.0
+        persistence += pts
+        persistence_detail.append(f"{tag}中位 {med:+.1f}%／上漲 {pos:.0f}%")
+
+    # D. 族群量價資金共振 2：只看價格與量能，不重複外資/投信。
+    active = [x for x in members if (f(x, "day_change") or 0) > 0 and (f(x, "vol_x") or 0) >= 1.2]
+    active_pct = (len(active) / total * 100.0) if total else 0.0
+    vxs = [f(x, "vol_x") for x in members]
+    vxs = [v for v in vxs if v is not None]
+    median_vx = float(np.median(vxs)) if vxs else None
+    capital = 0.0
+    capital += 1.2 if active_pct >= 40 and len(active) >= 2 else .8 if active_pct >= 25 and len(active) >= 2 else .4 if len(active) >= 1 else 0.0
+    if median_vx is not None:
+        capital += .8 if median_vx >= 1.3 else .5 if median_vx >= 1.05 else .2 if median_vx >= .85 else 0.0
+    capital = min(2.0, capital)
+
+    # E. 中期結構一致性 2：20MA方向與20日報酬，避免只看今日紅盤。
+    structure = 0.0
+    structure += 1.0 if ma20_up_pct >= 70 else .7 if ma20_up_pct >= 55 else .35 if ma20_up_pct >= 40 else 0.0
+    structure += 1.0 if ret20_pos_pct >= 70 else .7 if ret20_pos_pct >= 55 else .35 if ret20_pos_pct >= 40 else 0.0
+
+    # F. 分類可信度 1：不偽造基本面/新聞資料。窄族群高於官方大產業 proxy。
+    narrow = str(source or "").startswith("次產業")
+    if narrow and total >= 3:
+        taxonomy = 1.0
+    elif narrow and total >= 2:
+        taxonomy = .8
+    elif "官方產業" in str(source or "") and total >= 5:
+        taxonomy = .5
+    elif total >= 2:
+        taxonomy = .3
+    else:
+        taxonomy = .1
+
+    components = {
+        "breadth": _sector_v2_component("族群廣度", breadth, 4, f"上漲 {up_pct:.0f}%｜站20MA {above20_pct:.0f}%｜20日突破 {break20_pct:.0f}%"),
+        "leaders": _sector_v2_component("領頭股強度", leader_score, 3, f"合格領頭股 {leader_count}/{total} 檔"),
+        "persistence": _sector_v2_component("趨勢持續性", persistence, 3, "｜".join(persistence_detail)),
+        "capital_resonance": _sector_v2_component("量價資金共振", capital, 2, f"放量上漲 {len(active)}/{total} 檔｜族群量比中位 {median_vx:.2f}x" if median_vx is not None else f"放量上漲 {len(active)}/{total} 檔"),
+        "structure": _sector_v2_component("中期結構一致性", structure, 2, f"20MA上彎 {ma20_up_pct:.0f}%｜20日正報酬 {ret20_pos_pct:.0f}%"),
+        "taxonomy": _sector_v2_component("族群定義可信度", taxonomy, 1, f"{source or '待分類'}｜{label or '—'}｜樣本 {total} 檔"),
+    }
+    score15 = round(sum(x["score"] for x in components.values()), 1)
+    if "官方產業" in str(source or ""):
+        score15 = min(9.0, score15)
+    elif str(source or "") == "待分類":
+        score15 = min(4.5, score15)
+
+    confidence = 100.0 if narrow and total >= 5 else 92.0 if narrow and total >= 3 else 78.0 if narrow and total >= 2 else 70.0 if total >= 8 else 58.0 if total >= 3 else 40.0
+    if "官方產業" in str(source or ""):
+        confidence = min(confidence, 72.0)
+
+    verdict = "主升共振" if score15 >= 12 else "偏強" if score15 >= 9 else "中性" if score15 >= 6 else "偏弱"
+    if breadth >= 3 and persistence >= 2.2 and leader_score >= 2.6:
+        summary = "族群廣度、領頭股與多日趨勢同步"
+    elif breadth >= 3 and persistence < 1.5:
+        summary = "今日族群偏強，但多日持續性仍待確認"
+    elif leader_score >= 2.6 and breadth < 2:
+        summary = "領頭股強，但族群擴散仍不足"
+    elif score15 < 6:
+        summary = "族群共振偏弱，個股需靠自身結構"
+    else:
+        summary = "族群條件中性，尚未形成完整主升共振"
+
+    r["sector_model_version"] = "inuko-sector-v2.0"
+    r["sector_score_v2"] = score15
+    r["sector_confidence_v2"] = round(confidence, 0)
+    r["sector_verdict_v2"] = verdict
+    r["sector_summary_v2"] = summary
+    r["sector_components_v2"] = components
+    r["sector_member_count_v2"] = total
+    return score15, confidence
+
+
+def _liquidity_v2_component(label, score, max_score, detail):
+    score = max(0.0, min(float(max_score), float(score)))
+    return {"label": label, "score": round(score, 1), "max": float(max_score), "detail": str(detail or "")}
+
+
+def _apply_liquidity_score_v2(r):
+    """犬子流動性評分2.0：評估可持續進出品質，不把單日爆量直接當成高流動性。"""
+    avg = _chip_num(r.get("avg_turnover20"))
+    med = _chip_num(r.get("median_turnover20"))
+    low = _chip_num(r.get("min_turnover20"))
+    cv = _chip_num(r.get("turnover_cv20"))
+    days30 = int(r.get("turnover_days_ge30m20") or 0)
+    days80 = int(r.get("turnover_days_ge80m20") or 0)
+    impact = _chip_num(r.get("price_impact_median20"))
+    volx = _chip_num(r.get("vol_x"))
+    today_vs_med = _chip_num(r.get("turnover_vs_median20"))
+    upper = _chip_num(r.get("upper_wick_pct"))
+    close_pos = _chip_num(r.get("close_position_pct"))
+
+    # A. 20日平均成交額 3：飽和式，不讓巨型股靠成交額無限加分。
+    if avg is None:
+        avg_score = 0.0
+    elif avg >= 500_000_000:
+        avg_score = 3.0
+    elif avg >= 300_000_000:
+        avg_score = 2.7
+    elif avg >= 200_000_000:
+        avg_score = 2.4
+    elif avg >= 100_000_000:
+        avg_score = 2.0
+    elif avg >= 80_000_000:
+        avg_score = 1.6
+    elif avg >= 50_000_000:
+        avg_score = 1.2
+    elif avg >= 30_000_000:
+        avg_score = .8
+    else:
+        avg_score = 0.0
+
+    # B. 成交額穩定度 2：CV + 中位數/平均數。
+    stability = 0.0
+    if cv is not None:
+        stability += 1.2 if cv <= .45 else 1.0 if cv <= .65 else .7 if cv <= .9 else .35 if cv <= 1.25 else 0.0
+    ratio = (med / avg) if med is not None and avg not in (None, 0) else None
+    if ratio is not None:
+        stability += .8 if ratio >= .80 else .6 if ratio >= .65 else .35 if ratio >= .50 else .1
+
+    # C. 價格衝擊 2：每1億元成交額對應的日波動越小，越容易正常進出。
+    if impact is None:
+        impact_score = 1.0
+    elif impact <= .45:
+        impact_score = 2.0
+    elif impact <= .8:
+        impact_score = 1.7
+    elif impact <= 1.3:
+        impact_score = 1.4
+    elif impact <= 2.0:
+        impact_score = 1.0
+    elif impact <= 3.0:
+        impact_score = .6
+    else:
+        impact_score = .2
+
+    # D. 成交連續性 1.5：20個交易日有多少天真的達可交易門檻。
+    continuity = 0.0
+    ratio30 = days30 / 20.0
+    continuity += 1.0 if ratio30 >= .90 else .75 if ratio30 >= .75 else .45 if ratio30 >= .55 else .2 if ratio30 >= .35 else 0.0
+    if med is not None and med >= 80_000_000:
+        continuity += .5
+    elif days80 >= 12:
+        continuity += .4
+    elif avg is not None and avg >= 80_000_000:
+        continuity += .25
+    continuity = min(1.5, continuity)
+
+    # E. 異常爆量/擁擠風險 1.5：滿分代表乾淨；爆量長上影等才扣。
+    crowd = 1.5
+    alerts = []
+    if volx is not None and volx > 6:
+        crowd -= .7; alerts.append("量比>6x")
+    elif volx is not None and volx > 4:
+        crowd -= .3; alerts.append("量比>4x")
+    if today_vs_med is not None and today_vs_med > 5:
+        crowd -= .4; alerts.append("成交額>20日中位5倍")
+    elif today_vs_med is not None and today_vs_med > 3:
+        crowd -= .2; alerts.append("成交額短暫放大")
+    if upper is not None and upper >= 45 and (volx or 0) >= 1.4:
+        crowd -= .4; alerts.append("放量長上影")
+    if close_pos is not None and close_pos <= 25 and (volx or 0) >= 1.5:
+        crowd -= .4; alerts.append("放量收低")
+    crowd = max(0.0, crowd)
+
+    components = {
+        "avg_turnover": _liquidity_v2_component("20日平均成交額", avg_score, 3, f"{avg/100_000_000:.2f}億" if avg is not None else "資料待補"),
+        "stability": _liquidity_v2_component("成交額穩定度", stability, 2, f"CV {cv:.2f}｜中位/平均 {ratio:.0%}" if cv is not None and ratio is not None else "穩定度資料待補"),
+        "price_impact": _liquidity_v2_component("價格衝擊", impact_score, 2, f"中位 {impact:.2f}%／每1億元" if impact is not None else "價格衝擊樣本不足"),
+        "continuity": _liquidity_v2_component("成交連續性", continuity, 1.5, f"20日中 {days30} 日≥3000萬｜{days80} 日≥8000萬"),
+        "crowding": _liquidity_v2_component("擁擠／異常量風險", crowd, 1.5, "、".join(alerts) if alerts else "未見明顯異常爆量／流動性扭曲"),
+    }
+    score10 = round(sum(x["score"] for x in components.values()), 1)
+    fields = [avg, med, cv, impact]
+    confidence = round(sum(v is not None for v in fields) / len(fields) * 100.0, 0)
+    verdict = "健康" if score10 >= 8.5 else "可交易" if score10 >= 7 else "普通" if score10 >= 5.5 else "偏薄／風險較高"
+    if alerts:
+        summary = f"流動性可用，但注意{'、'.join(alerts[:2])}"
+    elif score10 >= 8.5:
+        summary = "成交額充足且穩定，價格衝擊低"
+    elif score10 >= 7:
+        summary = "流動性足以波段操作，仍需控制追價"
+    else:
+        summary = "成交品質普通，建議降低單筆部位與追價"
+
+    r["liquidity_model_version"] = "inuko-liquidity-v2.0"
+    r["liquidity_score_v2"] = score10
+    r["liquidity_confidence_v2"] = confidence
+    r["liquidity_verdict_v2"] = verdict
+    r["liquidity_summary_v2"] = summary
+    r["liquidity_components_v2"] = components
+    r["liquidity_alerts_v2"] = alerts
+    return score10, confidence
+
+
 def _swing_liquidity_score(r):
     """盤後波段延續的流動性 0~10；不和進場位置混在一起。"""
     level = str(r.get("liquidity_level") or "未知")
