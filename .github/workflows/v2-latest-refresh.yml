@@ -150,19 +150,68 @@ jobs:
           if not isinstance(zones,list) or not zones:
               raise SystemExit('close evidence gate: zone_close empty')
 
+          def num(v):
+              try:
+                  if v in (None,'',[]):
+                      return None
+                  return float(v)
+              except Exception:
+                  return None
+
+          def anchor_center(v):
+              if isinstance(v,dict):
+                  mid=num(v.get('center') if v.get('center') not in (None,'') else v.get('price'))
+                  if mid is None: mid=num(v.get('level') if v.get('level') not in (None,'') else v.get('mid'))
+                  lo=num(v.get('low') if v.get('low') not in (None,'') else v.get('zone_low'))
+                  hi=num(v.get('high') if v.get('high') not in (None,'') else v.get('zone_high'))
+                  if mid is None and lo is not None and hi is not None:
+                      mid=(lo+hi)/2
+                  return mid
+              return num(v)
+
+          def current_price(src):
+              for k in ('quote_close','close','price','last','last_price'):
+                  v=num(src.get(k))
+                  if v is not None and v>0:
+                      return v
+              return None
+
+          def active_anchor_required(src, side):
+              value=src.get('support') if side=='support' else src.get('resistance')
+              if value in (None,'',[]):
+                  return False
+              center=anchor_center(value)
+              cur=current_price(src)
+              # Malformed/non-numeric legacy anchors should still fail closed.
+              if center is None or cur is None:
+                  return True
+              # Must mirror scripts/v2/enrich_zones.py fused_levels side filter.
+              if side=='support':
+                  return center <= cur*1.003
+              return center >= cur*.997
+
           missing_zone=[]
+          crossed_anchor=[]
           missing_explain=[]
           for code,row in ditems.items():
               src=raw.get(str(code)) or {}
-              if src.get('support') not in (None,'',[]) and not row.get('support_zone_ids'):
+              has_support=bool(row.get('support_zone_ids'))
+              has_resistance=bool(row.get('resistance_zone_ids'))
+              if active_anchor_required(src,'support') and not has_support:
                   missing_zone.append(f'{code}:support')
-              if src.get('resistance') not in (None,'',[]) and not row.get('resistance_zone_ids'):
+              elif src.get('support') not in (None,'',[]) and not has_support:
+                  crossed_anchor.append(f'{code}:support')
+              if active_anchor_required(src,'resistance') and not has_resistance:
                   missing_zone.append(f'{code}:resistance')
+              elif src.get('resistance') not in (None,'',[]) and not has_resistance:
+                  crossed_anchor.append(f'{code}:resistance')
               exp=row.get('score_explanations') or {}
               if exp.get('version')!='score-explain-v4-resistance-aware':
                   missing_explain.append(code)
+          if crossed_anchor:
+              print('close evidence gate ignored crossed/inactive legacy anchors:', crossed_anchor[:30], 'count=', len(crossed_anchor))
           if missing_zone:
-              raise SystemExit(f'close evidence gate: source zones were not migrated {missing_zone[:20]}')
+              raise SystemExit(f'close evidence gate: active source zones were not migrated {missing_zone[:20]}')
           if missing_explain:
               raise SystemExit(f'close evidence gate: score explanations missing {missing_explain[:20]}')
 
