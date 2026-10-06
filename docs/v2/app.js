@@ -1,7 +1,8 @@
 const state={
   view:"intraday",manifest:null,cache:{},visibleCount:15,quickFilter:"",
   filterStage:"",filterAction:"",filterPosition:"",filterSector:"",
-  search:"",externalSearch:[],loading:false,searchTimer:null
+  search:"",externalSearch:[],loading:false,searchTimer:null,
+  livePollTimer:null,livePollBusy:false,lastAutoCheckAt:0
 };
 
 const NEXT_DAY_ELITE={qualityMin:75,positionMin:65,confidenceMin:80};
@@ -139,6 +140,43 @@ function quickValue(item,buckets,stages){
   return item.values.reduce((sum,key)=>sum+Number(source?.[key]||0),0);
 }
 
+const LIVE_POLL_MS=45000;
+function isLiveAutoView(){return state.view==="intraday"||state.view==="daytrade"}
+function manifestMissionMeta(manifest,view=state.view){const cfg=missionConfig[view];return cfg?.summary?manifest?.datasets?.[cfg.summary]:null}
+function manifestMissionKey(manifest,view=state.view){const meta=manifestMissionMeta(manifest,view);return `${manifest?.active_build_id||""}|${meta?.as_of||""}`}
+async function applyFreshManifest(manifest,{source="manual"}={}){
+  if(manifest.schema_version!=="2.0.0"||!manifest.health?.validation_passed)throw new Error("最新資料未通過 Contract Gate");
+  state.cache={};state.externalSearch=[];window.RadarUniverseSearch?.clear?.();
+  state.manifest=manifest;
+  showHealth();
+  await loadView();
+  if(hasDeepFilter()){
+    const needDetail=["NEAR_SUPPORT","NEAR_RESISTANCE"].includes(state.filterPosition);
+    await applyDeepFilter({needDetail});
+  }
+  document.dispatchEvent(new CustomEvent("radar:data-reloaded",{detail:{build:manifest.active_build_id,source}}));
+}
+async function checkLiveUpdate(){
+  if(!isLiveAutoView()||document.hidden||state.loading||state.livePollBusy)return;
+  state.livePollBusy=true;state.lastAutoCheckAt=Date.now();
+  try{
+    const r=await fetch(`./data/current_manifest.json?t=${Date.now()}`,{cache:"no-store"});
+    if(!r.ok)return;
+    const manifest=await r.json();
+    if(manifest.schema_version!=="2.0.0"||!manifest.health?.validation_passed)return;
+    const currentMeta=manifestMissionMeta(state.manifest),nextMeta=manifestMissionMeta(manifest);
+    const currentAsOf=String(currentMeta?.as_of||""),nextAsOf=String(nextMeta?.as_of||"");
+    if(currentAsOf&&nextAsOf&&nextAsOf<currentAsOf)return;
+    if(manifestMissionKey(manifest)===manifestMissionKey(state.manifest))return;
+    await applyFreshManifest(manifest,{source:"auto"});
+  }catch(err){console.warn("live auto refresh",err)}finally{state.livePollBusy=false}
+}
+function startLiveAutoRefresh(){
+  if(state.livePollTimer)clearInterval(state.livePollTimer);
+  state.livePollTimer=setInterval(()=>checkLiveUpdate(),LIVE_POLL_MS);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)checkLiveUpdate()});
+  window.addEventListener("focus",()=>checkLiveUpdate());
+}
 async function boot(){
   const manifest=await getJson("./data/current_manifest.json");
   if(manifest.schema_version!=="2.0.0")fail("不支援的 schema major");
@@ -146,6 +184,7 @@ async function boot(){
   state.manifest=manifest;
   showHealth();
   await loadView();
+  startLiveAutoRefresh();
 }
 async function reloadRadar(){
   if(state.loading)return;
@@ -153,13 +192,9 @@ async function reloadRadar(){
   const btn=$("#refreshBtn");
   if(btn){btn.disabled=true;btn.textContent="更新中…"}
   try{
-    state.cache={};state.externalSearch=[];window.RadarUniverseSearch?.clear?.();
     const manifest=await getJson(`./data/current_manifest.json?t=${Date.now()}`);
     if(manifest.schema_version!=="2.0.0"||!manifest.health?.validation_passed)fail("最新資料未通過 Contract Gate");
-    state.manifest=manifest;
-    showHealth();
-    await loadView();
-    document.dispatchEvent(new CustomEvent("radar:data-reloaded",{detail:{build:manifest.active_build_id}}));
+    await applyFreshManifest(manifest,{source:"manual"});
   }finally{
     state.loading=false;
     if(btn){btn.disabled=false;btn.textContent="重新整理"}
@@ -316,7 +351,7 @@ function openCard(card){
 
 document.addEventListener("click",async e=>{
   const tab=e.target.closest?.(".tab");
-  if(tab){state.view=tab.dataset.view;resetFilters();document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===tab));await loadView();return}
+  if(tab){state.view=tab.dataset.view;resetFilters();document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===tab));await loadView();if(isLiveAutoView())checkLiveUpdate();return}
 
   const quickClear=e.target.closest?.("[data-quick-filter-clear]");
   if(quickClear){state.quickFilter="";state.visibleCount=15;renderRadarSummary();renderCards();return}
