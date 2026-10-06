@@ -659,6 +659,8 @@ def close_technical(x):
         "break20": bool(c.iloc[-1] > p20.iloc[-1]) if pd.notna(p20.iloc[-1]) else False,
         "trend": bool(c.iloc[-1] > ma5.iloc[-1] > ma10.iloc[-1] > ma20.iloc[-1]),
         "volume": float(v.iloc[-1]),
+        "volume_3d": float(v.tail(3).sum()) if len(v) >= 3 else None,
+        "volume_5d": float(v.tail(5).sum()) if len(v) >= 5 else None,
         "avg_volume20": float(avgvol20.iloc[-1]) if pd.notna(avgvol20.iloc[-1]) else None,
         "breakout_event_count": int(len(hist_breakout_vol)),
         "breakout_volume_median20": float(hist_breakout_vol.median()) if len(hist_breakout_vol) >= 3 else None,
@@ -789,6 +791,260 @@ def chip_score(chip):
         score += 2.5
 
     return int(math.floor(min(25, score) + 0.5)), round(coverage/25*100, 0)
+
+
+def _chip_num(v):
+    try:
+        x = float(v)
+        return x if math.isfinite(x) else None
+    except Exception:
+        return None
+
+
+def _chip_clip(v):
+    return max(0.0, min(100.0, float(v)))
+
+
+def _chip_source_factor(source_date, trade_date):
+    if not source_date:
+        return 0.0
+    sd = str(source_date)[:10]
+    td = str(trade_date or "")[:10]
+    if not td:
+        return 0.7
+    if sd == td:
+        return 1.0
+    try:
+        days = abs((datetime.strptime(td, "%Y-%m-%d") - datetime.strptime(sd, "%Y-%m-%d")).days)
+    except Exception:
+        return 0.6
+    if days <= 1:
+        return 0.8
+    if days <= 4:
+        return 0.65
+    return 0.35
+
+
+def _chip_component(label, score, weight, detail):
+    score = round(_chip_clip(score), 1)
+    return {
+        "label": label,
+        "score": score,
+        "weight": float(weight),
+        "points": round(score / 100.0 * float(weight), 1),
+        "detail": str(detail or ""),
+    }
+
+
+def _apply_chip_score_v2(r, group_rows, trade_date):
+    """犬子籌碼評分 2.0：先算0~100，再折成盤後總分中的0~25。
+
+    缺資料不直接判空，而是該分項維持中性，另由 chip_confidence_v2
+    表示可信程度。如此避免晚公布的融資/借券拖累已更新的外資/投信。
+    """
+    f1 = _chip_num(r.get("foreign_net_latest"))
+    f3 = _chip_num(r.get("foreign_3d_net"))
+    f5 = _chip_num(r.get("foreign_5d_net"))
+    f20 = _chip_num(r.get("foreign_20d_net"))
+    fdays = _chip_num(r.get("foreign_buy_days_10"))
+    fstreak = _chip_num(r.get("foreign_streak"))
+    t1 = _chip_num(r.get("trust_net_latest"))
+    t3 = _chip_num(r.get("trust_3d_net"))
+    t5 = _chip_num(r.get("trust_5d_net"))
+    tdays = _chip_num(r.get("trust_buy_days_10"))
+    tstreak = _chip_num(r.get("trust_streak"))
+    s1 = _chip_num(r.get("sbl_1d_pct"))
+    s3 = _chip_num(r.get("sbl_3change_pct"))
+    s5 = _chip_num(r.get("sbl_5d_pct"))
+    m1 = _chip_num(r.get("margin_1d_pct"))
+    m3 = _chip_num(r.get("margin_3d_pct"))
+    m5 = _chip_num(r.get("margin_5d_pct"))
+    ret5 = _chip_num(r.get("ret5"))
+    vol3 = _chip_num(r.get("volume_3d"))
+    foreign_3d_volume_pct = (f3 / vol3 * 100.0) if f3 is not None and vol3 not in (None, 0) else None
+    r["foreign_3d_volume_pct"] = round(foreign_3d_volume_pct, 2) if foreign_3d_volume_pct is not None else None
+
+    # 1) 外資結構 / 影響力 25%
+    foreign = 50.0
+    if f1 is not None: foreign += 8 if f1 > 0 else -8 if f1 < 0 else 0
+    if f3 is not None: foreign += 12 if f3 > 0 else -12 if f3 < 0 else 0
+    if f5 is not None: foreign += 10 if f5 > 0 else -10 if f5 < 0 else 0
+    if f20 is not None: foreign += 5 if f20 > 0 else -5 if f20 < 0 else 0
+    if fstreak is not None:
+        if fstreak >= 3: foreign += 10
+        elif fstreak <= -3: foreign -= 10
+    if fdays is not None:
+        if fdays >= 7: foreign += 8
+        elif fdays <= 3: foreign -= 8
+    if foreign_3d_volume_pct is not None:
+        a = abs(foreign_3d_volume_pct)
+        impact = 15 if a >= 12 else 10 if a >= 7 else 6 if a >= 3 else 0
+        foreign += impact if foreign_3d_volume_pct > 0 else -impact
+    foreign_detail = (
+        f"3日 {f3/1000:+.0f}張｜占3日成交量 {foreign_3d_volume_pct:+.1f}%"
+        if f3 is not None and foreign_3d_volume_pct is not None
+        else (f"3日 {f3/1000:+.0f}張" if f3 is not None else "外資資料待補")
+    )
+
+    # 2) 投信結構 15%
+    trust = 50.0
+    if t1 is not None: trust += 15 if t1 > 0 else -15 if t1 < 0 else 0
+    if t3 is not None: trust += 15 if t3 > 0 else -15 if t3 < 0 else 0
+    if t5 is not None: trust += 10 if t5 > 0 else -10 if t5 < 0 else 0
+    if tstreak is not None:
+        if tstreak >= 3: trust += 10
+        elif tstreak <= -3: trust -= 10
+    if tdays is not None:
+        if tdays >= 7: trust += 10
+        elif tdays <= 3: trust -= 10
+    trust_detail = f"5日 {t5/1000:+.0f}張｜連續 {int(tstreak):+d}日" if t5 is not None and tstreak is not None else "投信資料待補"
+
+    # 3) 借券 / 空方壓力 15%
+    sbl = 50.0
+    if r.get("sbl_3down") is True: sbl += 20
+    elif r.get("sbl_3down") is False and s3 is not None and s3 > 0: sbl -= 8
+    if s1 is not None:
+        if s1 <= -2: sbl += 8
+        elif s1 >= 2: sbl -= 8
+    if s3 is not None:
+        if s3 <= -5: sbl += 20
+        elif s3 <= -2: sbl += 10
+        elif s3 >= 5: sbl -= 20
+        elif s3 >= 2: sbl -= 10
+    if s5 is not None:
+        if s5 <= -8: sbl += 12
+        elif s5 >= 8: sbl -= 12
+    sbl_detail = f"1日 {s1:+.1f}%｜3日 {s3:+.1f}%｜5日 {s5:+.1f}%" if None not in (s1, s3, s5) else (f"3日 {s3:+.1f}%" if s3 is not None else "借券資料待補")
+
+    # 4) 融資健康度 10%
+    margin = 55.0
+    status = str(r.get("margin_status") or "")
+    if status == "下降": margin += 12
+    elif status == "正常": margin += 5
+    elif status == "偏熱": margin -= 25
+    if m3 is not None:
+        if m3 <= -5: margin += 12
+        elif m3 <= 0: margin += 5
+        elif m3 >= 8: margin -= 20
+        elif m3 >= 3: margin -= 8
+    if m5 is not None:
+        if m5 <= -8: margin += 8
+        elif m5 >= 12: margin -= 10
+    if m3 is not None and ret5 is not None:
+        leverage_gap = m3 - max(ret5, 0.0)
+        if ret5 >= 3 and m3 <= 2: margin += 8
+        if leverage_gap >= 5: margin -= 10
+        elif leverage_gap <= -3: margin += 5
+    margin_detail = f"3日 {m3:+.1f}%｜5日 {m5:+.1f}%｜{status or '狀態待補'}" if m3 is not None else "融資資料待補"
+
+    # 5) 法人共識 10%
+    consensus = 50.0
+    if f1 is not None: consensus += 15 if f1 > 0 else -15 if f1 < 0 else 0
+    if t1 is not None: consensus += 10 if t1 > 0 else -10 if t1 < 0 else 0
+    if f1 is not None and t1 is not None:
+        if f1 > 0 and t1 > 0: consensus += 15
+        elif f1 < 0 and t1 < 0: consensus -= 15
+    if r.get("sbl_3down") is True: consensus += 8
+    elif s3 is not None and s3 >= 5: consensus -= 8
+    if status == "偏熱": consensus -= 8
+    elif status in {"正常", "下降"}: consensus += 4
+    consensus_detail = f"外資 {'買' if (f1 or 0)>0 else '賣' if (f1 or 0)<0 else '平'}｜投信 {'買' if (t1 or 0)>0 else '賣' if (t1 or 0)<0 else '平'}"
+
+    # 6) 價籌配合 / 背離 20%
+    price_chip = 50.0
+    if f3 is not None and ret5 is not None:
+        if f3 > 0:
+            if -1 <= ret5 <= 2: price_chip += 28
+            elif ret5 > 2: price_chip += 20
+            elif ret5 <= -5: price_chip -= 12
+            else: price_chip += 5
+        elif f3 < 0:
+            if ret5 >= 3: price_chip += 20  # 外資賣但價格不跌，承接偏強
+            elif ret5 <= -3: price_chip -= 28
+            else: price_chip += 5
+    if t3 is not None and ret5 is not None:
+        if t3 > 0 and ret5 >= 0: price_chip += 8
+        elif t3 < 0 and ret5 < 0: price_chip -= 8
+    if foreign_3d_volume_pct is not None and ret5 is not None:
+        if foreign_3d_volume_pct >= 5 and -1 <= ret5 <= 3: price_chip += 10
+        elif foreign_3d_volume_pct <= -5 and ret5 >= 3: price_chip += 8
+    price_chip_detail = f"5日股價 {ret5:+.1f}%｜外資3日占量 {foreign_3d_volume_pct:+.1f}%" if ret5 is not None and foreign_3d_volume_pct is not None else "價籌配合資料待補"
+
+    # 7) 同族群法人共振 5%
+    peers = []
+    for peer in group_rows or []:
+        pf = _chip_num(peer.get("foreign_net_latest"))
+        pt = _chip_num(peer.get("trust_net_latest"))
+        if pf is None and pt is None:
+            continue
+        flow = (pf or 0.0) + (pt or 0.0)
+        peers.append(1 if flow > 0 else -1 if flow < 0 else 0)
+    if len(peers) >= 3:
+        sector_inst = 50.0 + 50.0 * (sum(peers) / len(peers))
+        sector_detail = f"{sum(x>0 for x in peers)}/{len(peers)} 檔法人淨流向偏多"
+    else:
+        sector_inst = 50.0
+        sector_detail = "同族群法人樣本不足3檔"
+
+    components = {
+        "foreign": _chip_component("外資影響力", foreign, 25, foreign_detail),
+        "trust": _chip_component("投信結構", trust, 15, trust_detail),
+        "sbl": _chip_component("借券／空方壓力", sbl, 15, sbl_detail),
+        "margin": _chip_component("融資健康度", margin, 10, margin_detail),
+        "consensus": _chip_component("法人共識", consensus, 10, consensus_detail),
+        "price_chip": _chip_component("價籌配合", price_chip, 20, price_chip_detail),
+        "sector_inst": _chip_component("族群法人共振", sector_inst, 5, sector_detail),
+    }
+    total100 = round(sum(x["points"] for x in components.values()), 1)
+    score25 = round(total100 / 4.0, 1)
+
+    # 各來源日期獨立計算信心；晚公布的融資/借券不拖累已更新外資/投信的方向分。
+    confidence = 0.0
+    confidence += 25 * _chip_source_factor(r.get("foreign_date"), trade_date) if f1 is not None else 0
+    confidence += 15 * _chip_source_factor(r.get("trust_date"), trade_date) if t1 is not None else 0
+    confidence += 15 * _chip_source_factor(r.get("sbl_date"), trade_date) if s3 is not None else 0
+    confidence += 10 * _chip_source_factor(r.get("margin_date"), trade_date) if m3 is not None else 0
+    if f3 is not None and ret5 is not None and vol3 not in (None, 0): confidence += 20
+    if f1 is not None and t1 is not None: confidence += 10
+    elif f1 is not None or t1 is not None: confidence += 5
+    if len(peers) >= 3: confidence += 5
+    confidence = round(min(100.0, confidence), 0)
+
+    if total100 >= 80:
+        verdict = "強勢偏多"
+    elif total100 >= 68:
+        verdict = "偏多"
+    elif total100 >= 45:
+        verdict = "中性"
+    elif total100 >= 32:
+        verdict = "偏弱"
+    else:
+        verdict = "偏空"
+
+    if components["foreign"]["score"] >= 70 and components["price_chip"]["score"] >= 70:
+        summary = "法人收籌，股價也有配合"
+    elif components["foreign"]["score"] >= 70 and components["price_chip"]["score"] < 45:
+        summary = "法人偏買，但股價反應偏弱"
+    elif components["foreign"]["score"] < 40 and components["price_chip"]["score"] >= 65:
+        summary = "外資偏賣，但價格有明顯承接"
+    elif total100 < 40:
+        summary = "籌碼偏空，先看承接是否出現"
+    else:
+        summary = "籌碼方向尚未形成強共識"
+
+    legacy = _chip_num(r.get("chip_score_legacy"))
+    r["chip_model_version"] = "inuko-chip-v2.0"
+    r["chip_score_v2_raw"] = total100
+    r["chip_score_v2"] = score25
+    r["chip_confidence_v2"] = confidence
+    r["chip_verdict_v2"] = verdict
+    r["chip_summary_v2"] = summary
+    r["chip_components_v2"] = components
+    r["chip_score_delta"] = round(score25 - legacy, 1) if legacy is not None else None
+    # Compatibility: existing consumers keep reading chip_score / chip_coverage_pct.
+    r["chip_score"] = score25
+    r["chip_coverage_pct"] = confidence
+    return score25, confidence
 
 
 def sector_score(n, ratio=None, fallback=False):
@@ -2190,14 +2446,18 @@ def add_component_scores(rows, market, preliminary_intraday=False):
     _calibration = (_validation.get("calibration") or {}) if isinstance(_validation, dict) else {}
     _calibration_active = bool(_calibration.get("active"))
     _candidate_weights = _calibration.get("active_weights") or {}
-    _swing_weights = {}
-    for _k, _base in _baseline_swing_weights.items():
-        try:
-            _swing_weights[_k] = float(_candidate_weights.get(_k, _base)) if _calibration_active else _base
-        except Exception:
-            _swing_weights[_k] = _base
-    _wsum = sum(_swing_weights.values()) or 100.0
-    _swing_weights = {k: v / _wsum * 100.0 for k, v in _swing_weights.items()}
+    if _calibration_active:
+        _other = {}
+        for _k in ("technical", "sector", "liquidity"):
+            try:
+                _other[_k] = max(0.0, float(_candidate_weights.get(_k, _baseline_swing_weights[_k])))
+            except Exception:
+                _other[_k] = _baseline_swing_weights[_k]
+        _other_sum = sum(_other.values()) or 75.0
+        _swing_weights = {k: v / _other_sum * 75.0 for k, v in _other.items()}
+        _swing_weights["chip"] = 25.0
+    else:
+        _swing_weights = dict(_baseline_swing_weights)
 
     for r in rows:
         key = str(r.get("sector_group") or "").strip()
@@ -2248,8 +2508,10 @@ def add_component_scores(rows, market, preliminary_intraday=False):
         r["market_data_complete"] = bool(market.get("data_complete", True))
         r["market_trade_date"] = market.get("trade_date")
 
+        if not preliminary_intraday:
+            _apply_chip_score_v2(r, group_rows, market.get("trade_date"))
         cs = float(r.get("chip_score", 12.5))
-        chip_cov = float(r.get("chip_coverage_pct") or 0)
+        chip_cov = float(r.get("chip_confidence_v2", r.get("chip_coverage_pct") or 0))
         liq_adjust = float(r.get("liquidity_adjust", 0))
         r["market_in_quality_score"] = False
         r["chip_background"] = _chip_background_label(cs, chip_cov)
@@ -2433,6 +2695,8 @@ def build_close():
         chip = chips.get(r["code"], {})
         cs, coverage = chip_score(chip)
         r.update(chip)
+        r["chip_score_legacy"] = cs
+        r["chip_coverage_legacy_pct"] = coverage
         r["chip_score"] = cs
         r["chip_coverage_pct"] = coverage
 
@@ -2446,7 +2710,7 @@ def build_close():
         "market": market,
         "sector_funds": sector_funds,
         "sector_funds_note": "外資＋投信官方淨買賣股數 × 各交易日收盤價估算金額；張數保留；未含自營商；估算金額僅供力度比較，不額外計入個股100分",
-        "score_formula": {"mode": "swing_direct_100", "technical": 50, "chip": 25, "sector": 15, "liquidity": 10, "total": 100, "normalized": False, "entry_position": 100, "market_separate": 15},
+        "score_formula": {"mode": "swing_direct_100", "technical": 50, "chip": 25, "chip_model": "inuko-chip-v2.0", "chip_raw_max": 100, "sector": 15, "liquidity": 10, "total": 100, "normalized": False, "entry_position": 100, "market_separate": 15},
         "rows": rows,
     })
     dump("market.json", market)
@@ -2456,7 +2720,7 @@ def build_close():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "close_updated_at": now_tw().isoformat(timespec="seconds"),
         "daily_count": len(rows),
-        "version": "1.5.17-free",
+        "version": "1.5.31-free",
     })
     dump("status.json", status)
 
