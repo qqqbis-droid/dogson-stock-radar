@@ -175,6 +175,19 @@ jobs:
           if rows and not covered:
               raise SystemExit('chip coverage is still 0% for all rows')
 
+          chip2=[r for r in rows if r.get('chip_model_version')=='inuko-chip-v2.0' and isinstance(r.get('chip_components_v2'),dict)]
+          tech2=[r for r in rows if r.get('technical_model_version')=='inuko-tech-v2.0' and isinstance(r.get('technical_components_v2'),dict)]
+          print('chip2 rows:',len(chip2),'/',len(rows),'tech2 rows:',len(tech2),'/',len(rows))
+          if rows and len(chip2) != len(rows):
+              raise SystemExit(f'chip score 2.0 missing from {len(rows)-len(chip2)} close rows')
+          if rows and len(tech2) != len(rows):
+              raise SystemExit(f'technical score 2.0 missing from {len(rows)-len(tech2)} close rows')
+          formula=obj.get('score_formula') or {}
+          if float(formula.get('technical') or 0) != 50 or float(formula.get('chip') or 0) != 25:
+              raise SystemExit(f'fixed score contract drifted: {formula}')
+          if formula.get('technical_model') != 'inuko-tech-v2.0' or formula.get('chip_model') != 'inuko-chip-v2.0':
+              raise SystemExit(f'v2 score model metadata missing: {formula}')
+
           structured=[r for r in rows if (r.get('support_levels') or r.get('resistance_levels'))]
           print('SR 2.0 structured rows:',len(structured),'/',len(rows))
           if rows and not structured:
