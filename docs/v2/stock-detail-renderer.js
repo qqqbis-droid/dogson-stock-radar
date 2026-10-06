@@ -84,13 +84,14 @@ function style(){
 
 function tile(label,value,sub=""){return `<div><span>${sesc(label)}</span><b>${sesc(value??"—")}</b>${sub?`<small>${sesc(sub)}</small>`:""}</div>`}
 function hourlyConfirm(x){
-  if(!x||x.data_status!=="OK")return "60分資料待補";
-  const cat=String(x.category60||"");
+  const h=x?.hourly60||x;
+  if(!h||h.data_status!=="OK")return "60分資料待補";
+  const cat=String(h.category60||"");
   if(cat==="EARLY")return "60分初升確認";
   if(cat==="PRE_CROSS")return "60分金叉前夕";
   if(["STABLE_CONT","ACCEL_CONT"].includes(cat))return "60分趨勢確認";
-  if(x.dir20==="DOWN")return "60分短線修正";
-  if(x.dir20==="UP"&&["UP","FLAT"].includes(x.dir60))return "60分偏多";
+  if(h.dir20==="DOWN")return "60分短線修正";
+  if(h.dir20==="UP"&&["UP","FLAT"].includes(h.dir60))return "60分偏多";
   return "60分中性";
 }
 function tech2Section(x){
