@@ -684,7 +684,9 @@ def close_technical(x):
     ma5, ma10, ma20, ma60 = c.rolling(5).mean(), c.rolling(10).mean(), c.rolling(20).mean(), c.rolling(60).mean()
     vx = v / v.rolling(20).mean().shift(1).replace(0, np.nan)
     ret1 = (c/c.shift(1)-1)*100
+    ret3 = (c/c.shift(3)-1)*100
     ret5 = (c/c.shift(5)-1)*100
+    ret10 = (c/c.shift(10)-1)*100
     ret20 = (c/c.shift(20)-1)*100
     dist = (c/ma20-1)*100
     rr = rsi(c)
@@ -696,6 +698,21 @@ def close_technical(x):
     # v1.5.30: causal self baselines. Average volume excludes the current day;
     # breakout-event volume uses only prior completed 20-day breakout events.
     avgvol20 = v.shift(1).rolling(20).mean()
+    turnover = (c * v).replace([np.inf, -np.inf], np.nan)
+    turn20 = turnover.tail(20).dropna()
+    avg_turnover20 = float(turn20.mean()) if len(turn20) else None
+    median_turnover20 = float(turn20.median()) if len(turn20) else None
+    min_turnover20 = float(turn20.min()) if len(turn20) else None
+    turnover_cv20 = float(turn20.std(ddof=0) / turn20.mean()) if len(turn20) >= 5 and float(turn20.mean()) > 0 else None
+    turnover_days_ge30m20 = int((turn20 >= 30_000_000).sum()) if len(turn20) else 0
+    turnover_days_ge80m20 = int((turn20 >= 80_000_000).sum()) if len(turn20) else 0
+    turnover_today = float(turnover.iloc[-1]) if pd.notna(turnover.iloc[-1]) else None
+    turnover_vs_median20 = (turnover_today / median_turnover20) if turnover_today is not None and median_turnover20 and median_turnover20 > 0 else None
+    impact = pd.Series(index=x.index, dtype=float)
+    valid_turn = turnover > 0
+    impact.loc[valid_turn] = ret1.loc[valid_turn].abs() / (turnover.loc[valid_turn] / 100_000_000.0)
+    impact20 = impact.tail(20).replace([np.inf, -np.inf], np.nan).dropna()
+    price_impact_median20 = float(impact20.median()) if len(impact20) >= 5 else None
     breakout_mask = (c > p20) & p20.notna()
     hist_breakout_vol = v.iloc[:-1][breakout_mask.iloc[:-1]].dropna().tail(20)
 
@@ -761,7 +778,9 @@ def close_technical(x):
         "ma60_slope5_pct": round(slope_pct(ma60, 5), 3) if slope_pct(ma60, 5) is not None else None,
         "vol_x": float(vx.iloc[-1]) if pd.notna(vx.iloc[-1]) else 0,
         "day_change": float(ret1.iloc[-1]) if pd.notna(ret1.iloc[-1]) else 0,
+        "ret3": float(ret3.iloc[-1]) if pd.notna(ret3.iloc[-1]) else 0,
         "ret5": float(ret5.iloc[-1]) if pd.notna(ret5.iloc[-1]) else 0,
+        "ret10": float(ret10.iloc[-1]) if pd.notna(ret10.iloc[-1]) else 0,
         "ret20": float(ret20.iloc[-1]) if pd.notna(ret20.iloc[-1]) else 0,
         "dist20": float(dist.iloc[-1]) if pd.notna(dist.iloc[-1]) else 0,
         "rsi": float(rr.iloc[-1]),
@@ -795,7 +814,15 @@ def close_technical(x):
         "breakout_event_count": int(len(hist_breakout_vol)),
         "breakout_volume_median20": float(hist_breakout_vol.median()) if len(hist_breakout_vol) >= 3 else None,
         "breakout_volume_avg20": float(hist_breakout_vol.mean()) if len(hist_breakout_vol) >= 3 else None,
-        "avg_turnover20": float((c*v).rolling(20).mean().iloc[-1]),
+        "avg_turnover20": avg_turnover20,
+        "median_turnover20": median_turnover20,
+        "min_turnover20": min_turnover20,
+        "turnover_cv20": round(turnover_cv20, 4) if turnover_cv20 is not None else None,
+        "turnover_days_ge30m20": turnover_days_ge30m20,
+        "turnover_days_ge80m20": turnover_days_ge80m20,
+        "turnover_today": turnover_today,
+        "turnover_vs_median20": round(turnover_vs_median20, 3) if turnover_vs_median20 is not None else None,
+        "price_impact_median20": round(price_impact_median20, 4) if price_impact_median20 is not None else None,
         "date": str(x.index[-1].date()),
     }
 
