@@ -116,7 +116,16 @@ def main() -> None:
 
     bdate = ymd(bridge.get("trade_date"))
     bridged = int(bridge.get("bridged_rows") or 0)
-    official_snapshot_rows = int(bridge.get("official_snapshot_rows") or bridge.get("quoted_rows") or 0)
+    qlayer = intra.get("quote_layer") or {}
+    row_snapshot_rows = sum(1 for x in irows if isinstance(x, dict) and x.get("quote_snapshot_present") is True)
+    official_snapshot_rows = int(
+        bridge.get("official_snapshot_rows")
+        or bridge.get("quoted_rows")
+        or qlayer.get("official_snapshot_rows")
+        or qlayer.get("quoted_rows")
+        or row_snapshot_rows
+        or 0
+    )
     snapshot_ratio = (official_snapshot_rows / len(irows)) if irows else 0.0
     quote_time = bridge.get("latest_quote_time")
     structure_time = bridge.get("latest_structure_time")
