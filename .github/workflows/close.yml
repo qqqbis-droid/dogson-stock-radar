@@ -8,6 +8,8 @@ on:
     paths:
       - "scripts/sector_groups.py"
       - "scripts/chip_data.py"
+      - "scripts/build_data.py"
+      - "requirements.txt"
       - "scripts/build_hourly.py"
       - "scripts/enrich_sr_structure.py"
       - "scripts/sync_live_data.py"
