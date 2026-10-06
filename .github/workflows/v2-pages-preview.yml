@@ -5,14 +5,13 @@ on:
   push:
     branches: [ clean-build-v2 ]
     paths:
-      - 'docs/v2/*.html'
-      - 'docs/v2/*.js'
-      - 'docs/v2/*.css'
+      # Pure docs/v2 UI changes are validated by v2-preview.yml and deployed by
+      # main:v2-ui-deploy.yml, which preserves the newest live market bundle.
+      # Keep this heavy hydrated rebuild only for engine/contract changes.
       - 'scripts/v2/*.py'
       - 'contracts/**'
       - 'requirements-contract.txt'
       - 'vercel.json'
-      - '.github/workflows/v2-pages-preview.yml'
 
 permissions:
   contents: read
