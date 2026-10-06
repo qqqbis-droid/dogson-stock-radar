@@ -130,6 +130,18 @@
     return intradayEvidence(e);
   }
 
+  function v2BreakdownCard(label,total,max,parts,order,kind){
+    if(!parts||typeof parts!=='object')return'';
+    const rows=order.map(k=>{
+      const p=parts[k]; if(!p)return'';
+      const points=kind==='chip'?num(p.points):num(p.score);
+      const denom=kind==='chip'?num(p.weight):num(p.max);
+      const sub=kind==='chip'&&num(p.score)!=null?` · 子分 ${fmt(p.score,0)}/100`:'';
+      return `<div class="isd-exp-item"><b>${points==null?'—':`${fmt(points,1)}/${fmt(denom,0)}`}</b><span>${esc(p.label||k)}</span>${p.detail||sub?`<span class="isd-exp-detail">${esc((p.detail||'')+sub)}</span>`:''}</div>`;
+    }).join('');
+    return `<div class="isd-exp-card"><div class="isd-exp-head"><b>${esc(label)}</b><strong>${fmt(total,1)}/${fmt(max,0)}</strong></div>${rows||'<div class="isd-muted">2.0 分項證據待補。</div>'}</div>`;
+  }
+
   function explainHtml(d,e,view){
     if(view==='intraday'&&d.components?.intraday?.items?.length){
       const details={
@@ -141,7 +153,22 @@
       };
       return `<details class="isd-explain"><summary>評分依據｜為什麼是這個分數</summary><div class="isd-exp"><div class="isd-muted">盤中動能由 Engine 分項加總；前端只翻成可讀證據，不重新配分。</div>${d.components.intraday.items.map(i=>`<div class="isd-exp-card"><div class="isd-exp-head"><b>${esc(i.label||i.key||'分項')}</b><strong>${fmt(i.contribution)}/${fmt(i.contribution_max,0)}</strong></div>${details[i.key]?`<div class="isd-exp-detail" style="grid-column:auto;margin-top:5px">${esc(details[i.key])}</div>`:''}</div>`).join('')}<div class="isd-muted">分數代表條件同步程度，不代表上漲機率。</div></div></details>`;
     }
+
     const x=d.score_explanations||null;
+    if(view==='close'&&e){
+      const hasTech2=e.technical_model_version==='inuko-tech-v2.0'&&e.technical_components_v2;
+      const hasChip2=e.chip_model_version==='inuko-chip-v2.0'&&e.chip_components_v2;
+      if(hasTech2||hasChip2){
+        const tech=hasTech2?v2BreakdownCard('技術 2.0',e.technical_score_v2,50,e.technical_components_v2,['trend','breakout','volume_price','momentum','relative','risk_quality'],'technical'):'';
+        const chip=hasChip2?v2BreakdownCard('籌碼 2.0',e.chip_score_v2,25,e.chip_components_v2,['foreign','trust','sbl','margin','consensus','price_chip','sector_inst'],'chip'):'';
+        const rest=x?['sector','liquidity','entry_position'].map(k=>{
+          const p=x[k]; if(!p)return'';
+          return `<div class="isd-exp-card"><div class="isd-exp-head"><b>${esc({sector:'族群',liquidity:'流動性',entry_position:'進場位置'}[k]||k)}</b><strong>${fmt(p.score)}/${fmt(p.max,0)}</strong></div>${(p.items||[]).map(i=>`<div class="isd-exp-item"><b>${num(i.points)>0?'+':''}${fmt(i.points)}</b><span>${esc(i.label||'')}</span>${i.detail?`<span class="isd-exp-detail">${esc(i.detail)}</span>`:''}</div>`).join('')}</div>`;
+        }).join(''):'';
+        return `<details class="isd-explain"><summary>評分依據｜為什麼是這個分數</summary><div class="isd-exp"><div class="isd-muted">波段品質＝技術50＋籌碼25＋族群15＋流動性10；進場位置另計100。技術使用2.0六分項，籌碼使用2.0七分項；60分K只作確認，不重複計分。</div>${tech}${chip}${rest}<div class="isd-muted">技術／籌碼以 2.0 evidence 為準；舊制加分清單不再拿來解釋新版分數。</div></div></details>`;
+      }
+    }
+
     if(x){
       const parts=['technical','chip','sector','liquidity','entry_position'].map(k=>{
         const p=x[k]; if(!p)return'';
