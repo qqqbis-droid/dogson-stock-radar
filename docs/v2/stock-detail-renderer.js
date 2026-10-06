@@ -263,11 +263,13 @@ function v2ExplainCard(label,total,max,parts,order,kind){
 }
 function explain(view,d,e){
   if(view==="close"){
-    const x=d.score_explanations||{},hasTech2=e?.technical_model_version==="inuko-tech-v2.0",hasChip2=e?.chip_model_version==="inuko-chip-v2.0";
+    const x=d.score_explanations||{},hasTech2=e?.technical_model_version==="inuko-tech-v2.0",hasChip2=e?.chip_model_version==="inuko-chip-v2.0",hasSector2=e?.sector_model_version==="inuko-sector-v2.0",hasLiquidity2=e?.liquidity_model_version==="inuko-liquidity-v2.0";
     const techCard=hasTech2?v2ExplainCard("技術 2.0",e.technical_score_v2,50,e.technical_components_v2,["trend","breakout","volume_price","momentum","relative","risk_quality"],"technical"):expCard("技術",x.technical);
     const chipCard=hasChip2?v2ExplainCard("籌碼 2.0",e.chip_score_v2,25,e.chip_components_v2,["foreign","trust","sbl","margin","consensus","price_chip","sector_inst"],"chip"):expCard("籌碼",x.chip);
-    const notes=[];if(hasTech2)notes.push("技術採犬子2.0六分項；60分K只作確認，不重複計分。");if(hasChip2)notes.push("籌碼採犬子2.0七分項；先算100分，再固定折算25分，資料信心獨立。");
-    return `<details class="sdr-explain"><summary>評分依據｜為什麼是這個分數</summary><div class="sdr-explain-body"><div class="sdr-note">波段品質＝技術50＋籌碼25＋族群15＋流動性10；進場位置另計100。 ${sesc(notes.join(" "))}</div>${techCard}${chipCard}${expCard("族群",x.sector)}${expCard("流動性",x.liquidity)}${expCard("進場位置",x.entry_position)}<div class="sdr-note">技術／籌碼以 2.0 evidence 為準；舊制加分清單不再解釋新版分數。</div></div></details>`;
+    const sectorCard=hasSector2?v2ExplainCard(`族群 2.0 · ${e.sector_verdict_v2||""}`,e.sector_score_v2,15,e.sector_components_v2,["breadth","leaders","persistence","capital_resonance","structure","taxonomy"],"technical"):expCard("族群",x.sector);
+    const liquidityCard=hasLiquidity2?v2ExplainCard(`流動性 2.0 · ${e.liquidity_verdict_v2||""}`,e.liquidity_score_v2,10,e.liquidity_components_v2,["avg_turnover","stability","price_impact","continuity","crowding"],"technical"):expCard("流動性",x.liquidity);
+    const notes=[];if(hasTech2)notes.push("技術2.0六分項；");if(hasChip2)notes.push("籌碼2.0七分項；");if(hasSector2)notes.push("族群2.0六分項；");if(hasLiquidity2)notes.push("流動性2.0五分項。");
+    return `<details class="sdr-explain"><summary>評分依據｜為什麼是這個分數</summary><div class="sdr-explain-body"><div class="sdr-note">波段品質＝技術50＋籌碼25＋族群15＋流動性10；進場位置另計100。 ${sesc(notes.join(" "))}</div>${techCard}${chipCard}${sectorCard}${liquidityCard}${expCard("進場位置",x.entry_position)}<div class="sdr-note">四大模組以各自2.0 evidence為準；個股相對族群強弱只算在技術，法人族群共振只算在籌碼，避免重複灌分。</div></div></details>`;
   }
   if(view==="intraday"){
     const c=e?.intraday_components||{};
