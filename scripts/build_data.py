@@ -3139,6 +3139,8 @@ def add_component_scores(rows, market, preliminary_intraday=False):
         if not preliminary_intraday:
             _apply_chip_score_v2(r, group_rows, market.get("trade_date"))
             _apply_technical_score_v2(r, group_rows, market)
+            _apply_sector_score_v2(r, group_rows, source, label)
+            _apply_liquidity_score_v2(r)
         cs = float(r.get("chip_score", 12.5))
         chip_cov = float(r.get("chip_confidence_v2", r.get("chip_coverage_pct") or 0))
         liq_adjust = float(r.get("liquidity_adjust", 0))
@@ -3170,8 +3172,8 @@ def add_component_scores(rows, market, preliminary_intraday=False):
             # 技術50＋籌碼25＋族群15＋流動性10＝100；進場位置另外獨立100。
             tech_component = max(0.0, min(50.0, float(r.get("technical_score") or 0)))
             chip_component = max(0.0, min(25.0, cs))
-            sector_component = max(0.0, min(15.0, float(sec or 0) * 1.5))
-            liquidity_component = _swing_liquidity_score(r)
+            sector_component = max(0.0, min(15.0, float(r.get("sector_score_v2") or 0)))
+            liquidity_component = max(0.0, min(10.0, float(r.get("liquidity_score_v2") or _swing_liquidity_score(r))))
             # 原始 component 尺度仍是 50/25/15/10；校準只調整它們在100分內的相對權重。
             _component_caps = {"technical": 50.0, "chip": 25.0, "sector": 15.0, "liquidity": 10.0}
             _raw_components = {
@@ -3340,7 +3342,7 @@ def build_close():
         "market": market,
         "sector_funds": sector_funds,
         "sector_funds_note": "外資＋投信官方淨買賣股數 × 各交易日收盤價估算金額；張數保留；未含自營商；估算金額僅供力度比較，不額外計入個股100分",
-        "score_formula": {"mode": "swing_direct_100", "technical": 50, "technical_model": "inuko-tech-v2.0", "chip": 25, "chip_model": "inuko-chip-v2.0", "chip_raw_max": 100, "sector": 15, "liquidity": 10, "total": 100, "normalized": False, "entry_position": 100, "market_separate": 15},
+        "score_formula": {"mode": "swing_direct_100", "technical": 50, "technical_model": "inuko-tech-v2.0", "chip": 25, "chip_model": "inuko-chip-v2.0", "chip_raw_max": 100, "sector": 15, "sector_model": "inuko-sector-v2.0", "liquidity": 10, "liquidity_model": "inuko-liquidity-v2.0", "total": 100, "normalized": False, "entry_position": 100, "market_separate": 15},
         "rows": rows,
     })
     dump("market.json", market)
@@ -3350,7 +3352,7 @@ def build_close():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "close_updated_at": now_tw().isoformat(timespec="seconds"),
         "daily_count": len(rows),
-        "version": "1.6.0-free",
+        "version": "1.6.1-free",
     })
     dump("status.json", status)
 
