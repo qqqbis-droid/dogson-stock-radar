@@ -175,7 +175,14 @@ COMMON = (
     "support", "resistance", "reasons", "overheat_reasons", "stage_signals", "stage_risks",
 )
 CLOSE = (
-    "ma5", "ma10", "ma20", "dist20", "ret5", "ret20", "rsi", "macd_h", "macd_acc", "break3", "break20", "trend",
+    "ma5", "ma10", "ma20", "ma60", "ma5_slope5_pct", "ma10_slope5_pct", "ma20_slope5_pct", "ma60_slope5_pct",
+    "dist20", "ret5", "ret20", "rsi", "macd_h", "macd_acc", "kd_k", "kd_d", "kd_cross_up",
+    "sar", "sar_state", "sar_flip_age", "break3", "break20", "trend", "trend60",
+    "platform_high20", "platform_low20", "platform_width20_pct", "breakout_pct", "recent_breakout_age",
+    "recent_breakout_volume_x", "recent_breakout_width_pct", "failed_breakout", "close_position_pct", "upper_wick_pct", "body_pct",
+    "technical_model_version", "technical_score_legacy", "technical_score_v2", "technical_score_delta",
+    "technical_confidence_v2", "technical_components_v2", "technical_lifecycle_v2",
+    "technical_verdict_v2", "technical_summary_v2", "technical_relative_v2",
     "foreign_3buy", "foreign_net_latest", "foreign_3d_net", "foreign_5d_net", "foreign_20d_net",
     "foreign_buy_days_10", "foreign_streak", "foreign_3d_volume_pct",
     "trust_net_latest", "trust_3d_net", "trust_5d_net", "trust_buy_days_10", "trust_streak",
