@@ -46,6 +46,15 @@ async function sset(m,key){
   SDR.cache.set(ck,obj);
   return obj;
 }
+async function stockShard(m,view,code){
+  const ck=`${m.active_build_id}:stock-shard:${view}:${code}`;
+  if(SDR.cache.has(ck))return SDR.cache.get(ck);
+  const obj=await sjson(`./data/builds/${m.active_build_id}/stock-shards/${view}/${encodeURIComponent(String(code))}.json`);
+  if(obj?.build_id!==m.active_build_id)throw new Error("stock shard build_id 不一致");
+  if(String(obj?.code)!==String(code))throw new Error("stock shard code 不一致");
+  SDR.cache.set(ck,obj);
+  return obj;
+}
 
 function safeOpen(dialog){
   if(!dialog||dialog.open)return;
@@ -242,11 +251,23 @@ function intradayItems(kind,e){
   }
   return out;
 }
+function v2ExplainCard(label,total,max,parts,order,kind){
+  if(!parts||typeof parts!=="object")return"";
+  const rows=order.map(k=>{
+    const p=parts[k];if(!p)return"";
+    const pts=kind==="chip"?sn(p.points):sn(p.score),den=kind==="chip"?sn(p.weight):sn(p.max);
+    const scoreNote=kind==="chip"&&sn(p.score)!=null?` · 子分 ${sf(p.score,0)}/100`:"";
+    return `<div class="sdr-exp-item"><span class="sdr-exp-pts">${pts==null?"—":sf(pts,1)}/${den==null?"—":sf(den,0)}</span><span>${sesc(p.label||k)}</span><span class="sdr-exp-detail">${sesc((p.detail||"")+scoreNote)}</span></div>`;
+  }).join("");
+  return `<div class="sdr-exp-card"><div class="sdr-exp-head"><b>${sesc(label)}</b><strong>${sf(total,1)}/${sf(max,0)}</strong></div>${rows||'<div class="sdr-note">此分項目前沒有可顯示的 2.0 證據。</div>'}</div>`;
+}
 function explain(view,d,e){
   if(view==="close"){
-    const x=d.score_explanations||{},techCard=e?.technical_model_version?"":expCard("技術",x.technical),chipCard=e?.chip_model_version?"":expCard("籌碼",x.chip);
-    const notes=[];if(e?.technical_model_version)notes.push("技術採犬子2.0：趨勢、型態、量價、動能、相對強弱、結構風險共50分；60分K只作確認，不重複計分。");if(e?.chip_model_version)notes.push("籌碼採犬子2.0：內部先算100分，再固定折算為盤後25分；資料信心獨立。");
-    return `<details class="sdr-explain"><summary>評分依據｜為什麼是這個分數</summary><div class="sdr-explain-body"><div class="sdr-note">波段品質＝技術50＋籌碼25＋族群15＋流動性10；進場位置另計100。 ${sesc(notes.join(" "))}</div>${techCard}${chipCard}${expCard("族群",x.sector)}${expCard("流動性",x.liquidity)}${expCard("進場位置",x.entry_position)}<div class="sdr-note">分數代表條件同步程度，不代表上漲機率。</div></div></details>`;
+    const x=d.score_explanations||{},hasTech2=e?.technical_model_version==="inuko-tech-v2.0",hasChip2=e?.chip_model_version==="inuko-chip-v2.0";
+    const techCard=hasTech2?v2ExplainCard("技術 2.0",e.technical_score_v2,50,e.technical_components_v2,["trend","breakout","volume_price","momentum","relative","risk_quality"],"technical"):expCard("技術",x.technical);
+    const chipCard=hasChip2?v2ExplainCard("籌碼 2.0",e.chip_score_v2,25,e.chip_components_v2,["foreign","trust","sbl","margin","consensus","price_chip","sector_inst"],"chip"):expCard("籌碼",x.chip);
+    const notes=[];if(hasTech2)notes.push("技術採犬子2.0六分項；60分K只作確認，不重複計分。");if(hasChip2)notes.push("籌碼採犬子2.0七分項；先算100分，再固定折算25分，資料信心獨立。");
+    return `<details class="sdr-explain"><summary>評分依據｜為什麼是這個分數</summary><div class="sdr-explain-body"><div class="sdr-note">波段品質＝技術50＋籌碼25＋族群15＋流動性10；進場位置另計100。 ${sesc(notes.join(" "))}</div>${techCard}${chipCard}${expCard("族群",x.sector)}${expCard("流動性",x.liquidity)}${expCard("進場位置",x.entry_position)}<div class="sdr-note">技術／籌碼以 2.0 evidence 為準；舊制加分清單不再解釋新版分數。</div></div></details>`;
   }
   if(view==="intraday"){
     const c=e?.intraday_components||{};
@@ -263,8 +284,8 @@ function missing(d,support,resistance,e){
 }
 
 function coreHtml(view,cfg,d){
-  const h=hero(view,d);
-  return `<div class="sdr-context">${sesc(cfg.label)}詳情 · ${sesc(d.opportunity_bucket||"—")} · 排名 #${d.opportunity_rank??"—"}</div><div class="detail-hero"><div><span class="badge stage">${sesc(SSTAGE[d.lifecycle_stage]||d.lifecycle_stage||"—")}</span><h2>${sesc(SACTION[d.action_state]||d.action_state||"—")}</h2><p>${sesc(h.text)}</p></div><div class="detail-light ${h.tone}">${sesc(h.light)}</div></div><div class="sdr-quick">${quick(view,d)}</div>${list("為什麼現在看它",d.why_now||[],"目前沒有足夠的新理由。")} ${list("現在卡在哪裡",blockers(view,d,null,null),"目前沒有額外卡點。")}<div class="sdr-extra-loading">核心決策已載入；正在補支撐壓力與技術／籌碼證據…</div>${explain(view,d,null)}`;
+  const h=hero(view,d),pending=view==="close"?'<details class="sdr-explain" open><summary>評分依據｜為什麼是這個分數</summary><div class="sdr-explain-body"><div class="sdr-note">正在載入犬子技術 2.0 六分項與籌碼 2.0 七分項；載入完成前不顯示舊制明細，避免新分數配到舊說明。</div></div></details>':explain(view,d,null);
+  return `<div class="sdr-context">${sesc(cfg.label)}詳情 · ${sesc(d.opportunity_bucket||"—")} · 排名 #${d.opportunity_rank??"—"}</div><div class="detail-hero"><div><span class="badge stage">${sesc(SSTAGE[d.lifecycle_stage]||d.lifecycle_stage||"—")}</span><h2>${sesc(SACTION[d.action_state]||d.action_state||"—")}</h2><p>${sesc(h.text)}</p></div><div class="detail-light ${h.tone}">${sesc(h.light)}</div></div><div class="sdr-quick">${quick(view,d)}</div>${list("為什麼現在看它",d.why_now||[],"目前沒有足夠的新理由。")} ${list("現在卡在哪裡",blockers(view,d,null,null),"目前沒有額外卡點。")}<div class="sdr-extra-loading">核心決策已載入；正在補支撐壓力與技術／籌碼證據…</div>${pending}`;
 }
 function fullHtml(view,cfg,d,zones,ep){
   const e=ep?.items?.[String(d.code)]||null,wanted=new Set([...(d.support_zone_ids||[]),...(d.resistance_zone_ids||[])]),mine=(Array.isArray(zones)?zones:[]).filter(z=>wanted.has(z.zone_id)),supports=mine.filter(z=>z.side==="SUPPORT").sort((a,b)=>rankOrder(a)-rankOrder(b)).slice(0,2),resistances=mine.filter(z=>z.side==="RESISTANCE").sort((a,b)=>rankOrder(a)-rankOrder(b)).slice(0,2),support=supports[0]||null,resistance=resistances[0]||null,px=sn(e?.close??d.quote?.price),h=hero(view,d),miss=missing(d,support,resistance,e);
@@ -281,6 +302,17 @@ async function openStock(code,forcedView){
   try{
     const m=await smanifest();
     if(seq!==SDR.seq)return;
+
+    const shard=await stockShard(m,view,code).catch(()=>null);
+    if(seq!==SDR.seq)return;
+    if(shard?.decision&&shard?.evidence&&Array.isArray(shard?.zones)){
+      const d=shard.decision;
+      ui.title.textContent=`${d.code} ${d.name}`;
+      ui.body.innerHTML=fullHtml(view,cfg,d,shard.zones,{items:{[String(code)]:shard.evidence}});
+      document.dispatchEvent(new CustomEvent("radar:detail-rendered",{detail:{code:String(code),view,build:m.active_build_id,source:"stock-shard"}}));
+      return;
+    }
+
     const detail=await sset(m,cfg.detail);
     if(seq!==SDR.seq)return;
     const d=detail?.items?.[String(code)];
@@ -303,7 +335,7 @@ async function openStock(code,forcedView){
     if(seq!==SDR.seq||!ui.dialog.open)return;
     const ep=epRaw?.build_id===m.active_build_id?epRaw:null;
     ui.body.innerHTML=fullHtml(view,cfg,d,zones,ep);
-    document.dispatchEvent(new CustomEvent("radar:detail-rendered",{detail:{code:String(code),view,build:m.active_build_id}}));
+    document.dispatchEvent(new CustomEvent("radar:detail-rendered",{detail:{code:String(code),view,build:m.active_build_id,source:"full-dataset"}}));
   }catch(err){
     console.error("stock-detail-renderer",err);
     if(seq!==SDR.seq)return;
