@@ -123,6 +123,7 @@ def main() -> None:
         or bridge.get("quoted_rows")
         or qlayer.get("official_snapshot_rows")
         or qlayer.get("quoted_rows")
+        or qlayer.get("coverage")
         or row_snapshot_rows
         or 0
     )
