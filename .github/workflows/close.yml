@@ -182,6 +182,32 @@ jobs:
               raise SystemExit(f'chip score 2.0 missing from {len(rows)-len(chip2)} close rows')
           if rows and len(tech2) != len(rows):
               raise SystemExit(f'technical score 2.0 missing from {len(rows)-len(tech2)} close rows')
+
+          def fnum(v):
+              try:
+                  return float(v)
+              except Exception:
+                  return None
+
+          bad_math=[]
+          for r in rows:
+              code=str(r.get('code') or '')
+              tparts=r.get('technical_components_v2') or {}
+              tvals=[fnum((tparts.get(k) or {}).get('score')) for k in ('trend','breakout','volume_price','momentum','relative','risk_quality')]
+              tscore=fnum(r.get('technical_score_v2'))
+              if tscore is None or any(v is None for v in tvals) or abs(sum(tvals)-tscore)>0.11:
+                  bad_math.append(f'{code}:technical:{tvals}->{tscore}')
+
+              cparts=r.get('chip_components_v2') or {}
+              cvals=[fnum((cparts.get(k) or {}).get('points')) for k in ('foreign','trust','sbl','margin','consensus','price_chip','sector_inst')]
+              craw=fnum(r.get('chip_score_v2_raw'))
+              cscore=fnum(r.get('chip_score_v2'))
+              if craw is None or cscore is None or any(v is None for v in cvals) or abs(sum(cvals)-craw)>0.11 or abs(craw/4.0-cscore)>0.11:
+                  bad_math.append(f'{code}:chip:{cvals}->{craw}/100->{cscore}/25')
+          print('score v2 math checked:',len(rows),'bad=',len(bad_math))
+          if bad_math:
+              raise SystemExit(f'score v2 explanation math mismatch {bad_math[:20]}')
+
           formula=obj.get('score_formula') or {}
           if float(formula.get('technical') or 0) != 50 or float(formula.get('chip') or 0) != 25:
               raise SystemExit(f'fixed score contract drifted: {formula}')
