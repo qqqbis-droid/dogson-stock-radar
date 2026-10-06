@@ -396,15 +396,18 @@ def _extract_margin(df: pd.DataFrame, codes: set) -> Dict[str, dict]:
         return {}
 
     bal = (
-        _find_col(x, ["融資", "今日餘額"])
+        _find_exactish(x, ["MarginPurchaseBalanceOfTheMarketDay", "MarginPurchaseBalanceOfTheDay"])
+        or _find_col(x, ["融資", "今日餘額"])
         or _find_col(x, ["融資", "當日餘額"])
+        or _find_col(x, ["marginpurchase", "balanceofthemarketday"])
         or _find_col(x, ["marginpurchase", "balanceoftheday"])
         or _find_col(x, ["marginpurchase", "balance"], exclude=["previous", "prev", "前日"])
         or _find_col(x, ["margin", "balance"], exclude=["short", "previous", "prev"])
         or _find_col(x, ["資餘額"], exclude=["前"])
     )
     prev = (
-        _find_col(x, ["融資", "前日餘額"])
+        _find_exactish(x, ["MarginPurchaseBalancePreviousDay", "MarginPurchaseBalanceOfPreviousDay"])
+        or _find_col(x, ["融資", "前日餘額"])
         or _find_col(x, ["marginpurchase", "balanceofpreviousday"])
         or _find_col(x, ["marginpurchase", "previous", "balance"])
         or _find_col(x, ["marginpurchase", "prev", "balance"])
@@ -434,6 +437,9 @@ def _extract_margin(df: pd.DataFrame, codes: set) -> Dict[str, dict]:
             "margin_balance": _num(row[bal_idx]),
             "margin_prev": _num(row[prev_idx]) if prev_idx is not None else None,
         }
+    if not out:
+        sample=[str(v).strip() for v in x.iloc[:5, cc_idx].tolist()] if cc_idx is not None else []
+        _diag(f"margin parser: 0 matched codes; code_col={cc!r} sample={sample} cols={list(x.columns)[:20]}")
     return out
 
 
@@ -447,12 +453,15 @@ def _extract_sbl(df: pd.DataFrame, codes: set) -> Dict[str, dict]:
         return {}
 
     bal = (
-        _find_col(x, ["借券賣出", "當日餘額"])
+        _find_exactish(x, ["SecuritiesBorrowingBalanceOfTheMarketDay", "SecuritiesBorrowingBalanceOfMarketDay"])
+        or _find_col(x, ["借券賣出", "當日餘額"])
         or _find_col(x, ["借券賣出", "今日餘額"])
         or _find_col(x, ["借券賣出當日餘額"])
         or _find_col(x, ["借券賣出餘額"])
         or _find_col(x, ["sbl", "short", "balance"])
         or _find_col(x, ["securitieslending", "short", "balance"])
+        or _find_col(x, ["securitiesborrowing", "balanceofthemarketday"])
+        or _find_col(x, ["securitiesborrowing", "balance"])
         or _find_col(x, ["borrow", "short", "balance"])
         or _find_col(x, ["shortsale", "balance"], exclude=["margin"])
     )
@@ -475,6 +484,9 @@ def _extract_sbl(df: pd.DataFrame, codes: set) -> Dict[str, dict]:
         if code not in codes:
             continue
         out[code] = {"sbl_short_balance": _num(row[bal_idx])}
+    if not out:
+        sample=[str(v).strip() for v in x.iloc[:5, cc_idx].tolist()] if cc_idx is not None else []
+        _diag(f"SBL parser: 0 matched codes; code_col={cc!r} sample={sample} cols={list(x.columns)[:20]}")
     return out
 
 
