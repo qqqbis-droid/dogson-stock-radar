@@ -152,13 +152,39 @@ jobs:
           node --check docs/v2/card-display-v3.js
 
       - name: Publish validated Shadow bundle to clean-build-v2
+        shell: bash
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/v2/data
-          if git diff --cached --quiet; then
-            echo "No Shadow bundle changes"
-          else
+
+          # Keep the validated generated bundle aside. Before every push attempt,
+          # reset onto the newest clean-build-v2 so concurrent UI commits are never
+          # overwritten; then re-apply only docs/v2/data from this validated run.
+          rm -rf .shadow-generated-v2-data
+          cp -a docs/v2/data .shadow-generated-v2-data
+
+          for attempt in 1 2 3; do
+            echo "Shadow publish attempt $attempt"
+            git fetch origin clean-build-v2
+            git reset --hard origin/clean-build-v2
+            rm -rf docs/v2/data
+            cp -a .shadow-generated-v2-data docs/v2/data
+            git add docs/v2/data
+
+            if git diff --cached --quiet; then
+              echo "No Shadow bundle changes"
+              exit 0
+            fi
+
             git commit -m "chore(v2): sync Shadow bundle from production data [skip ci]"
-            git push origin HEAD:clean-build-v2
-          fi
+            if git push origin HEAD:clean-build-v2; then
+              exit 0
+            fi
+
+            echo "Concurrent clean-build-v2 update detected; retrying on latest branch."
+            sleep 2
+          done
+
+          echo "Shadow publish failed after 3 conflict-safe attempts" >&2
+          exit 1
