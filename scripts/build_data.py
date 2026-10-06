@@ -2598,6 +2598,7 @@ def add_component_scores(rows, market, preliminary_intraday=False):
     return rows
 
 
+# Inuko chip score 2.0 deployment trigger: official close rebuild
 def build_close():
     uni = get_universe()
     uni["industry_name"] = uni["industry"].map(industry_name_for)
