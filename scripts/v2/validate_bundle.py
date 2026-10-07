@@ -33,6 +33,39 @@ def resolve(root, url):
     return root / raw.lstrip("./")
 
 
+def validate_ignition_execution(row):
+    score=(row.get("scores") or {}).get("ignition_score")
+    if score is None:
+        return True
+    code=str(row.get("code") or "")
+    stage=str(row.get("ignition_stage") or "")
+    state=str(row.get("ignition_execution_state") or "")
+    ready=row.get("ignition_execution_ready")
+    action=str(row.get("ignition_action") or "")
+    entry=(row.get("scores") or {}).get("entry_position_score")
+    cap=row.get("ignition_gate_cap")
+    errors=[]
+    if not state or not isinstance(ready,bool):
+        errors.append("missing execution state/ready")
+    if stage=="末端過熱／不追" and (ready or state!="NO_CHASE"):
+        errors.append("overheat must be NO_CHASE")
+    if stage in {"剛點火","突破回踩"} and entry is not None:
+        try:
+            pos=float(entry); sc=float(score); cp=float(cap if cap is not None else 100)
+            if pos < 55 and ready:
+                errors.append("entry<55 cannot be ready")
+            if ready and (pos < 65 or sc < 75 or cp < 75):
+                errors.append("ready without score/entry/gate thresholds")
+            if pos < 55 and action in {"小量試單候選","等承接／小量試單"}:
+                errors.append("poor entry cannot show trial action")
+        except Exception:
+            errors.append("invalid numeric execution fields")
+    if errors:
+        print("ERROR ignition execution",code,stage,state,action,entry,score,cap,"; ".join(errors))
+        return False
+    return True
+
+
 def plan_zone_refs(plan):
     refs = []
     for key in ("entry_zone", "invalidation", "no_chase_zone"):
@@ -144,6 +177,8 @@ def main():
         elif key.startswith("decision_") and key.endswith("_summary"):
             for row in obj:
                 ok = validate("stock-decision.schema.json", row) and ok
+                if key.startswith("decision_close_"):
+                    ok = validate_ignition_execution(row) and ok
                 case_id = row.get("case_id")
                 if case_id and case_id not in case_ids:
                     print("ERROR unresolved summary case ref", row.get("code"), case_id)
@@ -153,6 +188,8 @@ def main():
             for row in values:
                 if isinstance(row, dict) and row.get("dataset") == "decision":
                     ok = validate("stock-decision.schema.json", row) and ok
+                    if key.startswith("decision_close_"):
+                        ok = validate_ignition_execution(row) and ok
                     if row.get("build_id") != active:
                         print("ERROR detail build_id mismatch", row.get("code"))
                         ok = False
