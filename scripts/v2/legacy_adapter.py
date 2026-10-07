@@ -157,6 +157,36 @@ def build_component_models(row, swing_score, intraday_score, daytrade_score):
     )
     return {"swing": swing, "intraday": intraday, "daytrade": daytrade}
 
+def ignition_execution(stage, signal_action, score, entry, gate_cap):
+    """Keep ignition probability/acceleration separate from whether the current
+    price is a good place to act. A strong ignition score never upgrades a poor
+    entry location into a buy signal."""
+    st = str(stage or "")
+    act = str(signal_action or "觀察")
+    s = num(score)
+    pos = num(entry)
+    cap = num(gate_cap, 100)
+
+    if st == "末端過熱／不追":
+        return {"state":"NO_CHASE","ready":False,"action":"不追","note":"點火訊號可能仍強，但末端／追價 Gate 已禁止追價。"}
+    if st == "蓄勢":
+        return {"state":"WAIT_BREAKOUT","ready":False,"action":"等突破","note":"尚未完成點火，等待正式突破與量價確認。"}
+    if st == "已發動等回踩":
+        return {"state":"WAIT_PULLBACK","ready":False,"action":"等回踩","note":"已發動但離起漲點偏遠，等回踩再評估。"}
+    if st in {"剛點火","突破回踩"}:
+        if pos is None:
+            return {"state":"WAIT_POSITION","ready":False,"action":"位置待補","note":"點火條件成立，但進場位置資料不足，不直接給試單訊號。"}
+        if pos < 55:
+            return {"state":"WAIT_PULLBACK","ready":False,"action":"點火成立・位置差，等回踩","note":f"點火成立，但進場位置僅 {pos:.0f}/100，先等回踩，不把強勢當買點。"}
+        if pos < 65:
+            return {"state":"WAIT_CONFIRM","ready":False,"action":"點火成立・等確認","note":f"點火成立，進場位置 {pos:.0f}/100；等支撐／突破回測確認後再升級。"}
+        if s is not None and s >= 75 and (cap is None or cap >= 75):
+            if st == "突破回踩":
+                return {"state":"RETEST_READY","ready":True,"action":"等承接／小量試單","note":f"突破回踩且進場位置 {pos:.0f}/100，可等承接確認後小量試單。"}
+            return {"state":"READY","ready":True,"action":"小量試單候選","note":f"剛點火且進場位置 {pos:.0f}/100，具備小量試單資格；仍不可追高。"}
+        return {"state":"WAIT_CONFIRM","ready":False,"action":"等確認","note":"點火尚未同時滿足分數／Gate／位置三項執行條件。"}
+    return {"state":"WATCH","ready":False,"action":act if act else "觀察","note":"點火條件尚未集中，維持觀察。"}
+
 def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, market_score=None, previous_stage=None, has_position=False):
     freshness = infer_freshness(row, session_phase)
     stage = canonical_stage(row.get("category"), previous_stage=previous_stage)
@@ -174,6 +204,13 @@ def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, mar
     intraday = num(row.get("intraday_score", row.get("intraday_momentum_score")))
     daytrade = num(row.get("daytrade_score"))
     ignition = num(row.get("ignition_score_v2"))
+    ignition_exec = ignition_execution(
+        row.get("ignition_stage_v2"),
+        row.get("ignition_action_v2"),
+        ignition,
+        entry,
+        row.get("ignition_gate_cap_v2"),
+    )
     components = build_component_models(row, score, intraday, daytrade)
     code = str(row.get("code") or "").strip()
     name = str(row.get("name") or code)
@@ -284,7 +321,11 @@ def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, mar
         "ignition_raw_score": num(row.get("ignition_raw_score_v2")),
         "ignition_confidence": num(row.get("ignition_confidence_v2")),
         "ignition_stage": row.get("ignition_stage_v2"),
-        "ignition_action": row.get("ignition_action_v2"),
+        "ignition_signal_action": row.get("ignition_action_v2"),
+        "ignition_action": ignition_exec["action"],
+        "ignition_execution_state": ignition_exec["state"],
+        "ignition_execution_ready": bool(ignition_exec["ready"]),
+        "ignition_execution_note": ignition_exec["note"],
         "ignition_verdict": row.get("ignition_verdict_v2"),
         "ignition_summary": row.get("ignition_summary_v2"),
         "ignition_reasons": list(row.get("ignition_reasons_v2") or []),
