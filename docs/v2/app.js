@@ -223,19 +223,28 @@ function showHealth(){const b=$("#healthBanner");if(!b)return;b.classList.add("h
 async function loadView(){
   state.visibleCount=15;
   const cfg=missionConfig[state.view];
-  if(state.view!=="portfolio")await Promise.all([dataset(cfg.summary),dataset("radar_stats")]);
+  if(state.view!=="portfolio"){
+    const jobs=[dataset(cfg.summary),dataset("radar_stats")];
+    if(isIgnitionMode()&&cfg.index)jobs.push(dataset(cfg.index));
+    await Promise.all(jobs);
+  }
   renderAll();
   document.dispatchEvent(new CustomEvent("radar:view-rendered",{detail:{view:state.view,build:state.manifest?.active_build_id}}));
 }
 function renderAll(){
   const cfg=missionConfig[state.view],m=state.manifest,phase=missionPhase(),date=missionDate(),time=missionTime(),knownAt=missionKnownAt();
   const dataStamp=stamp16(time||date||"—"),knownStamp=stamp16(knownAt);
-  const timing=state.view==="close"
-    ?`收盤資料 ${dataStamp}${knownStamp?` · 最後補齊 ${knownStamp}`:""}`
-    :`資料 ${dataStamp}`;
-  $("#mission").innerHTML=`<div>${esc(cfg.label)}</div><span>${esc(phaseLabel(phase))} · ${esc(timing)}</span>`;
-  $("#rankingTitle").textContent=cfg.title;
-  $("#statusBox").innerHTML=`<b>${esc(date||"—")}</b><br><span>${esc(phaseLabel(phase))}</span><br><small>${state.view==="close"&&knownStamp?`定格更新 ${esc(knownStamp)} · `:""}${m.health.validation_passed?"Contract ✓":"檢查失敗"}</small>`;
+  const timing=state.view==="close"?("收盤資料 "+dataStamp+(knownStamp?" · 最後補齊 "+knownStamp:"")):("資料 "+dataStamp);
+  let closeSwitch="";
+  if(state.view==="close"){
+    closeSwitch='<div class="close-mode-switch" aria-label="盤後雷達模式">'
+      +'<button type="button" data-close-mode="swing" class="'+(state.closeMode==="swing"?"active":"")+'">穩健波段</button>'
+      +'<button type="button" data-close-mode="ignition" class="ignite '+(state.closeMode==="ignition"?"active":"")+'">🔥 點火雷達</button>'
+      +'</div>';
+  }
+  $("#mission").innerHTML="<div>"+esc(cfg.label)+"</div><span>"+esc(phaseLabel(phase))+" · "+esc(timing)+"</span>"+closeSwitch;
+  $("#rankingTitle").textContent=isIgnitionMode()?"🔥 點火雷達｜找加速前段":cfg.title;
+  $("#statusBox").innerHTML="<b>"+esc(date||"—")+"</b><br><span>"+esc(phaseLabel(phase))+"</span><br><small>"+(state.view==="close"&&knownStamp?("定格更新 "+esc(knownStamp)+" · "):"")+(m.health.validation_passed?"Contract ✓":"檢查失敗")+"</small>";
   renderRadarSummary();renderStageFilter();renderActionFilter();renderPositionFilter();renderSectorFilter();renderCards();
 }
 
