@@ -259,12 +259,18 @@ function renderRadarSummary(){
 }
 function renderStageFilter(){
   const el=$("#stageFilter");if(!el)return;const current=state.filterStage;
-  el.innerHTML=['<option value="">全部階段</option>'].concat(Object.entries(stageLabel).map(([k,v])=>`<option value="${k}">${v}</option>`)).join("");
+  if(isIgnitionMode()){
+    el.innerHTML='<option value="">全部點火階段</option>'+Object.entries(ignitionStageLabel).map(([k,v])=>'<option value="'+esc(k)+'">'+esc(v)+'</option>').join("");
+  }else{
+    el.innerHTML=['<option value="">全部階段</option>'].concat(Object.entries(stageLabel).map(([k,v])=>'<option value="'+k+'">'+v+'</option>')).join("");
+  }
   el.value=current;
 }
 function renderActionFilter(){
   const el=$("#actionFilter");if(!el)return;const current=state.filterAction;
-  el.innerHTML='<option value="">全部狀態</option><option value="ACTIONABLE">可執行</option><option value="WAIT">等待</option><option value="NO_CHASE">不追</option><option value="RISK">風險優先</option><option value="STALE">資料失效</option>';
+  el.innerHTML=isIgnitionMode()
+    ?'<option value="">全部點火狀態</option><option value="IGNITION_TEST">小量試單候選</option><option value="WAIT_BREAKOUT">等突破</option><option value="WAIT_PULLBACK">等回踩</option><option value="NO_CHASE">不追</option><option value="WATCH">觀察</option>'
+    :'<option value="">全部狀態</option><option value="ACTIONABLE">可執行</option><option value="WAIT">等待</option><option value="NO_CHASE">不追</option><option value="RISK">風險優先</option><option value="STALE">資料失效</option>';
   el.value=current;
 }
 function renderPositionFilter(){
@@ -296,12 +302,25 @@ async function ensureIndex(){
   }
 }
 async function ensureDetail(){const cfg=missionConfig[state.view];if(cfg.detail&&!state.cache[cfg.detail])await dataset(cfg.detail)}
-function rowsForView(){const cfg=missionConfig[state.view];if(state.view==="portfolio")return[];return state.cache[cfg.index]||state.cache[cfg.summary]||[]}
+function rowsForView(){
+  const cfg=missionConfig[state.view];if(state.view==="portfolio")return[];
+  const rows=state.cache[cfg.index]||state.cache[cfg.summary]||[];
+  if(!isIgnitionMode())return rows;
+  return [...rows].sort((a,b)=>(num(b.scores?.ignition_score)??-1)-(num(a.scores?.ignition_score)??-1)||(num(b.ignition_confidence)??0)-(num(a.ignition_confidence)??0)||String(a.code).localeCompare(String(b.code)));
+}
 function hasDeepFilter(){return Boolean(state.search.trim()||state.quickFilter||state.filterStage||state.filterAction||state.filterPosition||state.filterSector)}
 function hasNonSearchFilter(){return Boolean(state.quickFilter||state.filterStage||state.filterAction||state.filterPosition||state.filterSector)}
 function fullIndexLoaded(){const cfg=missionConfig[state.view];return Boolean(cfg.index&&state.cache[cfg.index])}
 function filterAction(d){
   if(!state.filterAction)return true;
+  if(isIgnitionMode()){
+    if(state.filterAction==="IGNITION_TEST")return d.ignition_action==="小量試單候選"||d.ignition_action==="等承接／小量試單";
+    if(state.filterAction==="WAIT_BREAKOUT")return d.ignition_action==="等突破";
+    if(state.filterAction==="WAIT_PULLBACK")return d.ignition_action==="等回踩"||d.ignition_action==="等承接／小量試單";
+    if(state.filterAction==="NO_CHASE")return d.ignition_action==="不追";
+    if(state.filterAction==="WATCH")return d.ignition_action==="觀察";
+    return true;
+  }
   if(state.filterAction==="ACTIONABLE")return d.actionable===true;
   if(state.filterAction==="WAIT")return["WAIT_TRIGGER","WAIT_PULLBACK"].includes(d.action_state);
   if(state.filterAction==="NO_CHASE")return d.action_state==="DO_NOT_CHASE";
@@ -312,10 +331,10 @@ function filterAction(d){
 function positionMatch(d){
   const f=state.filterPosition;
   if(!f)return true;
-  if(f==="BREAKOUT")return d.lifecycle_stage==="LAUNCH"||(d.why_now||[]).some(x=>/突破/.test(String(x)));
-  if(f==="OVERHEAT")return d.action_state==="DO_NOT_CHASE"||(d.risk_overlays||[]).includes("OVERHEAT");
+  if(f==="BREAKOUT")return isIgnitionMode()?["剛點火","突破回踩"].includes(d.ignition_stage):(d.lifecycle_stage==="LAUNCH"||(d.why_now||[]).some(x=>/突破/.test(String(x))));
+  if(f==="OVERHEAT")return isIgnitionMode()?d.ignition_stage==="末端過熱／不追":(d.action_state==="DO_NOT_CHASE"||(d.risk_overlays||[]).includes("OVERHEAT"));
   const cfg=missionConfig[state.view],detail=state.cache[cfg.detail]?.items?.[String(d.code)]||d,labels=(detail.score_explanations?.entry_position?.items||[]).map(x=>String(x.label||"")),texts=[...(detail.blockers||[]),...(detail.upgrade_conditions||[])].join(" ");
-  if(f==="NEAR_SUPPORT")return labels.some(x=>/支撐/.test(x))||["PULLBACK_TEST","PULLBACK_CONFIRMED"].includes(d.lifecycle_stage)||d.action_state==="WAIT_PULLBACK";
+  if(f==="NEAR_SUPPORT")return labels.some(x=>/支撐/.test(x))||[ "突破回踩","蓄勢" ].includes(d.ignition_stage)||["PULLBACK_TEST","PULLBACK_CONFIRMED"].includes(d.lifecycle_stage)||d.action_state==="WAIT_PULLBACK";
   if(f==="NEAR_RESISTANCE")return labels.some(x=>/壓力/.test(x))||/壓力|突破/.test(texts);
   return true;
 }
