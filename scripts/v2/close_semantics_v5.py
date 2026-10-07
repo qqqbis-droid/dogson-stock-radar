@@ -44,10 +44,13 @@ def main():
     for row in index if isinstance(index,list) else []:
         src=items.get(str(row.get('code')))
         if not src or str(src.get('trade_date') or src.get('as_of') or '')[:10]!=close_date: continue
-        for k in ('freshness','lifecycle_stage','action_state','actionable','opportunity_bucket','why_now','blockers','upgrade_conditions','risk_flags'):
+        for k in ('freshness','lifecycle_stage','action_state','actionable','opportunity_bucket','why_now','blockers','upgrade_conditions','risk_flags',
+                  'ignition_model_version','ignition_raw_score','ignition_confidence','ignition_stage','ignition_action',
+                  'ignition_verdict','ignition_summary','ignition_reasons','ignition_gate_cap','ignition_gate_flags',
+                  'ignition_breakout_distance_pct','ignition_breakout_distance_atr','ignition_candidate','ignition_rank'):
             if k in src and row.get(k)!=src.get(k): row[k]=src.get(k); changed+=1
         rs=row.setdefault('scores',{}); ss=src.get('scores') or {}
-        for k in ('swing_quality_score','entry_position_score','market_score'):
+        for k in ('swing_quality_score','entry_position_score','ignition_score','market_score'):
             if k in ss and rs.get(k)!=ss.get(k): rs[k]=ss.get(k); changed+=1
     if changed: imeta.update(write(index_path,index))
 
