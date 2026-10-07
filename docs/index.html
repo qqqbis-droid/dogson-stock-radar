@@ -292,7 +292,7 @@ details{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}summar
 <div class="footer" id="footerText">盤中動能100＝價格結構30＋量價/動能25＋相對強弱15＋族群20＋流動性/追價風險10｜籌碼只作背景｜大盤15分獨立</div>
 
 <script>
-let mode="intraday",filter="all",watchOnly=false,portfolioOnly=false,portfolioData={},universe=[],closeRows=[],intraRows=[],daytradeRows=[],rows=[],market={},marketLive={},closeMarket={},intraMarket={},daytradeMarket={},sectorRotation=[],sectorFunds=[],changeRadar={},validationReport={},daytradeReport={};
+let mode="intraday",filter="all",watchOnly=false,portfolioOnly=false,portfolioData={},universe=[],closeRows=[],intraRows=[],daytradeRows=[],rows=[],market={},marketLive={},closeMarket={},intraMarket={},daytradeMarket={},sectorRotation=[],sectorFunds=[],changeRadar={},validationReport={},daytradeReport={},statusMeta={};
 let sectorFundsOpen=localStorage.getItem("dogsonSectorFundsOpen")==="1";
 let sectorRotationOpen=localStorage.getItem("dogsonSectorRotationOpen")==="1";
 const $=id=>document.getElementById(id);
@@ -841,6 +841,15 @@ function render(){
  </div>`).join("");
 }
 
+function refreshUpdatedStamp(){
+ const raw=mode==="close"?(statusMeta.close_updated_at||closeMarket?.updated_at):(mode==="daytrade"?(statusMeta.daytrade_updated_at||statusMeta.intraday_updated_at):(statusMeta.intraday_updated_at||statusMeta.updated_at));
+ const el=$("updated");if(!el)return;
+ if(!raw){el.textContent="—";return}
+ const stamp=new Date(raw).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
+ el.textContent=mode==="close"?`${stamp}｜盤後定格`:stamp;
+ el.title=mode==="close"?"盤後資料固定在最後一次正式盤後更新；隔日盤中仍保留，直到下一個交易日新的盤後資料完成。":"";
+}
+
 async function load(){
  try{
   const bust=Date.now();
@@ -849,10 +858,10 @@ async function load(){
    fetch("./data/intraday.json?"+bust),fetch("./data/status.json?"+bust),
    fetch("./data/market.json?"+bust),fetch("./data/validation.json?"+bust),fetch("./data/daytrade.json?"+bust)
   ]);
-  universe=await u.json();let cj=await c.json(),ij=await i.json(),sj=await s.json();validationReport=await v.json();daytradeReport=await d.json();
+  universe=await u.json();let cj=await c.json(),ij=await i.json(),sj=await s.json();statusMeta=sj||{};validationReport=await v.json();daytradeReport=await d.json();
   closeMarket=await m.json();intraMarket=ij.market||closeMarket;daytradeMarket=daytradeReport.market||intraMarket;marketLive=ij.market_intraday||{};sectorRotation=ij.sector_rotation||[];changeRadar=ij.change_radar||{};market=intraMarket;
   closeRows=cj.rows||[];sectorFunds=cj.sector_funds||[];intraRows=ij.rows||[];daytradeRows=daytradeReport.rows||[];
-  $("updated").textContent=sj.updated_at?new Date(sj.updated_at).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
+  refreshUpdatedStamp();
   $("status").textContent="已更新";syncModeFilters();$("marketbox").innerHTML=marketHTML();$("validationbox").innerHTML=validationHTML();$("rotationbox").innerHTML=rotationHTML();$("changebox").innerHTML=changeRadarHTML();render();
  }catch(e){
   $("status").textContent="資料尚未建立";
@@ -869,7 +878,7 @@ function syncModeFilters(){
  });
 }
 
-document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;filter="all";document.querySelectorAll(".filter[data-f]").forEach(x=>x.classList.toggle("on",x.dataset.f==="all"));market=mode==="daytrade"?daytradeMarket:(mode==="intraday"?intraMarket:closeMarket);$("modeText").textContent=mode==="daytrade"?"當沖：獨立100分 / VWAP / 5分執行 / 個股化追價門檻":(mode==="intraday"?"盤中波段：動能 / 三燈 / Stage / 族群輪動":"盤後波段：延續性 / 進場位置 / 60分K");syncModeFilters();$("marketbox").innerHTML=marketHTML();$("rotationbox").innerHTML=rotationHTML();$("changebox").innerHTML=changeRadarHTML();updateFooter();render()});
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;filter="all";document.querySelectorAll(".filter[data-f]").forEach(x=>x.classList.toggle("on",x.dataset.f==="all"));market=mode==="daytrade"?daytradeMarket:(mode==="intraday"?intraMarket:closeMarket);$("modeText").textContent=mode==="daytrade"?"當沖：獨立100分 / VWAP / 5分執行 / 個股化追價門檻":(mode==="intraday"?"盤中波段：動能 / 三燈 / Stage / 族群輪動":"盤後波段：延續性 / 進場位置 / 60分K｜昨收快照");refreshUpdatedStamp();syncModeFilters();$("marketbox").innerHTML=marketHTML();$("rotationbox").innerHTML=rotationHTML();$("changebox").innerHTML=changeRadarHTML();updateFooter();render()});
 document.querySelectorAll(".filter[data-f]").forEach(b=>b.onclick=()=>{document.querySelectorAll(".filter[data-f]").forEach(x=>x.classList.remove("on"));b.classList.add("on");filter=b.dataset.f;render()});
 $("watchOnly").onclick=()=>{watchOnly=!watchOnly;$("watchOnly").classList.toggle("on",watchOnly);render()};
 $("portfolioOnly").onclick=()=>{portfolioOnly=!portfolioOnly;$("portfolioOnly").classList.toggle("on",portfolioOnly);render()};
