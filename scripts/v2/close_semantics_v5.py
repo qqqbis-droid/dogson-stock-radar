@@ -45,7 +45,8 @@ def main():
         src=items.get(str(row.get('code')))
         if not src or str(src.get('trade_date') or src.get('as_of') or '')[:10]!=close_date: continue
         for k in ('freshness','lifecycle_stage','action_state','actionable','opportunity_bucket','why_now','blockers','upgrade_conditions','risk_flags',
-                  'ignition_model_version','ignition_raw_score','ignition_confidence','ignition_stage','ignition_action',
+                  'ignition_model_version','ignition_raw_score','ignition_confidence','ignition_stage','ignition_signal_action','ignition_action',
+                  'ignition_execution_state','ignition_execution_ready','ignition_execution_note',
                   'ignition_verdict','ignition_summary','ignition_reasons','ignition_gate_cap','ignition_gate_flags',
                   'ignition_breakout_distance_pct','ignition_breakout_distance_atr','ignition_candidate','ignition_rank'):
             if k in src and row.get(k)!=src.get(k): row[k]=src.get(k); changed+=1
