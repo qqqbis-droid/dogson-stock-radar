@@ -1,5 +1,7 @@
 name: Clean Build 2.0 Shadow Sync
 
+# ignition-radar-resync-20261007
+
 on:
   workflow_dispatch:
   push:
