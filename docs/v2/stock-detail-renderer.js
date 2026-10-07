@@ -12,6 +12,7 @@ const SRISK={OVERHEAT:"過熱",EVENT_RISK:"事件風險",LIQUIDITY_RISK:"流動�
 const SSTATE={TESTING:"測試中",NEAR:"接近",ACTIVE:"有效結構",BROKEN:"已失效"};
 
 const sview=()=>document.querySelector(".tab.active")?.dataset.view||"intraday";
+const signition=()=>sview()==="close"&&!!document.querySelector('[data-close-mode="ignition"].active');
 const sesc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const sn=v=>v==null||v===''||!Number.isFinite(Number(v))?null:Number(v);
 const sf=(v,d=1)=>sn(v)==null?"—":Number(v).toLocaleString("zh-TW",{maximumFractionDigits:d});
@@ -135,13 +136,14 @@ function readiness(d){
 }
 function quick(view,d){
   const s=d.scores||{};
+  if(view==="close"&&signition())return `${tile("點火分數",sf(s.ignition_score))}${tile("進場位置",sf(s.entry_position_score))}${tile("點火信心",d.ignition_confidence!=null?sf(d.ignition_confidence,0)+"%":"—")}`;
   if(view==="close")return `${tile("波段品質",sf(s.swing_quality_score))}${tile("進場位置",sf(s.entry_position_score))}${tile("明日準備度",readiness(d))}`;
   if(view==="intraday"){
     const liq=comp(d,"intraday","liquidity_risk"),lv=sn(liq?.contribution),chase=lv==null?"待補":lv>=8?"低":lv>=5?"中":"高";
     return `${tile("盤中動能",sf(s.intraday_momentum_score))}${tile("進場位置",sf(s.entry_position_score))}${tile("追價風險",chase)}`;
   }
   const ex=comp(d,"daytrade","execution_structure"),flow=comp(d,"daytrade","flow_volume");
-  return `${tile("當沖分",sf(s.daytrade_score))}${tile("執行結構",ex?`${sf(ex.contribution)}/${sf(ex.contribution_max,0)}`:"待補")}${tile("量價推進",flow?`${sf(flow.contribution)}/${sf(flow.contribution_max,0)}`:"待補")}`;
+  return `${tile("當沖分",sf(s.daytrade_score))}${tile("執行結構",ex?`${sf(ex.contribution)}/${sfmax(ex.contribution_max)}`:"待補")}${tile("量價推進",flow?`${sf(flow.contribution)}/${sfmax(flow.contribution_max)}`:"待補")}`;
 }
 function humanWhy(x){
   let s=String(x||"").trim();
@@ -156,6 +158,15 @@ function list(title,xs,empty){
 }
 function hero(view,d){
   const risk=["EXIT_PRIORITY","REDUCE_WATCH"].includes(d.action_state)||["FAILED","WEAKENING"].includes(d.lifecycle_stage);
+  if(view==="close"&&signition()){
+    const st=String(d.ignition_stage||""),action=String(d.ignition_action||"觀察");
+    if(st==="末端過熱／不追")return{tone:"risk",light:"過熱不追",text:d.ignition_summary||"已有末端或追價風險，強勢不等於現在可以追。"};
+    if(st==="剛點火")return{tone:"go",light:"剛點火",text:d.ignition_summary||"突破、量能與共振同步，仍需守住突破帶。"};
+    if(st==="突破回踩")return{tone:"go",light:"突破回踩",text:d.ignition_summary||"已回測突破帶，重點看承接是否確認。"};
+    if(st==="蓄勢")return{tone:"wait",light:"蓄勢",text:d.ignition_summary||"條件正在集中，等正式突破再升級。"};
+    if(st==="已發動等回踩")return{tone:"wait",light:"等回踩",text:d.ignition_summary||"已發動但位置偏遠，等待回踩比追價重要。"};
+    return{tone:"neutral",light:action||"觀察",text:d.ignition_summary||"點火條件尚未集中，先列研究觀察。"};
+  }
   if(view==="close"){
     const good=d.opportunity_bucket==="NEXT_DAY_READY"||["SMALL_TEST","ADD_ON_CONFIRM"].includes(d.action_state);
     return {tone:risk?"risk":good?"go":"wait",light:risk?"風險優先":good?"明日候選":"明日觀察",text:risk?"結構轉弱，先處理風險。":good?"盤後先規劃明天要確認的價位，開盤後再看即時量價。":"目前先列觀察，條件成立前不用追。"};
