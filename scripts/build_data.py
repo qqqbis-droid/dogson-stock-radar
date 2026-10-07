@@ -2504,8 +2504,15 @@ def _apply_sector_score_v2(r, group_rows, source, label):
         confidence = min(confidence, 72.0)
 
     verdict = "主升共振" if score15 >= 12 else "偏強" if score15 >= 9 else "中性" if score15 >= 6 else "偏弱"
-    if breadth >= 3 and persistence >= 2.2 and leader_score >= 2.6:
-        summary = "族群廣度、領頭股與多日趨勢同步"
+    if score15 >= 12:
+        if breadth >= 3 and persistence >= 2.2 and leader_score >= 2.6:
+            summary = "族群廣度、領頭股與多日趨勢同步"
+        elif persistence >= 2.2 and leader_score >= 2.6:
+            summary = "主升條件成立；多日趨勢與領頭股強，今日廣度仍可再擴散"
+        elif breadth >= 3 and persistence >= 2.2:
+            summary = "主升條件成立；族群廣度與多日趨勢同步，領頭股強度仍可再提升"
+        else:
+            summary = "族群總分已達主升共振，仍有部分子項未同步滿足"
     elif breadth >= 3 and persistence < 1.5:
         summary = "今日族群偏強，但多日持續性仍待確認"
     elif leader_score >= 2.6 and breadth < 2:
