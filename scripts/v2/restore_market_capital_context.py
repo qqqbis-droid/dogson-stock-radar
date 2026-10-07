@@ -107,9 +107,12 @@ def market_close(close, fallback, build_id, generated_at):
     m = (close.get("market") if isinstance(close, dict) else None) or fallback or {}
     td = trade_date_of(close) or str(m.get("trade_date") or "")[:10] or None
     known = source_time(close, td, "15:30:00")
-    fresh = "FRESH" if td == datetime.now(TW).date().isoformat() else "STALE"
+    # CLOSE is the latest completed-session snapshot. Calendar rollover must not
+    # mark it stale while the next session is still open. as_of stays at the
+    # session close; known_at records late close/chip completion.
+    fresh = "FROZEN" if td else "UNKNOWN"
     return {
-        "schema_version":"2.0.0","build_id":build_id,"dataset":"market_context","context":"CLOSE","trade_date":td,"session_phase":"POST_CLOSE",
+        "schema_version":"2.0.0","build_id":build_id,"dataset":"market_context","context":"CLOSE","trade_date":td,"session_phase":"CLOSE_FREEZE",
         "as_of":f"{td}T13:30:00+08:00" if td else None,"known_at":known,"generated_at":generated_at,"freshness":fresh,
         "complete":bool(m.get("data_complete", close.get("data_complete", False) if isinstance(close, dict) else False)),"source_status":source_status("docs/data/close.json",known),
         "market_regime":regime(m.get("market_mode")),"market_score":num(m.get("market_score")),"market_confidence":90 if m.get("market_score") is not None else 55,
@@ -201,8 +204,9 @@ def index_quote(close, intra, fallback, build_id, generated_at, target_date):
     }
 
 
-def capital_base(build_id, context, td, phase, fresh, as_of, generated_at, rows, source, method):
-    return {"schema_version":"2.0.0","build_id":build_id,"dataset":"capital_context","context":context,"trade_date":td,"session_phase":phase,"as_of":as_of,"known_at":as_of,"generated_at":generated_at,"freshness":fresh,"complete":bool(rows),"source_status":source_status(source,as_of),"method":method,"rows":rows}
+def capital_base(build_id, context, td, phase, fresh, as_of, generated_at, rows, source, method, known_at=None):
+    known = known_at or as_of
+    return {"schema_version":"2.0.0","build_id":build_id,"dataset":"capital_context","context":context,"trade_date":td,"session_phase":phase,"as_of":as_of,"known_at":known,"generated_at":generated_at,"freshness":fresh,"complete":bool(rows),"source_status":source_status(source,known),"method":method,"rows":rows}
 
 
 def capital_intraday(intra, build_id, generated_at):
@@ -216,13 +220,16 @@ def capital_intraday(intra, build_id, generated_at):
 
 
 def capital_close(close, build_id, generated_at):
-    td=trade_date_of(close); as_of=source_time(close,td,"15:30:00"); fresh="FRESH" if td==datetime.now(TW).date().isoformat() else "STALE"
+    td=trade_date_of(close)
+    as_of=f"{td}T13:30:00+08:00" if td else None
+    known=source_time(close,td,"15:30:00")
+    fresh="FROZEN" if td else "UNKNOWN"
     rows=[]
     for r in (close.get("sector_funds") or []):
         if not isinstance(r,dict) or not str(r.get("sector") or "").strip(): continue
         rows.append({"primary_group":str(r.get("sector")).strip(),"today_amount_100m":num(r.get("today_amount_100m")),"net5_amount_100m":num(r.get("net5_amount_100m")),"net20_amount_100m":num(r.get("net20_amount_100m")),"amount_history_days":int(r.get("amount_history_days") or 0),"amount_coverage_pct":num(r.get("amount_coverage_pct")),"amount_method":r.get("amount_method"),"today_lots":num(r.get("today_lots")),"net5_lots":num(r.get("net5_lots")),"net20_lots":num(r.get("net20_lots")),"history_days":int(r.get("history_days") or 0),"latest_date":r.get("latest_date"),"flow_streak":int(r.get("flow_streak") or 0),"flow_direction":r.get("flow_direction"),"accelerating":bool(r.get("accelerating")),"flow_text":r.get("flow_text"),"action":r.get("action"),"ret5_pct":num(r.get("ret5_pct"))})
     rows.sort(key=lambda x:abs(x.get("today_amount_100m") or 0),reverse=True)
-    return capital_base(build_id,"CLOSE",td,"POST_CLOSE",fresh,as_of,generated_at,rows,"docs/data/close.json","外資＋投信官方淨買賣股數 × 各交易日收盤價估算金額；金額看力度、張數看方向；未含自營商。")
+    return capital_base(build_id,"CLOSE",td,"CLOSE_FREEZE",fresh,as_of,generated_at,rows,"docs/data/close.json","外資＋投信官方淨買賣股數 × 各交易日收盤價估算金額；金額看力度、張數看方向；未含自營商。",known_at=known)
 
 
 def register(root, manifest, key, filename, obj):
