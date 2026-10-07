@@ -2977,6 +2977,51 @@ def _close_entry_position_score(r):
     return round(max(0.0, min(100.0, score)), 1)
 
 
+def _finalize_ignition_execution_v2(r):
+    """Separate 'is it igniting?' from 'is this price actionable now?'."""
+    stage = str(r.get("ignition_stage_v2") or "")
+    signal_action = str(r.get("ignition_action_v2") or "觀察")
+    score = _chip_num(r.get("ignition_score_v2"))
+    entry = _chip_num(r.get("entry_position_score"))
+    cap = _chip_num(r.get("ignition_gate_cap_v2"))
+    r["ignition_signal_action_v2"] = signal_action
+
+    def set_exec(state, ready, action, note):
+        r["ignition_execution_state_v2"] = state
+        r["ignition_execution_ready_v2"] = bool(ready)
+        r["ignition_action_v2"] = action
+        r["ignition_execution_note_v2"] = note
+
+    if stage == "末端過熱／不追":
+        set_exec("NO_CHASE", False, "不追", "點火訊號可能仍強，但末端／追價 Gate 已禁止追價。")
+        return
+    if stage == "蓄勢":
+        set_exec("WAIT_BREAKOUT", False, "等突破", "尚未完成點火，等待正式突破與量價確認。")
+        return
+    if stage == "已發動等回踩":
+        set_exec("WAIT_PULLBACK", False, "等回踩", "已發動但離起漲點偏遠，等回踩再評估。")
+        return
+    if stage in {"剛點火", "突破回踩"}:
+        if entry is None:
+            set_exec("WAIT_POSITION", False, "位置待補", "點火條件成立，但進場位置資料不足，不直接給試單訊號。")
+            return
+        if entry < 55:
+            set_exec("WAIT_PULLBACK", False, "點火成立・位置差，等回踩", f"點火成立，但進場位置僅 {entry:.0f}/100，先等回踩，不把強勢當買點。")
+            return
+        if entry < 65:
+            set_exec("WAIT_CONFIRM", False, "點火成立・等確認", f"點火成立，進場位置 {entry:.0f}/100；等支撐／突破回測確認後再升級。")
+            return
+        if (score or 0) >= 75 and (cap is None or cap >= 75):
+            if stage == "突破回踩":
+                set_exec("RETEST_READY", True, "等承接／小量試單", f"突破回踩且進場位置 {entry:.0f}/100，可等承接確認後小量試單。")
+            else:
+                set_exec("READY", True, "小量試單候選", f"剛點火且進場位置 {entry:.0f}/100，具備小量試單資格；仍不可追高。")
+            return
+        set_exec("WAIT_CONFIRM", False, "等確認", "點火尚未同時滿足分數／Gate／位置三項執行條件。")
+        return
+    set_exec("WATCH", False, signal_action if signal_action else "觀察", "點火條件尚未集中，維持觀察。")
+
+
 def _assign_stage_v2(r, preliminary_intraday, sector_score_10):
     """Stage Engine 2.0：只判斷生命週期，不改任何100分權重。
 
@@ -3472,6 +3517,7 @@ def add_component_scores(rows, market, preliminary_intraday=False):
             r["swing_quality_score"] = swing
             r["swing_continuation_score"] = swing
             r["entry_position_score"] = _close_entry_position_score(r)
+            _finalize_ignition_execution_v2(r)
             r["score_type"] = "swing_continuation_direct_100"
             r["score_reliable"] = bool(chip_cov >= 60)
             if not r["score_reliable"]:
