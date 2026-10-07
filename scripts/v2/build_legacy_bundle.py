@@ -376,6 +376,14 @@ def lightweight_index(rows):
         "opportunity_bucket": d.get("opportunity_bucket"), "opportunity_rank": d.get("opportunity_rank"),
         "scores": d["scores"], "why_now": d.get("why_now", []), "blockers": d.get("blockers", []),
         "upgrade_conditions": d.get("upgrade_conditions", []), "risk_flags": d.get("risk_flags", []),
+        "ignition_model_version": d.get("ignition_model_version"), "ignition_raw_score": d.get("ignition_raw_score"),
+        "ignition_confidence": d.get("ignition_confidence"), "ignition_stage": d.get("ignition_stage"),
+        "ignition_action": d.get("ignition_action"), "ignition_verdict": d.get("ignition_verdict"),
+        "ignition_summary": d.get("ignition_summary"), "ignition_reasons": d.get("ignition_reasons", []),
+        "ignition_gate_cap": d.get("ignition_gate_cap"), "ignition_gate_flags": d.get("ignition_gate_flags", []),
+        "ignition_breakout_distance_pct": d.get("ignition_breakout_distance_pct"),
+        "ignition_breakout_distance_atr": d.get("ignition_breakout_distance_atr"),
+        "ignition_candidate": d.get("ignition_candidate"), "ignition_rank": d.get("ignition_rank"),
     } for d in rows]
 
 
