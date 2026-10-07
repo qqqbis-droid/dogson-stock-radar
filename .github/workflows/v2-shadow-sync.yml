@@ -1,6 +1,6 @@
 name: Clean Build 2.0 Shadow Sync
 
-# close-freeze-resync-20261008
+# ignition-execution-resync-20261008
 
 on:
   workflow_dispatch:
