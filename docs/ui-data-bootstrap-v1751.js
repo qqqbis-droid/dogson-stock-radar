@@ -84,7 +84,16 @@
     if(results[0].status==='fulfilled')applyMarket(results[0].value);
     if(results[1].status==='fulfilled'){
       const s=results[1].value;
-      try{const el=document.getElementById('updated');if(el&&s?.updated_at)el.textContent=new Date(s.updated_at).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}catch{}
+      window.DOGSON_STATUS_META=s||{};
+      try{
+        if(typeof statusMeta!=='undefined')statusMeta=s||{};
+        if(typeof refreshUpdatedStamp==='function')refreshUpdatedStamp();
+        else{
+          const raw=modeNow()==='close'?(s?.close_updated_at||s?.updated_at):(modeNow()==='daytrade'?(s?.daytrade_updated_at||s?.intraday_updated_at||s?.updated_at):(s?.intraday_updated_at||s?.updated_at));
+          const el=document.getElementById('updated');
+          if(el&&raw)el.textContent=new Date(raw).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})+(modeNow()==='close'?'｜盤後定格':'');
+        }
+      }catch{}
     }
     if(results[2].status==='fulfilled')window.DOGSON_BOOT_SYSTEM_STATUS=results[2].value;
     paint();emit('small');
