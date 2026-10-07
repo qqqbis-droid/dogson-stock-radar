@@ -86,10 +86,12 @@ def main():
     require(app, "positionMin:65", "next-day position gate", errors)
     require(app, "confidenceMin:80", "next-day confidence gate", errors)
     require(app, "showAllNextDay", "uncapped next-day render path", errors)
-    for needle in ("ignitionQuickFilter", "data-close-mode", "🔥 點火雷達", "ignitionCardHtml", "scores?.ignition_score", "ignition_stage"):
+    for needle in ("ignitionQuickFilter", "data-close-mode", "🔥 點火雷達", "ignitionCardHtml", "scores?.ignition_score", "ignition_stage",
+                   "ignition_execution_ready", "ignition_execution_state", "ignition_execution_note"):
         require(app, needle, "close ignition radar", errors)
     require(app_css, ".close-mode-switch", "close ignition mode switch style", errors)
-    for needle in ("ignitionExplain", "Gate 上限", "ignition_components_v2", "volume_acceleration", "relative_acceleration", "chip_acceleration", "tradability_risk"):
+    for needle in ("ignitionExplain", "Gate 上限", "ignition_components_v2", "volume_acceleration", "relative_acceleration", "chip_acceleration", "tradability_risk",
+                   "點火分數只回答", "進場位置"):
         require(detail, needle, "ignition score explanation", errors)
     for capped in ("limit:8", "NEXT_DAY_ELITE.limit", "slice(0,NEXT_DAY_ELITE.limit)"):
         if capped in app:
