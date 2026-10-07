@@ -35,6 +35,7 @@ def main():
     quick = text("portfolio-quick-add.js")
     universe = text("universe-search.js")
     transparency = text("radar-transparency-v7.js")
+    freshness = text("unified-score-freshness-v1.js")
     theme = text("theme-toggle.js")
 
     errors: list[str] = []
@@ -90,6 +91,8 @@ def main():
                    "ignition_execution_ready", "ignition_execution_state", "ignition_execution_note"):
         require(app, needle, "close ignition radar", errors)
     require(app_css, ".close-mode-switch", "close ignition mode switch style", errors)
+    for needle in ("missionMeta('close').date", "盤後定格", "最後完成收盤"):
+        require(freshness, needle, "completed-close freeze semantics", errors)
     for needle in ("ignitionExplain", "Gate 上限", "ignition_components_v2", "volume_acceleration", "relative_acceleration", "chip_acceleration", "tradability_risk",
                    "點火分數只回答", "進場位置"):
         require(detail, needle, "ignition score explanation", errors)
