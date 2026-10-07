@@ -418,7 +418,11 @@ function resetFilters(){
 function openCard(card){
   const code=String(card?.dataset?.code||"").trim();
   if(!code||state.view==="portfolio")return;
-  document.dispatchEvent(new CustomEvent("radar:open-stock",{detail:{code,view:state.view}}));
+  document.dispatchEvent(new CustomEvent("radar:open-stock",{detail:{
+    code,
+    view:state.view,
+    closeMode:state.view==="close"?state.closeMode:null
+  }}));
 }
 
 document.addEventListener("click",async e=>{
