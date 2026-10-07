@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.v2.engine import bucket_for, synthesize_action
+from scripts.v2.legacy_adapter import ignition_execution
 
 
 def load(path: Path):
@@ -264,6 +265,27 @@ def normalize_decision(row: dict, canonical_date: str, src: dict | None = None, 
     if row.get("no_chase") != no_chase: row["no_chase"] = no_chase; changed = True
     bucket = bucket_for("close_next_day", row.get("lifecycle_stage"), action, "FRESH", bool(actionable), False)
     if row.get("opportunity_bucket") != bucket: row["opportunity_bucket"] = bucket; changed = True
+
+    # Recompute ignition execution only after the pressure-aware entry position is
+    # final. The ignition score itself remains untouched; this only decides
+    # whether today's price is actionable.
+    if scores.get("ignition_score") is not None:
+        ie = ignition_execution(
+            row.get("ignition_stage"),
+            row.get("ignition_signal_action") or row.get("ignition_action"),
+            scores.get("ignition_score"),
+            entry,
+            row.get("ignition_gate_cap"),
+        )
+        updates = {
+            "ignition_action": ie["action"],
+            "ignition_execution_state": ie["state"],
+            "ignition_execution_ready": bool(ie["ready"]),
+            "ignition_execution_note": ie["note"],
+        }
+        for k,v in updates.items():
+            if row.get(k) != v:
+                row[k] = v; changed = True
 
     if attach_explanations and src and entry_items is not None:
         exp = build_explanations(row, src, entry, entry_items)
