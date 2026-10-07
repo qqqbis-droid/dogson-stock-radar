@@ -15,6 +15,7 @@
 
   let manifest=null;
   let closeContext=null;
+  let capitalCloseContext=null;
   let closeRows=[];
   let closeIndex=null;
   let closeZones=null;
@@ -113,7 +114,10 @@
       if(m.complete===false)reasons.push(`${key} 尚未完整`);
       if(m.build_id&&build&&m.build_id!==build)reasons.push(`${key} build 不一致`);
       const d=ymd(m.as_of);
-      if(d&&tradeDate&&d!==tradeDate)reasons.push(`${key} 日期 ${d} ≠ ${tradeDate}`);
+      // market/capital close can finish filling after midnight; their metadata
+      // as_of in older bundles may reflect the fill clock. Validate those two by
+      // the dataset's explicit trade_date below instead of calendar date here.
+      if(!['market_close_context','capital_close_context'].includes(key)&&d&&tradeDate&&d!==tradeDate)reasons.push(`${key} 日期 ${d} ≠ ${tradeDate}`);
     }
     const ctxDate=ymd(closeContext?.trade_date||closeContext?.as_of);
     if(closeContext){
@@ -122,6 +126,13 @@
       if(ctxDate&&tradeDate&&ctxDate!==tradeDate)reasons.push(`市場環境日期 ${ctxDate} ≠ ${tradeDate}`);
       if(['STALE','UNKNOWN'].includes(String(closeContext.freshness||'').toUpperCase()))reasons.push(`市場環境 freshness=${closeContext.freshness}`);
     }else reasons.push('市場環境尚未載入');
+
+    const capitalDate=ymd(capitalCloseContext?.trade_date||capitalCloseContext?.as_of);
+    if(capitalCloseContext){
+      if(capitalCloseContext.complete===false)reasons.push('法人資金資料不完整');
+      if(capitalCloseContext.build_id&&build&&capitalCloseContext.build_id!==build)reasons.push('法人資金 build 不一致');
+      if(capitalDate&&tradeDate&&capitalDate!==tradeDate)reasons.push(`法人資金交易日 ${capitalDate} ≠ ${tradeDate}`);
+    }else reasons.push('法人資金尚未載入');
 
     const age=daysBetween(tradeDate,taipeiToday());
     if(age!=null&&age>=7)reasons.push(`資料距今天已 ${age} 天，超過安全上限`);
@@ -333,13 +344,14 @@
     try{
       manifest=await getJson(`./data/current_manifest.json?uf=${Date.now()}`);
       if(seq!==renderSeq)return;
-      closeContext=null;closeRows=[];closeIndex=null;closeZones=null;rowMap=new Map();zoneMap=new Map();
-      const [ctx,rows]=await Promise.all([
+      closeContext=null;capitalCloseContext=null;closeRows=[];closeIndex=null;closeZones=null;rowMap=new Map();zoneMap=new Map();
+      const [ctx,capitalCtx,rows]=await Promise.all([
         datasetFromManifest('market_close_context').catch(()=>null),
+        datasetFromManifest('capital_close_context').catch(()=>null),
         datasetFromManifest('decision_close_summary').catch(()=>[])
       ]);
       if(seq!==renderSeq)return;
-      closeContext=ctx;closeRows=Array.isArray(rows)?rows:[];mergeRows(closeRows);
+      closeContext=ctx;capitalCloseContext=capitalCtx;closeRows=Array.isArray(rows)?rows:[];mergeRows(closeRows);
       renderFreshness();renderMarketDecision();
       if(activeView()==='close')decorateCards();
       if(force)document.dispatchEvent(new CustomEvent('radar:afterhours-refresh',{detail:{build:manifest?.active_build_id}}));
