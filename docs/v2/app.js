@@ -1,5 +1,5 @@
 const state={
-  view:"intraday",manifest:null,cache:{},visibleCount:15,quickFilter:"",
+  view:"intraday",closeMode:"swing",manifest:null,cache:{},visibleCount:15,quickFilter:"",
   filterStage:"",filterAction:"",filterPosition:"",filterSector:"",
   search:"",externalSearch:[],loading:false,searchTimer:null,
   livePollTimer:null,livePollBusy:false,lastAutoCheckAt:0
@@ -17,6 +17,7 @@ const missionConfig={
 const stageLabel={OBSERVE:"觀察",SETUP:"蓄勢待發",LAUNCH:"剛啟動",TREND:"趨勢持有",PULLBACK_TEST:"回踩觀察",PULLBACK_CONFIRMED:"回踩承接",WEAKENING:"轉弱警戒",FAILED:"結構失效"};
 const actionLabel={WATCH:"觀察",WAIT_TRIGGER:"等觸發",SMALL_TEST:"小量試單候選",WAIT_PULLBACK:"等回踩",HOLD:"續抱",ADD_ON_CONFIRM:"確認後加碼候選",DO_NOT_CHASE:"過熱不追",REDUCE_WATCH:"減碼觀察",EXIT_PRIORITY:"優先出場",DATA_STALE:"資料失效"};
 const freshnessLabel={LIVE:"即時",FRESH:"新鮮",FROZEN:"收盤定格",STALE:"過期",UNKNOWN:"未知"};
+const ignitionStageLabel={"蓄勢":"蓄勢","剛點火":"剛點火","突破回踩":"突破回踩","已發動等回踩":"等回踩","末端過熱／不追":"過熱不追","觀察":"觀察"};
 const bucketLabel={TRIGGER_READY:"觸發就緒",WAIT_TRIGGER:"等待觸發",TREND_MONITOR:"趨勢追蹤",WAIT_PULLBACK:"等待回踩",RESEARCH_ONLY:"研究觀察",NEXT_DAY_READY:"明日候選",BREAKOUT_WATCH:"突破觀察",PULLBACK_WATCH:"回踩觀察",TREND_QUALITY:"趨勢品質",RESEARCH:"研究觀察",RISK:"風險優先",ACTIONABLE_NOW:"可執行",NO_TRADE:"不交易",STALE:"資料失效"};
 
 const quickFilterConfig={
@@ -39,6 +40,13 @@ const quickFilterConfig={
     {key:"STALE",label:"資料失效",icon:"!",note:"資料不足不執行",kind:"bucket",values:["STALE"],tone:"risk"}
   ]}
 };
+const ignitionQuickFilter={title:"🔥 點火雷達快篩",subtitle:"找還沒離起漲點太遠的蓄勢／剛點火，不把末端噴出當機會",items:[
+  {key:"IGNITION",label:"剛點火",icon:"🔥",note:"突破＋量能＋共振同步",kind:"ignition_stage",values:["剛點火"],tone:"go"},
+  {key:"SETUP",label:"蓄勢",icon:"⌛",note:"平台附近等待正式突破",kind:"ignition_stage",values:["蓄勢"],tone:"trend"},
+  {key:"RETEST",label:"突破回踩",icon:"↘",note:"回測突破帶看承接",kind:"ignition_stage",values:["突破回踩"],tone:"wait"},
+  {key:"WAIT_PULLBACK",label:"等回踩",icon:"↩",note:"已發動但位置不宜追",kind:"ignition_stage",values:["已發動等回踩"],tone:"wait"},
+  {key:"OVERHEAT",label:"過熱不追",icon:"!",note:"Gate 已限制追價",kind:"ignition_stage",values:["末端過熱／不追"],tone:"risk"}
+]};
 
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
@@ -47,6 +55,7 @@ const fmt=(v,d=1)=>num(v)==null?"—":Number(v).toLocaleString("zh-TW",{maximumF
 const priceFmt=v=>num(v)==null?"—":Number(v).toLocaleString("zh-TW",{maximumFractionDigits:2});
 const compact=v=>num(v)==null?"—":new Intl.NumberFormat("zh-TW",{notation:"compact",maximumFractionDigits:1}).format(Number(v));
 const signedPct=v=>num(v)==null?"—":`${Number(v)>0?"+":""}${fmt(v,2)}%`;
+const isIgnitionMode=()=>state.view==="close"&&state.closeMode==="ignition";
 
 function fail(message){
   const b=$("#healthBanner");
@@ -75,13 +84,20 @@ async function dataset(key){
 
 function phaseLabel(p){return({PRE_OPEN:"盤前",LIVE:"盤中",CLOSE_FREEZE:"收盤定格",POST_CLOSE:"盤後",NEXT_DAY:"隔日準備"})[p]||p||"—"}
 function actionTone(d){
+  if(isIgnitionMode()){
+    const st=String(d.ignition_stage||"");
+    if(st==="末端過熱／不追")return"risk";
+    if(["剛點火","突破回踩"].includes(st))return"go";
+    if(["蓄勢","已發動等回踩"].includes(st))return"wait";
+    return"neutral";
+  }
   if(d.action_state==="DATA_STALE")return"stale";
   if(["EXIT_PRIORITY","REDUCE_WATCH"].includes(d.action_state)||["FAILED","WEAKENING"].includes(d.lifecycle_stage))return"risk";
   if(d.actionable)return"go";
   if(["WAIT_TRIGGER","WAIT_PULLBACK","DO_NOT_CHASE"].includes(d.action_state))return"wait";
   return"neutral";
 }
-function scoreFor(d){const cfg=missionConfig[state.view],s=d.scores||{};return s[cfg.scoreKey]}
+function scoreFor(d){if(isIgnitionMode())return d.scores?.ignition_score;const cfg=missionConfig[state.view],s=d.scores||{};return s[cfg.scoreKey]}
 function summaryRows(){const cfg=missionConfig[state.view];return cfg?.summary?(state.cache[cfg.summary]||[]):[]}
 function missionPhase(){if(state.view==="close")return"CLOSE_FREEZE";if(state.view==="portfolio")return"POST_CLOSE";return summaryRows()[0]?.session_phase||state.manifest?.session_phase}
 function missionDate(){const cfg=missionConfig[state.view],meta=cfg?.summary?state.manifest?.datasets?.[cfg.summary]:null;return String(meta?.as_of||state.manifest?.trade_date||"").slice(0,10)}
@@ -108,11 +124,11 @@ function quoteHtml(d){
   const turnover=num(q.turnover_value_twd)!=null?`<div class="quote-turnover">成交值 ${compact(q.turnover_value_twd)}元</div>`:"";
   return `<div class="quote-strip"><div class="quote-price">${priceFmt(p)}</div><div class="quote-change ${cls}">${signedPct(chg)}</div><div class="quote-volume">${esc(vol)}</div>${turnover}</div>`;
 }
-function rankText(d){return `${bucketLabel[d.opportunity_bucket]||"排序"} #${d.opportunity_rank??"—"}`}
+function rankText(d){if(isIgnitionMode())return "🔥 點火 #"+(d.ignition_rank??"—");return `${bucketLabel[d.opportunity_bucket]||"排序"} #${d.opportunity_rank??"—"}`}
 function sectorDisplay(d){const primary=String(d?.primary_group||"").trim();if(primary)return primary;const industry=String(d?.industry||d?.industry_name||d?.official_industry||"").trim();return industry?`${industry}・官方產業代理`:"分類待補"}
 function sectorFilterKey(d){return String(d?.primary_group||d?.industry||d?.industry_name||d?.official_industry||"").trim()}
 
-function quickSpec(){return quickFilterConfig[state.view]||null}
+function quickSpec(){return isIgnitionMode()?ignitionQuickFilter:(quickFilterConfig[state.view]||null)}
 function activeQuickItem(){return quickSpec()?.items?.find(x=>x.key===state.quickFilter)||null}
 function isNextDayElite(d){
   const s=d?.scores||{};
@@ -126,6 +142,7 @@ function isNextDayElite(d){
 function quickMatch(d){
   const q=activeQuickItem();
   if(!q)return true;
+  if(isIgnitionMode()&&q.kind==="ignition_stage")return q.values.includes(d.ignition_stage);
   if(state.view==="close"&&q.key==="NEXT_DAY_READY")return isNextDayElite(d);
   return q.kind==="stage"?q.values.includes(d.lifecycle_stage):q.values.includes(d.opportunity_bucket);
 }
@@ -135,9 +152,8 @@ function applyQuickRows(rows){
   return rows.filter(quickMatch);
 }
 function quickValue(item,buckets,stages){
-  if(state.view==="close"&&item.key==="NEXT_DAY_READY"){
-    return (rowsForView()||[]).filter(isNextDayElite).length;
-  }
+  if(isIgnitionMode()&&item.kind==="ignition_stage")return (rowsForView()||[]).filter(d=>item.values.includes(d.ignition_stage)).length;
+  if(state.view==="close"&&item.key==="NEXT_DAY_READY")return (rowsForView()||[]).filter(isNextDayElite).length;
   const source=item.kind==="stage"?stages:buckets;
   return item.values.reduce((sum,key)=>sum+Number(source?.[key]||0),0);
 }
