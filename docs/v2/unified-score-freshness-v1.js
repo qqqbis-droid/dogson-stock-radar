@@ -59,29 +59,40 @@
 
   function missionMeta(key){
     const cfg=MISSION[key],ds=manifest?.datasets||{},core=ds[cfg.core]||null;
-    return {cfg,core,asOf:core?.as_of||null,date:ymd(core?.as_of)||dateKey(core?.as_of)};
+    return {key,cfg,core,asOf:core?.as_of||null,date:ymd(core?.as_of)||dateKey(core?.as_of)};
   }
   function missionBadge(meta){
     if(!meta.asOf)return {cls:'unknown',text:'時間未知'};
+    if(meta.key==='close')return {cls:'same',text:`盤後定格｜${meta.date||'—'}`};
     const base=manifest?.trade_date||ymd(manifest?.generated_at);
     if(meta.date&&base&&meta.date<base)return {cls:'stale',text:'舊資料／凍結'};
     if(meta.date===base)return {cls:'same',text:'本交易日快照'};
     return {cls:'unknown',text:'日期待核對'};
   }
   function datasetRows(key){
-    const cfg=MISSION[key],ds=manifest?.datasets||{};
+    const cfg=MISSION[key],ds=manifest?.datasets||{},missionDate=missionMeta(key).date,base=key==='close'?missionDate:(manifest?.trade_date||missionDate);
     return Object.entries(ds)
       .filter(([name])=>cfg.prefixes.some(p=>name===p||name.startsWith(p)))
       .sort((a,b)=>a[0].localeCompare(b[0]))
       .map(([name,m])=>{
-        const d=ymd(m?.as_of)||dateKey(m?.as_of),st=!m?.as_of?'時間未知':(d&&manifest?.trade_date&&d<manifest.trade_date?'舊／凍結':'本交易日');
-        return `<div class="uf-ds"><code>${esc(name)}</code><span>${esc(shortTime(m?.as_of))}</span><b class="${st==='舊／凍結'?'stale':''}">${esc(st)}</b></div>`;
+        const d=ymd(m?.as_of)||dateKey(m?.as_of);
+        let st='時間未知';
+        if(m?.as_of){
+          if(key==='close')st=d===base?'盤後定格':d&&base&&d<base?'更舊快照':'日期異常';
+          else st=d&&base&&d<base?'舊／凍結':'本交易日';
+        }
+        const bad=['舊／凍結','更舊快照','日期異常'].includes(st);
+        return `<div class="uf-ds"><code>${esc(name)}</code><span>${esc(shortTime(m?.as_of))}</span><b class="${bad?'stale':''}">${esc(st)}</b></div>`;
       }).join('');
   }
   function mixedWarning(){
     const metas=Object.fromEntries(Object.keys(MISSION).map(k=>[k,missionMeta(k)]));
     const dates=[...new Set(Object.values(metas).map(x=>x.date).filter(Boolean))];
     if(dates.length<=1)return '';
+    const closeDate=metas.close?.date||'',liveDates=[metas.intraday?.date,metas.daytrade?.date].filter(Boolean),liveSame=liveDates.length&&liveDates.every(x=>x===liveDates[0]);
+    if(closeDate&&liveSame&&liveDates[0]>closeDate){
+      return `<div class="uf-schedule">雙時鐘正常：盤中／當沖已進入 ${esc(liveDates[0])}；盤後仍定格最後完成收盤 ${esc(closeDate)}，直到新收盤 Atomic Build 驗證完成才切換。</div>`;
+    }
     return `<div class="uf-warning">⚠ 混合資料日：${Object.entries(metas).map(([k,m])=>`${m.cfg.label} ${m.date||'未知'}`).join('；')}。不同任務不可互相視為同一時間的新資料。</div>`;
   }
 
@@ -89,7 +100,11 @@
     const reasons=[];
     const warnings=[];
     const build=manifest?.active_build_id||'';
-    const tradeDate=manifest?.trade_date||'';
+    // Close decisions are anchored to the latest completed close mission, not
+    // the bundle's live trade_date. During the next session, manifest.trade_date
+    // may already be today while close must remain yesterday until today's close
+    // bundle is complete and validated.
+    const tradeDate=missionMeta('close').date||manifest?.trade_date||'';
     if(!manifest||manifest.schema_version!=='2.0.0')reasons.push('V2 manifest 契約無效');
     if(!manifest?.health?.validation_passed)reasons.push('Atomic Build 尚未通過驗證');
     for(const key of CLOSE_REQUIRED){
@@ -169,7 +184,7 @@
     const g=view==='close'?closeGuard():null;
     const hard=g&&!g.allowed?`<div class="uf-warning hard">⛔ 盤後不可執行：${esc(g.reasons.join('；'))}</div>`:'';
     const caution=g?.caution?`<div class="uf-warning">⚠ ${esc(g.warnings.join('；'))}</div>`:'';
-    host.innerHTML=`<div class="uf-head"><div><b>資料新鮮度</b><small>每個任務看自己的 as_of；盤後另外檢查整包日期、build 與可執行性。</small></div><button type="button" class="uf-refresh">重查時間</button></div>${mixedWarning()}${hard}${caution}<div class="uf-cards">${cards}</div><details class="uf-detail"><summary>${current.label}｜逐資料集時間</summary><div class="uf-datasets">${datasetRows(view)}</div></details><div class="uf-bundle">資料包產生：${esc(shortTime(manifest.generated_at))}。這只代表重新打包時間，<b>不代表包內每一個數據都在這個時間更新。</b></div>${view==='close'?'<div class="uf-schedule">盤後資料必須同一 Atomic Build、同交易日且通過驗證，才會提供明日操作建議。</div>':''}`;
+    host.innerHTML=`<div class="uf-head"><div><b>資料新鮮度</b><small>每個任務看自己的 as_of；盤後另外檢查整包日期、build 與可執行性。</small></div><button type="button" class="uf-refresh">重查時間</button></div>${mixedWarning()}${hard}${caution}<div class="uf-cards">${cards}</div><details class="uf-detail"><summary>${current.label}｜逐資料集時間</summary><div class="uf-datasets">${datasetRows(view)}</div></details><div class="uf-bundle">資料包產生：${esc(shortTime(manifest.generated_at))}。這只代表重新打包時間，<b>不代表包內每一個數據都在這個時間更新。</b></div>${view==='close'?'<div class="uf-schedule">盤後資料以最後完成收盤日為基準；市場、法人、決策與 Zone 必須同一 Close 日期且通過驗證。隔日收盤前維持前一完成交易日快照。</div>':''}`;
     host.querySelectorAll('[data-uf-view]').forEach(btn=>btn.addEventListener('click',()=>document.querySelector(`.tab[data-view="${btn.dataset.ufView}"]`)?.click()));
     host.querySelector('.uf-refresh')?.addEventListener('click',()=>load(true));
   }
