@@ -878,7 +878,11 @@
             "等突破",
             "等回踩",
             "不追",
-            "觀察"
+            "觀察",
+            "位置待補",
+            "點火成立・位置差，等回踩",
+            "點火成立・等確認",
+            "等確認"
           ]
         },
         {
@@ -949,6 +953,51 @@
         "null"
       ],
       "minimum": 1
+    },
+    "ignition_signal_action": {
+      "anyOf": [
+        {
+          "enum": [
+            "小量試單候選",
+            "等承接／小量試單",
+            "等突破",
+            "等回踩",
+            "不追",
+            "觀察"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "ignition_execution_state": {
+      "anyOf": [
+        {
+          "enum": [
+            "NO_CHASE",
+            "WAIT_BREAKOUT",
+            "WAIT_PULLBACK",
+            "WAIT_POSITION",
+            "WAIT_CONFIRM",
+            "READY",
+            "RETEST_READY",
+            "WATCH"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "ignition_execution_ready": {
+      "type": "boolean"
+    },
+    "ignition_execution_note": {
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "allOf": [
