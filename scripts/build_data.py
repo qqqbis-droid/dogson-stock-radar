@@ -2654,6 +2654,254 @@ def _apply_liquidity_score_v2(r):
     return score10, confidence
 
 
+def _ignition_component(label, score, max_score, detail):
+    score = max(0.0, min(float(max_score), float(score)))
+    return {"label": label, "score": round(score, 1), "max": float(max_score), "detail": str(detail or "")}
+
+
+def _apply_ignition_score_v2(r):
+    """犬子點火雷達 2.0：找「壓縮→擴張／剛突破／突破回踩」而不是把慢牛直接排第一。
+
+    六大分項固定 25+20+15+15+15+10=100；Gate 只做風險封頂，
+    raw score 與 final score 分開保存，前端必須顯示封頂原因。
+    """
+    close = _chip_num(r.get("close")) or 0.0
+    width = _chip_num(r.get("platform_width20_pct"))
+    platform_high = _chip_num(r.get("platform_high20"))
+    breakout_pct = _chip_num(r.get("breakout_pct"))
+    breakout_age = r.get("recent_breakout_age")
+    breakout_vx = _chip_num(r.get("recent_breakout_volume_x"))
+    volx = _chip_num(r.get("vol_x")) or 0.0
+    turn_vs_med = _chip_num(r.get("turnover_vs_median20"))
+    close_pos = _chip_num(r.get("close_position_pct"))
+    upper_wick = _chip_num(r.get("upper_wick_pct"))
+    ret1 = _chip_num(r.get("day_change")) or 0.0
+    ret5 = _chip_num(r.get("ret5")) or 0.0
+    dist20 = _chip_num(r.get("dist20"))
+    failed_breakout = bool(r.get("failed_breakout"))
+    atr_pct = _chip_num((r.get("dynamic_profile") or {}).get("atr14_pct"))
+
+    # A. 壓縮／突破結構 25：平台越乾淨、突破越新、起漲量越健康越高。
+    structure = 0.0
+    if width is not None:
+        structure += 8 if width <= 10 else 7 if width <= 14 else 5 if width <= 18 else 3 if width <= 25 else 1 if width <= 35 else 0
+    if bool(r.get("break20")):
+        structure += 8
+    elif bool(r.get("break3")):
+        structure += 5
+    elif platform_high and close >= platform_high * .98:
+        structure += 3
+    if breakout_age is not None:
+        age = int(breakout_age)
+        structure += 5 if age == 0 else 4 if age <= 2 else 2 if age <= 5 else 1 if age <= 10 else 0
+        if breakout_vx is not None:
+            structure += 4 if 1.5 <= breakout_vx <= 3.5 else 3 if 1.2 <= breakout_vx < 1.5 else 2 if 3.5 < breakout_vx <= 5 else 0
+    elif platform_high and close >= platform_high * .95:
+        structure += 2
+    structure = min(25.0, structure)
+
+    # B. 量能加速 20：要「開始進錢」，但極端爆量不當成滿分。
+    volume = 0.0
+    volume += 8 if 1.5 <= volx <= 3.0 else 6 if 1.2 <= volx < 1.5 else 4 if 1.0 <= volx < 1.2 else 3 if 3.0 < volx <= 4.5 else 0
+    if turn_vs_med is not None:
+        volume += 6 if 1.8 <= turn_vs_med <= 3.5 else 5 if 1.4 <= turn_vs_med < 1.8 else 3 if 1.1 <= turn_vs_med < 1.4 else 2 if 3.5 < turn_vs_med <= 5 else 0
+    if close_pos is not None:
+        volume += 4 if close_pos >= 75 else 3 if close_pos >= 60 else 1 if close_pos >= 45 else 0
+    if ret1 > 0 and volx >= 1.2:
+        volume += 2
+    volume = min(20.0, volume)
+
+    # C. 族群共振 15：直接引用已去重複計分的 Sector 2.0。
+    sector = max(0.0, min(15.0, float(_chip_num(r.get("sector_score_v2")) or 0.0)))
+
+    # D. 相對強度加速 15：不只看「強」，而是看短期是否正在加速領先市場／同族群。
+    rel = r.get("technical_relative_v2") or {}
+    rel1 = _chip_num(rel.get("market_1d_pct"))
+    rel5 = _chip_num(rel.get("market_5d_pct"))
+    sector_rel5 = _chip_num(rel.get("sector_5d_pct"))
+    relative = 0.0
+    if rel1 is not None:
+        relative += 6 if rel1 >= 2 else 5 if rel1 >= 1 else 3 if rel1 >= .3 else 1 if rel1 >= 0 else 0
+    if rel5 is not None:
+        relative += 4 if rel5 >= 5 else 3 if rel5 >= 2 else 2 if rel5 >= .5 else 1 if rel5 >= 0 else 0
+    if sector_rel5 is not None:
+        relative += 3 if sector_rel5 >= 3 else 2 if sector_rel5 >= 1 else 1 if sector_rel5 >= 0 else 0
+    if rel1 is not None and rel5 is not None and rel1 > rel5 / 5.0 + .5:
+        relative += 2
+    relative = min(15.0, relative)
+
+    # E. 籌碼加速 15：看「最近一天是否比5日均速更積極」＋法人共識＋借券/融資壓力。
+    f1 = _chip_num(r.get("foreign_net_latest")); f3 = _chip_num(r.get("foreign_3d_net")); f5 = _chip_num(r.get("foreign_5d_net"))
+    t1 = _chip_num(r.get("trust_net_latest")); t3 = _chip_num(r.get("trust_3d_net")); t5 = _chip_num(r.get("trust_5d_net"))
+    fstreak = _chip_num(r.get("foreign_streak")); tstreak = _chip_num(r.get("trust_streak"))
+    sbl3 = _chip_num(r.get("sbl_3change_pct")); margin3 = _chip_num(r.get("margin_3d_pct"))
+    chip_acc = 0.0
+    if f1 is not None and f5 is not None:
+        chip_acc += 4 if f1 > 0 and f1 > (f5 / 5.0) * 1.3 else 3 if f1 > 0 else 0
+    elif f1 is not None and f1 > 0:
+        chip_acc += 2
+    if t1 is not None and t5 is not None:
+        chip_acc += 3 if t1 > 0 and t1 > max(0.0, t5 / 5.0) * 1.2 else 2 if t1 > 0 else 0
+    elif t1 is not None and t1 > 0:
+        chip_acc += 1.5
+    if f3 is not None and t3 is not None and f3 > 0 and t3 > 0:
+        chip_acc += 3
+    elif (f3 or 0) > 0 or (t3 or 0) > 0:
+        chip_acc += 1.5
+    if fstreak is not None and fstreak >= 3: chip_acc += 1.5
+    if tstreak is not None and tstreak >= 3: chip_acc += 1.5
+    if sbl3 is not None:
+        chip_acc += 1.5 if sbl3 <= -5 else 1.0 if sbl3 < 0 else 0
+    if margin3 is not None and margin3 <= 2:
+        chip_acc += .5
+    chip_acc = min(15.0, chip_acc)
+
+    # F. 可交易性／風險 10：以 Liquidity 2.0 為底，再扣假突破、爆量長上影、收低。
+    liquidity = _chip_num(r.get("liquidity_score_v2"))
+    tradability = float(liquidity if liquidity is not None else 5.0)
+    risk_notes = []
+    if failed_breakout:
+        tradability -= 5; risk_notes.append("假突破")
+    if upper_wick is not None and upper_wick >= 45 and volx >= 1.4:
+        tradability -= 2; risk_notes.append("放量長上影")
+    if close_pos is not None and close_pos <= 25 and volx >= 1.5:
+        tradability -= 2; risk_notes.append("放量收低")
+    if volx > 6:
+        tradability -= 2; risk_notes.append("極端爆量")
+    if ret1 <= -4 and volx >= 1.3:
+        tradability -= 2; risk_notes.append("帶量長黑")
+    tradability = max(0.0, min(10.0, tradability))
+
+    components = {
+        "structure": _ignition_component("壓縮／突破結構", structure, 25,
+            f"平台寬 {width:.1f}%｜突破 {breakout_pct:+.1f}%｜突破年齡 {int(breakout_age)}日" if width is not None and breakout_pct is not None and breakout_age is not None
+            else (f"平台寬 {width:.1f}%｜突破待確認" if width is not None else "平台／突破資料待補")),
+        "volume_acceleration": _ignition_component("量能加速", volume, 20,
+            f"量比 {volx:.2f}x｜成交額/20日中位 {turn_vs_med:.2f}x｜收盤位置 {close_pos:.0f}%" if turn_vs_med is not None and close_pos is not None
+            else f"量比 {volx:.2f}x"),
+        "sector_resonance": _ignition_component("族群共振", sector, 15,
+            f"{r.get('sector_verdict_v2') or '待確認'}｜{r.get('sector_summary_v2') or r.get('sector_score_label') or '族群資料待補'}"),
+        "relative_acceleration": _ignition_component("相對強度加速", relative, 15,
+            f"對市場 1日 {rel1:+.1f}%｜5日 {rel5:+.1f}%｜對族群5日 {sector_rel5:+.1f}%" if None not in (rel1, rel5, sector_rel5)
+            else "相對強弱資料部分待補"),
+        "chip_acceleration": _ignition_component("籌碼加速", chip_acc, 15,
+            f"外資1日 {f1/1000:+.0f}張｜5日 {f5/1000:+.0f}張｜投信1日 {t1/1000:+.0f}張" if None not in (f1, f5, t1)
+            else "法人加速度資料部分待補"),
+        "tradability_risk": _ignition_component("可交易性／風險", tradability, 10,
+            "、".join(risk_notes) if risk_notes else f"流動性 {liquidity:.1f}/10" if liquidity is not None else "流動性資料待補"),
+    }
+    raw_score = round(sum(float(x["score"]) for x in components.values()), 1)
+
+    # 距離突破點用 ATR 標準化：同樣3%對高波動／低波動股票意義不同。
+    breakout_distance_pct = None
+    breakout_distance_atr = None
+    if platform_high and close > 0:
+        breakout_distance_pct = (close / platform_high - 1.0) * 100.0
+        if atr_pct not in (None, 0):
+            breakout_distance_atr = breakout_distance_pct / atr_pct
+
+    # Gate：股票再強，只要位置／流動性已不適合追，就限制 final score。
+    gate_cap = 100.0
+    gate_flags = []
+    def cap_at(value, reason):
+        nonlocal gate_cap
+        gate_cap = min(gate_cap, float(value))
+        if reason not in gate_flags:
+            gate_flags.append(reason)
+
+    if failed_breakout:
+        cap_at(45, "假突破")
+    if liquidity is not None and liquidity < 5.5:
+        cap_at(60, "流動性偏薄")
+    elif liquidity is not None and liquidity < 7:
+        cap_at(75, "流動性普通")
+    if breakout_distance_atr is not None and breakout_distance_atr > 3:
+        cap_at(60, "距突破點>3ATR")
+    elif breakout_distance_atr is not None and breakout_distance_atr > 2.2:
+        cap_at(72, "距突破點偏遠")
+    if dist20 is not None and dist20 > 18:
+        cap_at(60, "距20MA過遠")
+    if ret5 > 30:
+        cap_at(55, "5日漲幅>30%")
+    elif ret5 > 22:
+        cap_at(68, "5日漲幅偏大")
+    if upper_wick is not None and upper_wick >= 45 and volx >= 1.4:
+        cap_at(55, "放量長上影")
+    if close_pos is not None and close_pos <= 20 and volx >= 1.5:
+        cap_at(55, "放量收低")
+    if volx > 6:
+        cap_at(65, "極端爆量")
+
+    score = round(min(raw_score, gate_cap), 1)
+    near_platform = bool(platform_high and close > 0 and abs(close / platform_high - 1) <= .025)
+    pre_break = bool(platform_high and close < platform_high and close >= platform_high * .94)
+    recent = breakout_age is not None and int(breakout_age) <= 5
+
+    if failed_breakout or "放量長上影" in gate_flags or "放量收低" in gate_flags or "5日漲幅>30%" in gate_flags:
+        stage, action = "末端過熱／不追", "不追"
+    elif recent and near_platform and int(breakout_age) >= 1 and volx <= 1.8 and ret1 <= 2.5:
+        stage, action = "突破回踩", "等承接／小量試單"
+    elif score >= 75 and (bool(r.get("break20")) or (breakout_age is not None and int(breakout_age) <= 2)) and volx >= 1.2 and (breakout_distance_atr is None or breakout_distance_atr <= 1.8):
+        stage, action = "剛點火", "小量試單候選"
+    elif score >= 65 and pre_break and width is not None and width <= 20 and volx <= 1.8:
+        stage, action = "蓄勢", "等突破"
+    elif score >= 68 and recent:
+        stage, action = "已發動等回踩", "等回踩"
+    else:
+        stage, action = "觀察", "觀察"
+
+    verdict = "高點火" if score >= 82 else "點火候選" if score >= 72 else "蓄勢觀察" if score >= 62 else "一般"
+    if stage == "末端過熱／不追":
+        verdict = "過熱不追"
+    reasons = []
+    if structure >= 18: reasons.append("突破／壓縮結構集中")
+    if volume >= 15: reasons.append("量能加速")
+    if sector >= 12: reasons.append("族群主升共振")
+    if relative >= 11: reasons.append("相對強度加速")
+    if chip_acc >= 10: reasons.append("籌碼加速")
+    if stage == "突破回踩": reasons.insert(0, "突破後回踩確認區")
+    if gate_flags: reasons.append("Gate：" + "、".join(gate_flags[:2]))
+    summary = (
+        "突破、量能、族群與相對強度同步，且仍在可追蹤的早期發動區"
+        if stage == "剛點火" else
+        "尚未正式突破，但平台、量價與資金條件正在集中"
+        if stage == "蓄勢" else
+        "近期已突破，現正回測突破帶；重點看承接是否守住"
+        if stage == "突破回踩" else
+        "條件仍強，但已離起漲點較遠；等回踩比追價重要"
+        if stage == "已發動等回踩" else
+        "已有末端／流動性風險訊號，強勢不等於可以追"
+        if stage == "末端過熱／不追" else
+        "點火條件尚未集中，先列研究觀察"
+    )
+
+    confidence_parts = [
+        100.0 if (r.get("dynamic_profile") or {}).get("ready") else 65.0,
+        float(_chip_num(r.get("sector_confidence_v2")) or 50.0),
+        float(_chip_num(r.get("chip_confidence_v2")) or 50.0),
+        float(_chip_num(r.get("liquidity_confidence_v2")) or 50.0),
+        100.0 if isinstance(r.get("technical_relative_v2"), dict) and any(v is not None for v in (r.get("technical_relative_v2") or {}).values()) else 60.0,
+    ]
+    confidence = round(sum(confidence_parts) / len(confidence_parts), 0)
+
+    r["ignition_model_version"] = "inuko-ignition-v2.0"
+    r["ignition_score_v2"] = score
+    r["ignition_raw_score_v2"] = raw_score
+    r["ignition_confidence_v2"] = confidence
+    r["ignition_components_v2"] = components
+    r["ignition_gate_cap_v2"] = round(gate_cap, 1)
+    r["ignition_gate_flags_v2"] = gate_flags
+    r["ignition_stage_v2"] = stage
+    r["ignition_action_v2"] = action
+    r["ignition_verdict_v2"] = verdict
+    r["ignition_summary_v2"] = summary
+    r["ignition_reasons_v2"] = reasons[:5]
+    r["ignition_breakout_distance_pct_v2"] = round(breakout_distance_pct, 2) if breakout_distance_pct is not None else None
+    r["ignition_breakout_distance_atr_v2"] = round(breakout_distance_atr, 2) if breakout_distance_atr is not None else None
+    r["ignition_candidate_v2"] = bool(score >= 62 and stage != "末端過熱／不追")
+    return score, confidence
+
+
 def _swing_liquidity_score(r):
     """盤後波段延續的流動性 0~10；不和進場位置混在一起。"""
     level = str(r.get("liquidity_level") or "未知")
@@ -3163,6 +3411,7 @@ def add_component_scores(rows, market, preliminary_intraday=False):
             _apply_technical_score_v2(r, group_rows, market)
             _apply_sector_score_v2(r, group_rows, source, label)
             _apply_liquidity_score_v2(r)
+            _apply_ignition_score_v2(r)
         cs = float(r.get("chip_score", 12.5))
         chip_cov = float(r.get("chip_confidence_v2", r.get("chip_coverage_pct") or 0))
         liq_adjust = float(r.get("liquidity_adjust", 0))
@@ -3237,6 +3486,18 @@ def add_component_scores(rows, market, preliminary_intraday=False):
             r["quality_pass_market"] = bool(r["score_reliable"] and swing >= quality_reference)
 
         _assign_stage_v2(r, preliminary_intraday, sec)
+
+    if not preliminary_intraday:
+        ignition_sorted = sorted(
+            rows,
+            key=lambda x: (
+                -float(x.get("ignition_score_v2") or 0),
+                -float(x.get("ignition_confidence_v2") or 0),
+                str(x.get("code") or ""),
+            ),
+        )
+        for rank, item in enumerate(ignition_sorted, 1):
+            item["ignition_rank_v2"] = rank
 
     order = {
         "剛啟動": 0, "蓄勢待發": 1, "回踩承接": 2, "趨勢持有": 3,
@@ -3366,7 +3627,7 @@ def build_close():
         "market": market,
         "sector_funds": sector_funds,
         "sector_funds_note": "外資＋投信官方淨買賣股數 × 各交易日收盤價估算金額；張數保留；未含自營商；估算金額僅供力度比較，不額外計入個股100分",
-        "score_formula": {"mode": "swing_direct_100", "technical": 50, "technical_model": "inuko-tech-v2.0", "chip": 25, "chip_model": "inuko-chip-v2.0", "chip_raw_max": 100, "sector": 15, "sector_model": "inuko-sector-v2.0", "liquidity": 10, "liquidity_model": "inuko-liquidity-v2.0", "total": 100, "normalized": False, "entry_position": 100, "market_separate": 15},
+        "score_formula": {"mode": "swing_direct_100", "technical": 50, "technical_model": "inuko-tech-v2.0", "chip": 25, "chip_model": "inuko-chip-v2.0", "chip_raw_max": 100, "sector": 15, "sector_model": "inuko-sector-v2.0", "liquidity": 10, "liquidity_model": "inuko-liquidity-v2.0", "total": 100, "normalized": False, "entry_position": 100, "market_separate": 15, "ignition": {"model": "inuko-ignition-v2.0", "structure": 25, "volume_acceleration": 20, "sector_resonance": 15, "relative_acceleration": 15, "chip_acceleration": 15, "tradability_risk": 10, "raw_total": 100, "gate_capped": True}},
         "rows": rows,
     })
     dump("market.json", market)
