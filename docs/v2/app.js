@@ -85,10 +85,10 @@ async function dataset(key){
 function phaseLabel(p){return({PRE_OPEN:"盤前",LIVE:"盤中",CLOSE_FREEZE:"收盤定格",POST_CLOSE:"盤後",NEXT_DAY:"隔日準備"})[p]||p||"—"}
 function actionTone(d){
   if(isIgnitionMode()){
-    const st=String(d.ignition_stage||"");
-    if(st==="末端過熱／不追")return"risk";
-    if(["剛點火","突破回踩"].includes(st))return"go";
-    if(["蓄勢","已發動等回踩"].includes(st))return"wait";
+    const st=String(d.ignition_stage||""),ex=String(d.ignition_execution_state||"");
+    if(ex==="NO_CHASE"||st==="末端過熱／不追")return"risk";
+    if(d.ignition_execution_ready===true||["READY","RETEST_READY"].includes(ex))return"go";
+    if(["WAIT_BREAKOUT","WAIT_PULLBACK","WAIT_CONFIRM","WAIT_POSITION"].includes(ex)||["蓄勢","已發動等回踩","剛點火","突破回踩"].includes(st))return"wait";
     return"neutral";
   }
   if(d.action_state==="DATA_STALE")return"stale";
@@ -314,11 +314,12 @@ function fullIndexLoaded(){const cfg=missionConfig[state.view];return Boolean(cf
 function filterAction(d){
   if(!state.filterAction)return true;
   if(isIgnitionMode()){
-    if(state.filterAction==="IGNITION_TEST")return d.ignition_action==="小量試單候選"||d.ignition_action==="等承接／小量試單";
-    if(state.filterAction==="WAIT_BREAKOUT")return d.ignition_action==="等突破";
-    if(state.filterAction==="WAIT_PULLBACK")return d.ignition_action==="等回踩"||d.ignition_action==="等承接／小量試單";
-    if(state.filterAction==="NO_CHASE")return d.ignition_action==="不追";
-    if(state.filterAction==="WATCH")return d.ignition_action==="觀察";
+    const ex=String(d.ignition_execution_state||"");
+    if(state.filterAction==="IGNITION_TEST")return d.ignition_execution_ready===true||["READY","RETEST_READY"].includes(ex);
+    if(state.filterAction==="WAIT_BREAKOUT")return ex==="WAIT_BREAKOUT"||d.ignition_action==="等突破";
+    if(state.filterAction==="WAIT_PULLBACK")return ["WAIT_PULLBACK","WAIT_CONFIRM","WAIT_POSITION"].includes(ex)||/等回踩|等確認|位置待補/.test(String(d.ignition_action||""));
+    if(state.filterAction==="NO_CHASE")return ex==="NO_CHASE"||d.ignition_action==="不追";
+    if(state.filterAction==="WATCH")return ex==="WATCH"||d.ignition_action==="觀察";
     return true;
   }
   if(state.filterAction==="ACTIONABLE")return d.actionable===true;
@@ -356,14 +357,15 @@ function ignitionCardHtml(d,cfg){
   const confidence=d.ignition_confidence??d.data_confidence;
   const atr=num(d.ignition_breakout_distance_atr);
   const dist=atr!=null?(" · 距突破點 "+fmt(atr,1)+" ATR"):"";
-  const dot=["小量試單候選","等承接／小量試單"].includes(action)?"●":"○";
+  const dot=d.ignition_execution_ready===true?"●":"○";
+  const executionNote=!d.ignition_execution_ready&&d.ignition_execution_note?String(d.ignition_execution_note):"";
   return '<article class="card '+tone+'" data-ignition="1" data-code="'+esc(d.code)+'" role="button" tabindex="0" aria-label="查看 '+esc(d.code)+" "+esc(d.name)+' 個股詳情">'
     +'<div class="card-top"><div class="identity"><span class="rank">'+esc(rankText(d))+'</span><div><span class="code">'+esc(d.code)+" "+esc(d.name)+'</span><div class="muted">'+esc(sectorDisplay(d))+'</div></div></div><span class="badge stage">'+esc(stage)+'</span></div>'
     +quoteHtml(d)
     +'<div class="action-line '+tone+'"><span>'+dot+'</span><b>'+esc(action)+'</b><small>'+esc(fresh)+'</small></div>'
     +'<div class="score-row"><div class="score"><span>點火分數</span><b>'+fmt(score)+'</b></div><div class="score"><span>進場位置</span><b>'+fmt(s.entry_position_score)+'</b></div><div class="score"><span>點火信心</span><b>'+fmt(confidence,0)+'<small>%</small></b></div></div>'
     +'<div class="reason">'+(reason.length?reason.map(esc).join("・"):"目前無新增點火理由")+esc(dist)+'</div>'
-    +(gate?'<div class="blocker">Gate：'+esc(humanBlock(gate))+'</div>':"")
+    +(executionNote?'<div class="blocker">執行：'+esc(executionNote)+'</div>':(gate?'<div class="blocker">Gate：'+esc(humanBlock(gate))+'</div>':""))
     +'</article>';
 }
 function renderCards(){
