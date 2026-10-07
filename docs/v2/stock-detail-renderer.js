@@ -15,6 +15,7 @@ const sview=()=>document.querySelector(".tab.active")?.dataset.view||"intraday";
 const sesc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const sn=v=>v==null||v===''||!Number.isFinite(Number(v))?null:Number(v);
 const sf=(v,d=1)=>sn(v)==null?"—":Number(v).toLocaleString("zh-TW",{maximumFractionDigits:d});
+const sfmax=v=>{const n=sn(v);return n==null?"—":sf(n,Number.isInteger(n)?0:1)};
 const ssigned=(v,d=1,s="")=>sn(v)==null?"—":`${Number(v)>0?"+":""}${sf(v,d)}${s}`;
 const slots=v=>sn(v)==null?"—":`${Number(v)>0?"+":""}${sf(Number(v)/1000,1)} 張`;
 
@@ -107,7 +108,7 @@ function tech2Section(x){
   if(!x||sn(x.technical_score_v2)==null)return"";
   const score=sn(x.technical_score_v2),conf=sn(x.technical_confidence_v2),legacy=sn(x.technical_score_legacy),delta=sn(x.technical_score_delta),parts=x.technical_components_v2||{};
   const order=["trend","breakout","volume_price","momentum","relative","risk_quality"];
-  const rows=order.map(k=>{const p=parts[k];if(!p)return"";return `<div class="tech2-row"><b>${sesc(p.label||k)}</b><strong>${sf(p.score,1)}/${sf(p.max,0)}</strong><span>${sesc(p.detail||"")}</span></div>`}).join("");
+  const rows=order.map(k=>{const p=parts[k];if(!p)return"";return `<div class="tech2-row"><b>${sesc(p.label||k)}</b><strong>${sf(p.score,1)}/${sfmax(p.max)}</strong><span>${sesc(p.detail||"")}</span></div>`}).join("");
   const deltaText=legacy!=null&&delta!=null?`舊制 ${sf(legacy,1)}/50 → 新制 ${sf(score,1)}/50（${ssigned(delta,1)}）`:"";
   const sar=x.sar!=null?`SAR ${x.sar_state==="BULL"?"多":"空"} ${sp(x.sar)}`:"";
   const kd=x.kd_k!=null&&x.kd_d!=null?`KD ${sf(x.kd_k,0)}/${sf(x.kd_d,0)}`:"";
@@ -213,7 +214,7 @@ function expPoints(x){const p=sn(x?.points);if(p==null)return"•";return `${p>0
 function expCard(label,obj){
   if(!obj)return"";
   const items=(obj.items||[]).map(it=>`<div class="sdr-exp-item"><span class="sdr-exp-pts">${sesc(expPoints(it))}</span><span>${sesc(it.label||"")}</span>${it.detail?`<span class="sdr-exp-detail">${sesc(it.detail)}</span>`:""}</div>`).join("");
-  return `<div class="sdr-exp-card"><div class="sdr-exp-head"><b>${sesc(label)}</b><strong>${sf(obj.score)}/${sf(obj.max,0)}</strong></div>${items||'<div class="sdr-note">此分項目前沒有可顯示的輸入證據。</div>'}</div>`;
+  return `<div class="sdr-exp-card"><div class="sdr-exp-head"><b>${sesc(label)}</b><strong>${sf(obj.score)}/${sfmax(obj.max)}</strong></div>${items||'<div class="sdr-note">此分項目前沒有可顯示的輸入證據。</div>'}</div>`;
 }
 function eitem(label,value,detail=""){
   if(value==null||value===""||value==="—")return null;
@@ -257,9 +258,9 @@ function v2ExplainCard(label,total,max,parts,order,kind){
     const p=parts[k];if(!p)return"";
     const pts=kind==="chip"?sn(p.points):sn(p.score),den=kind==="chip"?sn(p.weight):sn(p.max);
     const scoreNote=kind==="chip"&&sn(p.score)!=null?` · 子分 ${sf(p.score,0)}/100`:"";
-    return `<div class="sdr-exp-item"><span class="sdr-exp-pts">${pts==null?"—":sf(pts,1)}/${den==null?"—":sf(den,0)}</span><span>${sesc(p.label||k)}</span><span class="sdr-exp-detail">${sesc((p.detail||"")+scoreNote)}</span></div>`;
+    return `<div class="sdr-exp-item"><span class="sdr-exp-pts">${pts==null?"—":sf(pts,1)}/${den==null?"—":sfmax(den)}</span><span>${sesc(p.label||k)}</span><span class="sdr-exp-detail">${sesc((p.detail||"")+scoreNote)}</span></div>`;
   }).join("");
-  return `<div class="sdr-exp-card"><div class="sdr-exp-head"><b>${sesc(label)}</b><strong>${sf(total,1)}/${sf(max,0)}</strong></div>${rows||'<div class="sdr-note">此分項目前沒有可顯示的 2.0 證據。</div>'}</div>`;
+  return `<div class="sdr-exp-card"><div class="sdr-exp-head"><b>${sesc(label)}</b><strong>${sf(total,1)}/${sfmax(max)}</strong></div>${rows||'<div class="sdr-note">此分項目前沒有可顯示的 2.0 證據。</div>'}</div>`;
 }
 function explain(view,d,e){
   if(view==="close"){
@@ -276,7 +277,7 @@ function explain(view,d,e){
     return `<details class="sdr-explain"><summary>評分依據｜盤中動能怎麼來</summary><div class="sdr-explain-body"><div class="sdr-note">盤中動能100＝價格結構30＋量價動能25＋相對強弱15＋族群20＋流動性／追價風險10。下列為同一快照可驗證的 Engine 輸入證據；前端不重新配分。</div>${expCard("價格結構",{score:c.price_structure,max:30,items:intradayItems("price_structure",e)})}${expCard("量價動能",{score:c.flow_volume,max:25,items:intradayItems("flow_volume",e)})}${expCard("相對強弱",{score:c.relative_strength,max:15,items:intradayItems("relative_strength",e)})}${expCard("族群共振",{score:c.sector,max:20,items:intradayItems("sector",e)})}${expCard("流動性／追價風險",{score:c.liquidity_risk,max:10,items:intradayItems("liquidity_risk",e)})}</div></details>`;
   }
   const items=(d.components?.daytrade?.items||[]);
-  return `<details class="sdr-explain"><summary>評分依據｜當沖分怎麼來</summary><div class="sdr-explain-body">${items.map(x=>`<div class="sdr-exp-card"><div class="sdr-exp-head"><b>${sesc(x.label||x.key||"分項")}</b><strong>${sf(x.contribution)}/${sf(x.contribution_max,0)}</strong></div></div>`).join("")||'<div class="sdr-note">當沖分項依據待補。</div>'}</div></details>`;
+  return `<details class="sdr-explain"><summary>評分依據｜當沖分怎麼來</summary><div class="sdr-explain-body">${items.map(x=>`<div class="sdr-exp-card"><div class="sdr-exp-head"><b>${sesc(x.label||x.key||"分項")}</b><strong>${sf(x.contribution)}/${sfmax(x.contribution_max)}</strong></div></div>`).join("")||'<div class="sdr-note">當沖分項依據待補。</div>'}</div></details>`;
 }
 
 function missing(d,support,resistance,e){
