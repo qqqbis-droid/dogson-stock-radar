@@ -1,6 +1,6 @@
 name: Clean Build 2.0 Shadow Sync
 
-# ignition-execution-resync-20261008
+# ignition-final-entry-resync-20261008
 
 on:
   workflow_dispatch:
