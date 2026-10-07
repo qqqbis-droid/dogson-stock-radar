@@ -179,7 +179,8 @@ jobs:
           tech2=[r for r in rows if r.get('technical_model_version')=='inuko-tech-v2.0' and isinstance(r.get('technical_components_v2'),dict)]
           sector2=[r for r in rows if r.get('sector_model_version')=='inuko-sector-v2.0' and isinstance(r.get('sector_components_v2'),dict)]
           liquidity2=[r for r in rows if r.get('liquidity_model_version')=='inuko-liquidity-v2.0' and isinstance(r.get('liquidity_components_v2'),dict)]
-          print('chip2 rows:',len(chip2),'/',len(rows),'tech2 rows:',len(tech2),'/',len(rows),'sector2 rows:',len(sector2),'/',len(rows),'liquidity2 rows:',len(liquidity2),'/',len(rows))
+          ignition2=[r for r in rows if r.get('ignition_model_version')=='inuko-ignition-v2.0' and isinstance(r.get('ignition_components_v2'),dict)]
+          print('chip2 rows:',len(chip2),'/',len(rows),'tech2 rows:',len(tech2),'/',len(rows),'sector2 rows:',len(sector2),'/',len(rows),'liquidity2 rows:',len(liquidity2),'/',len(rows),'ignition2 rows:',len(ignition2),'/',len(rows))
           if rows and len(chip2) != len(rows):
               raise SystemExit(f'chip score 2.0 missing from {len(rows)-len(chip2)} close rows')
           if rows and len(tech2) != len(rows):
@@ -188,6 +189,8 @@ jobs:
               raise SystemExit(f'sector score 2.0 missing from {len(rows)-len(sector2)} close rows')
           if rows and len(liquidity2) != len(rows):
               raise SystemExit(f'liquidity score 2.0 missing from {len(rows)-len(liquidity2)} close rows')
+          if rows and len(ignition2) != len(rows):
+              raise SystemExit(f'ignition score 2.0 missing from {len(rows)-len(ignition2)} close rows')
 
           def fnum(v):
               try:
@@ -222,6 +225,15 @@ jobs:
               lscore=fnum(r.get('liquidity_score_v2'))
               if lscore is None or any(v is None for v in lvals) or abs(sum(lvals)-lscore)>0.11:
                   bad_math.append(f'{code}:liquidity:{lvals}->{lscore}/10')
+
+              iparts=r.get('ignition_components_v2') or {}
+              ivals=[fnum((iparts.get(k) or {}).get('score')) for k in ('structure','volume_acceleration','sector_resonance','relative_acceleration','chip_acceleration','tradability_risk')]
+              iraw=fnum(r.get('ignition_raw_score_v2')); iscore=fnum(r.get('ignition_score_v2')); icap=fnum(r.get('ignition_gate_cap_v2'))
+              imaxs=[fnum((iparts.get(k) or {}).get('max')) for k in ('structure','volume_acceleration','sector_resonance','relative_acceleration','chip_acceleration','tradability_risk')]
+              if iraw is None or iscore is None or icap is None or any(v is None for v in ivals+imaxs):
+                  bad_math.append(f'{code}:ignition:missing')
+              elif abs(sum(ivals)-iraw)>0.11 or abs(sum(imaxs)-100.0)>0.11 or iscore-iraw>0.11 or iscore-icap>0.11:
+                  bad_math.append(f'{code}:ignition:{ivals}->{iraw} cap={icap} final={iscore}')
 
               sw=r.get('swing_components') or {}
               expected=(fnum(r.get('technical_score_v2')),fnum(r.get('chip_score_v2')),sscore,lscore)
