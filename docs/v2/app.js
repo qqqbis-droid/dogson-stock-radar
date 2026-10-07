@@ -347,6 +347,25 @@ function outsideCard(x){
   return `<article class="card neutral outside-pool"><div class="card-top"><div class="identity"><span class="rank">全市場 · 未排名</span><div><span class="code">${esc(x.code)} ${esc(x.name)}</span><div class="muted">${esc(x.sector_group||x.industry_name||"分類待補")} · ${esc(x.market||"")}</div></div></div><span class="badge stage">未進排名池</span></div><div class="action-line neutral"><span>○</span><b>不產生執行分</b><small>全市場搜尋</small></div><div class="reason">${esc(x._outsideReason||"目前不在雷達排名池。")}</div></article>`;
 }
 
+function ignitionCardHtml(d,cfg){
+  const s=d.scores||{},tone=actionTone(d),score=scoreFor(d),fresh=displayFreshness(d);
+  const reason=(d.ignition_reasons||[]).slice(0,2).map(humanReason);
+  const gate=(d.ignition_gate_flags||[])[0]||"";
+  const stage=ignitionStageLabel[d.ignition_stage]||d.ignition_stage||"資料待補";
+  const action=d.ignition_action||"點火資料待補";
+  const confidence=d.ignition_confidence??d.data_confidence;
+  const atr=num(d.ignition_breakout_distance_atr);
+  const dist=atr!=null?(" · 距突破點 "+fmt(atr,1)+" ATR"):"";
+  const dot=["小量試單候選","等承接／小量試單"].includes(action)?"●":"○";
+  return '<article class="card '+tone+'" data-ignition="1" data-code="'+esc(d.code)+'" role="button" tabindex="0" aria-label="查看 '+esc(d.code)+" "+esc(d.name)+' 個股詳情">'
+    +'<div class="card-top"><div class="identity"><span class="rank">'+esc(rankText(d))+'</span><div><span class="code">'+esc(d.code)+" "+esc(d.name)+'</span><div class="muted">'+esc(sectorDisplay(d))+'</div></div></div><span class="badge stage">'+esc(stage)+'</span></div>'
+    +quoteHtml(d)
+    +'<div class="action-line '+tone+'"><span>'+dot+'</span><b>'+esc(action)+'</b><small>'+esc(fresh)+'</small></div>'
+    +'<div class="score-row"><div class="score"><span>點火分數</span><b>'+fmt(score)+'</b></div><div class="score"><span>進場位置</span><b>'+fmt(s.entry_position_score)+'</b></div><div class="score"><span>點火信心</span><b>'+fmt(confidence,0)+'<small>%</small></b></div></div>'
+    +'<div class="reason">'+(reason.length?reason.map(esc).join("・"):"目前無新增點火理由")+esc(dist)+'</div>'
+    +(gate?'<div class="blocker">Gate：'+esc(humanBlock(gate))+'</div>':"")
+    +'</article>';
+}
 function renderCards(){
   if(state.view==="portfolio"){
     $("#countText").textContent="私人資料";
@@ -358,14 +377,15 @@ function renderCards(){
   const originalCount=rows.length,q=state.search.trim().toLowerCase(),cfg=missionConfig[state.view],indexLoaded=fullIndexLoaded(),canLoadFull=Boolean(cfg.index&&state.manifest?.datasets?.[cfg.index]),activeQuick=activeQuickItem();
   if(q)rows=rows.filter(d=>String(d.code||"").toLowerCase().includes(q)||String(d.name||"").toLowerCase().includes(q));
   rows=applyQuickRows(rows);
-  if(state.filterStage)rows=rows.filter(d=>d.lifecycle_stage===state.filterStage);
+  if(state.filterStage)rows=rows.filter(d=>isIgnitionMode()?d.ignition_stage===state.filterStage:d.lifecycle_stage===state.filterStage);
   if(state.filterSector)rows=rows.filter(d=>sectorFilterKey(d)===state.filterSector);
   rows=rows.filter(filterAction).filter(positionMatch);
-  const showAllNextDay=state.view==="close"&&state.quickFilter==="NEXT_DAY_READY";
+  const showAllNextDay=state.view==="close"&&!isIgnitionMode()&&state.quickFilter==="NEXT_DAY_READY";
   const external=q&&!hasNonSearchFilter()?state.externalSearch:[],shown=showAllNextDay?rows:rows.slice(0,state.visibleCount),shownCount=shown.length+external.length,prefix=activeQuick?`${activeQuick.label} · `:"";
   $("#countText").textContent=!indexLoaded&&canLoadFull&&!hasDeepFilter()?`已顯示 ${shown.length} 檔`:`${prefix}${shownCount}/${rows.length+external.length} 檔`;
 
   const rankedHtml=shown.map(d=>{
+    if(isIgnitionMode())return ignitionCardHtml(d,cfg);
     const s=d.scores||{},tone=actionTone(d),score=scoreFor(d),reason=(d.why_now||[]).slice(0,2).map(humanReason),block=(d.blockers||[])[0],fresh=displayFreshness(d);
     return `<article class="card ${tone}" data-code="${esc(d.code)}" role="button" tabindex="0" aria-label="查看 ${esc(d.code)} ${esc(d.name)} 個股詳情"><div class="card-top"><div class="identity"><span class="rank">${esc(rankText(d))}</span><div><span class="code">${esc(d.code)} ${esc(d.name)}</span><div class="muted">${esc(sectorDisplay(d))}</div></div></div><span class="badge stage">${esc(stageLabel[d.lifecycle_stage]||d.lifecycle_stage)}</span></div>${quoteHtml(d)}<div class="action-line ${tone}"><span>${d.actionable?"●":"○"}</span><b>${esc(actionLabel[d.action_state]||d.action_state||"—")}</b><small>${esc(fresh)}</small></div><div class="score-row"><div class="score"><span>${esc(cfg.scoreLabel)}</span><b>${fmt(score)}</b></div><div class="score"><span>進場位置</span><b>${fmt(s.entry_position_score)}</b></div><div class="score"><span>資料信心</span><b>${fmt(d.data_confidence,0)}<small>%</small></b></div></div><div class="reason">${reason.length?reason.map(esc).join("・"):"目前無新增理由"}</div>${block?`<div class="blocker">卡點：${esc(humanBlock(block))}</div>`:""}</article>`;
   }).join("");
@@ -400,6 +420,14 @@ function openCard(card){
 }
 
 document.addEventListener("click",async e=>{
+  const closeMode=e.target.closest?.("[data-close-mode]");
+  if(closeMode&&state.view==="close"){
+    state.closeMode=closeMode.dataset.closeMode==="ignition"?"ignition":"swing";
+    resetFilters();state.visibleCount=15;
+    if(isIgnitionMode())await ensureIndex();
+    renderAll();
+    return;
+  }
   const tab=e.target.closest?.(".tab");
   if(tab){state.view=tab.dataset.view;resetFilters();document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===tab));await loadView();if(isLiveAutoView())checkLiveUpdate();return}
 
