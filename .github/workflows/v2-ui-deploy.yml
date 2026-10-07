@@ -65,11 +65,17 @@ jobs:
           set -euo pipefail
           git fetch origin clean-build-v2 --depth=1
           rm -rf /tmp/v2-source && mkdir -p /tmp/v2-source
-          git archive FETCH_HEAD docs/v2 scripts/v2/validate_single_writer_ui.py scripts/v2/validate_product_surface.py scripts/v2/test_portfolio_ledger.js scripts/v2/build_stock_shards.py scripts/v2/enrich_zones.py | tar -xf - -C /tmp/v2-source
+          # UI-only deploy still has to normalize the preserved Atomic bundle:
+          # entry-position, ignition execution, card/detail semantics and close
+          # freeze dates are data-contract semantics, not cosmetic UI state.
+          git archive FETCH_HEAD docs/v2 scripts/v2 contracts requirements-contract.txt | tar -xf - -C /tmp/v2-source
           test -s /tmp/v2-source/docs/v2/index.html
           test -s /tmp/v2-source/docs/v2/data/current_manifest.json
           test -s /tmp/v2-source/scripts/v2/build_stock_shards.py
           test -s /tmp/v2-source/scripts/v2/enrich_zones.py
+          test -s /tmp/v2-source/scripts/v2/normalize_close_snapshot_by_close_date.py
+          test -s /tmp/v2-source/scripts/v2/validate_bundle.py
+          test -s /tmp/v2-source/scripts/v2/validate_market_capital_context.py
 
       - name: Preserve newer published V2 market bundle
         shell: bash
@@ -133,6 +139,40 @@ jobs:
           if not usable: raise SystemExit('S/R enrichment produced no usable close zones')
           PY
 
+      - name: Normalize completed-close semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          python /tmp/v2-source/scripts/v2/normalize_close_snapshot_by_close_date.py --root /tmp/v2-source/docs/v2/data
+          python /tmp/v2-source/scripts/v2/validate_bundle.py --root /tmp/v2-source/docs/v2/data
+          python /tmp/v2-source/scripts/v2/validate_market_capital_context.py --root /tmp/v2-source/docs/v2/data
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('/tmp/v2-source/docs/v2/data')
+          m=json.loads((root/'current_manifest.json').read_text(encoding='utf-8'))
+          def resolve(meta):
+              raw=str((meta or {}).get('url') or '')
+              return root/(raw[len('./data/'):] if raw.startswith('./data/') else raw.lstrip('./'))
+          idx=json.loads(resolve(m['datasets']['decision_close_index']).read_text(encoding='utf-8'))
+          det=json.loads(resolve(m['datasets']['decision_close_detail']).read_text(encoding='utf-8')).get('items') or {}
+          mismatches=[]
+          for row in idx:
+              code=str(row.get('code') or '')
+              d=det.get(code)
+              if not d: continue
+              a=row.get('scores') or {}; b=d.get('scores') or {}
+              for key in ('entry_position_score','ignition_score'):
+                  if a.get(key)!=b.get(key):
+                      mismatches.append(f'{code}:{key}:{a.get(key)}!={b.get(key)}')
+              for key in ('ignition_action','ignition_execution_state','ignition_execution_ready'):
+                  if row.get(key)!=d.get(key):
+                      mismatches.append(f'{code}:{key}:{row.get(key)}!={d.get(key)}')
+          if mismatches:
+              raise SystemExit('close card/detail mismatch after normalization: '+', '.join(mismatches[:20]))
+          print('Close card/detail semantic parity OK', {'rows':len(idx),'details':len(det)})
+          PY
+
       - name: Verify canonical V2 Atomic bundle
         shell: bash
         run: |
@@ -181,6 +221,10 @@ jobs:
           cp /tmp/v2-source/scripts/v2/test_portfolio_ledger.js scripts/v2/test_portfolio_ledger.js
           cp /tmp/v2-source/scripts/v2/build_stock_shards.py scripts/v2/build_stock_shards.py
           cp /tmp/v2-source/scripts/v2/enrich_zones.py scripts/v2/enrich_zones.py
+          cp /tmp/v2-source/scripts/v2/normalize_close_snapshot_by_close_date.py scripts/v2/normalize_close_snapshot_by_close_date.py
+          cp /tmp/v2-source/scripts/v2/normalize_close_snapshot.py scripts/v2/normalize_close_snapshot.py
+          cp /tmp/v2-source/scripts/v2/close_semantics_v5.py scripts/v2/close_semantics_v5.py
+          cp /tmp/v2-source/scripts/v2/rebuild_close_rank_views.py scripts/v2/rebuild_close_rank_views.py
           python - <<'PY'
           from pathlib import Path
           p=Path('docs/sw.js')
