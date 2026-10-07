@@ -24,6 +24,7 @@ def require_once(haystack: str, needle: str, label: str, errors: list[str]):
 def main():
     html = text("index.html")
     app = text("app.js")
+    app_css = text("app.css")
     quick_filter_css = text("quick-filter.css")
     market = text("market-capital-renderer.js")
     sector_rank = text("sector-ranking-panel.js")
@@ -85,6 +86,11 @@ def main():
     require(app, "positionMin:65", "next-day position gate", errors)
     require(app, "confidenceMin:80", "next-day confidence gate", errors)
     require(app, "showAllNextDay", "uncapped next-day render path", errors)
+    for needle in ("ignitionQuickFilter", "data-close-mode", "🔥 點火雷達", "ignitionCardHtml", "scores?.ignition_score", "ignition_stage"):
+        require(app, needle, "close ignition radar", errors)
+    require(app_css, ".close-mode-switch", "close ignition mode switch style", errors)
+    for needle in ("ignitionExplain", "Gate 上限", "ignition_components_v2", "volume_acceleration", "relative_acceleration", "chip_acceleration", "tradability_risk"):
+        require(detail, needle, "ignition score explanation", errors)
     for capped in ("limit:8", "NEXT_DAY_ELITE.limit", "slice(0,NEXT_DAY_ELITE.limit)"):
         if capped in app:
             errors.append(f"next-day candidate must be uncapped: found {capped}")
@@ -157,7 +163,8 @@ def main():
         "product_goal": "10s market/attention; immediate detail shell; progressive evidence",
         "market_pulse": True,
         "radar_summary": True,
-        "quick_filters": ["intraday", "close", "daytrade"],
+        "quick_filters": ["intraday", "close", "close_ignition", "daytrade"],
+        "close_modes": ["swing", "ignition"],
         "next_day_elite": {"quality_min": 75, "position_min": 65, "confidence_min": 80, "limit": "unlimited"},
         "filters": ["quick", "stage", "action", "position", "sector"],
         "full_market_search": True,
