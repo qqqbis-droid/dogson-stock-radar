@@ -206,7 +206,7 @@ def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, mar
     ignition = num(row.get("ignition_score_v2"))
     ignition_exec = ignition_execution(
         row.get("ignition_stage_v2"),
-        row.get("ignition_action_v2"),
+        row.get("ignition_signal_action_v2") or row.get("ignition_action_v2"),
         ignition,
         entry,
         row.get("ignition_gate_cap_v2"),
@@ -321,7 +321,7 @@ def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, mar
         "ignition_raw_score": num(row.get("ignition_raw_score_v2")),
         "ignition_confidence": num(row.get("ignition_confidence_v2")),
         "ignition_stage": row.get("ignition_stage_v2"),
-        "ignition_signal_action": row.get("ignition_action_v2"),
+        "ignition_signal_action": row.get("ignition_signal_action_v2") or row.get("ignition_action_v2"),
         "ignition_action": ignition_exec["action"],
         "ignition_execution_state": ignition_exec["state"],
         "ignition_execution_ready": bool(ignition_exec["ready"]),
