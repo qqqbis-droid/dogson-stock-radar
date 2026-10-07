@@ -69,6 +69,22 @@ def main():
     ci=loaded.get("capital_intraday_context") or {}; cc=loaded.get("capital_close_context") or {}
     if any("today_amount_100m" in r for r in ci.get("rows") or []): print("ERROR intraday capital contaminated by close money fields"); ok=False
     if cc.get("rows") and not any(r.get("today_amount_100m") is not None for r in cc.get("rows") or []): print("ERROR close capital has no amount rows"); ok=False
+
+    # Close mission uses its own completed-session clock. It may legitimately be
+    # one trading day behind the live manifest during the next session, but every
+    # CLOSE context must agree with decision_close_summary and must never use a
+    # next-calendar-day late-fill timestamp as its as_of date.
+    close_meta=(manifest.get("datasets") or {}).get("decision_close_summary") or {}
+    close_date=str(close_meta.get("as_of") or "")[:10]
+    for key,obj in (("market_close_context",mc),("capital_close_context",cc)):
+        obj_date=str(obj.get("trade_date") or "")[:10]
+        asof_date=str(obj.get("as_of") or "")[:10]
+        if close_date and obj_date!=close_date:
+            print("ERROR close context trade_date mismatch",key,obj_date,"!=",close_date); ok=False
+        if close_date and asof_date!=close_date:
+            print("ERROR close context as_of date mismatch",key,asof_date,"!=",close_date); ok=False
+        if str(obj.get("freshness") or "").upper() not in {"FROZEN","FRESH"}:
+            print("ERROR close context must remain frozen/usable until next completed close",key,obj.get("freshness")); ok=False
     if not ok: raise SystemExit(1)
     # Shared production release gate: every publisher already calls this data
     # validator, so bind the UI single-writer/syntax checks here to prevent a
