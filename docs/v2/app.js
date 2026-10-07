@@ -83,9 +83,11 @@ function actionTone(d){
 }
 function scoreFor(d){const cfg=missionConfig[state.view],s=d.scores||{};return s[cfg.scoreKey]}
 function summaryRows(){const cfg=missionConfig[state.view];return cfg?.summary?(state.cache[cfg.summary]||[]):[]}
-function missionPhase(){if(state.view==="close"||state.view==="portfolio")return"POST_CLOSE";return summaryRows()[0]?.session_phase||state.manifest?.session_phase}
+function missionPhase(){if(state.view==="close")return"CLOSE_FREEZE";if(state.view==="portfolio")return"POST_CLOSE";return summaryRows()[0]?.session_phase||state.manifest?.session_phase}
 function missionDate(){const cfg=missionConfig[state.view],meta=cfg?.summary?state.manifest?.datasets?.[cfg.summary]:null;return String(meta?.as_of||state.manifest?.trade_date||"").slice(0,10)}
 function missionTime(){const cfg=missionConfig[state.view],meta=cfg?.summary?state.manifest?.datasets?.[cfg.summary]:null;return meta?.as_of||null}
+function missionKnownAt(){const cfg=missionConfig[state.view],meta=cfg?.summary?state.manifest?.datasets?.[cfg.summary]:null,row=summaryRows()[0]||null;return row?.known_at||meta?.known_at||null}
+function stamp16(v){return String(v||"").replace("T"," ").slice(0,16)}
 function displayFreshness(d){if(state.view==="close"&&["FRESH","FROZEN"].includes(d.freshness))return"盤後定格";return freshnessLabel[d.freshness]||d.freshness||"—"}
 function humanReason(text){
   let s=String(text||"").trim();
@@ -210,10 +212,14 @@ async function loadView(){
   document.dispatchEvent(new CustomEvent("radar:view-rendered",{detail:{view:state.view,build:state.manifest?.active_build_id}}));
 }
 function renderAll(){
-  const cfg=missionConfig[state.view],m=state.manifest,phase=missionPhase(),date=missionDate(),time=missionTime();
-  $("#mission").innerHTML=`<div>${esc(cfg.label)}</div><span>${esc(phaseLabel(phase))} · 資料 ${esc((time||date||"—").replace("T"," ").slice(0,16))}</span>`;
+  const cfg=missionConfig[state.view],m=state.manifest,phase=missionPhase(),date=missionDate(),time=missionTime(),knownAt=missionKnownAt();
+  const dataStamp=stamp16(time||date||"—"),knownStamp=stamp16(knownAt);
+  const timing=state.view==="close"
+    ?`收盤資料 ${dataStamp}${knownStamp?` · 最後補齊 ${knownStamp}`:""}`
+    :`資料 ${dataStamp}`;
+  $("#mission").innerHTML=`<div>${esc(cfg.label)}</div><span>${esc(phaseLabel(phase))} · ${esc(timing)}</span>`;
   $("#rankingTitle").textContent=cfg.title;
-  $("#statusBox").innerHTML=`<b>${esc(date||"—")}</b><br><span>${esc(phaseLabel(phase))}</span><br><small>${m.health.validation_passed?"Contract ✓":"檢查失敗"}</small>`;
+  $("#statusBox").innerHTML=`<b>${esc(date||"—")}</b><br><span>${esc(phaseLabel(phase))}</span><br><small>${state.view==="close"&&knownStamp?`定格更新 ${esc(knownStamp)} · `:""}${m.health.validation_passed?"Contract ✓":"檢查失敗"}</small>`;
   renderRadarSummary();renderStageFilter();renderActionFilter();renderPositionFilter();renderSectorFilter();renderCards();
 }
 
