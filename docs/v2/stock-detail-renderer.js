@@ -145,6 +145,26 @@ function quick(view,d){
   const ex=comp(d,"daytrade","execution_structure"),flow=comp(d,"daytrade","flow_volume");
   return `${tile("當沖分",sf(s.daytrade_score))}${tile("執行結構",ex?`${sf(ex.contribution)}/${sfmax(ex.contribution_max)}`:"待補")}${tile("量價推進",flow?`${sf(flow.contribution)}/${sfmax(flow.contribution_max)}`:"待補")}`;
 }
+function detailStage(view,d){
+  if(view==="close"&&signition())return d.ignition_stage||"點火資料待補";
+  return SSTAGE[d.lifecycle_stage]||d.lifecycle_stage||"—";
+}
+function detailAction(view,d){
+  if(view==="close"&&signition())return d.ignition_action||"觀察";
+  return SACTION[d.action_state]||d.action_state||"—";
+}
+function detailRank(view,d){
+  if(view==="close"&&signition())return "點火 #"+(d.ignition_rank??"—");
+  return "排名 #"+(d.opportunity_rank??"—");
+}
+function detailWhy(view,d,e){
+  if(view==="close"&&signition())return [...(d.ignition_reasons||[]),...(e?.ignition_summary_v2?[e.ignition_summary_v2]:[])];
+  return [...(d.why_now||[]),...(e?.stage_reason?[e.stage_reason]:[])];
+}
+function detailBlocks(view,d){
+  if(view==="close"&&signition())return d.ignition_gate_flags||[];
+  return d.blockers||[];
+}
 function humanWhy(x){
   let s=String(x||"").trim();
   s=s.replace(/^20日突破$/,"突破20日高點").replace(/^3日突破$/,"突破近3日高點").replace(/^均線多頭$/,"短中期均線偏多");
@@ -273,7 +293,25 @@ function v2ExplainCard(label,total,max,parts,order,kind){
   }).join("");
   return `<div class="sdr-exp-card"><div class="sdr-exp-head"><b>${sesc(label)}</b><strong>${sf(total,1)}/${sfmax(max)}</strong></div>${rows||'<div class="sdr-note">此分項目前沒有可顯示的 2.0 證據。</div>'}</div>`;
 }
+function ignitionExplain(d,e){
+  const parts=e?.ignition_components_v2||null;
+  const finalScore=sn(d?.scores?.ignition_score)??sn(e?.ignition_score_v2);
+  const raw=sn(d?.ignition_raw_score)??sn(e?.ignition_raw_score_v2);
+  const cap=sn(d?.ignition_gate_cap)??sn(e?.ignition_gate_cap_v2)??100;
+  const conf=sn(d?.ignition_confidence)??sn(e?.ignition_confidence_v2);
+  const stage=d?.ignition_stage||e?.ignition_stage_v2||"—";
+  const action=d?.ignition_action||e?.ignition_action_v2||"—";
+  const flags=(d?.ignition_gate_flags||e?.ignition_gate_flags_v2||[]).filter(Boolean);
+  const atr=sn(d?.ignition_breakout_distance_atr)??sn(e?.ignition_breakout_distance_atr_v2);
+  const order=["structure","volume_acceleration","sector_resonance","relative_acceleration","chip_acceleration","tradability_risk"];
+  const rawCard=parts?v2ExplainCard("六項原始分",raw,100,parts,order,"technical"):'<div class="sdr-note">點火 2.0 分項證據待本次盤後重建補齊。</div>';
+  const flow="Final "+sf(finalScore)+"/100 ＝ Raw "+sf(raw)+"/100 → Gate 上限 "+sf(cap)+"/100";
+  const gateText=flags.length?("Gate："+flags.join("、")):"Gate：未觸發封頂";
+  const atrText=atr!=null?(" · 距突破點 "+sf(atr,2)+" ATR"):"";
+  return `<details class="sdr-explain" open><summary>🔥 點火 2.0｜為什麼是這個分數</summary><div class="sdr-explain-body"><div class="sdr-note"><b>${sesc(flow)}</b><br>${sesc(stage)} · ${sesc(action)} · 點火信心 ${sf(conf,0)}%${sesc(atrText)}<br>${sesc(gateText)}</div>${rawCard}<div class="sdr-note">點火100＝起漲／突破結構25＋量能加速20＋族群共振15＋相對強度加速15＋籌碼加速15＋可交易性／風險10。Gate 只負責封頂，不偷偷改六項原始分。</div></div></details>`;
+}
 function explain(view,d,e){
+  if(view==="close"&&signition())return ignitionExplain(d,e);
   if(view==="close"){
     const x=d.score_explanations||{},hasTech2=e?.technical_model_version==="inuko-tech-v2.0",hasChip2=e?.chip_model_version==="inuko-chip-v2.0",hasSector2=e?.sector_model_version==="inuko-sector-v2.0",hasLiquidity2=e?.liquidity_model_version==="inuko-liquidity-v2.0";
     const techCard=hasTech2?v2ExplainCard("技術 2.0",e.technical_score_v2,50,e.technical_components_v2,["trend","breakout","volume_price","momentum","relative","risk_quality"],"technical"):expCard("技術",x.technical);
