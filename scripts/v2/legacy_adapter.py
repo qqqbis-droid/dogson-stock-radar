@@ -173,6 +173,7 @@ def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, mar
 
     intraday = num(row.get("intraday_score", row.get("intraday_momentum_score")))
     daytrade = num(row.get("daytrade_score"))
+    ignition = num(row.get("ignition_score_v2"))
     components = build_component_models(row, score, intraday, daytrade)
     code = str(row.get("code") or "").strip()
     name = str(row.get("name") or code)
@@ -275,9 +276,24 @@ def adapt_legacy_stock(row, *, build_id, trade_date, session_phase, mission, mar
             "intraday_momentum_score": intraday,
             "daytrade_score": daytrade,
             "entry_position_score": entry,
+            "ignition_score": ignition,
             "market_score": market_score,
         },
         "components": components,
+        "ignition_model_version": row.get("ignition_model_version"),
+        "ignition_raw_score": num(row.get("ignition_raw_score_v2")),
+        "ignition_confidence": num(row.get("ignition_confidence_v2")),
+        "ignition_stage": row.get("ignition_stage_v2"),
+        "ignition_action": row.get("ignition_action_v2"),
+        "ignition_verdict": row.get("ignition_verdict_v2"),
+        "ignition_summary": row.get("ignition_summary_v2"),
+        "ignition_reasons": list(row.get("ignition_reasons_v2") or []),
+        "ignition_gate_cap": num(row.get("ignition_gate_cap_v2")),
+        "ignition_gate_flags": list(row.get("ignition_gate_flags_v2") or []),
+        "ignition_breakout_distance_pct": num(row.get("ignition_breakout_distance_pct_v2")),
+        "ignition_breakout_distance_atr": num(row.get("ignition_breakout_distance_atr_v2")),
+        "ignition_candidate": bool(row.get("ignition_candidate_v2")),
+        "ignition_rank": row.get("ignition_rank_v2"),
         "lifecycle_stage": stage,
         "previous_stage": previous_stage,
         "stage_changed_at": None,
