@@ -303,12 +303,18 @@ function ignitionExplain(d,e){
   const action=d?.ignition_action||e?.ignition_action_v2||"—";
   const flags=(d?.ignition_gate_flags||e?.ignition_gate_flags_v2||[]).filter(Boolean);
   const atr=sn(d?.ignition_breakout_distance_atr)??sn(e?.ignition_breakout_distance_atr_v2);
+  const entry=sn(d?.scores?.entry_position_score);
+  const execState=String(d?.ignition_execution_state||"");
+  const execReady=d?.ignition_execution_ready===true;
+  const execNote=String(d?.ignition_execution_note||"");
   const order=["structure","volume_acceleration","sector_resonance","relative_acceleration","chip_acceleration","tradability_risk"];
   const rawCard=parts?v2ExplainCard("六項原始分",raw,100,parts,order,"technical"):'<div class="sdr-note">點火 2.0 分項證據待本次盤後重建補齊。</div>';
   const flow="Final "+sf(finalScore)+"/100 ＝ Raw "+sf(raw)+"/100 → Gate 上限 "+sf(cap)+"/100";
   const gateText=flags.length?("Gate："+flags.join("、")):"Gate：未觸發封頂";
   const atrText=atr!=null?(" · 距突破點 "+sf(atr,2)+" ATR"):"";
-  return `<details class="sdr-explain" open><summary>🔥 點火 2.0｜為什麼是這個分數</summary><div class="sdr-explain-body"><div class="sdr-note"><b>${sesc(flow)}</b><br>${sesc(stage)} · ${sesc(action)} · 點火信心 ${sf(conf,0)}%${sesc(atrText)}<br>${sesc(gateText)}</div>${rawCard}<div class="sdr-note">點火100＝起漲／突破結構25＋量能加速20＋族群共振15＋相對強度加速15＋籌碼加速15＋可交易性／風險10。Gate 只負責封頂，不偷偷改六項原始分。</div></div></details>`;
+  const execLabel=execReady?"可小量試單":execState==="NO_CHASE"?"不追":execState==="WAIT_BREAKOUT"?"等突破":execState==="WAIT_POSITION"?"位置待補":"先等待";
+  const execLine="執行判斷："+execLabel+(entry!=null?("｜進場位置 "+sf(entry,1)+"/100"):"")+(execNote?("｜"+execNote):"");
+  return `<details class="sdr-explain" open><summary>🔥 點火 2.0｜為什麼是這個分數</summary><div class="sdr-explain-body"><div class="sdr-note"><b>${sesc(flow)}</b><br>${sesc(stage)} · ${sesc(action)} · 點火信心 ${sf(conf,0)}%${sesc(atrText)}<br>${sesc(gateText)}<br><b>${sesc(execLine)}</b></div>${rawCard}<div class="sdr-note">點火100＝起漲／突破結構25＋量能加速20＋族群共振15＋相對強度加速15＋籌碼加速15＋可交易性／風險10。點火分數只回答「是否正在加速」；進場位置另外決定「現在能不能下手」。Gate 只負責封頂，不把位置分偷灌進點火分數。</div></div></details>`;
 }
 function explain(view,d,e){
   if(view==="close"&&signition())return ignitionExplain(d,e);
