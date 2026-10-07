@@ -68,7 +68,7 @@ jobs:
           # UI-only deploy still has to normalize the preserved Atomic bundle:
           # entry-position, ignition execution, card/detail semantics and close
           # freeze dates are data-contract semantics, not cosmetic UI state.
-          git archive FETCH_HEAD docs/v2 scripts/v2 contracts requirements-contract.txt | tar -xf - -C /tmp/v2-source
+          git archive FETCH_HEAD docs/v2 scripts contracts requirements-contract.txt | tar -xf - -C /tmp/v2-source
           test -s /tmp/v2-source/docs/v2/index.html
           test -s /tmp/v2-source/docs/v2/data/current_manifest.json
           test -s /tmp/v2-source/scripts/v2/build_stock_shards.py
