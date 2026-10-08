@@ -158,6 +158,20 @@ def main():
         require(store, needle, "portfolio ledger store", errors)
     for needle in ("新增成交", "交易流水", "已實現", "addTransaction"):
         require(ledger, needle, "portfolio ledger interaction", errors)
+    # Held securities are not disqualified from coverage by the swing radar.
+    for needle in ("portfolio_market_quotes.json", "ownedDecision", "official", "portfolio_coverage"):
+        if needle == "official":
+            continue
+        require(portfolio, needle, "portfolio full-market quote fallback", errors)
+    for needle in ("record_mode", "DAYTRADE", "buy_price", "sell_price", "addDaytradeRoundTrip"):
+        require(ledger, needle, "paired daytrade entry UX", errors)
+    for needle in ("addDaytradeRoundTrip", "daytrade_pair_id", "DAYTRADE_FILL"):
+        require(store, needle, "atomic daytrade ledger", errors)
+    intel = text("inuko-portfolio-intel-v2.js")
+    for needle in ("data-portfolio-jump", "scrollIntoView", "portfolioQuotes", "ownedDecision"):
+        require(intel, needle, "unlimited actionable portfolio priority list", errors)
+    if "slice(0,Math.min(4,sorted.length))" in intel or "slice(0,5)" in intel:
+        errors.append("all held L2-L4 positions must remain visible without a hard-coded 4/5 cap")
     require(quick, "RadarPortfolioStore.addTransaction", "detail-to-portfolio ledger append", errors)
     if "RadarPortfolioStore.upsert" in quick:
         errors.append("detail quick-add must not overwrite aggregate holdings in ledger 2.0")
