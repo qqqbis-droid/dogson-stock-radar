@@ -104,6 +104,11 @@ function missionDate(){const cfg=missionConfig[state.view],meta=cfg?.summary?sta
 function missionTime(){const cfg=missionConfig[state.view],meta=cfg?.summary?state.manifest?.datasets?.[cfg.summary]:null;return meta?.as_of||null}
 function missionKnownAt(){const cfg=missionConfig[state.view],meta=cfg?.summary?state.manifest?.datasets?.[cfg.summary]:null,row=summaryRows()[0]||null;return row?.known_at||meta?.known_at||null}
 function stamp16(v){return String(v||"").replace("T"," ").slice(0,16)}
+function stampMDHM(v){
+  const s=String(v||"");
+  const m=s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  return m?Number(m[2])+"/"+Number(m[3])+" "+m[4]+":"+m[5]:stamp16(v);
+}
 function displayFreshness(d){if(state.view==="close"&&["FRESH","FROZEN"].includes(d.freshness))return"盤後定格";return freshnessLabel[d.freshness]||d.freshness||"—"}
 function humanReason(text){
   let s=String(text||"").trim();
@@ -234,7 +239,6 @@ async function loadView(){
 function renderAll(){
   const cfg=missionConfig[state.view],m=state.manifest,phase=missionPhase(),date=missionDate(),time=missionTime(),knownAt=missionKnownAt();
   const dataStamp=stamp16(time||date||"—"),knownStamp=stamp16(knownAt);
-  const timing=state.view==="close"?("收盤資料 "+dataStamp+(knownStamp?" · 最後補齊 "+knownStamp:"")):("資料 "+dataStamp);
   let closeSwitch="";
   if(state.view==="close"){
     closeSwitch='<div class="close-mode-switch" aria-label="盤後雷達模式">'
@@ -242,7 +246,10 @@ function renderAll(){
       +'<button type="button" data-close-mode="ignition" class="ignite '+(state.closeMode==="ignition"?"active":"")+'">🔥 點火雷達</button>'
       +'</div>';
   }
-  $("#mission").innerHTML="<div>"+esc(cfg.label)+"</div><span>"+esc(phaseLabel(phase))+" · "+esc(timing)+"</span>"+closeSwitch;
+  const metaHtml=state.view==="close"
+    ? '<div class="mission-meta"><b>'+esc(phaseLabel(phase))+'</b><span>收盤 '+esc(stampMDHM(time||date||"—"))+'</span>'+(knownAt?'<span>補齊 '+esc(stampMDHM(knownAt))+'</span>':'')+'</div>'
+    : '<div class="mission-meta"><b>'+esc(phaseLabel(phase))+'</b><span>資料 '+esc(dataStamp)+'</span></div>';
+  $("#mission").innerHTML='<div class="mission-head"><div class="mission-title">'+esc(cfg.label)+'</div>'+metaHtml+'</div>'+closeSwitch;
   $("#rankingTitle").textContent=isIgnitionMode()?"🔥 點火雷達｜找加速前段":cfg.title;
   $("#statusBox").innerHTML="<b>"+esc(date||"—")+"</b><br><span>"+esc(phaseLabel(phase))+"</span><br><small>"+(state.view==="close"&&knownStamp?("定格更新 "+esc(knownStamp)+" · "):"")+(m.health.validation_passed?"Contract ✓":"檢查失敗")+"</small>";
   renderRadarSummary();renderStageFilter();renderActionFilter();renderPositionFilter();renderSectorFilter();renderCards();
