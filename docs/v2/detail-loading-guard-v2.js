@@ -172,7 +172,7 @@
         sector:e?.sector_score_label?`${e.sector_score_label}｜族群分 ${fmt(e.sector_score,1)}`:'',
         liquidity_risk:e?`20日均成交額 ${num(e.avg_turnover20_mn)==null?'—':`${fmt(e.avg_turnover20_mn,1)} 百萬`}｜${e.liquidity_level||'流動性待補'}`:''
       };
-      return `<details class="isd-explain"><summary>評分依據｜為什麼是這個分數</summary><div class="isd-exp"><div class="isd-muted">盤中動能由 Engine 分項加總；前端只翻成可讀證據，不重新配分。</div>${d.components.intraday.items.map(i=>`<div class="isd-exp-card"><div class="isd-exp-head"><b>${esc(i.label||i.key||'分項')}</b><strong>${fmt(i.contribution)}/${fmt(i.contribution_max,0)}</strong></div>${details[i.key]?`<div class="isd-exp-detail" style="grid-column:auto;margin-top:5px">${esc(details[i.key])}</div>`:''}</div>`).join('')}<div class="isd-muted">分數代表條件同步程度，不代表上漲機率。</div></div></details>`;
+      return `<details class="isd-explain"><summary>評分依據｜為什麼是這個分數</summary><div class="isd-exp"><div class="isd-muted">盤中動能由 Engine 分項加總；前端不重新配分，只翻成可讀證據。</div>${d.components.intraday.items.map(i=>`<div class="isd-exp-card"><div class="isd-exp-head"><b>${esc(i.label||i.key||'分項')}</b><strong>${fmt(i.contribution)}/${fmt(i.contribution_max,0)}</strong></div>${details[i.key]?`<div class="isd-exp-detail" style="grid-column:auto;margin-top:5px">${esc(details[i.key])}</div>`:''}</div>`).join('')}<div class="isd-muted">分數代表條件同步程度，不代表上漲機率。</div></div></details>`;
     }
 
     const x=d.score_explanations||null;
