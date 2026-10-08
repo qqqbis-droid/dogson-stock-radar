@@ -79,8 +79,8 @@ function addDaytradeRoundTrip(input){
   if(!code||!Number.isInteger(shares)||shares<=0||buy==null||buy<=0||sell==null||sell<=0||!/^(20\d\d)-(0[1-9]|1[0-2])-([0-2]\d|3[01])$/.test(date))
     throw new Error('當沖必須填同一交易日、實際買進／賣出價格和相同的已成交股數；未賣出請使用一般買進');
   const data=read(),pair=uid(),before=aggregateCode(data,code),created=nowIso(),reason=cleanText(input.reason,800);
-  const b=normalizeTx({id:uid(),code,name,side:'BUY',action:before.shares>0?'ADD':'ENTRY',shares,price:buy,trade_date:date,reason,note:input.note,source:'DAYTRADE_FILL',daytrade_pair_id:pair,created_at:created});
-  const s=normalizeTx({id:uid(),code,name,side:'SELL',action:before.shares>0?'REDUCE':'EXIT',shares,price:sell,trade_date:date,reason,note:input.note,source:'DAYTRADE_FILL',daytrade_pair_id:pair,created_at:created});
+  const b=normalizeTx({id:`${pair}_buy`,code,name,side:'BUY',action:before.shares>0?'ADD':'ENTRY',shares,price:buy,trade_date:date,reason,note:input.note,source:'DAYTRADE_FILL',daytrade_pair_id:pair,created_at:created});
+  const s=normalizeTx({id:`${pair}_sell`,code,name,side:'SELL',action:before.shares>0?'REDUCE':'EXIT',shares,price:sell,trade_date:date,reason,note:input.note,source:'DAYTRADE_FILL',daytrade_pair_id:pair,created_at:created});
   data.transactions.push(b,s);
   if(name||!data.meta[code])data.meta[code]=normalizeMeta({...data.meta[code],name:name||data.meta[code]?.name||''});
   validateLedger(data);write(data);
