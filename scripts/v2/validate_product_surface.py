@@ -90,6 +90,10 @@ def main():
     for needle in ("ignitionQuickFilter", "data-close-mode", "🔥 點火雷達", "ignitionCardHtml", "scores?.ignition_score", "ignition_stage",
                    "ignition_execution_ready", "ignition_execution_state", "ignition_execution_note"):
         require(app, needle, "close ignition radar", errors)
+    for needle in ('closeMode:state.view==="close"?state.closeMode:null',):
+        require(app, needle, "close detail source-mode bridge", errors)
+    for needle in ("forcedCloseMode", "SDR.detailCloseMode", "盤後點火", "點火底層證據"):
+        require(detail, needle, "ignition detail mode lock", errors)
     require(app_css, ".close-mode-switch", "close ignition mode switch style", errors)
     for needle in ("missionMeta('close').date", "盤後定格", "最後完成收盤"):
         require(freshness, needle, "completed-close freeze semantics", errors)
