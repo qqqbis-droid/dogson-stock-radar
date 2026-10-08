@@ -3570,6 +3570,22 @@ def build_close():
     meta = uni.set_index("symbol").to_dict("index")
     official_today = official_mis_snapshot(uni)
     official_trade_date = max((v.get("date") for v in official_today.values() if v.get("date")), default=None)
+    # Owned holdings need independent close coverage, even when the swing radar
+    # rejects a thin or nonrankable stock. Never assign fake swing scores.
+    universe_by_code = {str(x["code"]): x for x in universe_public}
+    portfolio_ref = {}
+    for code, snap in official_today.items():
+        meta_row = universe_by_code.get(str(code), {})
+        if snap.get("Close") is None or not snap.get("date"):
+            continue
+        portfolio_ref[str(code)] = {
+            "code": str(code), "name": meta_row.get("name", ""),
+            "market": meta_row.get("market", ""), "industry_name": meta_row.get("industry_name", ""),
+            "trade_date": snap["date"].isoformat(), "close": snap["Close"],
+            "high": snap.get("High"), "low": snap.get("Low"),
+            "volume": snap.get("Volume"), "source": "TWSE MIS verified close",
+            "coverage": "OFFICIAL_CLOSE_ONLY", "rank_eligible": False,
+        }
 
     rows = []
     # v1.5.12：沿用這一輪本來就下載的6個月日K，保存各股近期每日收盤價，
@@ -3604,7 +3620,26 @@ def build_close():
                 if not t:
                     continue
                 breadth_changes.append(t["day_change"])
+                # Preserve the non-ranked stock's real daily K metrics for its
+                # owner. These are raw evidence, never the ranking 2.0 score.
+                meta_row = universe_by_code.get(code, {})
+                reference = portfolio_ref.get(code, {
+                    "code": code, "name": meta_row.get("name", ""),
+                    "market": meta_row.get("market", ""),
+                    "industry_name": meta_row.get("industry_name", ""),
+                    "source": "Yahoo daily close", "rank_eligible": False,
+                })
+                reference.update({
+                    "trade_date": str(t.get("date") or ""), "coverage": "DAILY_TECHNICAL",
+                    **{key: t.get(key) for key in
+                       ("close", "high", "low", "day_change", "ma5", "ma10",
+                        "ma20", "ma60", "rsi", "macd_h", "kd_k", "kd_d",
+                        "sar", "support", "resistance", "vol_x",
+                        "avg_turnover20", "liquidity_level")},
+                })
+                portfolio_ref[code] = reference
                 liq_level, liq_adjust = liquidity_profile(t["avg_turnover20"])
+                reference["liquidity_level"] = liq_level
                 if liq_level == "不足":
                     continue
                 t["liquidity_level"] = liq_level
@@ -3636,6 +3671,18 @@ def build_close():
         before = len(rows)
         rows = [r for r in rows if str(r.get("date")) == td]
         print("close trade-date lock", td, "kept", len(rows), "of", before)
+
+    # Only publish evidence from this exact verified completed session.
+    td_ref = trade_date.isoformat() if hasattr(trade_date, "isoformat") else str(trade_date or "")
+    if td_ref:
+        portfolio_ref = {code: row for code, row in portfolio_ref.items()
+                         if row.get("trade_date") == td_ref}
+    dump("portfolio_reference.json", {
+        "schema_version": "1.0.0", "trade_date": td_ref,
+        "generated_at": now_tw().isoformat(timespec="seconds"),
+        "note": "All owned stocks: official close and available unscored daily K evidence; separate from swing ranking liquidity gate.",
+        "quotes": portfolio_ref,
+    })
 
     market_map = dict(zip(uni["code"].astype(str), uni["market"].astype(str)))
 
