@@ -173,6 +173,22 @@ jobs:
           print('Close card/detail semantic parity OK', {'rows':len(idx),'details':len(det)})
           PY
 
+      - name: Add official full-market portfolio close quotes
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Independent of the liquidity-filtered swing radar. Official market
+          # dates remain attached to every quote; this never manufactures scores.
+          python /tmp/v2-source/scripts/v2/portfolio_quote_fallback.py --out /tmp/v2-source/docs/v2/data/portfolio_market_quotes.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('/tmp/v2-source/docs/v2/data/portfolio_market_quotes.json')
+          if p.exists():
+              q=json.loads(p.read_text(encoding='utf-8'))
+              print('Portfolio official quotes:',len(q.get('quotes') or {}),'5302:',(q.get('quotes') or {}).get('5302'))
+          PY
+
       - name: Verify canonical V2 Atomic bundle
         shell: bash
         run: |
