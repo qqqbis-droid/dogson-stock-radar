@@ -1,14 +1,14 @@
 {
   "shadow_summary_schema_version": "1.0.0",
-  "generated_at": "2026-10-07T15:41:57+08:00",
-  "total_report_files": 18,
-  "distinct_trading_days": 9,
+  "generated_at": "2026-10-08T15:41:22+08:00",
+  "total_report_files": 19,
+  "distinct_trading_days": 10,
   "first_trade_date": "2026-09-23",
-  "latest_trade_date": "2026-10-07",
-  "latest_build_id": "cb2-legacy-20261007-4ac59754c4",
+  "latest_trade_date": "2026-10-08",
+  "latest_build_id": "cb2-legacy-20261008-1b943830ee",
   "latest_status": "PASS",
   "daily_status_counts": {
-    "PASS": 4,
+    "PASS": 5,
     "WARN": 5
   },
   "unresolved_safety_violations": 0,
@@ -19,16 +19,16 @@
   },
   "payload": {
     "latest_initial_bytes": {
-      "intraday": 109112,
-      "close": 117128,
-      "portfolio": 74732,
-      "daytrade": 122257
+      "intraday": 117645,
+      "close": 125602,
+      "portfolio": 74691,
+      "daytrade": 131326
     },
     "max_initial_bytes": {
-      "intraday": 109281,
-      "close": 117250,
+      "intraday": 117645,
+      "close": 125602,
       "portfolio": 74839,
-      "daytrade": 123134
+      "daytrade": 131326
     },
     "note": "Static transfer-size observability only; browser interaction SLO remains a separate measured gate."
   },
@@ -38,7 +38,7 @@
     "ready_for_review": false,
     "eligible_for_cutover": false,
     "blockers": [
-      "Need 11 more distinct trading-day Shadow samples to reach the minimum review window.",
+      "Need 10 more distinct trading-day Shadow samples to reach the minimum review window.",
       "Predictive threshold validation evidence and rollback verification remain separate Phase 5/6 gates."
     ]
   }
