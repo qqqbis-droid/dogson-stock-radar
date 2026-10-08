@@ -86,7 +86,7 @@ function addDaytradeRoundTrip(input){
   validateLedger(data);write(data);
   return{pair_id:pair,buy:b,sell:s,gross_profit:(sell-buy)*shares,shares_before:before.shares};
 }
-function deleteTransaction(id){const key=cleanText(id,80),data=read(),before=data.transactions.length;data.transactions=data.transactions.filter(t=>t.id!==key);if(data.transactions.length===before)throw new Error('找不到這筆成交');validateLedger(data);return write(data)}
+function deleteTransaction(id){const key=cleanText(id,80),data=read(),found=data.transactions.find(t=>t.id===key);if(!found)throw new Error('找不到這筆成交');const pair=found.daytrade_pair_id;data.transactions=data.transactions.filter(t=>pair?t.daytrade_pair_id!==pair:t.id!==key);validateLedger(data);return write(data)}
 function upsert(position){
   const code=cleanCode(position?.code);if(!code)throw new Error('股票代號無效');const data=read(),cur=aggregateCode(data,code),shares=cleanNumber(position?.shares),avg=cleanNumber(position?.avg_cost??position?.avg_price);
   if(!cur.transaction_count){if(shares==null||shares<=0||!Number.isInteger(shares)||avg==null||avg<=0)throw new Error('首次持股需要有效股數與成交價');addTransaction({code,name:position.name,side:'BUY',shares,price:avg,trade_date:position.entry_date,reason:position.entry_reason,source:'COMPAT_POSITION_FORM'});}
