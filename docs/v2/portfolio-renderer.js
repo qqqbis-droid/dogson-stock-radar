@@ -24,9 +24,13 @@ async function allMarketQuotes(m){
     j('./data/portfolio_market_quotes.json?t='+Date.now()).catch(()=>null),
     j('../data/portfolio_reference.json?t='+Date.now()).catch(()=>null)
   ]);
-  const merged={...(reference?.quotes||{}),...(official?.quotes||{})},out={};
-  for(const [code,q] of Object.entries(merged)){
-    if(q?.trade_date===day&&pn(q.close)!=null)out[String(code)]=q;
+  const out={},sources=[reference?.quotes||{},official?.quotes||{}];
+  for(const source of sources)for(const [code,q] of Object.entries(source)){
+    const date=String(q?.trade_date||'');
+    // Portfolio is a current holding view, not the frozen close strategy.
+    // A quote newer than the last completed Close Build is allowed, but
+    // its actual trading date must always remain visible. Never use older.
+    if(date>=day&&pn(q?.close)!=null&&(!out[code]||date>=out[code].trade_date))out[String(code)]=q;
   }
   return out;
 }
