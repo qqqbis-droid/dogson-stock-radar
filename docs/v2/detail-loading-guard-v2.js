@@ -3,7 +3,9 @@
 
   const nativeFetch=window.fetch.bind(window);
   let seq=0;
+  let activeCloseMode='swing';
   const cache=new Map();
+  const isIgnition=view=>view==='close'&&activeCloseMode==='ignition';
 
   const VIEW={intraday:'盤中波段',close:'盤後波段',daytrade:'當沖'};
   const STAGE={OBSERVE:'觀察',SETUP:'蓄勢待發',LAUNCH:'剛啟動',TREND:'趨勢持有',PULLBACK_TEST:'回踩觀察',PULLBACK_CONFIRMED:'回踩承接',WEAKENING:'轉弱警戒',FAILED:'結構失效'};
@@ -77,9 +79,14 @@
     const s=d.scores||{};
     if(view==='intraday')return ['盤中動能',fmt(s.intraday_momentum_score)];
     if(view==='daytrade')return ['當沖分',fmt(s.daytrade_score)];
-    return ['波段品質',fmt(s.swing_quality_score)];
+    return isIgnition(view)?['點火分數',fmt(s.ignition_score)]:['波段品質',fmt(s.swing_quality_score)];
   }
   function light(view,d){
+    if(isIgnition(view)){
+      if(d.ignition_stage==='末端過熱／不追'||d.ignition_execution_state==='NO_CHASE')return['過熱不追','risk'];
+      if(d.ignition_execution_ready===true)return['可試單',''];
+      return[d.ignition_stage||'先等待',''];
+    }
     const risk=['EXIT_PRIORITY','REDUCE_WATCH'].includes(d.action_state)||['FAILED','WEAKENING'].includes(d.lifecycle_stage);
     if(risk)return['風險優先','risk'];
     if(view==='daytrade'&&!(d.session_phase==='LIVE'&&d.freshness==='LIVE'))return['不可執行',''];
@@ -88,6 +95,7 @@
     return['先等待',''];
   }
   function heroText(view,d){
+    if(isIgnition(view))return d.ignition_summary||'點火強度只代表加速訊號；是否買進仍需看進場位置及隔日即時確認。';
     if(['EXIT_PRIORITY','REDUCE_WATCH'].includes(d.action_state)||['FAILED','WEAKENING'].includes(d.lifecycle_stage))return'結構轉弱，先處理風險。';
     if(view==='close')return d.actionable?'盤後條件已同步，明天仍要用即時量價確認。':'目前先列觀察，條件成立前不用追。';
     if(view==='daytrade'&&!(d.session_phase==='LIVE'&&d.freshness==='LIVE'))return'當沖只在即時資料合格時有效；這份資料只供回看。';
@@ -143,6 +151,19 @@
   }
 
   function explainHtml(d,e,view){
+    if(isIgnition(view)){
+      const parts=e?.ignition_components_v2||null;
+      const raw=num(d.ignition_raw_score)??num(e?.ignition_raw_score_v2);
+      const cap=num(d.ignition_gate_cap)??num(e?.ignition_gate_cap_v2)??100;
+      const finalScore=num(d.scores?.ignition_score)??num(e?.ignition_score_v2);
+      const confidence=num(d.ignition_confidence)??num(e?.ignition_confidence_v2);
+      const dist=num(d.ignition_breakout_distance_atr)??num(e?.ignition_breakout_distance_atr_v2);
+      const flags=(d.ignition_gate_flags||e?.ignition_gate_flags_v2||[]).filter(Boolean);
+      const order=['structure','volume_acceleration','sector_resonance','relative_acceleration','chip_acceleration','tradability_risk'];
+      const scores=parts?v2BreakdownCard('🔥 點火 2.0 六項分數',raw,100,parts,order,'technical'):'<div class="isd-muted">點火六項證據待盤後重建補齊。</div>';
+      const gate=flags.length?flags.join('、'):'未觸發封頂';
+      return `<details class="isd-explain" open><summary>🔥 點火 2.0｜為什麼是這個分數</summary><div class="isd-exp"><div class="isd-muted"><b>Final ${fmt(finalScore,1)}/100 = Raw ${fmt(raw,1)}/100 → Gate ${fmt(cap,1)}/100</b><br>階段：${esc(d.ignition_stage||'—')}｜點火信心 ${fmt(confidence,0)}%｜距突破點 ${dist==null?'—':fmt(dist,2)+' ATR'}<br>Gate：${esc(gate)}<br>進場位置 ${fmt(d.scores?.entry_position_score,1)}/100｜${esc(d.ignition_execution_note||'仍須隔日確認量價')}</div>${scores}<div class="isd-muted">點火100＝起漲／突破25＋量能加速20＋族群共振15＋相對強度加速15＋籌碼加速15＋可交易性／風險10。點火高分不代表現在適合追價。</div></div></details>`;
+    }
     if(view==='intraday'&&d.components?.intraday?.items?.length){
       const details={
         price_structure:e?`VWAP ${price(e.vwap)}｜距 VWAP ${pct(e.vwap_dist)}｜5分 ${e.multi_timeframe?.['5m']?.label||'—'}`:'',
@@ -211,14 +232,19 @@
     const d=shard.decision||{},e=shard.evidence||null,zones=Array.isArray(shard.zones)?shard.zones:[];
     const supports=zones.filter(z=>z.side==='SUPPORT').slice(0,2),resistances=zones.filter(z=>z.side==='RESISTANCE').slice(0,2);
     const [ms,mv]=mainScore(view,d),[lt,tone]=light(view,d);
+    const ignite=isIgnition(view);
+    const context=ignite?'盤後點火':(VIEW[view]||view);
+    const rank=ignite?'點火 #'+(d.ignition_rank??'—'):'排名 #'+(d.opportunity_rank??'—');
+    const stage=ignite?(d.ignition_stage||'點火資料待補'):(STAGE[d.lifecycle_stage]||d.lifecycle_stage||'—');
+    const action=ignite?(d.ignition_action||'觀察'):(ACTION[d.action_state]||d.action_state||'—');
     box.title.textContent=`${d.code||shard.code} ${d.name||e?.name||''}`.trim();
-    box.body.innerHTML=`<div class="isd-context">${esc(VIEW[view]||view)}詳情 · ${esc(d.opportunity_bucket||'—')} · 排名 #${d.opportunity_rank??'—'}</div>
-      <div class="isd-hero"><div><span class="isd-badge">${esc(STAGE[d.lifecycle_stage]||d.lifecycle_stage||'—')}</span><h2>${esc(ACTION[d.action_state]||d.action_state||'—')}</h2><p>${esc(heroText(view,d))}</p></div><div class="isd-light ${tone}">${esc(lt)}</div></div>
-      <div class="isd-score">${scoreTile(ms,mv)}${scoreTile('進場位置',fmt(d.scores?.entry_position_score))}${scoreTile('資料信心',`${fmt(d.data_confidence,0)}%`)}</div>
+    box.body.innerHTML=`<div class="isd-context">${esc(context)}詳情 · ${esc(ignite?(d.ignition_stage||'—'):(d.opportunity_bucket||'—'))} · ${esc(rank)}</div>
+      <div class="isd-hero"><div><span class="isd-badge">${esc(stage)}</span><h2>${esc(action)}</h2><p>${esc(heroText(view,d))}</p></div><div class="isd-light ${tone}">${esc(lt)}</div></div>
+      <div class="isd-score">${scoreTile(ms,mv)}${scoreTile('進場位置',fmt(d.scores?.entry_position_score))}${scoreTile(ignite?'點火信心':'資料信心',`${fmt(ignite?d.ignition_confidence:d.data_confidence,0)}%`)}</div>
       ${freshnessHtml(shard,d,e,m)}
       <div class="isd-section"><h3>支撐 / 壓力</h3><div class="isd-zones">${supports.map(zoneHtml).join('')}${resistances.map(zoneHtml).join('')||'<div class="isd-muted">目前沒有可用支撐／壓力區。</div>'}</div></div>
-      <div class="isd-section"><h3>為什麼現在看它</h3>${tags([...(d.why_now||[]),...(e?.stage_signals||[])],'目前沒有足夠的新理由。')}</div>
-      <div class="isd-section"><h3>現在卡在哪裡</h3>${tags(d.blockers||[],'目前沒有額外卡點。')}</div>
+      <div class="isd-section"><h3>為什麼現在看它</h3>${tags(ignite?(d.ignition_reasons||[]):[...(d.why_now||[]),...(e?.stage_signals||[])],'目前沒有足夠的新理由。')}</div>
+      <div class="isd-section"><h3>${ignite?'點火 Gate／卡點':'現在卡在哪裡'}</h3>${tags(ignite?(d.ignition_gate_flags||[]):(d.blockers||[]),'目前沒有額外卡點。')}</div>
       <div class="isd-section"><h3>${view==='close'?'明日升級條件':'升級條件'}</h3>${tags(d.upgrade_conditions||[],'目前尚未形成額外升級條件。')}</div>
       <div class="isd-section"><h3>失效／風險條件</h3>${tags([...(d.risk_flags||[]),...(e?.stage_risks||[]),...(e?.overheat_reasons||[])],'目前沒有額外風險旗標。')}</div>
       <div class="isd-section"><h3>${view==='close'?'盤後技術／籌碼':'即時量價／相對強弱'}</h3>${evidenceHtml(e,view)}</div>
@@ -226,7 +252,8 @@
       ${qualityHtml(shard,d,m)}`;
   }
 
-  async function openStock(code,view){
+  async function openStock(code,view,closeMode){
+    activeCloseMode=view==='close'?(closeMode==='ignition'?'ignition':'swing'):'swing';
     const my=++seq,box=ui(code); if(!box)return;
     try{
       const m=await json(`./data/current_manifest.json?t=${Date.now()}`,6000);
@@ -260,7 +287,8 @@
     if(!code||view==='portfolio')return;
     e.stopImmediatePropagation();
     if(e.cancelable)e.preventDefault();
-    openStock(code,view);
+    const mode=String(e.detail?.closeMode||document.querySelector('[data-close-mode="ignition"].active')?.dataset.closeMode||'swing');
+    openStock(code,view,mode);
   },true);
   document.addEventListener('radar:data-reloaded',()=>{cache.clear();seq++;});
   document.addEventListener('close',e=>{if(e.target?.id==='detailDialog')seq++;},true);
