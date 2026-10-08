@@ -94,6 +94,8 @@ def main():
         require(app, needle, "close detail source-mode bridge", errors)
     for needle in ("forcedCloseMode", "SDR.detailCloseMode", "盤後點火", "點火底層證據"):
         require(detail, needle, "ignition detail mode lock", errors)
+    for needle in ("mission-head", "mission-meta", "stampMDHM"):
+        require(app, needle, "close freeze mission layout", errors)
     require(app_css, ".close-mode-switch", "close ignition mode switch style", errors)
     for needle in ("missionMeta('close').date", "盤後定格", "最後完成收盤"):
         require(freshness, needle, "completed-close freeze semantics", errors)
@@ -116,7 +118,7 @@ def main():
     require(app, "radar:open-stock", "ranked card open event", errors)
     require(app, 'role="button"', "ranked card keyboard target", errors)
     for retired in (
-        "card-open-bridge.js", "stock-detail-prime.js", "live-ui-20261001.js",
+        "card-open-bridge.js", "stock-detail-prime.js", "detail-loading-guard-v2.js", "live-ui-20261001.js",
         "live-pulse-points.js", "live-index-source-guard.js",
         "sector-member-alias-guard.js", "sector-summary-layout-v2.js",
         "price-map-theme.js", "brand-inuko-lab.js",
