@@ -19,7 +19,7 @@ function dist(from,to){const a=n(from),b=n(to);return a==null||b==null||b===0?nu
 async function getJson(url){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error(`${url} HTTP ${r.status}`);return r.json()}
 async function manifest(){const m=await getJson(`./data/current_manifest.json?t=${Date.now()}`);if(CACHE.build!==m.active_build_id){CACHE.build=m.active_build_id;CACHE.data.clear();CACHE.shards.clear()}CACHE.manifest=m;return m}
 async function dataset(m,key){const meta=m.datasets?.[key];if(!meta)return null;const ck=`${m.active_build_id}:${key}`;if(CACHE.data.has(ck))return CACHE.data.get(ck);const x=await getJson(meta.url);if(x?.build_id&&x.build_id!==m.active_build_id)throw new Error(`${key} build mismatch`);CACHE.data.set(ck,x);return x}
-async async function portfolioQuotes(m){
+async function portfolioQuotes(m){
   const day=String(m?.datasets?.decision_close_index?.as_of||m?.trade_date||'').slice(0,10);
   const [official,reference]=await Promise.all([
     getJson('./data/portfolio_market_quotes.json?t='+Date.now()).catch(()=>null),
