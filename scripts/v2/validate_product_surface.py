@@ -28,7 +28,7 @@ def main():
     quick_filter_css = text("quick-filter.css")
     market = text("market-capital-renderer.js")
     sector_rank = text("sector-ranking-panel.js")
-    detail = text("stock-detail-renderer.js")
+    detail = text("detail-loading-guard-v2.js")
     portfolio = text("portfolio-renderer.js")
     store = text("portfolio-store.js")
     ledger = text("portfolio-ledger-ui.js")
@@ -92,15 +92,15 @@ def main():
         require(app, needle, "close ignition radar", errors)
     for needle in ('closeMode:state.view==="close"?state.closeMode:null',):
         require(app, needle, "close detail source-mode bridge", errors)
-    for needle in ("forcedCloseMode", "SDR.detailCloseMode", "盤後點火", "點火底層證據"):
+    for needle in ("activeCloseMode", "isIgnition", "盤後點火", "closeMode"):
         require(detail, needle, "ignition detail mode lock", errors)
     for needle in ("mission-head", "mission-meta", "stampMDHM"):
         require(app, needle, "close freeze mission layout", errors)
     require(app_css, ".close-mode-switch", "close ignition mode switch style", errors)
     for needle in ("missionMeta('close').date", "盤後定格", "最後完成收盤"):
         require(freshness, needle, "completed-close freeze semantics", errors)
-    for needle in ("ignitionExplain", "Gate 上限", "ignition_components_v2", "volume_acceleration", "relative_acceleration", "chip_acceleration", "tradability_risk",
-                   "點火分數只回答", "進場位置"):
+    for needle in ("🔥 點火 2.0", "Gate", "ignition_components_v2", "volume_acceleration", "relative_acceleration", "chip_acceleration", "tradability_risk",
+                   "點火高分不代表", "進場位置"):
         require(detail, needle, "ignition score explanation", errors)
     for capped in ("limit:8", "NEXT_DAY_ELITE.limit", "slice(0,NEXT_DAY_ELITE.limit)"):
         if capped in app:
@@ -118,7 +118,7 @@ def main():
     require(app, "radar:open-stock", "ranked card open event", errors)
     require(app, 'role="button"', "ranked card keyboard target", errors)
     for retired in (
-        "card-open-bridge.js", "stock-detail-prime.js", "detail-loading-guard-v2.js", "live-ui-20261001.js",
+        "card-open-bridge.js", "stock-detail-prime.js", "stock-detail-renderer.js", "live-ui-20261001.js",
         "live-pulse-points.js", "live-index-source-guard.js",
         "sector-member-alias-guard.js", "sector-summary-layout-v2.js",
         "price-map-theme.js", "brand-inuko-lab.js",
@@ -127,18 +127,17 @@ def main():
         if retired in html:
             errors.append(f"retired overlay still active: {retired}")
 
-    for needle in ("支撐區", "壓力區", "評分依據", "資料品質"):
+    for needle in ("支撐", "壓力", "評分依據", "資料品質"):
         require(detail, needle, "stock detail", errors)
-    require(detail, "safeOpen", "stock detail immediate dialog", errors)
-    require(detail, "radar:detail-core-rendered", "progressive detail core", errors)
-    require(detail, "radar:detail-rendered", "progressive detail completion", errors)
-    require(detail, "intradayItems", "intraday score evidence", errors)
+    require(detail, "function ui(code)", "stock detail immediate dialog", errors)
+    require(detail, "radar:detail-rendered", "single-stock detail completion", errors)
+    require(detail, "intradayEvidence", "intraday score evidence", errors)
     require(detail, "前端不重新配分", "intraday no-rescore disclosure", errors)
     open_start = detail.find("async function openStock")
     open_fn = detail[open_start:] if open_start >= 0 else ""
-    if "loadingShell(code)" not in open_fn or "await smanifest()" not in open_fn:
+    if "box=ui(code)" not in open_fn or "const m=await json(" not in open_fn:
         errors.append("stock detail open flow incomplete")
-    elif open_fn.find("loadingShell(code)") > open_fn.find("await smanifest()"):
+    elif open_fn.find("box=ui(code)") > open_fn.find("const m=await json("):
         errors.append("stock detail must open before network fetch")
 
     ensure_start = app.find("async function ensureIndex")
@@ -181,8 +180,8 @@ def main():
         "full_market_search": True,
         "sector_drilldown": "inline",
         "stock_card_owner": "app.js",
-        "stock_detail_owner": "stock-detail-renderer.js",
-        "progressive_stock_detail": True,
+        "stock_detail_owner": "detail-loading-guard-v2.js",
+        "progressive_stock_detail": False,
         "legacy_index_overlay": False,
         "portfolio_private": True,
         "portfolio_one_share": True,
