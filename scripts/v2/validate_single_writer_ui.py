@@ -18,7 +18,7 @@ REQUIRED = {
     "app.js",
     "market-capital-renderer.js",
     "sector-ranking-panel.js",
-    "stock-detail-renderer.js",
+    "detail-loading-guard-v2.js",
     "portfolio-renderer.js",
     "portfolio-ledger-ui.js",
     "portfolio-quick-add.js",
@@ -56,7 +56,7 @@ SINGLE_WRITER_FILES = {
     "app.js",
     "market-capital-renderer.js",
     "sector-ranking-panel.js",
-    "stock-detail-renderer.js",
+    "detail-loading-guard-v2.js",
     "portfolio-renderer.js",
 }
 
@@ -102,7 +102,7 @@ def main():
             errors.append(f"single-writer renderer must not use MutationObserver: {name}")
 
     app = (ROOT / "docs" / "v2" / "app.js").read_text(encoding="utf-8")
-    detail = (ROOT / "docs" / "v2" / "stock-detail-renderer.js").read_text(encoding="utf-8")
+    detail = (ROOT / "docs" / "v2" / "detail-loading-guard-v2.js").read_text(encoding="utf-8")
     market = (ROOT / "docs" / "v2" / "market-capital-renderer.js").read_text(encoding="utf-8")
 
     for token in ('#cards .card[data-code]', 'radar:open-stock', 'NEXT_DAY_ELITE', 'qualityMin:75', 'positionMin:65', 'confidenceMin:80'):
@@ -118,11 +118,11 @@ def main():
 
     start = detail.find("async function openStock")
     open_fn = detail[start:] if start >= 0 else ""
-    if "loadingShell(code)" not in open_fn or "await smanifest()" not in open_fn:
-        errors.append("detail open flow missing loading shell or manifest")
-    elif open_fn.find("loadingShell(code)") > open_fn.find("await smanifest()"):
+    if "box=ui(code)" not in open_fn or "const m=await json(" not in open_fn:
+        errors.append("detail open flow missing loading shell or single-stock fetch")
+    elif open_fn.find("box=ui(code)") > open_fn.find("const m=await json("):
         errors.append("detail dialog must open before network awaits")
-    for token in ("safeOpen", "radar:detail-core-rendered", "radar:detail-rendered", "支撐區", "壓力區", "評分依據", "資料品質"):
+    for token in ("radar:open-stock", "radar:detail-rendered", "支撐", "壓力", "評分依據", "資料品質", "點火分數", "ignition_components_v2", "stopImmediatePropagation"):
         if token not in detail:
             errors.append(f"canonical detail renderer missing {token}")
 
@@ -133,7 +133,7 @@ def main():
         "marketSummary": "market-capital-renderer.js",
         "sectorList": "market-capital-renderer.js",
         "sectorRankExplain": "sector-ranking-panel.js",
-        "detailBody": "stock-detail-renderer.js",
+        "detailBody": "detail-loading-guard-v2.js",
         "cards": "app.js",
         "portfolioPanel": "portfolio-renderer.js",
         "portfolioCards": "portfolio-renderer.js",
@@ -198,8 +198,8 @@ def main():
         "card_owner": "app.js",
         "market_owner": "market-capital-renderer.js",
         "sector_rank_owner": "sector-ranking-panel.js",
-        "detail_owner": "stock-detail-renderer.js",
-        "detail_loading": "progressive",
+        "detail_owner": "detail-loading-guard-v2.js",
+        "detail_loading": "single-stock-shard",
         "legacy_index_writer_active": False,
         "mutation_observers_in_single_writers": False,
         "next_day_elite_limit": "unlimited",
