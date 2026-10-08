@@ -1,4 +1,4 @@
-const SDR={build:null,manifest:null,cache:new Map(),seq:0};
+const SDR={build:null,manifest:null,cache:new Map(),seq:0,detailView:null,detailCloseMode:null};
 
 const SCFG={
   intraday:{detail:"decision_intraday_detail",zone:"zone_intraday",evidence:"stock_detail_intraday",label:"盤中波段"},
@@ -12,7 +12,9 @@ const SRISK={OVERHEAT:"過熱",EVENT_RISK:"事件風險",LIQUIDITY_RISK:"流動�
 const SSTATE={TESTING:"測試中",NEAR:"接近",ACTIVE:"有效結構",BROKEN:"已失效"};
 
 const sview=()=>document.querySelector(".tab.active")?.dataset.view||"intraday";
-const signition=()=>sview()==="close"&&!!document.querySelector('[data-close-mode="ignition"].active');
+const signition=()=>SDR.detailView==="close"
+  ? SDR.detailCloseMode==="ignition"
+  : (sview()==="close"&&!!document.querySelector('[data-close-mode="ignition"].active'));
 const sesc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const sn=v=>v==null||v===''||!Number.isFinite(Number(v))?null:Number(v);
 const sf=(v,d=1)=>sn(v)==null?"—":Number(v).toLocaleString("zh-TW",{maximumFractionDigits:d});
@@ -156,6 +158,9 @@ function detailAction(view,d){
 function detailRank(view,d){
   if(view==="close"&&signition())return "點火 #"+(d.ignition_rank??"—");
   return "排名 #"+(d.opportunity_rank??"—");
+}
+function detailModeLabel(view,cfg){
+  return view==="close"&&signition()?"盤後點火":cfg.label;
 }
 function detailWhy(view,d,e){
   if(view==="close"&&signition())return [...(d.ignition_reasons||[]),...(e?.ignition_summary_v2?[e.ignition_summary_v2]:[])];
@@ -343,16 +348,21 @@ function missing(d,support,resistance,e){
 
 function coreHtml(view,cfg,d){
   const h=hero(view,d),pending=view==="close"?(signition()?'<details class="sdr-explain" open><summary>🔥 點火 2.0｜載入分項中</summary><div class="sdr-explain-body"><div class="sdr-note">正在載入六大點火分項、Raw 分與 Gate 封頂證據；載入完成前不補猜。</div></div></details>':'<details class="sdr-explain" open><summary>評分依據｜為什麼是這個分數</summary><div class="sdr-explain-body"><div class="sdr-note">正在載入犬子技術 2.0 六分項與籌碼 2.0 七分項；載入完成前不顯示舊制明細，避免新分數配到舊說明。</div></div></details>'):explain(view,d,null);
-  return `<div class="sdr-context">${sesc(cfg.label)}詳情 · ${sesc(signition()?(d.ignition_stage||"—"):(d.opportunity_bucket||"—"))} · ${sesc(detailRank(view,d))}</div><div class="detail-hero"><div><span class="badge stage">${sesc(detailStage(view,d))}</span><h2>${sesc(detailAction(view,d))}</h2><p>${sesc(h.text)}</p></div><div class="detail-light ${h.tone}">${sesc(h.light)}</div></div><div class="sdr-quick">${quick(view,d)}</div>${list("為什麼現在看它",signition()?(d.ignition_reasons||[]):(d.why_now||[]),"目前沒有足夠的新理由。")} ${list(signition()?"點火 Gate／卡點":"現在卡在哪裡",signition()?(d.ignition_gate_flags||[]):blockers(view,d,null,null),"目前沒有額外卡點。")}<div class="sdr-extra-loading">核心決策已載入；正在補支撐壓力與技術／籌碼證據…</div>${pending}`;
+  return `<div class="sdr-context">${sesc(detailModeLabel(view,cfg))}詳情 · ${sesc(signition()?(d.ignition_stage||"—"):(d.opportunity_bucket||"—"))} · ${sesc(detailRank(view,d))}</div><div class="detail-hero"><div><span class="badge stage">${sesc(detailStage(view,d))}</span><h2>${sesc(detailAction(view,d))}</h2><p>${sesc(h.text)}</p></div><div class="detail-light ${h.tone}">${sesc(h.light)}</div></div><div class="sdr-quick">${quick(view,d)}</div>${list("為什麼現在看它",signition()?(d.ignition_reasons||[]):(d.why_now||[]),"目前沒有足夠的新理由。")} ${list(signition()?"點火 Gate／卡點":"現在卡在哪裡",signition()?(d.ignition_gate_flags||[]):blockers(view,d,null,null),"目前沒有額外卡點。")}<div class="sdr-extra-loading">核心決策已載入；正在補支撐壓力與技術／籌碼證據…</div>${pending}`;
 }
 function fullHtml(view,cfg,d,zones,ep){
   const e=ep?.items?.[String(d.code)]||null,wanted=new Set([...(d.support_zone_ids||[]),...(d.resistance_zone_ids||[])]),mine=(Array.isArray(zones)?zones:[]).filter(z=>wanted.has(z.zone_id)),supports=mine.filter(z=>z.side==="SUPPORT").sort((a,b)=>rankOrder(a)-rankOrder(b)).slice(0,2),resistances=mine.filter(z=>z.side==="RESISTANCE").sort((a,b)=>rankOrder(a)-rankOrder(b)).slice(0,2),support=supports[0]||null,resistance=resistances[0]||null,px=sn(e?.close??d.quote?.price),h=hero(view,d),miss=missing(d,support,resistance,e);
-  return `<div class="sdr-context">${sesc(cfg.label)}詳情 · ${sesc(signition()?(d.ignition_stage||"—"):(d.opportunity_bucket||"—"))} · ${sesc(detailRank(view,d))}</div><div class="detail-hero"><div><span class="badge stage">${sesc(detailStage(view,d))}</span><h2>${sesc(detailAction(view,d))}</h2><p>${sesc(h.text)}</p></div><div class="detail-light ${h.tone}">${sesc(h.light)}</div></div><div class="sdr-quick">${quick(view,d)}</div>${zoneSection(supports,resistances,px)}${list("為什麼現在看它",detailWhy(view,d,e),"目前沒有足夠的新理由。")} ${list(signition()?"點火 Gate／卡點":"現在卡在哪裡",signition()?(d.ignition_gate_flags||[]):blockers(view,d,support,resistance),"目前沒有額外卡點。")} ${list(view==="close"?"明日升級條件":"升級條件",upgrades(view,d,support,resistance),"目前尚未形成可量化的升級條件。")} ${list("失效／風險條件",risks(view,d,support,e),"目前沒有額外風險旗標。")}<div class="detail-block"><h3>${view==="close"?"盤後技術／籌碼":view==="daytrade"?"即時執行證據":"即時量價／相對強弱"}</h3>${evidence(view,e)}</div>${explain(view,d,e)}<div class="detail-block"><h3>資料品質</h3><div class="quality-grid">${tile("Freshness",SFRESH[d.freshness]||d.freshness||"—")}${tile("資料信心",`${sf(d.data_confidence,0)}%`)}${tile("覆蓋率",`${sf(d.component_coverage,0)}%`)}${tile("排名",detailRank(view,d))}</div>${miss.length?`<div class="missing">仍待補：${miss.map(sesc).join("、")}</div>`:'<div class="detail-note ok">主要決策資料已齊。</div>'}</div><details class="engineering"><summary>資料時間與版本</summary><div>as_of：${sesc(d.as_of||"—")}<br>known_at：${sesc(d.known_at||"—")}<br>context：${sesc(d.decision_context_id||"—")}<br>build：${sesc(d.build_id||"—")}<br>Zone：support ${supports.length} / resistance ${resistances.length}</div></details>`;
+  return `<div class="sdr-context">${sesc(detailModeLabel(view,cfg))}詳情 · ${sesc(signition()?(d.ignition_stage||"—"):(d.opportunity_bucket||"—"))} · ${sesc(detailRank(view,d))}</div><div class="detail-hero"><div><span class="badge stage">${sesc(detailStage(view,d))}</span><h2>${sesc(detailAction(view,d))}</h2><p>${sesc(h.text)}</p></div><div class="detail-light ${h.tone}">${sesc(h.light)}</div></div><div class="sdr-quick">${quick(view,d)}</div>${zoneSection(supports,resistances,px)}${list("為什麼現在看它",detailWhy(view,d,e),"目前沒有足夠的新理由。")} ${list(signition()?"點火 Gate／卡點":"現在卡在哪裡",signition()?(d.ignition_gate_flags||[]):blockers(view,d,support,resistance),"目前沒有額外卡點。")} ${list(view==="close"?"明日升級條件":"升級條件",upgrades(view,d,support,resistance),"目前尚未形成可量化的升級條件。")} ${list("失效／風險條件",risks(view,d,support,e),"目前沒有額外風險旗標。")}<div class="detail-block"><h3>${view==="close"?(signition()?"點火底層證據":"盤後技術／籌碼"):view==="daytrade"?"即時執行證據":"即時量價／相對強弱"}</h3>${evidence(view,e)}</div>${explain(view,d,e)}<div class="detail-block"><h3>資料品質</h3><div class="quality-grid">${tile("Freshness",SFRESH[d.freshness]||d.freshness||"—")}${tile("資料信心",`${sf(d.data_confidence,0)}%`)}${tile("覆蓋率",`${sf(d.component_coverage,0)}%`)}${tile("排名",detailRank(view,d))}</div>${miss.length?`<div class="missing">仍待補：${miss.map(sesc).join("、")}</div>`:'<div class="detail-note ok">主要決策資料已齊。</div>'}</div><details class="engineering"><summary>資料時間與版本</summary><div>as_of：${sesc(d.as_of||"—")}<br>known_at：${sesc(d.known_at||"—")}<br>context：${sesc(d.decision_context_id||"—")}<br>build：${sesc(d.build_id||"—")}<br>Zone：support ${supports.length} / resistance ${resistances.length}</div></details>`;
 }
 
-async function openStock(code,forcedView){
+async function openStock(code,forcedView,forcedCloseMode){
   const view=forcedView||sview();
   if(view==="portfolio")return;
+  const inferredCloseMode=view==="close"
+    ? (forcedCloseMode||document.querySelector('[data-close-mode="ignition"].active')?"ignition":"swing")
+    : null;
+  SDR.detailView=view;
+  SDR.detailCloseMode=inferredCloseMode;
   const ui=loadingShell(code);
   if(!ui)return;
   const seq=++SDR.seq,cfg=SCFG[view]||SCFG.intraday;
@@ -403,11 +413,17 @@ async function openStock(code,forcedView){
 
 document.addEventListener("radar:open-stock",e=>{
   const code=String(e.detail?.code||"").trim();
-  if(code)openStock(code,e.detail?.view);
+  if(code)openStock(code,e.detail?.view,e.detail?.closeMode);
 });
 document.addEventListener("radar:data-reloaded",()=>{
   SDR.build=null;SDR.manifest=null;SDR.cache.clear();SDR.seq++;
 });
-document.addEventListener("close",e=>{if(e.target?.id==="detailDialog")SDR.seq++},true);
+document.addEventListener("close",e=>{
+  if(e.target?.id==="detailDialog"){
+    SDR.seq++;
+    SDR.detailView=null;
+    SDR.detailCloseMode=null;
+  }
+},true);
 
 style();
