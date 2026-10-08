@@ -358,8 +358,9 @@ function fullHtml(view,cfg,d,zones,ep){
 async function openStock(code,forcedView,forcedCloseMode){
   const view=forcedView||sview();
   if(view==="portfolio")return;
+  const domIgnition=!!document.querySelector('[data-close-mode="ignition"].active');
   const inferredCloseMode=view==="close"
-    ? (forcedCloseMode||document.querySelector('[data-close-mode="ignition"].active')?"ignition":"swing")
+    ? (forcedCloseMode==="ignition"?"ignition":forcedCloseMode==="swing"?"swing":domIgnition?"ignition":"swing")
     : null;
   SDR.detailView=view;
   SDR.detailCloseMode=inferredCloseMode;
