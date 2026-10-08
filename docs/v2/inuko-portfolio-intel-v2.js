@@ -126,7 +126,7 @@ function ensureSummary(models,positions){
   const cards=$('#portfolioCards');if(!cards)return;
   let root=$('#inukoPortfolioIntel');
   if(!root){root=document.createElement('section');root.id='inukoPortfolioIntel';root.className='inuko-pintel';cards.insertAdjacentElement('beforebegin',root)}
-  const urgent=models.filter(x=>levelOf(x)>=2).sort((a,b)=>levelOf(b)-levelOf(a)||b.score-a.score||String(a.p.code).localeCompare(String(b.p.code));
+  const urgent=models.filter(x=>levelOf(x)>=2).sort((a,b)=>levelOf(b)-levelOf(a)||b.score-a.score||String(a.p.code).localeCompare(String(b.p.code)));
   const total=positions.reduce((s,p)=>s+(n(p.avg_cost)||0)*(n(p.shares)||0),0);
   const stock=positions.map(p=>({code:p.code,w:total>0?(n(p.avg_cost)||0)*(n(p.shares)||0)/total*100:0})).sort((a,b)=>b.w-a.w)[0],groups=new Map();
   for(const x of models){const cost=(n(x.p.avg_cost)||0)*(n(x.p.shares)||0),g=x.d?.primary_group||'待分類';groups.set(g,(groups.get(g)||0)+cost)}
