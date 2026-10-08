@@ -25,8 +25,12 @@ async async function portfolioQuotes(m){
     getJson('./data/portfolio_market_quotes.json?t='+Date.now()).catch(()=>null),
     getJson('../data/portfolio_reference.json?t='+Date.now()).catch(()=>null)
   ]);
-  const all={...(reference?.quotes||{}),...(official?.quotes||{})},out={};
-  for(const [code,q] of Object.entries(all))if(q?.trade_date===day&&n(q.close)!=null)out[String(code)]=q;
+  const out={};
+  for(const source of [reference?.quotes||{},official?.quotes||{}])
+    for(const [code,q] of Object.entries(source)){
+      const date=String(q?.trade_date||'');
+      if(date>=day&&n(q?.close)!=null&&(!out[code]||date>=out[code].trade_date))out[String(code)]=q;
+    }
   return out;
 }
 function ownedDecision(p,base,quotes){const q=quotes[String(p.code)]||null;if(!q?.close)return base||null;return{...(base||{}),code:p.code,name:p.name||base?.name||q.name,quote:base?.quote?.price?base.quote:{price:q.close,trade_date:q.trade_date,source:q.source},portfolio_quote_trade_date:q.trade_date,portfolio_coverage:base?'SCORE_PARTIAL':'PRICE_ONLY'};}
