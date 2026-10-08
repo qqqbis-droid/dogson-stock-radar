@@ -13,7 +13,7 @@ function normalizeTx(t){
   const code=cleanCode(t.code),side=String(t.side||'').toUpperCase(),shares=cleanNumber(t.shares),price=cleanNumber(t.price??t.avg_cost??t.avg_price);
   if(!code||!['BUY','SELL'].includes(side)||shares==null||shares<=0||!Number.isInteger(shares)||price==null||price<=0)return null;
   const action=['ENTRY','ADD','REDUCE','EXIT','OPENING'].includes(String(t.action||'').toUpperCase())?String(t.action).toUpperCase():(side==='BUY'?'ENTRY':'REDUCE');
-  return{id:cleanText(t.id,80)||uid(),code,name:cleanText(t.name,40),side,action,shares:Number(shares),price:Number(price),trade_date:cleanText(t.trade_date||t.entry_date,10),reason:cleanText(t.reason||t.entry_reason,800),note:cleanText(t.note,800),source:cleanText(t.source,60)||'MANUAL_FILL',created_at:t.created_at||nowIso(),updated_at:t.updated_at||nowIso()};
+  return{id:cleanText(t.id,80)||uid(),code,name:cleanText(t.name,40),side,action,shares:Number(shares),price:Number(price),trade_date:cleanText(t.trade_date||t.entry_date,10),reason:cleanText(t.reason||t.entry_reason,800),note:cleanText(t.note,800),source:cleanText(t.source,60)||'MANUAL_FILL',daytrade_pair_id:cleanText(t.daytrade_pair_id,80),created_at:t.created_at||nowIso(),updated_at:t.updated_at||nowIso()};
 }
 function migrateLegacy(x){
   const out=blank();
@@ -71,6 +71,21 @@ function addTransaction(input){
   const tx=normalizeTx({...input,code,side,shares,price,action,id:input.id||uid(),source:input.source||'MANUAL_FILL'});data.transactions.push(tx);
   if(input.name||!data.meta[code])data.meta[code]=normalizeMeta({...data.meta[code],name:input.name||data.meta[code]?.name||tx.name});validateLedger(data);write(data);return tx;
 }
+// Record a completed same-day round trip atomically. A pending/unfilled sell
+// is never created; the ordinary BUY flow remains available for open trades.
+function addDaytradeRoundTrip(input){
+  const code=cleanCode(input?.code),shares=cleanNumber(input?.shares),buy=cleanNumber(input?.buy_price),sell=cleanNumber(input?.sell_price),
+    date=cleanText(input?.trade_date,10),name=cleanText(input?.name,40);
+  if(!code||!Number.isInteger(shares)||shares<=0||buy==null||buy<=0||sell==null||sell<=0||!/^(20\d\d)-(0[1-9]|1[0-2])-([0-2]\d|3[01])$/.test(date))
+    throw new Error('當沖必須填同一交易日、實際買進／賣出價格和相同的已成交股數；未賣出請使用一般買進');
+  const data=read(),pair=uid(),before=aggregateCode(data,code),created=nowIso(),reason=cleanText(input.reason,800);
+  const b=normalizeTx({id:uid(),code,name,side:'BUY',action:before.shares>0?'ADD':'ENTRY',shares,price:buy,trade_date:date,reason,note:input.note,source:'DAYTRADE_FILL',daytrade_pair_id:pair,created_at:created});
+  const s=normalizeTx({id:uid(),code,name,side:'SELL',action:before.shares>0?'REDUCE':'EXIT',shares,price:sell,trade_date:date,reason,note:input.note,source:'DAYTRADE_FILL',daytrade_pair_id:pair,created_at:created});
+  data.transactions.push(b,s);
+  if(name||!data.meta[code])data.meta[code]=normalizeMeta({...data.meta[code],name:name||data.meta[code]?.name||''});
+  validateLedger(data);write(data);
+  return{pair_id:pair,buy:b,sell:s,gross_profit:(sell-buy)*shares,shares_before:before.shares};
+}
 function deleteTransaction(id){const key=cleanText(id,80),data=read(),before=data.transactions.length;data.transactions=data.transactions.filter(t=>t.id!==key);if(data.transactions.length===before)throw new Error('找不到這筆成交');validateLedger(data);return write(data)}
 function upsert(position){
   const code=cleanCode(position?.code);if(!code)throw new Error('股票代號無效');const data=read(),cur=aggregateCode(data,code),shares=cleanNumber(position?.shares),avg=cleanNumber(position?.avg_cost??position?.avg_price);
@@ -85,4 +100,4 @@ function validateLedger(data){const balances={};for(const t of sortedTx(data)){c
 function importData(payload){let data;if(payload&&Array.isArray(payload.transactions)){data={schema_version:PORTFOLIO_SCHEMA,transactions:payload.transactions.map(normalizeTx).filter(Boolean),meta:payload.meta||{}};if(data.transactions.length!==payload.transactions.length)throw new Error('備份中有無效成交紀錄，已停止匯入')}else if(payload&&Array.isArray(payload.positions))data=migrateLegacy(payload);else throw new Error('備份格式不正確');validateLedger(data);return write(data)}
 function storageInfo(){return{key:PORTFOLIO_KEY,schema:PORTFOLIO_SCHEMA,scope:'device-local',cloud_sync:false,public_repo:false,model:'transaction-ledger'}}
 
-window.RadarPortfolioStore={key:PORTFOLIO_KEY,schema:PORTFOLIO_SCHEMA,list,listAll,get,history,addTransaction,deleteTransaction,updateMeta,upsert,remove,clear,exportData,importData,storageInfo};
+window.RadarPortfolioStore={key:PORTFOLIO_KEY,schema:PORTFOLIO_SCHEMA,list,listAll,get,history,addTransaction,addDaytradeRoundTrip,deleteTransaction,updateMeta,upsert,remove,clear,exportData,importData,storageInfo};
