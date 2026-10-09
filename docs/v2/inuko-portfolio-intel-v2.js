@@ -26,11 +26,16 @@ async function portfolioQuotes(m){
     getJson('../data/portfolio_reference.json?t='+Date.now()).catch(()=>null)
   ]);
   const out={};
-  for(const source of [reference?.quotes||{},official?.quotes||{}])
-    for(const [code,q] of Object.entries(source)){
-      const date=String(q?.trade_date||'');
-      if(date>=day&&n(q?.close)!=null&&(!out[code]||date>=out[code].trade_date))out[String(code)]=q;
-    }
+  for(const [code,q] of Object.entries(reference?.quotes||{})){
+    const date=String(q?.trade_date||'');
+    if(date>=day&&n(q?.close)>0)out[String(code)]=q;
+  }
+  for(const [code,q] of Object.entries(official?.quotes||{})){
+    const date=String(q?.trade_date||''),old=out[String(code)];
+    if(date<day||n(q?.close)==null)continue;
+    if(!old||date>String(old.trade_date||''))out[String(code)]=q;
+    else if(date===String(old.trade_date||''))out[String(code)]={...old,...q,coverage:old.coverage||q.coverage,technical_source:old.source||'',official_source:q.source||''};
+  }
   return out;
 }
 function ownedDecision(p,base,quotes){const q=quotes[String(p.code)]||null;if(!q?.close)return base||null;return{...(base||{}),code:p.code,name:p.name||base?.name||q.name,quote:base?.quote?.price?base.quote:{price:q.close,trade_date:q.trade_date,source:q.source},portfolio_quote_trade_date:q.trade_date,portfolio_coverage:base?'SCORE_PARTIAL':'PRICE_ONLY'};}
