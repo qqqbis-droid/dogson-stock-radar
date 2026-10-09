@@ -1,4 +1,5 @@
 name: Clean Build 2.0 UI-only Deploy
+# Portfolio integrated release: 2026-10-09 transaction review, fees, quote, risk and cloud compatibility.
 
 on:
   workflow_dispatch:
