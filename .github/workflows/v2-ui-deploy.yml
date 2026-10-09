@@ -268,6 +268,16 @@ jobs:
           node --check docs/v2/detail-loading-guard-v1.js
           node --check docs/v2/detail-loading-guard-v2.js
           node --check docs/v2/price-map-v2-lite.js
+          node --check docs/v2/portfolio-store.js
+          node --check docs/v2/portfolio-fees.js
+          node --check docs/v2/portfolio-renderer.js
+          node --check docs/v2/portfolio-ledger-ui.js
+          node --check docs/v2/portfolio-quick-add.js
+          node --check docs/v2/inuko-portfolio-intel-v2.js
+          node --check docs/v2/portfolio-weekly-review.js
+          node --check docs/v2/portfolio-cloud.js
+          grep -q 'portfolio-weekly-review.js?v=20261009review1' docs/v2/index.html
+          ! grep -q '這筆賣出是現股當沖' docs/v2/portfolio-fees.js
           node --check docs/sw.js
 
       - uses: actions/configure-pages@v5
