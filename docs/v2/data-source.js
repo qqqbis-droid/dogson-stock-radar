@@ -90,7 +90,7 @@
   cloudConfig.defer=true;
   cloudConfig.onload=()=>{
     const cloud=document.createElement("script");
-    cloud.src=`./portfolio-cloud.js?v=20261002cloud1`;
+    cloud.src=`./portfolio-cloud.js?v=20261009review-cloud1`;
     cloud.defer=true;
     cloud.onload=()=>{
       // Conflict resolution must never restore a stale local snapshot. This
