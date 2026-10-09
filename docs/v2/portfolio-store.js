@@ -1,5 +1,5 @@
 const PORTFOLIO_KEY='dogson.portfolio.v1';
-const PORTFOLIO_SCHEMA='2.1.0';
+const PORTFOLIO_SCHEMA='2.0.0';
 
 function nowIso(){return new Date().toISOString()}
 function cleanText(v,max=800){return String(v??'').trim().slice(0,max)}
