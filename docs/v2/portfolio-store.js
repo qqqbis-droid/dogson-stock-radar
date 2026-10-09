@@ -130,7 +130,7 @@ function updateTransactionDiscipline(id,status){
 function upsert(position){
   const code=cleanCode(position?.code);if(!code)throw new Error('股票代號無效');const data=read(),cur=aggregateCode(data,code),shares=cleanNumber(position?.shares),avg=cleanNumber(position?.avg_cost??position?.avg_price);
   if(!cur.transaction_count){if(shares==null||shares<=0||!Number.isInteger(shares)||avg==null||avg<=0)throw new Error('首次持股需要有效股數與成交價');addTransaction({code,name:position.name,side:'BUY',shares,price:avg,trade_date:position.entry_date,reason:position.entry_reason,source:'COMPAT_POSITION_FORM'});}
-  else if((shares!=null&&Number(shares)!==cur.shares)||(avg!=null&&Math.abs(Number(avg)-cur.avg_cost)>0.0001))throw new Error('Portfolio Ledger 2.0 請用「新增成交」記錄加碼／減碼，不直接改總股數或平均成本');
+  else {const feeAware=window.RadarPortfolioStore?.get?.(code),feeAvg=Number(feeAware?.avg_cost??cur.avg_cost),costMatched=avg==null||Math.abs(Number(avg)-cur.avg_cost)<=0.0001||Math.abs(Number(avg)-feeAvg)<=0.0001;if((shares!=null&&Number(shares)!==cur.shares)||!costMatched)throw new Error('Portfolio Ledger 2.0 請用「新增成交」記錄加碼／減碼，不直接改總股數或平均成本');}
   return updateMeta(code,position);
 }
 function remove(code){const c=cleanCode(code),data=read();data.transactions=data.transactions.filter(t=>t.code!==c);delete data.meta[c];return write(data)}
