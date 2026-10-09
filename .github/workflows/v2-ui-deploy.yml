@@ -1,5 +1,5 @@
 name: Clean Build 2.0 UI-only Deploy
-# Portfolio integrated release: 2026-10-09 final verified thesis, transaction review, fees, quotes and cloud compatibility.
+# Portfolio integrated release: 2026-10-09 verified thesis, transaction review, fees and quotes. CI gate now scopes L2-L4 limits to actual priority rows.
 
 on:
   workflow_dispatch:
