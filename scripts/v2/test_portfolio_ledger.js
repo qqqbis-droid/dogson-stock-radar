@@ -56,5 +56,8 @@ const fees=window.__FEE_TEST__.estimateTx;
 const daytradeNet=fees(mixedPair.sell).net-fees(mixedPair.buy).net;
 assert(near(feeMixed.daytrade_realized_pl,daytradeNet),'taxed daytrade realized PnL must be independent of swing average');
 assert(near(feeMixed.realized_pl,feeMixed.swing_realized_pl+feeMixed.daytrade_realized_pl),'realized sum reconciles');
+const currentFeePosition=S.get('7777');
+S.upsert({code:'7777',name:'同股混合',shares:currentFeePosition.shares,avg_cost:currentFeePosition.avg_cost,hold_reason:'成本仍須守住原本結構'});
+assert(S.get('7777').hold_reason==='成本仍須守住原本結構','reason-only edit must work with fee-inclusive average cost');
 console.log('holdings isolation, holiday, discipline, cloud-format import and fee-aware mixed-position tests PASS');
 console.log(JSON.stringify({status:'PASS',shares:p.shares,avg_cost:p.avg_cost,realized_pl:p.realized_pl,cycle_count:p.cycle_count,transactions:p.transaction_count}));
