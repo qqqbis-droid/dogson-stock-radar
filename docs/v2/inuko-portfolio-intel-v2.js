@@ -38,7 +38,7 @@ async function portfolioQuotes(m){
   }
   return out;
 }
-function ownedDecision(p,base,quotes){const q=quotes[String(p.code)]||null;if(!q?.close)return base||null;return{...(base||{}),code:p.code,name:p.name||base?.name||q.name,quote:base?.quote?.price?base.quote:{price:q.close,trade_date:q.trade_date,source:q.source},portfolio_quote_trade_date:q.trade_date,portfolio_coverage:base?'SCORE_PARTIAL':'PRICE_ONLY'};}
+function ownedDecision(p,base,quotes){const q=quotes[String(p.code)]||null;if(!q?.close)return base||null;const existing=base?.quote,ed=String(existing?.trade_date||existing?.date||''),qd=String(q.trade_date||''),chosen=existing?.price&&ed>qd?existing:{price:q.close,trade_date:q.trade_date,source:q.source};return{...(base||{}),code:p.code,name:p.name||base?.name||q.name,quote:chosen,portfolio_quote_trade_date:q.trade_date,portfolio_coverage:base?'SCORE_PARTIAL':'PRICE_ONLY'};}
 async function history(code){const k=String(code||'');if(!k)return null;if(CACHE.history.has(k))return CACHE.history.get(k);try{const x=await getJson(`../data/history/${encodeURIComponent(k)}.json?t=${Date.now()}`);CACHE.history.set(k,x);return x}catch(_){CACHE.history.set(k,null);return null}}
 async function shard(m,code){const k=`${m.active_build_id}:${code}`;if(CACHE.shards.has(k))return CACHE.shards.get(k);try{const x=await getJson(`./data/builds/${encodeURIComponent(m.active_build_id)}/stock-shards/close/${encodeURIComponent(code)}.json?t=${Date.now()}`);if(x?.build_id&&x.build_id!==m.active_build_id)throw new Error('shard build mismatch');CACHE.shards.set(k,x);return x}catch(_){CACHE.shards.set(k,null);return null}}
 
