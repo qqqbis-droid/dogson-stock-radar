@@ -63,6 +63,9 @@ jobs:
           ! grep -q '這筆賣出是現股當沖' docs/v2/portfolio-fees.js
           node --check docs/v2/portfolio-ledger-ui.js
           node --check docs/v2/portfolio-quick-add.js
+          node --check docs/v2/portfolio-weekly-review.js
+          node scripts/v2/test_portfolio_ledger.js
+          grep -q 'portfolio-weekly-review.js?v=20261009review1' docs/v2/index.html
           node --check docs/v2/radar-transparency-v7.js
           grep -q "sector_intraday" docs/v2/sector-ranking-panel.js
           grep -q "sector_close" docs/v2/sector-ranking-panel.js
