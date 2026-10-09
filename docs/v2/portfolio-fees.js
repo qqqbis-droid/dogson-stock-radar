@@ -57,22 +57,33 @@ function estimateTx(t,p=profile){
 }
 function feeAggregate(data,code){
   const c=String(code||'').toUpperCase(),txs=(data?.transactions||[]).filter(t=>t.code===c).slice().sort((a,b)=>String(a.trade_date||'').localeCompare(String(b.trade_date||''))||String(a.created_at||'').localeCompare(String(b.created_at||''))||String(a.id||'').localeCompare(String(b.id||'')));
-  let shares=0,avg=0,realized=0,buyValue=0,sellValue=0,buyFees=0,sellFees=0,sellTax=0,cycle=0,lastBuy=null,lastSell=null;
+  let shares=0,avg=0,swingRealized=0,daytradeRealized=0,buyValue=0,sellValue=0,buyFees=0,sellFees=0,sellTax=0,cycle=0,lastBuy=null,lastSell=null,daytradeCount=0;
+  const pairs=new Map();
+  for(const t of txs)if(t.daytrade_pair_id){const id=t.daytrade_pair_id;if(!pairs.has(id))pairs.set(id,{});pairs.get(id)[t.side]=t}
+  for(const [id,pair] of pairs){
+    const b=pair.BUY,s=pair.SELL;
+    if(!b||!s||b.shares!==s.shares||b.trade_date!==s.trade_date)throw new Error('當沖買賣資料不完整：'+id);
+    const bf=estimateTx(b),sf=estimateTx(s);
+    daytradeRealized+=sf.net-bf.net;daytradeCount++;
+    buyValue+=bf.gross;sellValue+=sf.gross;buyFees+=bf.commission;sellFees+=sf.commission;sellTax+=sf.tax;
+  }
   for(const t of txs){
+    if(t.daytrade_pair_id)continue;
     const q=Number(t.shares),fees=estimateTx(t);
     if(t.side==='BUY'){
-      if(shares===0)cycle+=1;
-      const previousCost=avg*shares;
-      avg=(previousCost+fees.net)/(shares+q);
+      if(shares===0)cycle++;
+      avg=(avg*shares+fees.net)/(shares+q);
       shares+=q;buyValue+=fees.gross;buyFees+=fees.commission;lastBuy={...t,...fees};
     }else{
-      if(q>shares)throw new Error(`${c} 在 ${t.trade_date||'未填日期'} 的減碼超過當時持股`);
-      realized+=fees.net-(avg*q);shares-=q;sellValue+=fees.gross;sellFees+=fees.commission;sellTax+=fees.tax;lastSell={...t,...fees};if(shares===0)avg=0;
+      if(q>shares)throw new Error(`${c} 在 ${t.trade_date||'未填日期'} 的減碼超過當時波段持股`);
+      swingRealized+=fees.net-(avg*q);shares-=q;sellValue+=fees.gross;sellFees+=fees.commission;sellTax+=fees.tax;lastSell={...t,...fees};if(shares===0)avg=0;
     }
   }
-  const m=data?.meta?.[c]||{},firstBuy=txs.find(t=>t.side==='BUY');
-  return{code:c,name:m.name||lastBuy?.name||firstBuy?.name||'',shares,avg_cost:shares>0?avg:0,entry_date:firstBuy?.trade_date||'',entry_reason:firstBuy?.reason||'',hold_reason:m.hold_reason||'',reason_status:m.reason_status||'VALID',validation_condition:m.validation_condition||'',failure_condition:m.failure_condition||'',strategy:m.strategy||'',note:m.note||'',realized_pl:realized,buy_value:buyValue,sell_value:sellValue,buy_fees:buyFees,sell_fees:sellFees,sell_tax:sellTax,total_fees:buyFees+sellFees+sellTax,transaction_count:txs.length,cycle_count:cycle,last_buy:lastBuy,last_sell:lastSell,closed:shares===0&&txs.length>0,created_at:firstBuy?.created_at||'',updated_at:m.updated_at||data?.updated_at||new Date().toISOString()};
+  const m=data?.meta?.[c]||{},firstBuy=txs.find(t=>t.side==='BUY'&&!t.daytrade_pair_id),entryReason=firstBuy?.reason||'';
+  const status=m.reason_status==='VALID'&&!String(entryReason||m.hold_reason||m.validation_condition||'').trim()?'UNVERIFIED':(m.reason_status||'UNVERIFIED');
+  return{code:c,name:m.name||lastBuy?.name||firstBuy?.name||txs[0]?.name||'',shares,avg_cost:shares>0?avg:0,entry_date:firstBuy?.trade_date||'',entry_reason:entryReason,hold_reason:m.hold_reason||'',reason_status:status,validation_condition:m.validation_condition||'',failure_condition:m.failure_condition||'',strategy:m.strategy||'',note:m.note||'',realized_pl:swingRealized+daytradeRealized,swing_realized_pl:swingRealized,daytrade_realized_pl:daytradeRealized,daytrade_count:daytradeCount,buy_value:buyValue,sell_value:sellValue,buy_fees:buyFees,sell_fees:sellFees,sell_tax:sellTax,total_fees:buyFees+sellFees+sellTax,transaction_count:txs.length,cycle_count:cycle,last_buy:lastBuy,last_sell:lastSell,closed:shares===0&&txs.length>0,created_at:firstBuy?.created_at||'',updated_at:m.updated_at||data?.updated_at||new Date().toISOString()};
 }
+
 function enrichHistory(rows=[]){return rows.map(t=>({...t,...estimateTx(t)}))}
 // Daytrade is declared by an explicit completed BUY/SELL pair or an explicit
 // imported legacy transaction flag, never inferred from a checkbox in a sell form.
