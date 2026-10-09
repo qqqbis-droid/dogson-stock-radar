@@ -78,7 +78,7 @@ document.addEventListener('change',event=>{
   const id=event.target?.dataset?.inukoDiscipline;
   if(id)try{window.RadarPortfolioStore?.updateTransactionDiscipline?.(id,event.target.value);schedule()}catch(e){alert(e.message||'紀律更新失敗')}
 });
-document.addEventListener('radar:portfolio-changed',schedule);
+document.addEventListener('radar:portfolio-cards-ready',()=>schedule(100));document.addEventListener('radar:portfolio-changed',schedule);
 document.addEventListener('radar:view-rendered',schedule);
 document.addEventListener('inuko:fee-profile-changed',schedule);
 document.addEventListener('click',e=>{if(e.target?.closest?.('.tab[data-view="portfolio"]'))schedule()},true);
