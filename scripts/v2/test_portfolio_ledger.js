@@ -10,7 +10,7 @@ S.addTransaction({code:'9999',name:'測試股',side:'BUY',shares:60,price:110,tr
 S.addTransaction({code:'9999',name:'測試股',side:'SELL',shares:30,price:120,trade_date:'2026-09-03',reason:'減碼測試'});p=S.get('9999');assert(p.shares===70,'reduce shares');assert(near(p.avg_cost,106),'reduce must keep remaining avg cost');assert(near(p.realized_pl,420),'realized pnl after reduce');assert(S.history('9999')[0].action==='REDUCE','auto REDUCE action');
 let oversell=false;try{S.addTransaction({code:'9999',side:'SELL',shares:71,price:120,trade_date:'2026-09-03'})}catch{oversell=true}assert(oversell,'oversell must be rejected');
 S.addTransaction({code:'9999',name:'測試股',side:'SELL',shares:70,price:90,trade_date:'2026-09-04',reason:'全出'});p=S.get('9999');assert(p.shares===0,'exit shares');assert(near(p.avg_cost,0),'closed position avg resets');assert(near(p.realized_pl,-700),'cumulative realized pnl');assert(S.history('9999')[0].action==='EXIT','auto EXIT action');
-S.addTransaction({code:'9999',name:'測試股',side:'BUY',shares:10,price:95,trade_date:'2026-09-05',reason:'第二輪進場'});p=S.get('9999');assert(p.shares===10,'new cycle shares');assert(near(p.avg_cost,95),'new cycle avg');assert(p.cycle_count===2,'new cycle count');assert(S.history('9999')[0].action==='ENTRY','new cycle ENTRY action');
+S.addTransaction({code:'9999',name:'測試股',side:'BUY',shares:10,price:95,trade_date:'2026-09-07',reason:'第二輪進場'});p=S.get('9999');assert(p.shares===10,'new cycle shares');assert(near(p.avg_cost,95),'new cycle avg');assert(p.cycle_count===2,'new cycle count');assert(S.history('9999')[0].action==='ENTRY','new cycle ENTRY action');
 const exported=S.exportData();assert(exported.schema_version==='2.0.0','schema 2.0');assert(Array.isArray(exported.transactions)&&exported.transactions.length===5,'ledger tx persistence');
 // A completed cash daytrade is two actual fills saved in one atomic write.
 const pre=S.exportData().transactions.length;
@@ -23,4 +23,38 @@ assert(near(dp.realized_pl,500)&&near(pair.gross_profit,500),'gross round-trip p
 assert(dt.length===2&&dt.every(x=>x.source==='DAYTRADE_FILL'&&x.daytrade_pair_id===pair.pair_id),'daytrade linked records persist');
 assert(dt[0].side==='SELL'&&dt[1].side==='BUY','same-day BUY must sort ahead of SELL');
 assert(S.exportData().transactions.length===pre+2,'two actual fills only');
+
+S.addTransaction({code:'7777',name:'同股混合',side:'BUY',shares:100,price:100,trade_date:'2026-09-09',reason:'主波段'});
+const mixedPair=S.addDaytradeRoundTrip({code:'7777',name:'同股混合',shares:100,buy_price:105,sell_price:106,trade_date:'2026-09-09',reason:'當沖試單'});
+let mixed=S.get('7777');
+assert(mixed.shares===100&&near(mixed.avg_cost,100),'same-symbol daytrade MUST NOT change swing shares or average cost');
+assert(mixed.cycle_count===1&&mixed.daytrade_count===1,'daytrade cannot create another swing holding cycle');
+assert(near(mixed.realized_pl,100)&&near(mixed.daytrade_realized_pl,100)&&near(mixed.swing_realized_pl,0),'gross daytrade separately reported');
+S.addTransaction({code:'7777',side:'SELL',shares:20,price:110,trade_date:'2026-09-10',reason:'分批賣'});
+mixed=S.get('7777');
+assert(mixed.shares===80&&near(mixed.avg_cost,100),'swing exit must not change remaining swing average');
+assert(near(mixed.swing_realized_pl,200)&&near(mixed.daytrade_realized_pl,100)&&near(mixed.realized_pl,300),'swing/daytrade realized split');
+S.updateTransactionDiscipline(mixedPair.buy.id,'FOLLOWED');
+assert(S.history('7777').filter(t=>t.daytrade_pair_id===mixedPair.pair_id).every(t=>t.discipline==='FOLLOWED'),'atomic pair review notes');
+let invalidDate=0;
+for(const date of ['2026-10-09','2026-10-10','2099-01-03'])try{S.addTransaction({code:'7777',side:'BUY',shares:1,price:100,trade_date:date})}catch{invalidDate++}
+assert(invalidDate===3,'holiday/weekend/future fill dates must be rejected');
+assert(S.latestTradingDay('2026-10-09')==='2026-10-08','last valid trading day defaults');
+const beforeReject=JSON.stringify(S.exportData());const corrupt=JSON.parse(beforeReject);corrupt.transactions=corrupt.transactions.filter(x=>x.id!==mixedPair.sell.id);
+let pairRejected=false;try{S.importData(corrupt)}catch{pairRejected=true}
+assert(pairRejected&&JSON.stringify(S.exportData())===beforeReject,'incomplete daytrade import must not alter ledger');
+let blankReason=S.get('8888');assert(blankReason.reason_status==='UNVERIFIED','missing thesis must never be treated as VALID');
+global.document.readyState='loading';global.document.addEventListener=()=>{};
+const feePath=path.resolve(__dirname,'../../docs/v2/portfolio-fees.js');
+const feeCode=fs.readFileSync(feePath,'utf8').replace(/\}\)\(\);\s*$/,'window.__FEE_TEST__={wrapStore,estimateTx};})();');
+vm.runInThisContext(feeCode,{filename:feePath});
+window.__FEE_TEST__.wrapStore();
+const feeMixed=S.get('7777');
+assert(feeMixed.shares===80,'fees wrapper must not create phantom swing positions');
+assert(near(feeMixed.avg_cost,100.14),'swing average must include own buy fees only');
+const fees=window.__FEE_TEST__.estimateTx;
+const daytradeNet=fees(mixedPair.sell).net-fees(mixedPair.buy).net;
+assert(near(feeMixed.daytrade_realized_pl,daytradeNet),'taxed daytrade realized PnL must be independent of swing average');
+assert(near(feeMixed.realized_pl,feeMixed.swing_realized_pl+feeMixed.daytrade_realized_pl),'realized sum reconciles');
+console.log('holdings isolation, holiday, discipline, cloud-format import and fee-aware mixed-position tests PASS');
 console.log(JSON.stringify({status:'PASS',shares:p.shares,avg_cost:p.avg_cost,realized_pl:p.realized_pl,cycle_count:p.cycle_count,transactions:p.transaction_count}));
