@@ -74,10 +74,8 @@ function feeAggregate(data,code){
   return{code:c,name:m.name||lastBuy?.name||firstBuy?.name||'',shares,avg_cost:shares>0?avg:0,entry_date:firstBuy?.trade_date||'',entry_reason:firstBuy?.reason||'',hold_reason:m.hold_reason||'',reason_status:m.reason_status||'VALID',validation_condition:m.validation_condition||'',failure_condition:m.failure_condition||'',strategy:m.strategy||'',note:m.note||'',realized_pl:realized,buy_value:buyValue,sell_value:sellValue,buy_fees:buyFees,sell_fees:sellFees,sell_tax:sellTax,total_fees:buyFees+sellFees+sellTax,transaction_count:txs.length,cycle_count:cycle,last_buy:lastBuy,last_sell:lastSell,closed:shares===0&&txs.length>0,created_at:firstBuy?.created_at||'',updated_at:m.updated_at||data?.updated_at||new Date().toISOString()};
 }
 function enrichHistory(rows=[]){return rows.map(t=>({...t,...estimateTx(t)}))}
-function detectDaytradeFromOpenForm(){
-  const el=document.querySelector('#portfolioLedgerDialog[open] [name="daytrade"],#quickPortfolioDialog[open] [name="daytrade"]');
-  return Boolean(el?.checked);
-}
+// Daytrade is declared by an explicit completed BUY/SELL pair or an explicit
+// imported legacy transaction flag, never inferred from a checkbox in a sell form.
 function wrapStore(){
   const s=window.RadarPortfolioStore;if(!s||wrapped)return false;wrapped=true;
   const original={addTransaction:s.addTransaction,exportData:s.exportData,history:s.history};
@@ -88,7 +86,7 @@ function wrapStore(){
   s.history=code=>enrichHistory(original.history(code));
   s.addTransaction=input=>{
     const x={...(input||{})};
-    if(String(x.side||'').toUpperCase()==='SELL'&&(x.daytrade===true||detectDaytradeFromOpenForm())){
+    if(String(x.side||'').toUpperCase()==='SELL'&&x.daytrade===true){
       const base=String(x.source||'MANUAL_FILL').replace(/:DAYTRADE/ig,'');x.source=(base+':DAYTRADE').slice(0,60);
     }
     return original.addTransaction(x);
@@ -137,7 +135,7 @@ async function loadProfile(){
 }
 
 function injectStyle(){if($('#inukoFeeStyle'))return;const s=document.createElement('style');s.id='inukoFeeStyle';s.textContent=`
-.inuko-fees{margin:10px 0 14px;border:1px solid var(--line);border-radius:14px;background:var(--card);overflow:hidden}.inuko-fees summary{list-style:none;cursor:pointer;padding:11px 12px;font-weight:800;display:flex;align-items:center;justify-content:space-between;gap:8px}.inuko-fees summary::-webkit-details-marker{display:none}.inuko-fees-summary{font-size:.68rem;color:var(--muted);font-weight:600;text-align:right}.inuko-fees-body{padding:0 12px 12px}.inuko-fees-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.inuko-fees label{display:grid;gap:4px;font-size:.72rem;color:var(--muted)}.inuko-fees input{width:100%;box-sizing:border-box;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:9px;padding:9px}.inuko-fees-note{font-size:.68rem;color:var(--muted);line-height:1.5;margin:8px 0}.inuko-fees-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}.inuko-fees-status{font-size:.68rem;color:var(--muted)}.fee-daytrade-row{display:none;padding:8px 10px;border-radius:9px;background:var(--soft);font-size:.74rem}.fee-daytrade-row.show{display:flex;align-items:center;gap:8px}.fee-daytrade-row input{width:auto!important}.fee-tx-detail{margin-top:4px;font-size:.67rem;color:var(--muted);font-weight:500}@media(max-width:560px){.inuko-fees-grid{grid-template-columns:1fr}}
+.inuko-fees{margin:10px 0 14px;border:1px solid var(--line);border-radius:14px;background:var(--card);overflow:hidden}.inuko-fees summary{list-style:none;cursor:pointer;padding:11px 12px;font-weight:800;display:flex;align-items:center;justify-content:space-between;gap:8px}.inuko-fees summary::-webkit-details-marker{display:none}.inuko-fees-summary{font-size:.68rem;color:var(--muted);font-weight:600;text-align:right}.inuko-fees-body{padding:0 12px 12px}.inuko-fees-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.inuko-fees label{display:grid;gap:4px;font-size:.72rem;color:var(--muted)}.inuko-fees input{width:100%;box-sizing:border-box;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:9px;padding:9px}.inuko-fees-note{font-size:.68rem;color:var(--muted);line-height:1.5;margin:8px 0}.inuko-fees-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}.inuko-fees-status{font-size:.68rem;color:var(--muted)}.fee-tx-detail{margin-top:4px;font-size:.67rem;color:var(--muted);font-weight:500}@media(max-width:560px){.inuko-fees-grid{grid-template-columns:1fr}}
 `;document.head.appendChild(s)}
 function panelHost(){return $('#inukoCloudPanel')||document.querySelector('#portfolioPanel .portfolio-privacy')}
 function ensurePanel(){injectStyle();let d=$('#inukoFeePanel');if(d)return d;const host=panelHost();if(!host)return null;d=document.createElement('details');d.id='inukoFeePanel';d.className='inuko-fees';host.insertAdjacentElement('afterend',d);d.addEventListener('submit',saveForm);return d}
@@ -150,12 +148,11 @@ async function saveForm(e){
   const account=currentAccount();applyProfile(p,{account,silent:false});renderPanel('正在儲存…');
   try{if(account!=='device'&&authSession()){await saveRemote(account,p);lastRemoteAccount=account;renderPanel('已儲存到雲端');}else renderPanel('已儲存在這台裝置');}catch(err){console.error(err);renderPanel(`雲端儲存失敗：${err.message||'請稍後再試'}；本機設定已保留`)}
 }
-function makeDaytradeRow(form){
-  if(!form||form.querySelector('[name="daytrade"]'))return;const side=form.elements?.side;if(!side)return;const row=document.createElement('label');row.className='fee-daytrade-row';row.innerHTML='<input name="daytrade" type="checkbox" value="1"><span><b>這筆賣出是現股當沖</b><br><small>勾選後使用當沖交易稅率。</small></span>';
-  const reason=[...form.querySelectorAll('label')].find(x=>x.querySelector('textarea[name="reason"]'));if(reason)reason.insertAdjacentElement('beforebegin',row);else form.appendChild(row);
-  const refresh=()=>row.classList.toggle('show',String(side.value).toUpperCase()==='SELL');side.addEventListener('change',refresh);refresh();
+// Remove stale checkbox injected by older cached fee scripts, while preserving
+// the separate completed same-day round-trip entry mode and its tax treatment.
+function patchDaytradeControls(){
+  document.querySelectorAll('#ledgerForm .fee-daytrade-row,#pqaForm .fee-daytrade-row').forEach(el=>el.remove());
 }
-function patchDaytradeControls(){makeDaytradeRow($('#ledgerForm'));makeDaytradeRow($('#pqaForm'))}
 function patchLedgerRows(){
   for(const row of document.querySelectorAll('.ledger-row')){const btn=row.querySelector('[data-ledger-delete]'),id=btn?.dataset?.ledgerDelete;if(!id)continue;const raw=window.RadarPortfolioStore?.exportData?.()?.transactions?.find(x=>x.id===id);if(!raw)continue;const fee=estimateTx(raw);if(fee.daytrade&&!row.querySelector('.fee-daytrade-badge')){const tag=row.querySelector('.ledger-row-top>div');tag?.insertAdjacentHTML('beforeend',' <span class="tag fee-daytrade-badge">當沖</span>')}
     const main=row.querySelector('.ledger-row-main');if(main){let detail=row.querySelector('.fee-tx-detail');if(!detail){detail=document.createElement('div');detail.className='fee-tx-detail';main.insertAdjacentElement('afterend',detail)}const text=raw.side==='BUY'?`手續費 ${money(fee.commission)} · 含費用成本 ${money(fee.net)}`:`手續費 ${money(fee.commission)} · 交易稅 ${money(fee.tax)} · 賣出實收 ${money(fee.net)}`;if(detail.textContent!==text)detail.textContent=text}
