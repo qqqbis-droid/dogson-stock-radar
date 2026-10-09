@@ -24,13 +24,17 @@ async function allMarketQuotes(m){
     j('./data/portfolio_market_quotes.json?t='+Date.now()).catch(()=>null),
     j('../data/portfolio_reference.json?t='+Date.now()).catch(()=>null)
   ]);
-  const out={},sources=[reference?.quotes||{},official?.quotes||{}];
-  for(const source of sources)for(const [code,q] of Object.entries(source)){
-    const date=String(q?.trade_date||'');
-    // Portfolio is a current holding view, not the frozen close strategy.
-    // A quote newer than the last completed Close Build is allowed, but
-    // its actual trading date must always remain visible. Never use older.
-    if(date>=day&&pn(q?.close)!=null&&(!out[code]||date>=out[code].trade_date))out[String(code)]=q;
+  const out={};
+  // Keep verified daily K evidence and official prices in the SAME record.
+  // A close-only snapshot must never erase previously fetched technical fields.
+  for(const [code,q] of Object.entries(reference?.quotes||{})){
+    const date=String(q?.trade_date||'');if(date>=day&&pn(q?.close)>0)out[String(code)]=q;
+  }
+  for(const [code,q] of Object.entries(official?.quotes||{})){
+    const date=String(q?.trade_date||''),old=out[String(code)];
+    if(date<day||pn(q?.close)==null)continue;
+    if(!old||date>String(old.trade_date||''))out[String(code)]=q;
+    else if(date===String(old.trade_date||''))out[String(code)]={...old,...q,coverage:old.coverage||q.coverage,technical_source:old.source||'',official_source:q.source||''};
   }
   return out;
 }
