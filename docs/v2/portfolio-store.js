@@ -118,6 +118,15 @@ function addDaytradeRoundTrip(input){
   return{pair_id:pair,buy:b,sell:s,gross_profit:(sell-buy)*shares,shares_before:before.shares};
 }
 function deleteTransaction(id){const key=cleanText(id,80),data=read(),found=data.transactions.find(t=>t.id===key);if(!found)throw new Error('找不到這筆成交');const pair=found.daytrade_pair_id;data.transactions=data.transactions.filter(t=>pair?t.daytrade_pair_id!==pair:t.id!==key);validateLedger(data);return write(data)}
+function updateTransactionDiscipline(id,status){
+  if(!['FOLLOWED','VIOLATED','UNREVIEWED'].includes(status))throw new Error('無效的復盤紀律狀態');
+  const data=read(),tx=data.transactions.find(x=>x.id===String(id||''));
+  if(!tx)throw new Error('找不到這筆實際成交');
+  const rows=data.transactions.filter(x=>tx.daytrade_pair_id?x.daytrade_pair_id===tx.daytrade_pair_id:x.id===tx.id);
+  for(const row of rows)row.discipline=status;
+  write(data);
+  return rows.length;
+}
 function upsert(position){
   const code=cleanCode(position?.code);if(!code)throw new Error('股票代號無效');const data=read(),cur=aggregateCode(data,code),shares=cleanNumber(position?.shares),avg=cleanNumber(position?.avg_cost??position?.avg_price);
   if(!cur.transaction_count){if(shares==null||shares<=0||!Number.isInteger(shares)||avg==null||avg<=0)throw new Error('首次持股需要有效股數與成交價');addTransaction({code,name:position.name,side:'BUY',shares,price:avg,trade_date:position.entry_date,reason:position.entry_reason,source:'COMPAT_POSITION_FORM'});}
@@ -131,4 +140,4 @@ function validateLedger(data){const txs=sortedTx(data);pairedTxs(txs);const bala
 function importData(payload){let data;if(payload&&Array.isArray(payload.transactions)){data={schema_version:PORTFOLIO_SCHEMA,transactions:payload.transactions.map(normalizeTx).filter(Boolean),meta:payload.meta||{}};if(data.transactions.length!==payload.transactions.length)throw new Error('備份中有無效成交紀錄，已停止匯入')}else if(payload&&Array.isArray(payload.positions))data=migrateLegacy(payload);else throw new Error('備份格式不正確');validateLedger(data);return write(data)}
 function storageInfo(){return{key:PORTFOLIO_KEY,schema:PORTFOLIO_SCHEMA,scope:'device-local',cloud_sync:false,public_repo:false,model:'transaction-ledger'}}
 
-window.RadarPortfolioStore={key:PORTFOLIO_KEY,schema:PORTFOLIO_SCHEMA,isTradingDay,latestTradingDay,verifyFillDate,list,listAll,get,history,addTransaction,addDaytradeRoundTrip,deleteTransaction,updateMeta,upsert,remove,clear,exportData,importData,storageInfo};
+window.RadarPortfolioStore={key:PORTFOLIO_KEY,schema:PORTFOLIO_SCHEMA,isTradingDay,latestTradingDay,verifyFillDate,list,listAll,get,history,addTransaction,addDaytradeRoundTrip,deleteTransaction,updateTransactionDiscipline,updateMeta,upsert,remove,clear,exportData,importData,storageInfo};
