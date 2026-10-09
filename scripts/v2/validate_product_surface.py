@@ -170,8 +170,14 @@ def main():
     intel = text("inuko-portfolio-intel-v2.js")
     for needle in ("data-portfolio-jump", "scrollIntoView", "portfolioQuotes", "ownedDecision"):
         require(intel, needle, "unlimited actionable portfolio priority list", errors)
-    if "slice(0,Math.min(4,sorted.length))" in intel or "slice(0,5)" in intel:
-        errors.append("all held L2-L4 positions must remain visible without a hard-coded 4/5 cap")
+    # Check the actual held-position priority collection, not unrelated
+    # snippet limits (e.g. a list of five risk-reason phrases).
+    urgent_lines = [line for line in intel.splitlines() if "const urgent=" in line]
+    if len(urgent_lines) != 1 or "models.filter(x=>levelOf(x)>=2)" not in urgent_lines[0]:
+        errors.append("L2-L4 priority collection must include every held position with level >=2")
+    elif any(cap in urgent_lines[0] for cap in (".slice(", ".splice(")):
+        errors.append("all held L2-L4 positions must remain visible without a hard-coded cap")
+    require(intel, "urgent.map(x=>", "render all L2-L4 priority rows", errors)
     require(quick, "RadarPortfolioStore.addTransaction", "detail-to-portfolio ledger append", errors)
     if "RadarPortfolioStore.upsert" in quick:
         errors.append("detail quick-add must not overwrite aggregate holdings in ledger 2.0")
