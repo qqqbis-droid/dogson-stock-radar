@@ -12,7 +12,7 @@ const store=()=>window.RadarPortfolioStore;
 const blankLedger=()=>({schema_version:'2.0.0',updated_at:new Date().toISOString(),transactions:[],meta:{}});
 const ledgerData=x=>x&&typeof x==='object'?{schema_version:String(x.schema_version||'2.0.0'),updated_at:x.updated_at||new Date().toISOString(),transactions:Array.isArray(x.transactions)?x.transactions:[],meta:x.meta&&typeof x.meta==='object'&&!Array.isArray(x.meta)?x.meta:{}}:blankLedger();
 const hasData=x=>Boolean((x?.transactions||[]).length||Object.keys(x?.meta||{}).length);
-function canonical(x){const v=ledgerData(x),tx=v.transactions.slice().sort((a,b)=>String(a.id||'').localeCompare(String(b.id||''))),meta={};for(const k of Object.keys(v.meta).sort())meta[k]=v.meta[k];return JSON.stringify({schema_version:v.schema_version,transactions:tx,meta})}
+function canonical(x){const v=ledgerData(x),tx=v.transactions.map(t=>({...t,discipline:['FOLLOWED','VIOLATED','UNREVIEWED'].includes(t.discipline)?t.discipline:'UNREVIEWED'})).sort((a,b)=>String(a.id||'').localeCompare(String(b.id||''))),meta={};for(const k of Object.keys(v.meta).sort())meta[k]=v.meta[k];return JSON.stringify({schema_version:v.schema_version,transactions:tx,meta})}
 function sameLedger(a,b){return canonical(a)===canonical(b)}
 function localLedger(){try{return ledgerData(store()?.exportData?.()||blankLedger())}catch{return blankLedger()}}
 function fmtTime(v){if(!v)return'';try{return new Date(v).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})}catch{return String(v)}}
