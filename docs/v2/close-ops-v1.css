@@ -25,4 +25,6 @@
 .close-ops-extra summary{cursor:pointer;color:var(--text);font-weight:750}
 .close-ops-extra p{line-height:1.65}
 .close-ops-empty{padding:12px;text-align:center;color:var(--muted);font-size:.73rem}
+ .close-ops-more{display:block;width:100%;margin-top:9px;padding:9px 10px;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:10px;font-weight:750;cursor:pointer}
+.close-ops-held-label{margin-left:auto;font-size:.66rem;color:var(--text);padding:5px 8px;background:var(--soft);border:1px solid var(--line);border-radius:999px;white-space:nowrap}
 @media(min-width:780px){.close-ops-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
