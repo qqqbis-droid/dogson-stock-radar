@@ -9,7 +9,7 @@
   const POS={GREEN:'🟢 位置舒服',YELLOW:'🟡 等回踩／確認',ORANGE:'🟠 偏延伸不追',RED:'🔴 過熱／失效'};
   const DIR={UP:'↗',FLAT:'→',DOWN:'↘'};
   const storeKey='dogson-v2-close-mode';
-  const state={mode:'v2',payload:null,category:'',preset:'',position:'',sector:'',search:'',sort:'combined'};
+  const state={mode:'v2',payload:null,expectedCloseDate:'',category:'',preset:'',position:'',sector:'',search:'',sort:'combined'};
   let mounted=false,loading=false;
 
   const $=s=>document.querySelector(s);
@@ -20,6 +20,8 @@
   const activeView=()=>$('.tab.active')?.dataset?.view||'intraday';
   const rows=()=>{
     const p=state.payload||{};
+    // Do not mingle stale 60K evidence with a newer completed-close mission.
+    if(!state.expectedCloseDate||String(p.trade_date||'').slice(0,10)!==state.expectedCloseDate)return [];
     const source=Array.isArray(p.all_rows)?p.all_rows:Array.isArray(p.rows)?p.rows:[];
     return source.filter(r=>r&&CAT[r.category60]&&r.data_status!=='UNAVAILABLE');
   };
@@ -117,6 +119,8 @@
       let r=await fetch(`../data/hourly.json?t=${Date.now()}`,{cache:'no-store'});
       if(!r.ok)throw new Error(`hourly ${r.status}`);
       state.payload=await r.json();
+      const m=await fetch('./data/current_manifest.json?hourly60='+Date.now(),{cache:'no-store'}).then(x=>{if(!x.ok)throw Error('manifest '+x.status);return x.json()});
+      state.expectedCloseDate=String(m.datasets?.decision_close_summary?.as_of||'').slice(0,10);
       hydrateControls();
     }catch(err){
       console.warn('60K screener load failed',err);
@@ -173,7 +177,7 @@
     if(meta){
       const d=String(state.payload?.trade_date||'—'),u=String(state.payload?.updated_at||'');
       const presetText=state.preset==='unheated'?' · 未過熱啟動＝金叉前夕/剛啟動＋日K距20MA 0～7%＋RSI 40～65＋量比1.0～1.8＋位置不過熱。':'';
-      meta.textContent=`60分K Engine 資料日 ${d}${u?` · 更新 ${u.replace('T',' ').slice(0,16)}`:''} · 目前 ${list.length} 檔。這是獨立60K技術篩選，不等同 V2 Stage。${presetText}`;
+      meta.textContent=(!state.expectedCloseDate||d!==state.expectedCloseDate)?`⛔ 60分K 資料日 ${d} 與盤後定格 ${state.expectedCloseDate||'未知'} 不一致，禁止混用；候選已隱藏。`:`60分K Engine 資料日 ${d}${u?` · 更新 ${u.replace('T',' ').slice(0,16)}`:''} · 目前 ${list.length} 檔。這是獨立60K技術篩選，不等同 V2 Stage。${presetText}`;
     }
     if($('#countText'))$('#countText').textContent=`60分K · ${list.length} 檔`;
     if(host)host.innerHTML=list.length?list.map(card).join(''):'<div class="h60-empty">目前沒有符合這組 60分K 條件的股票。</div>';
@@ -207,6 +211,6 @@
     e.preventDefault();document.dispatchEvent(new CustomEvent('radar:open-stock',{detail:{code:c.dataset.code,source:'hourly60-screener'}}));
   }
 
-  function boot(){mount();document.addEventListener('keydown',openFromKeyboard);document.addEventListener('radar:view-rendered',()=>setTimeout(syncView,30));document.addEventListener('radar:data-reloaded',()=>{state.payload=null;if(activeView()==='close'&&state.mode==='hourly60')load()});document.addEventListener('click',e=>{if(e.target.closest?.('.tab'))setTimeout(syncView,80)});setInterval(syncView,1200)}
+  function boot(){mount();document.addEventListener('keydown',openFromKeyboard);document.addEventListener('radar:view-rendered',()=>setTimeout(syncView,30));document.addEventListener('radar:data-reloaded',()=>{state.payload=null;state.expectedCloseDate='';if(activeView()==='close'&&state.mode==='hourly60')load()});document.addEventListener('click',e=>{if(e.target.closest?.('.tab'))setTimeout(syncView,80)});setInterval(syncView,1200)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
