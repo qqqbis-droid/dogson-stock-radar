@@ -59,5 +59,29 @@ assert(near(feeMixed.realized_pl,feeMixed.swing_realized_pl+feeMixed.daytrade_re
 const currentFeePosition=S.get('7777');
 S.upsert({code:'7777',name:'同股混合',shares:currentFeePosition.shares,avg_cost:currentFeePosition.avg_cost,hold_reason:'成本仍須守住原本結構'});
 assert(S.get('7777').hold_reason==='成本仍須守住原本結構','reason-only edit must work with fee-inclusive average cost');
+
+const rendererPath=path.resolve(__dirname,'../../docs/v2/portfolio-renderer.js');
+const rendererSrc=fs.readFileSync(rendererPath,'utf8');
+const calcStart=rendererSrc.indexOf('function positionCalc(');
+const calcEnd=rendererSrc.indexOf('\nfunction sysRisk(',calcStart);
+assert(calcStart>=0&&calcEnd>calcStart,'renderer portfolio valuation calculator available');
+const calcFn=new Function('pn','currentPrice','window',rendererSrc.slice(calcStart,calcEnd)+'; return positionCalc;')(
+  v=>v==null||v===''||!Number.isFinite(Number(v))?null:Number(v),
+  (d,e)=>Number(d?.quote?.price||e?.close)||null,
+  window
+);
+window.InukoFeeEngine={estimate:fees};
+const taiBo=calcFn({code:'1802',shares:1000,avg_cost:66.6},{quote:{price:63.9}},null);
+const hypotheticalSale=fees({code:'1802',side:'SELL',shares:1000,price:63.9,source:'PORTFOLIO_EXIT_ESTIMATE'});
+assert(near(taiBo.value,63900),'gross valuation remains price × shares');
+assert(near(taiBo.netValue,hypotheticalSale.net),'broker-comparable liquidation value uses fee and tax engine');
+assert(near(taiBo.pl,hypotheticalSale.net-66600),'unrealized PnL deducts hypothetical sale tax and commission');
+assert(near(taiBo.value-taiBo.netValue,taiBo.exitFees),'per-holding gross/net difference reconciles');
+window.InukoFeeEngine=null;
+const withoutFee=calcFn({code:'1802',shares:1000,avg_cost:66.6},{quote:{price:63.9}},null);
+assert(withoutFee.pl===null&&near(withoutFee.value,63900),'missing fee engine must never mislabel gross as net PnL');
+window.InukoFeeEngine={estimate:fees};
+console.log('broker-comparable net liquidation PnL regression test PASS');
+
 console.log('holdings isolation, holiday, discipline, cloud-format import and fee-aware mixed-position tests PASS');
 console.log(JSON.stringify({status:'PASS',shares:p.shares,avg_cost:p.avg_cost,realized_pl:p.realized_pl,cycle_count:p.cycle_count,transactions:p.transaction_count}));
