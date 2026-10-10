@@ -138,6 +138,9 @@
     if(age!=null&&age>=7)reasons.push(`資料距今天已 ${age} 天，超過安全上限`);
     else if(age!=null&&age>=5)warnings.push(`資料距今天 ${age} 天；可能遇連假，開盤前請再核對最新交易日`);
 
+    // Strict exchange-calendar guard is an additional mandatory gate; never let
+    // the async context validator overwrite an already-stale close session.
+    if(window.DOGSON_CLOSE_DATA_STATUS?.strictStale===true)reasons.push('盤後快照未達最後完成交易日');
     const allowed=reasons.length===0;
     const caution=allowed&&warnings.length>0;
     window.DOGSON_CLOSE_DECISION_ALLOWED=allowed;
@@ -359,6 +362,7 @@
       console.error('unified freshness v2',err);
       const host=ensureFreshnessPanel();if(host)host.innerHTML=`<div class="uf-warning hard">⛔ 無法驗證盤後資料：${esc(err.message||err)}。操作建議已停用。</div>`;
       window.DOGSON_CLOSE_DECISION_ALLOWED=false;
+      window.DOGSON_CLOSE_DATA_STATUS={...(window.DOGSON_CLOSE_DATA_STATUS||{}),allowed:false,reasons:['盤後上下文驗證失敗：'+String(err.message||err)]};
     }
   }
   function rerender(){
