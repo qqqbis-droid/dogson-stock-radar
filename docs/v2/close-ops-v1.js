@@ -9,7 +9,7 @@ const p=v=>n(v)==null?'—':fmt(v,n(v)<50?2:n(v)<500?1:0);
 const td=v=>String(v||'').slice(0,10);
 const KEY='dogson.close.public-candidate-history.v1';
 const HOLIDAYS=new Set(['2026-10-09','2026-10-26','2026-12-25']);
-const S={manifest:null,index:[],shards:new Map(),build:'',busy:false,seq:0,filter:'all',latest:'',error:'',visible:false};
+const S={manifest:null,index:[],shards:new Map(),build:'',busy:false,seq:0,filter:'all',visibleCount:5,latest:'',error:'',visible:false};
 const view=()=>$('.tab.active')?.dataset.view||'intraday';
 const held=()=>{try{return window.RadarPortfolioStore?.list?.()||[]}catch{return[]}};
 const allow=()=>window.DOGSON_CLOSE_DECISION_ALLOWED===true&&window.DOGSON_CLOSE_DATA_STATUS?.allowed===true&&!window.DOGSON_CLOSE_DATA_STATUS?.strictStale;
@@ -51,6 +51,7 @@ function calcStatus(a){if(!allow())return ['歷史參考','資料未通過最新
 if(!a.sourceOK)return ['證據不足','個股證據／信心未通過驗證'];
 if(a.held&&(a.position?.reason_status==='INVALID'||a.position?.reason_status==='WEAKENING'))return ['持倉風險','原始持有理由已弱化或失效，先處理持股風險'];
 if(a.overheated)return ['不追','過熱或 Engine 標示不追'];
+if(a.resistance&&a.price!=null&&a.price>=a.resistance.low)return ['壓力帶內','收盤價已碰到第一壓力帶，不把位置當成新倉低風險區'];
 if(a.rr!=null&&a.rr<1.5)return ['先不追','從收盤價到 R1 的報酬／S1 風險比不足 1.5'];
 if(!a.zoneFresh)return ['等結構核對','支撐／壓力 Zone 尚未標示為新鮮，不提供可執行價'];
 if(a.meets&&(n(a.d.scores?.entry_position_score)||0)>=65)return ['優先觀察','籌碼＋族群共振；等回測與量價確認'];
@@ -67,7 +68,8 @@ return '<article class="close-ops-card"><button type="button" class="close-ops-o
 +'<div class="close-ops-prices"><div><small>回踩防守 S1</small><b>'+esc(zoneText(a.support))+'</b></div><div><small>突破確認 R1</small><b>'+esc(zoneText(a.resistance))+'</b></div><div><small>失效參考（S1下緣）</small><b>'+esc(a.support?p(a.support.low):'—')+'</b></div><div><small>收盤到 R1 報酬／風險</small><b>'+esc(a.rr!=null?fmt(a.rr,2)+' 倍':'不具備計算條件')+'</b></div></div>'
 +'<p class="close-ops-hint">'+esc(st[1])+'。'+(known?'回踩守住、突破後回測不破並有量價確認才重新評估。':'結構價位不完整，不設假停損。')+'｜'+priceTag+'，價格以 '+esc(td(S.manifest.datasets?.decision_close_summary?.as_of))+' 收盤快照為準。</p></article>'}
 function filtersHtml(rows){const opt=[['all','綜合優先'],['early','提前卡位'],['chip','籌碼三共振'],['held','我的持股']];return opt.map(([k,label])=>'<button type="button" data-closeops-filter="'+k+'" class="'+(S.filter===k?'active':'')+'">'+label+' '+rows.filter(a=>k==='all'||(k==='early'&&a.early)||(k==='chip'&&a.meets)||(k==='held'&&a.held)).length+'</button>').join('')}
-function render(){const box=locate();if(!box)return;box.hidden=view()!=='close'||$('#radarPanel')?.classList.contains('h60-screen-active');if(box.hidden)return;
+function markHeld(){const codes=new Set(held().map(x=>String(x.code)));document.querySelectorAll('#cards .card[data-code]').forEach(card=>{const old=card.querySelector('[data-closeops-held]');if(!codes.has(String(card.dataset.code))){old?.remove();return}if(old)return;const el=document.createElement('span');el.dataset.closeopsHeld='1';el.className='close-ops-held-label';el.textContent='💼 已持有';(card.querySelector('.card-top')||card).appendChild(el)})}
+function render(){const box=locate();if(!box)return;box.hidden=view()!=='close'||$('#radarPanel')?.classList.contains('h60-screen-active');if(box.hidden)return;markHeld();
 if(S.busy&&!S.index.length){box.innerHTML='<div class="close-ops-head"><b>🧭 犬子明日作戰補強</b></div><p>正在檢查盤後證據…</p>';return}
 if(S.error&&!S.index.length){box.innerHTML='<b>盤後補強資料未載入</b><p>'+esc(S.error)+'</p>';return}
 const list=choose(), positions=held(),risk=positions.filter(x=>['INVALID','WEAKENING','UNVERIFIED'].includes(x.reason_status)).length;
@@ -77,7 +79,7 @@ const market=$('#afterhoursDecision .ahd-head b')?.textContent||'市場資訊請
 const scope=positions.length?'<div class="close-ops-strategy">持股先核對原始進場理由、有效跌破條件與持倉集中風險；未驗證理由不視為安全續抱。</div>':'';
 box.innerHTML='<div class="close-ops-head"><div><b>🧭 犬子明日作戰｜選股與價格二次核對</b><small>市場 '+esc(market)+' · 不改原排名與 Engine 分數</small></div><span>'+esc(td(S.manifest?.datasets?.decision_close_summary?.as_of)||'—')+'</span></div>'
 +'<div class="close-ops-flags">'+flags.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div>'+scope
-+'<div class="close-ops-tabs">'+filtersHtml(list)+'</div><div class="close-ops-list">'+(filtered.length?filtered.slice(0,12).map(subCard).join(''):'<p class="close-ops-empty">目前沒有符合這組二次篩選條件的個股；不放寬門檻補名單。</p>')+'</div>'
++'<div class="close-ops-tabs">'+filtersHtml(list)+'</div><div class="close-ops-list">'+(filtered.length?filtered.slice(0,S.visibleCount).map(subCard).join(''):'<p class="close-ops-empty">目前沒有符合這組二次篩選條件的個股；不放寬門檻補名單。</p>')+'</div>'+(filtered.length>S.visibleCount?'<button type="button" class="close-ops-more" data-closeops-more>查看更多候選（'+filtered.length+' 檔）</button>':'')
 +'<details class="close-ops-extra"><summary>📊 歷史候選校準與風險來源</summary><p>'+esc(historyHtml())+'</p><p>期貨外資部位、散戶多空比、PCR、波動率及美元／台幣尚無經驗證的同日資料介面，本版不虛填，也不納入持股建議。</p><p>籌碼三共振＝外資連3買＋借券連3減＋同族群至少3檔具有合格的波段結構；另需流動性、Zone 與報酬風險條件驗證。以上均為篩選觀察，非下單訊號。</p></details>';
 }
 async function load(){if(view()!=='close')return;if(S.busy)return;S.busy=true;const seq=++S.seq;render();
@@ -94,7 +96,7 @@ if(seq===S.seq){archiveWrite();S.error=''}
 finally{if(seq===S.seq){S.busy=false;render()}}}
 let scheduled=0;
 function schedule(){clearTimeout(scheduled);scheduled=setTimeout(()=>{if(view()==='close'){if(!S.manifest&&!S.busy)load();else render()}else{const b=$('#inukoCloseOps');if(b)b.hidden=true}},70)}
-document.addEventListener('click',e=>{const filter=e.target.closest('[data-closeops-filter]');if(filter){S.filter=filter.dataset.closeopsFilter;render();return}const code=e.target.closest('[data-closeops-code]');if(code){e.preventDefault();document.dispatchEvent(new CustomEvent('radar:open-stock',{detail:{code:code.dataset.closeopsCode,source:'close-ops'}}))}});
+document.addEventListener('click',e=>{const filter=e.target.closest('[data-closeops-filter]');if(filter){S.filter=filter.dataset.closeopsFilter;S.visibleCount=5;render();return}if(e.target.closest('[data-closeops-more]')){S.visibleCount=Math.min(S.visibleCount+7,75);render();return}const code=e.target.closest('[data-closeops-code]');if(code){e.preventDefault();document.dispatchEvent(new CustomEvent('radar:open-stock',{detail:{code:code.dataset.closeopsCode,source:'close-ops'}}))}});
 document.addEventListener('radar:view-rendered',schedule);
 document.addEventListener('radar:data-reloaded',()=>{S.manifest=null;S.index=[];S.shards.clear();S.build='';load()});
 document.addEventListener('radar:portfolio-changed',schedule);
