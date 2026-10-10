@@ -5,7 +5,7 @@ const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const n=v=>v==null||v===''||!Number.isFinite(Number(v))?null:Number(v);
 const fmt=(v,d=1)=>n(v)==null?'—':Number(v).toLocaleString('zh-TW',{maximumFractionDigits:d});
-const p=v=>n(v)==null?'—':fmt(v,n(v)<50?2:n(v)<500?1:0);
+const p=(v,edge='nearest')=>{const x=n(v);if(x==null)return '—';const t=x<10?.01:x<50?.05:x<100?.1:x<500?.5:x<1000?1:5;const ticks=edge==='low'?Math.floor((x+1e-9)/t):edge==='high'?Math.ceil((x-1e-9)/t):Math.round(x/t);return fmt(ticks*t,t<.1?2:t<1?1:0)};
 const td=v=>String(v||'').slice(0,10);
 const KEY='dogson.close.public-candidate-history.v1';
 const HOLIDAYS=new Set(['2026-10-09','2026-10-26','2026-12-25']);
@@ -58,7 +58,7 @@ if(!a.zoneFresh)return ['等結構核對','支撐／壓力 Zone 尚未標示為�
 if(a.meets&&(n(a.d.scores?.entry_position_score)||0)>=65)return ['優先觀察','籌碼＋族群共振；等回測與量價確認'];
 if(a.early)return ['提前觀察','早期結構成立，等待個股觸發條件'];
 return ['觀察','條件尚未完整，不提前買進']}
-function zoneText(z){return z?p(z.low)+'～'+p(z.high):'—'}
+function zoneText(z){return z?p(z.low,'low')+'～'+p(z.high,'high'):'—'}
 function subCard(a){const st=calcStatus(a),q=n(a.d.scores?.swing_quality_score),loc=n(a.d.scores?.entry_position_score),known=!!a.support&&!!a.resistance;
 const chip=a.readyChip?'外資3買＋借券3減':'籌碼未達雙條件';
 const peer=a.peers>=3?'同族群共振 '+a.peers+' 檔':'同族群符合結構 '+a.peers+' 檔';
@@ -66,7 +66,7 @@ const thesis=a.held?(a.position?.reason_status==='INVALID'?'❌ 理由失效':a.
 const priceTag=a.zoneFresh?'已核對':'結構新鮮度待核對';
 return '<article class="close-ops-card"><button type="button" class="close-ops-open" data-closeops-code="'+esc(a.x.code)+'"><b>'+esc(a.x.code+' '+a.x.name)+'</b><span>'+esc(st[0])+' ›</span></button>'
 +'<div class="close-ops-mini">'+esc(thesis)+'｜品質 '+fmt(q,0)+'・位置 '+fmt(loc,0)+'｜'+esc(chip)+'｜'+esc(peer)+'</div>'
-+'<div class="close-ops-prices"><div><small>回踩防守 S1</small><b>'+esc(zoneText(a.support))+'</b></div><div><small>突破確認 R1</small><b>'+esc(zoneText(a.resistance))+'</b></div><div><small>失效參考（S1下緣）</small><b>'+esc(a.support?p(a.support.low):'—')+'</b></div><div><small>收盤到 R1 報酬／風險</small><b>'+esc(a.rr!=null?fmt(a.rr,2)+' 倍':'不具備計算條件')+'</b></div></div>'
++'<div class="close-ops-prices"><div><small>回踩防守 S1</small><b>'+esc(zoneText(a.support))+'</b></div><div><small>突破確認 R1</small><b>'+esc(zoneText(a.resistance))+'</b></div><div><small>失效參考（S1下緣）</small><b>'+esc(a.support?p(a.support.low,'low'):'—')+'</b></div><div><small>收盤到 R1 報酬／風險</small><b>'+esc(a.rr!=null?fmt(a.rr,2)+' 倍':'不具備計算條件')+'</b></div></div>'
 +'<p class="close-ops-hint">'+esc(st[1])+'。'+(known?'回踩守住、突破後回測不破並有量價確認才重新評估。':'結構價位不完整，不設假停損。')+'｜'+priceTag+'；交易限制仍須當日核對公告，價格以 '+esc(td(S.manifest.datasets?.decision_close_summary?.as_of))+' 收盤快照為準。</p></article>'}
 function filtersHtml(rows){const opt=[['all','綜合優先'],['early','提前卡位'],['chip','籌碼三共振'],['held','我的持股']];return opt.map(([k,label])=>'<button type="button" data-closeops-filter="'+k+'" class="'+(S.filter===k?'active':'')+'">'+label+' '+rows.filter(a=>k==='all'||(k==='early'&&a.early)||(k==='chip'&&a.meets)||(k==='held'&&a.held)).length+'</button>').join('')}
 function markHeld(){const codes=new Set(held().map(x=>String(x.code)));document.querySelectorAll('#cards .card[data-code]').forEach(card=>{const old=card.querySelector('[data-closeops-held]');if(!codes.has(String(card.dataset.code))){old?.remove();return}if(old)return;const el=document.createElement('span');el.dataset.closeopsHeld='1';el.className='close-ops-held-label';el.textContent='💼 已持有';(card.querySelector('.card-top')||card).appendChild(el)})}
