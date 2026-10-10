@@ -35,7 +35,8 @@ return included.map(x=>{const shard=S.shards.get(String(x.code)),e=shard?.eviden
 const price=n(d.quote?.price??x.quote?.price),group=String(x.primary_group||''),peers=members.get(group)||0;
 const readyChip=e.foreign_3buy===true&&e.sbl_3down===true&&[e.foreign_date,e.sbl_date].every(v=>td(v)===td(S.manifest.datasets?.decision_close_summary?.as_of));
 const validLiq=n(e.avg_turnover20)>=30000000;
-const overheated=(n(e.dist20)!=null&&e.dist20>8)||['DO_NOT_CHASE','EXIT_PRIORITY','REDUCE_WATCH'].includes(d.action_state)||['末端過熱／不追'].includes(d.ignition_stage)||d.no_chase===true;
+const restricted=Array.isArray(d.risk_overlays)&&d.risk_overlays.some(x=>['TRADING_RESTRICTION','DATA_QUALITY_RISK','LIQUIDITY_RISK','OVERHEAT'].includes(String(x)));
+const overheated=restricted||(n(e.dist20)!=null&&e.dist20>8)||['DO_NOT_CHASE','EXIT_PRIORITY','REDUCE_WATCH'].includes(d.action_state)||['末端過熱／不追'].includes(d.ignition_stage)||d.no_chase===true;
 const zones=(shard?.zones||[]).filter(z=>z.build_id===S.build&&z.trade_date===td(S.manifest.datasets?.decision_close_summary?.as_of)&&z.structure_state!=='INVALID');
 const support=zones.filter(z=>z.side==='SUPPORT'&&n(z.low)!=null&&n(z.high)!=null&&price!=null&&z.low<=price).sort((a,b)=>b.high-a.high)[0]||null;
 const resistance=zones.filter(z=>z.side==='RESISTANCE'&&n(z.high)!=null&&price!=null&&z.high>=price).sort((a,b)=>a.low-b.low)[0]||null;
@@ -66,7 +67,7 @@ const priceTag=a.zoneFresh?'已核對':'結構新鮮度待核對';
 return '<article class="close-ops-card"><button type="button" class="close-ops-open" data-closeops-code="'+esc(a.x.code)+'"><b>'+esc(a.x.code+' '+a.x.name)+'</b><span>'+esc(st[0])+' ›</span></button>'
 +'<div class="close-ops-mini">'+esc(thesis)+'｜品質 '+fmt(q,0)+'・位置 '+fmt(loc,0)+'｜'+esc(chip)+'｜'+esc(peer)+'</div>'
 +'<div class="close-ops-prices"><div><small>回踩防守 S1</small><b>'+esc(zoneText(a.support))+'</b></div><div><small>突破確認 R1</small><b>'+esc(zoneText(a.resistance))+'</b></div><div><small>失效參考（S1下緣）</small><b>'+esc(a.support?p(a.support.low):'—')+'</b></div><div><small>收盤到 R1 報酬／風險</small><b>'+esc(a.rr!=null?fmt(a.rr,2)+' 倍':'不具備計算條件')+'</b></div></div>'
-+'<p class="close-ops-hint">'+esc(st[1])+'。'+(known?'回踩守住、突破後回測不破並有量價確認才重新評估。':'結構價位不完整，不設假停損。')+'｜'+priceTag+'，價格以 '+esc(td(S.manifest.datasets?.decision_close_summary?.as_of))+' 收盤快照為準。</p></article>'}
++'<p class="close-ops-hint">'+esc(st[1])+'。'+(known?'回踩守住、突破後回測不破並有量價確認才重新評估。':'結構價位不完整，不設假停損。')+'｜'+priceTag+'；交易限制仍須當日核對公告，價格以 '+esc(td(S.manifest.datasets?.decision_close_summary?.as_of))+' 收盤快照為準。</p></article>'}
 function filtersHtml(rows){const opt=[['all','綜合優先'],['early','提前卡位'],['chip','籌碼三共振'],['held','我的持股']];return opt.map(([k,label])=>'<button type="button" data-closeops-filter="'+k+'" class="'+(S.filter===k?'active':'')+'">'+label+' '+rows.filter(a=>k==='all'||(k==='early'&&a.early)||(k==='chip'&&a.meets)||(k==='held'&&a.held)).length+'</button>').join('')}
 function markHeld(){const codes=new Set(held().map(x=>String(x.code)));document.querySelectorAll('#cards .card[data-code]').forEach(card=>{const old=card.querySelector('[data-closeops-held]');if(!codes.has(String(card.dataset.code))){old?.remove();return}if(old)return;const el=document.createElement('span');el.dataset.closeopsHeld='1';el.className='close-ops-held-label';el.textContent='💼 已持有';(card.querySelector('.card-top')||card).appendChild(el)})}
 function render(){const box=locate();if(!box)return;box.hidden=view()!=='close'||$('#radarPanel')?.classList.contains('h60-screen-active');if(box.hidden)return;markHeld();
