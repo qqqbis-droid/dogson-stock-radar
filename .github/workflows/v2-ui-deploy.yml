@@ -276,6 +276,13 @@ jobs:
           node --check docs/v2/portfolio-quick-add.js
           node --check docs/v2/inuko-portfolio-intel-v2.js
           node --check docs/v2/portfolio-weekly-review.js
+          node --check docs/v2/close-ops-v1.js
+          node --check docs/v2/hourly60-screener.js
+          node --check docs/v2/chip-freshness-provenance.js
+          node --check docs/v2/unified-score-freshness-v1.js
+          grep -q 'close-ops-v1.js?v=20261011a' docs/v2/index.html
+          grep -q 'hourly60-screener.js?v=20261011closegate1' docs/v2/index.html
+          grep -q 'close-ops-v1.css?v=20261011a' docs/v2/index.html
           node --check docs/v2/portfolio-cloud.js
           grep -q 'portfolio-weekly-review.js?v=20261009review2' docs/v2/index.html
           ! grep -q '這筆賣出是現股當沖' docs/v2/portfolio-fees.js
