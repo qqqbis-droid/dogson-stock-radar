@@ -383,7 +383,7 @@ def main():
     rank_map = rerank(records(detail_obj)) if detail_obj is not None else {}
     for key in ("decision_close_summary", "decision_close_index"):
         counts[key], _ = normalize_decision_dataset(root, manifest, key, canonical_date, sources, rank_map=rank_map)
-    for key in ("sector_close", "market_summary", "market_close_context", "capital_close_context"):
+    for key in ("zone_close", "sector_close", "market_summary", "market_close_context", "capital_close_context"):
         counts[key] = normalize_generic_dataset(root, manifest, key, canonical_date)
 
     warnings = manifest.setdefault("health", {}).setdefault("warnings", [])
