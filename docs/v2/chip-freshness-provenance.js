@@ -155,8 +155,12 @@
   }
 
   function publish(){
-    window.DOGSON_CLOSE_DECISION_ALLOWED=!state.stale;
-    window.DOGSON_CLOSE_DATA_STATUS={...(window.DOGSON_CLOSE_DATA_STATUS||{}),allowed:!state.stale,strictExpectedDate:state.expected,strictActualDate:state.actual,strictStale:state.stale};
+    const previous=window.DOGSON_CLOSE_DATA_STATUS||{};
+    // Strict calendar checks must never re-enable trading while the Atomic
+    // context validator still reports errors, or vice versa.
+    const mergedAllowed=!state.stale&&!(Array.isArray(previous.reasons)&&previous.reasons.length);
+    window.DOGSON_CLOSE_DECISION_ALLOWED=mergedAllowed;
+    window.DOGSON_CLOSE_DATA_STATUS={...previous,allowed:mergedAllowed,strictExpectedDate:state.expected,strictActualDate:state.actual,strictStale:state.stale};
     document.documentElement.dataset.inukoCloseStale=state.stale?'1':'0';
   }
 
