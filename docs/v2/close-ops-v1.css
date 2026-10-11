@@ -7,6 +7,8 @@
 #cards .card .cp-levels b{display:block;margin-top:4px;font-size:.86rem;line-height:1.25;color:var(--ink);font-weight:850;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 #cards .card .cp-message{font-size:.72rem;line-height:1.55;color:var(--ink);margin-top:8px}
 #cards .card .cp-risk{font-size:.67rem;line-height:1.5;color:var(--muted);margin-top:4px}
+#cards .card .cp-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+#cards .card .cp-tags span{border:1px solid var(--line);background:var(--soft);color:var(--muted);border-radius:100px;padding:3px 7px;font-size:.65rem;line-height:1.4}
 #cards .card .cp-owned{display:inline-flex;align-items:center;font-size:.68rem;padding:3px 7px;border:1px solid var(--line);border-radius:999px;background:var(--soft);margin-bottom:7px}
 #cards .card .action-line b{overflow-wrap:anywhere}
 #cards .card .action-line small{white-space:nowrap}
