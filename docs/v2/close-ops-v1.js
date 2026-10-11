@@ -163,6 +163,6 @@ document.addEventListener('radar:view-rendered',schedule);
 document.addEventListener('radar:data-reloaded',invalidate);
 document.addEventListener('radar:afterhours-refresh',schedule);
 document.addEventListener('click',e=>{if(e.target.closest('[data-close-mode],.tab'))setTimeout(schedule,100)});
-window.InukoCloseOps={version:'2.0',schedule,get(code){const s=D.cache.get(String(code));return s?classify(s.decision||{},s):null},isReady(){return validGlobal()}};
+window.InukoCloseOps={version:'2.0',schedule,get(code){const s=D.cache.get(String(code));return s?classify(s.decision||{},s):null},analyze(shard){return shard?.view==='close'?classify(shard.decision||{},shard):null},isReady(){return validGlobal()}};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});else schedule();
 })();
