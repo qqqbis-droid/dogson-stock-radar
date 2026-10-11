@@ -145,6 +145,7 @@ jobs:
         run: |
           set -euo pipefail
           python /tmp/v2-source/scripts/v2/normalize_close_snapshot_by_close_date.py --root /tmp/v2-source/docs/v2/data
+          python /tmp/v2-source/scripts/v2/test_capital_stock_breakdown.py
           python /tmp/v2-source/scripts/v2/build_capital_stock_breakdown.py --root /tmp/v2-source/docs/v2/data --registry /tmp/v2-source/contracts/registries/sector_registry.json
           python /tmp/v2-source/scripts/v2/validate_bundle.py --root /tmp/v2-source/docs/v2/data
           python /tmp/v2-source/scripts/v2/validate_market_capital_context.py --root /tmp/v2-source/docs/v2/data
