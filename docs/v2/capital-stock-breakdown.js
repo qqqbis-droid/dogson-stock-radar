@@ -17,6 +17,7 @@ function style(){
  const s=document.createElement('style');s.id='dogsonCapitalStocksStyle';
  s.textContent='.cms-glance{margin:7px 0;padding:8px;background:var(--soft);border:1px solid var(--line);border-radius:9px;font-size:.7rem;line-height:1.55}.cms-glance.good{border-left:3px solid var(--green)}.cms-glance.warn{border-left:3px solid #b89636}.cms-glance.bad{border-left:3px solid var(--red)}'
  +'.cms-detail{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}.cms-title{font-weight:900;font-size:.8rem}.cms-warning{padding:8px 9px;margin:7px 0;border-radius:8px;border:1px solid var(--line);background:var(--soft);font-size:.69rem;line-height:1.55}'
+ +'.capital-more .capital-section-label[hidden],.capital-more .member-list[hidden]{display:none!important}'
  +'.cms-stocks{display:grid;gap:6px;max-height:370px;overflow-y:auto;overscroll-behavior:contain;margin-top:7px}.cms-stock{padding:8px 9px;border:1px solid var(--line);background:var(--card);border-radius:9px}.cms-main{display:flex;align-items:center;justify-content:space-between;gap:8px}.cms-main button{border:0;background:transparent;color:var(--text);font-weight:850;font-size:.78rem;text-align:left;padding:0;cursor:pointer}.cms-money{font-size:.8rem;font-weight:900;white-space:nowrap}.cms-money.plus{color:var(--red)}.cms-money.minus{color:var(--green)}.cms-sub{margin-top:5px;font-size:.66rem;line-height:1.55;color:var(--muted)}.cms-method{font-size:.65rem;line-height:1.5;color:var(--muted);margin:8px 0 2px}';
  document.head.appendChild(s);
 }
