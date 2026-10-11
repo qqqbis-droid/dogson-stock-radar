@@ -69,7 +69,7 @@ function compact(x){
   :'<div class="cp-levels"><div><small>回踩觀察 S1</small><b>'+esc(range(x.support))+'</b></div><div><small>第一壓力 R1</small><b>'+esc(range(x.resistance))+'</b></div></div>'
   +'<div class="cp-message">'+esc(x.gate)+(x.rr!=null?'｜收盤價風報比 '+esc(fmt(x.rr,2))+' 倍':'')+'</div>'
   +'<div class="cp-risk">失效觀察：S1 下緣 '+esc(pp(x.support?.low,'lower'))+' 有效跌破才重新評估；隔日不照抄收盤價。</div>';
- return '<div class="close-plan-integrated" data-close-plan><div class="cp-summary"><b>'+esc(x.label)+'</b>'+owned+'</div><div class="cp-explain">'+esc(x.note)+'</div>'+status+'</div>';
+ return '<div class="close-plan-integrated" data-close-plan>'+owned+'<div class="cp-explain">'+esc(x.note)+'</div>'+status+'</div>';
 }
 function writeCard(card,x){
  if(!card?.isConnected)return;
@@ -127,9 +127,10 @@ async function indexForPeers(){
   try{const archives=JSON.parse(localStorage.getItem(KEY)||'[]');let values=Array.isArray(archives)?archives.filter(x=>x?.date!==D.date).slice(-24):[];values.push({date:D.date,rows:rows.filter(x=>n(x.quote?.price)>0).slice(0,60).map(x=>({code:String(x.code),close:n(x.quote.price)}))});localStorage.setItem(KEY,JSON.stringify(values.slice(-24)))}catch{}
  }catch(err){console.warn('close candidate index unavailable',err)}
 }
-let timer=0,working=false;
+let timer=0,working=false,queued=false;
 async function refresh(){
- if(working||!swingActive())return;
+ if(!swingActive())return;
+ if(working){queued=true;return}
  working=true;const job=++D.seq;
  try{
   if(!D.manifest||Date.now()-D.lastRefresh>60000){await manifest();D.lastRefresh=Date.now()}
@@ -152,7 +153,7 @@ async function refresh(){
  }catch(e){
   console.warn('integrated close plan',e);
   for(const card of document.querySelectorAll('#cards .card[data-code]:not([data-ignition]):not(.outside-pool)'))writeCard(card,classify({code:card.dataset.code},null));
- }finally{working=false}
+ }finally{working=false;if(queued){queued=false;schedule()}}
 }
 function schedule(){clearTimeout(timer);timer=setTimeout(refresh,65)}
 function invalidate(){D.manifest=null;D.build='';D.date='';D.cache.clear();D.index=null;D.peers=null;D.lastRefresh=0;schedule()}
