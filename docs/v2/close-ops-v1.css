@@ -15,6 +15,8 @@
 #cards .card-top{min-width:0}
 #cards .card .rf-star{flex:0 0 35px;display:inline-flex;align-items:center;justify-content:center;border-radius:9px;border:1px solid var(--line);color:var(--muted);background:var(--card);height:35px;min-width:35px;padding:0;font-size:1.3rem;line-height:1;cursor:pointer;touch-action:manipulation}
 #cards .card .rf-star.active{color:#b68a13;background:#fff8e6;border-color:#dfc48b}
+#h60Cards .h60-screen-card .rf-star{display:inline-flex;align-items:center;justify-content:center;flex:0 0 34px;min-width:34px;width:34px;height:34px;padding:0;border:1px solid var(--line);border-radius:9px;color:var(--muted);background:var(--card);font-size:1.25rem;line-height:1;cursor:pointer}
+#h60Cards .h60-screen-card .rf-star.active{color:#b68a13;background:#fff8e6;border-color:#dfc48b}
 #cards .card .rf-star:focus-visible,.rf-only:focus-visible,.rf-unranked-items button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 #radarPanel .rf-only{border:1px solid var(--line);color:var(--ink);border-radius:999px;background:var(--soft);padding:7px 10px;font-size:.73rem;font-weight:850;white-space:nowrap;cursor:pointer;margin-left:auto}
 #radarPanel .rf-only.active{border-color:var(--green);background:color-mix(in srgb,var(--green) 12%,var(--card))}
