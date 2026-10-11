@@ -143,6 +143,7 @@
       const sec=String(r.sector_group||r.industry_name||'').trim();
       if(state.sector&&sec!==state.sector)return false;
       if(state.search&&!`${r.code||''} ${r.name||''}`.toLowerCase().includes(state.search))return false;
+      if(window.RadarFavorites?.only?.()&&!window.RadarFavorites.has(r.code))return false;
       return true;
     });
     const sorters={
@@ -181,8 +182,11 @@
     }
     if($('#countText'))$('#countText').textContent=`60分K · ${list.length} 檔`;
     if(host)host.innerHTML=list.length?list.map(card).join(''):'<div class="h60-empty">目前沒有符合這組 60分K 條件的股票。</div>';
+    document.dispatchEvent(new Event('radar:hourly60-rendered'));
   }
 
+  document.addEventListener('radar:favorites-filter-changed',()=>{if(state.mode==='hourly60'&&activeView()==='close')renderCards()});
+  document.addEventListener('radar:favorites-changed',()=>{if(state.mode==='hourly60'&&activeView()==='close'&&window.RadarFavorites?.only?.())renderCards()});
   function render(){renderCats();renderCards()}
 
   async function setMode(mode){
