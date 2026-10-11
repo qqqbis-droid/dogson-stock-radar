@@ -103,6 +103,7 @@ jobs:
           python scripts/v2/enrich_stock_detail_context.py --legacy-root docs/data --root docs/v2/data
           python scripts/v2/restore_market_capital_context.py --legacy-root docs/data --root docs/v2/data
           python scripts/v2/normalize_close_snapshot_by_close_date.py --root docs/v2/data
+          python scripts/v2/build_capital_stock_breakdown.py --root docs/v2/data --registry contracts/registries/sector_registry.json
           python scripts/v2/stamp_version_contract.py --root docs/v2/data
           python -m scripts.v2.validate_bundle --root docs/v2/data
           python scripts/v2/validate_market_capital_context.py --root docs/v2/data
