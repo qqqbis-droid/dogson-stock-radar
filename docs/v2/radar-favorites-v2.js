@@ -1,7 +1,7 @@
 (()=>{'use strict';
 if(window.RadarFavorites?.version==='2.0')return;
 const KEY='inuko.radar.favorites.v2';
-const PRIOR=['dogson-favorites-v1','dogson-favorites','dogson-watchlist-v1','dogson-stock-watchlist','inuko-watchlist-v1','dogson.my-watchlist'];
+const PRIOR=['dogson-favorites-v1','dogson-favorites','dogson-watchlist-v1','dogson-stock-watchlist','inuko-watchlist-v1','dogson.my-watchlist','dogson-radar-watchlist','dogson-stock-radar-favorites','inuko-favorites'];
 const clean=v=>{const s=String(v||'').trim();return /^\d{4,6}$/.test(s)?s:''};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const read=(k)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):null}catch{return null}};
@@ -24,7 +24,7 @@ function refreshUi(){
 }
 function renderMissing(){
  let tray=document.getElementById('radarFavoritesUnranked');if(!tray)return;
- if(!only){tray.hidden=true;tray.innerHTML='';return}
+ if(!only||document.querySelector('.tab.active')?.dataset.view==='portfolio'){tray.hidden=true;tray.innerHTML='';return}
  const ranked=new Set([...document.querySelectorAll('#cards .card[data-code]')].map(c=>c.dataset.code));
  const unknown=[...cache.values()].filter(x=>!ranked.has(x.code));
  if(!unknown.length){tray.hidden=true;tray.innerHTML='';return}
@@ -40,6 +40,7 @@ function mountFilter(){
   btn=document.createElement('button');btn.type='button';btn.id='radarFavoritesOnly';btn.className='rf-only';btn.setAttribute('aria-pressed','false');
   wrap.appendChild(btn);
  }
+ btn.hidden=document.querySelector('.tab.active')?.dataset.view==='portfolio';
  const panel=document.querySelector('#radarPanel');
  if(panel&&!document.getElementById('radarFavoritesUnranked')){
   const tray=document.createElement('div');tray.id='radarFavoritesUnranked';tray.className='rf-unranked';tray.hidden=true;
