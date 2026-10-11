@@ -69,7 +69,8 @@ function compact(x){
   :'<div class="cp-levels"><div><small>回踩觀察 S1</small><b>'+esc(range(x.support))+'</b></div><div><small>第一壓力 R1</small><b>'+esc(range(x.resistance))+'</b></div></div>'
   +'<div class="cp-message">'+esc(x.gate)+(x.rr!=null?'｜收盤價風報比 '+esc(fmt(x.rr,2))+' 倍':'')+'</div>'
   +'<div class="cp-risk">失效觀察：S1 下緣 '+esc(pp(x.support?.low,'lower'))+' 有效跌破才重新評估；隔日不照抄收盤價。</div>';
- return '<div class="close-plan-integrated" data-close-plan>'+owned+'<div class="cp-explain">'+esc(x.note)+'</div>'+status+'</div>';
+ const tags=(x.ready?[x.early?'🌱 起漲前段觀察':null,x.chipReady?'🔗 籌碼與族群共振已核對':null].filter(Boolean):[]);
+ return '<div class="close-plan-integrated" data-close-plan>'+owned+'<div class="cp-explain">'+esc(x.note)+'</div>'+(tags.length?'<div class="cp-tags">'+tags.map(t=>'<span>'+esc(t)+'</span>').join('')+'</div>':'')+status+'</div>';
 }
 function writeCard(card,x){
  if(!card?.isConnected)return;
