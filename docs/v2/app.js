@@ -474,11 +474,11 @@ document.addEventListener("keydown",e=>{
 });
 
 document.addEventListener("radar:favorites-filter-changed",async e=>{
-  if(state.view==="portfolio")return;
+  if(state.view==="portfolio"||document.querySelector("#radarPanel")?.classList.contains("h60-screen-active"))return;
   try{if(e.detail?.only){await ensureIndex();state.visibleCount=Math.max(state.visibleCount,30)}renderCards()}catch(err){console.warn("收藏篩選載入失敗",err);renderCards()}
 });
 document.addEventListener("radar:favorites-changed",()=>{
-  if(state.view!=="portfolio"&&window.RadarFavorites?.only?.())renderCards();
+  if(state.view!=="portfolio"&&!document.querySelector("#radarPanel")?.classList.contains("h60-screen-active")&&window.RadarFavorites?.only?.())renderCards();
 });
 
 $("#searchInput")?.addEventListener("input",e=>{
