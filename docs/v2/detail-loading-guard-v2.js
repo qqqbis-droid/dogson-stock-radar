@@ -231,15 +231,19 @@
   function render(shard,view,box,m){
     const d=shard.decision||{},e=shard.evidence||null,zones=Array.isArray(shard.zones)?shard.zones:[];
     const supports=zones.filter(z=>z.side==='SUPPORT').slice(0,2),resistances=zones.filter(z=>z.side==='RESISTANCE').slice(0,2);
-    const [ms,mv]=mainScore(view,d),[lt,tone]=light(view,d);
     const ignite=isIgnition(view);
+    const singlePlan=view==='close'&&!ignite?window.InukoCloseOps?.analyze?.(shard):null;
+    const [ms,mv]=mainScore(view,d),[engineLabel,engineTone]=light(view,d);
+    const lt=singlePlan?.label||engineLabel;
+    const tone=singlePlan?(singlePlan.type==='NO_CHASE'?'risk':singlePlan.type==='VERIFY'?'stale':singlePlan.type==='LAYOUT'||singlePlan.type==='BREAKOUT'?'wait':''):engineTone;
     const context=ignite?'盤後點火':(VIEW[view]||view);
     const rank=ignite?'點火 #'+(d.ignition_rank??'—'):'排名 #'+(d.opportunity_rank??'—');
     const stage=ignite?(d.ignition_stage||'點火資料待補'):(STAGE[d.lifecycle_stage]||d.lifecycle_stage||'—');
-    const action=ignite?(d.ignition_action||'觀察'):(ACTION[d.action_state]||d.action_state||'—');
+    const action=singlePlan?.label||(ignite?(d.ignition_action||'觀察'):(ACTION[d.action_state]||d.action_state||'—'));
+    const desc=singlePlan?singlePlan.note+' '+singlePlan.gate:heroText(view,d);
     box.title.textContent=`${d.code||shard.code} ${d.name||e?.name||''}`.trim();
     box.body.innerHTML=`<div class="isd-context">${esc(context)}詳情 · ${esc(ignite?(d.ignition_stage||'—'):(d.opportunity_bucket||'—'))} · ${esc(rank)}</div>
-      <div class="isd-hero"><div><span class="isd-badge">${esc(stage)}</span><h2>${esc(action)}</h2><p>${esc(heroText(view,d))}</p></div><div class="isd-light ${tone}">${esc(lt)}</div></div>
+      <div class="isd-hero"><div><span class="isd-badge">${esc(stage)}</span><h2>${esc(action)}</h2><p>${esc(desc)}</p></div><div class="isd-light ${tone}">${esc(lt)}</div></div>
       <div class="isd-score">${scoreTile(ms,mv)}${scoreTile('進場位置',fmt(d.scores?.entry_position_score))}${scoreTile(ignite?'點火信心':'資料信心',`${fmt(ignite?d.ignition_confidence:d.data_confidence,0)}%`)}</div>
       ${freshnessHtml(shard,d,e,m)}
       <div class="isd-section"><h3>支撐 / 壓力</h3><div class="isd-zones">${supports.map(zoneHtml).join('')}${resistances.map(zoneHtml).join('')||'<div class="isd-muted">目前沒有可用支撐／壓力區。</div>'}</div></div>
