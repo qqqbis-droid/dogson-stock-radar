@@ -352,7 +352,7 @@ function emptyMessage(rows,external){
   return"目前沒有符合條件的股票。";
 }
 function outsideCard(x){
-  return `<article class="card neutral outside-pool"><div class="card-top"><div class="identity"><span class="rank">全市場 · 未排名</span><div><span class="code">${esc(x.code)} ${esc(x.name)}</span><div class="muted">${esc(x.sector_group||x.industry_name||"分類待補")} · ${esc(x.market||"")}</div></div></div><span class="badge stage">未進排名池</span></div><div class="action-line neutral"><span>○</span><b>不產生執行分</b><small>全市場搜尋</small></div><div class="reason">${esc(x._outsideReason||"目前不在雷達排名池。")}</div></article>`;
+  return `<article class="card neutral outside-pool" data-code="${esc(x.code)}" role="button" tabindex="0"><div class="card-top"><div class="identity"><span class="rank">全市場 · 未排名</span><div><span class="code">${esc(x.code)} ${esc(x.name)}</span><div class="muted">${esc(x.sector_group||x.industry_name||"分類待補")} · ${esc(x.market||"")}</div></div></div><span class="badge stage">未進排名池</span></div><div class="action-line neutral"><span>○</span><b>不產生執行分</b><small>全市場搜尋</small></div><div class="reason">${esc(x._outsideReason||"目前不在雷達排名池。")}</div></article>`;
 }
 
 function ignitionCardHtml(d,cfg){
@@ -389,14 +389,15 @@ function renderCards(){
   if(state.filterStage)rows=rows.filter(d=>isIgnitionMode()?d.ignition_stage===state.filterStage:d.lifecycle_stage===state.filterStage);
   if(state.filterSector)rows=rows.filter(d=>sectorFilterKey(d)===state.filterSector);
   rows=rows.filter(filterAction).filter(positionMatch);
+  if(window.RadarFavorites?.only?.())rows=rows.filter(d=>window.RadarFavorites.has(d.code));
   const showAllNextDay=state.view==="close"&&!isIgnitionMode()&&state.quickFilter==="NEXT_DAY_READY";
-  const external=q&&!hasNonSearchFilter()?state.externalSearch:[],shown=showAllNextDay?rows:rows.slice(0,state.visibleCount),shownCount=shown.length+external.length,prefix=activeQuick?`${activeQuick.label} · `:"";
+  const external=q&&!hasNonSearchFilter()&&!window.RadarFavorites?.only?.()?state.externalSearch:[],shown=showAllNextDay?rows:rows.slice(0,state.visibleCount),shownCount=shown.length+external.length,prefix=activeQuick?`${activeQuick.label} · `:"";
   $("#countText").textContent=!indexLoaded&&canLoadFull&&!hasDeepFilter()?`已顯示 ${shown.length} 檔`:`${prefix}${shownCount}/${rows.length+external.length} 檔`;
 
   const rankedHtml=shown.map(d=>{
     if(isIgnitionMode())return ignitionCardHtml(d,cfg);
-    const s=d.scores||{},tone=actionTone(d),score=scoreFor(d),reason=(d.why_now||[]).slice(0,2).map(humanReason),block=(d.blockers||[])[0],fresh=displayFreshness(d);
-    return `<article class="card ${tone}" data-code="${esc(d.code)}" role="button" tabindex="0" aria-label="查看 ${esc(d.code)} ${esc(d.name)} 個股詳情"><div class="card-top"><div class="identity"><span class="rank">${esc(rankText(d))}</span><div><span class="code">${esc(d.code)} ${esc(d.name)}</span><div class="muted">${esc(sectorDisplay(d))}</div></div></div><span class="badge stage">${esc(stageLabel[d.lifecycle_stage]||d.lifecycle_stage)}</span></div>${quoteHtml(d)}<div class="action-line ${tone}"><span>${d.actionable?"●":"○"}</span><b>${esc(actionLabel[d.action_state]||d.action_state||"—")}</b><small>${esc(fresh)}</small></div><div class="score-row"><div class="score"><span>${esc(cfg.scoreLabel)}</span><b>${fmt(score)}</b></div><div class="score"><span>進場位置</span><b>${fmt(s.entry_position_score)}</b></div><div class="score"><span>資料信心</span><b>${fmt(d.data_confidence,0)}<small>%</small></b></div></div><div class="reason">${reason.length?reason.map(esc).join("・"):"目前無新增理由"}</div>${block?`<div class="blocker">卡點：${esc(humanBlock(block))}</div>`:""}</article>`;
+    const s=d.scores||{},closeStrategy=state.view==="close"&&!isIgnitionMode(),tone=closeStrategy?"neutral":actionTone(d),score=scoreFor(d),reason=(d.why_now||[]).slice(0,2).map(humanReason),block=(d.blockers||[])[0],fresh=displayFreshness(d);
+    return `<article class="card ${tone}" data-code="${esc(d.code)}" role="button" tabindex="0" aria-label="查看 ${esc(d.code)} ${esc(d.name)} 個股詳情"><div class="card-top"><div class="identity"><span class="rank">${esc(rankText(d))}</span><div><span class="code">${esc(d.code)} ${esc(d.name)}</span><div class="muted">${esc(sectorDisplay(d))}</div></div></div><span class="badge stage">${esc(stageLabel[d.lifecycle_stage]||d.lifecycle_stage)}</span></div>${quoteHtml(d)}<div class="action-line ${tone}"><span>${closeStrategy?"○":d.actionable?"●":"○"}</span><b>${closeStrategy?"明日策略核對中":esc(actionLabel[d.action_state]||d.action_state||"—")}</b><small>${closeStrategy?"盤後價格核對":esc(fresh)}</small></div><div class="score-row"><div class="score"><span>${esc(cfg.scoreLabel)}</span><b>${fmt(score)}</b></div><div class="score"><span>進場位置</span><b>${fmt(s.entry_position_score)}</b></div><div class="score"><span>資料信心</span><b>${fmt(d.data_confidence,0)}<small>%</small></b></div></div><div class="reason">${reason.length?reason.map(esc).join("・"):"目前無新增理由"}</div>${block?`<div class="blocker">卡點：${esc(humanBlock(block))}</div>`:""}</article>`;
   }).join("");
   const outsideHtml=external.map(outsideCard).join("");
   $("#cards").innerHTML=(rankedHtml+outsideHtml)||`<div class="empty-state"><b>${esc(emptyMessage(rows,external))}</b><p>原始雷達池 ${originalCount} 檔；空結果會保留並說明，不會自動放寬成假訊號。</p></div>`;
@@ -405,6 +406,7 @@ function renderCards(){
   if(showAllNextDay){loadMore.classList.add("hidden")}
   else if(!indexLoaded&&canLoadFull&&!hasDeepFilter()){loadMore.classList.remove("hidden");loadMore.textContent="查看更多全部候選"}
   else{const hasMore=state.visibleCount<rows.length;loadMore.classList.toggle("hidden",!hasMore);loadMore.textContent="查看更多"}
+  document.dispatchEvent(new CustomEvent("radar:cards-rendered",{detail:{view:state.view,closeMode:state.closeMode,build:state.manifest?.active_build_id}}));
 }
 
 async function applyDeepFilter({needDetail=false}={}){
@@ -418,7 +420,7 @@ async function applyDeepFilter({needDetail=false}={}){
   renderSectorFilter();renderRadarSummary();renderCards();
 }
 function resetFilters(){
-  state.search="";state.externalSearch=[];state.quickFilter="";state.filterStage="";state.filterAction="";state.filterPosition="";state.filterSector="";
+  state.search="";state.externalSearch=[];state.quickFilter="";state.filterStage="";state.filterAction="";state.filterPosition="";state.filterSector="";window.RadarFavorites?.setOnly(false,false);
   clearTimeout(state.searchTimer);
   for(const id of ["searchInput","stageFilter","actionFilter","positionFilter","sectorFilter"]){const el=$("#"+id);if(el)el.value=""}
 }
@@ -469,6 +471,14 @@ document.addEventListener("keydown",e=>{
   const card=e.target.closest?.("#cards .card[data-code]");
   if(!card||e.target!==card)return;
   e.preventDefault();openCard(card);
+});
+
+document.addEventListener("radar:favorites-filter-changed",async e=>{
+  if(state.view==="portfolio")return;
+  try{if(e.detail?.only){await ensureIndex();state.visibleCount=Math.max(state.visibleCount,30)}renderCards()}catch(err){console.warn("收藏篩選載入失敗",err);renderCards()}
+});
+document.addEventListener("radar:favorites-changed",()=>{
+  if(state.view!=="portfolio"&&window.RadarFavorites?.only?.())renderCards();
 });
 
 $("#searchInput")?.addEventListener("input",e=>{
