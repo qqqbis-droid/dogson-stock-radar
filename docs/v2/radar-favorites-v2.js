@@ -25,7 +25,8 @@ function refreshUi(){
 function renderMissing(){
  let tray=document.getElementById('radarFavoritesUnranked');if(!tray)return;
  if(!only||document.querySelector('.tab.active')?.dataset.view==='portfolio'){tray.hidden=true;tray.innerHTML='';return}
- const ranked=new Set([...document.querySelectorAll('#cards .card[data-code]')].map(c=>c.dataset.code));
+ const is60=document.querySelector('#radarPanel')?.classList.contains('h60-screen-active');
+ const ranked=new Set([...document.querySelectorAll(is60?'#h60Cards .h60-screen-card[data-code]':'#cards .card[data-code]')].map(c=>c.dataset.code));
  const unknown=[...cache.values()].filter(x=>!ranked.has(x.code));
  if(!unknown.length){tray.hidden=true;tray.innerHTML='';return}
  tray.hidden=false;
@@ -50,9 +51,9 @@ function mountFilter(){
 }
 function mountStars(){
  mountFilter();
- document.querySelectorAll('#cards .card[data-code]').forEach(card=>{
+ document.querySelectorAll('#cards .card[data-code],#h60Cards .h60-screen-card[data-code]').forEach(card=>{
   const code=clean(card.dataset.code);if(!code)return;
-  const top=card.querySelector(':scope > .card-top');if(!top)return;
+  const top=card.querySelector(':scope > .card-top,:scope > .h60-card-top');if(!top)return;
   let btn=top.querySelector('[data-radar-fav-code]');
   if(!btn){btn=document.createElement('button');btn.type='button';btn.className='rf-star';btn.dataset.radarFavCode=code;btn.title='收藏／取消收藏';top.insertAdjacentElement('beforeend',btn)}
  });
@@ -70,13 +71,14 @@ function setOnly(v,emit=true){
 }
 document.addEventListener('click',e=>{
  const star=e.target.closest('[data-radar-fav-code]');if(star){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
-  const card=star.closest('.card'),name=card?.querySelector('.code')?.textContent?.replace(/^\d{4,6}\s*/,'')||'';
+  const card=star.closest('.card'),name=card?.querySelector('.code,.h60-card-name')?.textContent?.replace(/^\d{4,6}\s*/,'')||'';
   toggle(star.dataset.radarFavCode,name);return}
  if(e.target.closest('#radarFavoritesOnly')){e.preventDefault();e.stopPropagation();setOnly(!only);return}
  const search=e.target.closest('[data-radar-fav-search]');if(search){e.preventDefault();const input=document.querySelector('#searchInput');
   if(input){if(only)setOnly(false);input.value=search.dataset.radarFavSearch;input.dispatchEvent(new Event('input',{bubbles:true}));input.focus()}return}
 },true);
 document.addEventListener('radar:cards-rendered',mountStars);
+document.addEventListener('radar:hourly60-rendered',mountStars);
 document.addEventListener('radar:view-rendered',mountStars);
 document.addEventListener('radar:data-reloaded',mountStars);
 window.addEventListener('storage',e=>{if(e.key===KEY){cache.clear();toItems(read(KEY)).forEach(x=>cache.set(x.code,x));refreshUi();document.dispatchEvent(new Event('radar:favorites-changed'))}});
