@@ -72,8 +72,8 @@ def build(root, registry):
     source = load(resolve(root, datasets["stock_detail_close"]["url"]))
     if not close_date or context.get("build_id") != build_id or source.get("build_id") != build_id:
         raise SystemExit("capital detail source build/date mismatch")
-    if str(context.get("trade_date") or "")[:10] != close_date:
-        raise SystemExit("capital detail dates inconsistent")
+    if str(context.get("trade_date") or "")[:10] != close_date or str(datasets["stock_detail_close"].get("as_of") or "")[:10] != close_date:
+        raise SystemExit("capital detail/stock close price dates inconsistent")
     members = registry_groups(registry)
     groups = {str(x["primary_group"]): x for x in context.get("rows") or [] if x.get("primary_group")}
     if not groups:
@@ -201,8 +201,8 @@ def build(root, registry):
     mf.write_text(json.dumps(m, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     print("capital close constituents", {"build": build_id, "date": close_date, "groups": len(out),
                                        "verified": valid_count, "unreconciled": mismatch_count,
-                                       "memory": {k: out[k][k2] for k2 in ["buy_count", "sell_count", "delta_amount_100m", "delta_lots", "verdict"]}
-                                       if (k := "記憶體IC") in out else None})
+                                       "memory": {field: out["記憶體IC"][field] for field in ["buy_count", "sell_count", "delta_amount_100m", "delta_lots", "verdict"]}
+                                       if "記憶體IC" in out else None})
     # Do not abort deployment for missing/partial provenance in some groups.
     # UI will clearly label them unverified, never invent a strong sector signal.
 
