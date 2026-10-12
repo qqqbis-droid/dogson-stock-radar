@@ -164,6 +164,11 @@ function quickValue(item,buckets,stages){
 }
 
 const LIVE_POLL_MS=45000;
+let viewLoadSerial=0;
+function isEditingRadar(){
+  const el=document.activeElement;
+  return !!(el&&(el.isContentEditable||el.matches?.('input, textarea, select, [contenteditable="true"]')));
+}
 function isLiveAutoView(){return ["intraday","close","portfolio","daytrade"].includes(state.view)}
 function manifestMissionMeta(manifest,view=state.view){const cfg=missionConfig[view];return cfg?.summary?manifest?.datasets?.[cfg.summary]:null}
 function manifestMissionKey(manifest,view=state.view){const meta=manifestMissionMeta(manifest,view);return `${manifest?.active_build_id||""}|${meta?.as_of||""}`}
@@ -180,7 +185,7 @@ async function applyFreshManifest(manifest,{source="manual"}={}){
   document.dispatchEvent(new CustomEvent("radar:data-reloaded",{detail:{build:manifest.active_build_id,source}}));
 }
 async function checkLiveUpdate(){
-  if(!isLiveAutoView()||document.hidden||state.loading||state.livePollBusy)return;
+  if(!isLiveAutoView()||document.hidden||state.loading||state.livePollBusy||isEditingRadar())return;
   state.livePollBusy=true;state.lastAutoCheckAt=Date.now();
   try{
     const r=await fetch(`./data/current_manifest.json?t=${Date.now()}`,{cache:"no-store"});
@@ -226,13 +231,17 @@ async function reloadRadar(){
 function showHealth(){const b=$("#healthBanner");if(!b)return;b.classList.add("hidden");b.textContent=""}
 
 async function loadView(){
+  const serial=++viewLoadSerial,view=state.view,closeMode=state.closeMode;
   state.visibleCount=15;
-  const cfg=missionConfig[state.view];
+  const cfg=missionConfig[view];
   if(state.view!=="portfolio"){
     const jobs=[dataset(cfg.summary),dataset("radar_stats")];
     if(isIgnitionMode()&&cfg.index)jobs.push(dataset(cfg.index));
     await Promise.all(jobs);
   }
+  // Ignore completed fetches from a previous tab or mode switch.
+  // They must never repaint the user's active screen during text entry.
+  if(serial!==viewLoadSerial||state.view!==view||state.closeMode!==closeMode)return;
   renderAll();
   document.dispatchEvent(new CustomEvent("radar:view-rendered",{detail:{view:state.view,build:state.manifest?.active_build_id}}));
 }
@@ -454,7 +463,7 @@ document.addEventListener("click",async e=>{
     await loadView();
     if(state.view===tab.dataset.view){
       requestAnimationFrame(()=>{
-        if(state.view!==tab.dataset.view)return;
+        if(state.view!==tab.dataset.view||isEditingRadar())return;
         if(state.view==='portfolio'){
           const p=document.getElementById('portfolioPanel');
           const sticky=(document.getElementById('marketPulse')?.offsetHeight||0)
