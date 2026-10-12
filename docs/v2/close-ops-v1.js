@@ -24,7 +24,9 @@ function findZones(shard,price,date,build){
  let support=pick('SUPPORT','S1');
  let resistance=pick('RESISTANCE','R1');
  // Never silently substitute a distant S2/R2 for S1/R1 in the compact card.
- return {support,resistance,fresh:!!support&&!!resistance&&[support,resistance].every(z=>['FRESH','FROZEN'].includes(String(z.freshness||'')))};
+ const valid=z=>!!z&&['FRESH','FROZEN'].includes(String(z.freshness||''));
+ return {support:valid(support)?support:null,resistance:valid(resistance)?resistance:null,
+    supportFresh:valid(support),resistanceFresh:valid(resistance),fresh:valid(support)&&valid(resistance)};
 }
 function classify(d,shard){
  const ev=shard?.evidence||{},engine=shard?.decision||d||{},code=String(engine.code||d?.code||''),price=n(engine.quote?.price??d?.quote?.price),date=D.date;
@@ -33,7 +35,10 @@ function classify(d,shard){
  const rr=price!=null&&r!=null&&target!=null&&price>r&&target>price?(target-price)/(price-r):null;
  const same=!!shard&&shard.build_id===D.build&&shard.view==='close'&&td(shard.as_of)===date;
  const confidence=n(engine.data_confidence);
- const good=validGlobal()&&same&&confidence!=null&&confidence>=80&&zones.fresh&&price!=null;
+ // Price structures are independently valid: R1 may be absent even if S1 is
+ // confirmed. Never erase an existing S1 when a separate R1 is missing.
+ const sessionOK=validGlobal()&&same&&confidence!=null&&confidence>=80&&price!=null;
+ const good=sessionOK&&zones.fresh;
  const riskover=Array.isArray(engine.risk_overlays)?engine.risk_overlays:[];
  const restricted=riskover.some(x=>['TRADING_RESTRICTION','LIQUIDITY_RISK','DATA_QUALITY_RISK'].includes(String(x)));
  const overheated=engine.action_state==='DO_NOT_CHASE'||engine.no_chase===true||riskover.includes('OVERHEAT')||(n(ev.dist20)!=null&&n(ev.dist20)>8);
@@ -46,8 +51,12 @@ function classify(d,shard){
  const early=['SETUP','LAUNCH','PULLBACK_TEST','PULLBACK_CONFIRMED'].includes(engine.lifecycle_stage)&&!overheated&&(n(ev.dist20)==null||n(ev.dist20)<=7);
  const owned=positions().some(p=>String(p.code)===code);
  let type='WATCH',label='暫時觀察',note='尚未出現足夠的進場條件，等待量價與結構同步。',gate='等關鍵條件確認';
- if(!good){
-  type='VERIFY';label='資料待驗證';note='尚未取得通過交易日、資料信心和 S1／R1 檢查的完整證據；不提供可執行買進價。';gate='資料核對後再評估';
+ if(!sessionOK){
+  type='VERIFY';label='資料待驗證';note=same?'盤後資料信心或全域資料日期尚未確認；已驗證的價位只供參考，不作為下單指令。':'個股盤後來源尚未取得或交易日不一致，暫不使用任何價位下單。';gate='完成同交易日資料核對後再評估';
+ }else if(!zones.supportFresh||!zones.resistanceFresh){
+  type='PARTIAL';label=!zones.supportFresh?'支撐待補':'壓力待補';
+  note=!zones.supportFresh?'沒有有效 S1 支撐，不硬設停損；已有的 R1 僅供觀察。':'同日 S1 已核對，但缺少有效 R1，無法計算進場風報比；不推估突破價。';
+  gate='價位證據補齊前，暫不建立新倉';
  }else if(restricted||overheated||impaired){
   type='NO_CHASE';label='先不追價';note=restricted?'有交易限制、流動性或資料品質風險，暫不列新倉。':impaired?'原始結構已轉弱或風險優先，暫不列新倉。':'過熱／不追價條件已成立。';gate='等待風險解除並重新驗證';
  }else if(resistance&&price>=resistance.low){
@@ -61,22 +70,34 @@ function classify(d,shard){
  }else if(early&&engine.actionable===true){
   type='LAYOUT';label='等待布局';note='原模型條件具備，但隔日仍須等價位與量價確認。';gate='等待支撐附近有效承接';
  }
- return {code,type,label,note,gate,owned,rr,support,resistance,chipReady,early,confidence,ready:good,block:restricted,missing:!same};
+ return {code,type,label,note,gate,owned,rr,support:same?support:null,resistance:same?resistance:null,chipReady,early,confidence,
+   ready:good,sessionOK,partial:same&&!zones.fresh,block:restricted,missing:!same,date:D.date};
 }
 function compact(x){
  const owned=x.owned?'<span class="cp-owned">💼 已持有</span>':'';
- const status=!x.ready?'<div class="cp-message">資料尚未通過盤後驗證；完整證據請見個股詳情。</div>'
-  :'<div class="cp-levels"><div><small>回踩觀察 S1</small><b>'+esc(range(x.support))+'</b></div><div><small>第一壓力 R1</small><b>'+esc(range(x.resistance))+'</b></div></div>'
-  +'<div class="cp-message">'+esc(x.gate)+(x.rr!=null?'｜收盤價風報比 '+esc(fmt(x.rr,2))+' 倍':'')+'</div>'
-  +'<div class="cp-risk">失效觀察：S1 下緣 '+esc(pp(x.support?.low,'lower'))+' 有效跌破才重新評估；隔日不照抄收盤價。</div>';
+ const levels=x.support||x.resistance
+  ?'<div class="cp-levels"><div><small>回踩觀察 S1</small><b>'+esc(x.support?range(x.support):'待補（不推估）')+'</b></div><div><small>第一壓力 R1</small><b>'+esc(x.resistance?range(x.resistance):'待補（不推估）')+'</b></div></div>'
+  :'<div class="cp-message">尚無同日、同版本的有效支撐／壓力價區。</div>';
+ const readyNote=x.ready&&x.rr!=null?'｜收盤價風報比 '+esc(fmt(x.rr,2))+' 倍'
+  :x.partial?'｜缺少一側價區，不計算風報比':'';
+ const guide=x.support?'失效觀察：S1 下緣 '+esc(pp(x.support.low,'lower'))+'；確認有效跌破再重新評估，並非碰價即停損。'
+   :'沒有有效 S1，不依百分比或猜測設定停損。';
+ const foot='<div class="cp-message">'+esc(x.gate)+readyNote+'</div>'
+   +'<div class="cp-risk">'+guide+'｜'+esc(x.date||'—')+' 盤後資料；隔日需核對即時報價。</div>';
+ const caution=x.sessionOK?'':(x.missing?'⛔ 尚無同版本盤後證據；以下僅顯示已核對的價位。'
+  :'⚠️ 資料日期或信心檢查未通過，已核對價位僅供參考，不可直接下單。');
  const tags=(x.ready?[x.early?'🌱 起漲前段觀察':null,x.chipReady?'🔗 籌碼與族群共振已核對':null].filter(Boolean):[]);
- return '<div class="close-plan-integrated" data-close-plan>'+owned+'<div class="cp-explain">'+esc(x.note)+'</div>'+(tags.length?'<div class="cp-tags">'+tags.map(t=>'<span>'+esc(t)+'</span>').join('')+'</div>':'')+status+'</div>';
+ return '<div class="close-plan-integrated" data-close-plan>'+owned
+  +'<div class="cp-explain">'+esc(x.note)+'</div>'
+  +(caution?'<div class="cp-risk">'+esc(caution)+'</div>':'')
+  +(tags.length?'<div class="cp-tags">'+tags.map(t=>'<span>'+esc(t)+'</span>').join('')+'</div>':'')
+  +levels+foot+'</div>';
 }
 function writeCard(card,x){
  if(!card?.isConnected)return;
  const line=card.querySelector(':scope > .action-line'),label=line?.querySelector('b');
  if(line&&label){
-  const tone=x.type==='NO_CHASE'?'risk':x.type==='VERIFY'?'stale':x.type==='LAYOUT'||x.type==='BREAKOUT'?'wait':'neutral';
+  const tone=x.type==='NO_CHASE'?'risk':x.type==='VERIFY'||x.type==='PARTIAL'?'stale':x.type==='LAYOUT'||x.type==='BREAKOUT'?'wait':'neutral';
   line.classList.remove('go','wait','risk','stale','neutral');line.classList.add(tone);
   label.textContent=x.label;
   const dot=line.querySelector('span');if(dot)dot.textContent=x.type==='VERIFY'?'!':'○';
