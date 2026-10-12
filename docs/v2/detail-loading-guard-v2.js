@@ -5,6 +5,7 @@
   let seq=0;
   let activeCloseMode='swing';
   const cache=new Map();
+  let activeDetail=null;
   const isIgnition=view=>view==='close'&&activeCloseMode==='ignition';
 
   const VIEW={intraday:'盤中波段',close:'盤後波段',daytrade:'當沖'};
@@ -272,6 +273,7 @@
   }
 
   async function openStock(code,view,closeMode){
+    activeDetail={code:String(code),view,closeMode};
     activeCloseMode=view==='close'?(closeMode==='ignition'?'ignition':'swing'):'swing';
     const my=++seq,box=ui(code); if(!box)return;
     try{
@@ -309,6 +311,15 @@
     const mode=String(e.detail?.closeMode||document.querySelector('[data-close-mode="ignition"].active')?.dataset.closeMode||'swing');
     openStock(code,view,mode);
   },true);
-  document.addEventListener('radar:data-reloaded',()=>{cache.clear();seq++;});
-  document.addEventListener('close',e=>{if(e.target?.id==='detailDialog')seq++;},true);
+  document.addEventListener('radar:data-reloaded',()=>{
+    cache.clear();seq++;
+    // If close data advances while an iPhone stock modal stays open, refresh
+    // that modal too instead of leaving the previous build's chip date visible.
+    const dialog=document.getElementById('detailDialog');
+    if(dialog?.open&&activeDetail){
+      const {code,view,closeMode}=activeDetail;
+      void openStock(code,view,closeMode);
+    }
+  });
+  document.addEventListener('close',e=>{if(e.target?.id==='detailDialog'){seq++;activeDetail=null;}},true);
 })();
