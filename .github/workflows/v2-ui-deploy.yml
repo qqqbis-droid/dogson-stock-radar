@@ -270,6 +270,7 @@ jobs:
           python -m py_compile scripts/v2/build_stock_shards.py scripts/v2/enrich_zones.py
           node --check docs/v2/app.js
           node --check docs/v2/market-pulse-v2.js
+          grep -q 'market-pulse-v2.js?v=20261012partial1' docs/v2/index.html
           node --check docs/v2/stock-detail-renderer.js
           node --check docs/v2/detail-loading-guard-v1.js
           node --check docs/v2/detail-loading-guard-v2.js
