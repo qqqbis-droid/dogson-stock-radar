@@ -144,13 +144,13 @@ window.RadarUniverseSearch={search:searchUniverse,clear(){US.rows=null;US.promis
     card.dataset.shardHydrated=String(payload.build_id||'');
   }
   async function hydrateVisibleCards(){
+    // Search owns discovery and filtering, NOT trading verdicts.
+    // The legacy hydrated AH strip duplicates and contradicts the single
+    // next-session plan rendered by close-ops-v1.js.
     if(activeView()!=='close')return;
-    const m=await ensureManifest(),build=String(m?.active_build_id||'');if(!build)return;
-    const cards=[...document.querySelectorAll('#cards .card[data-code]')].filter(c=>needsHydration(c,build));
-    let cursor=0;
-    async function worker(){while(cursor<cards.length){const card=cards[cursor++],code=String(card.dataset.code||'');const shard=await loadShard(code);if(shard&&activeView()==='close'&&card.isConnected)applyShard(card,shard)}}
-    await Promise.all(Array.from({length:Math.min(4,cards.length)},()=>worker()));
+    document.querySelectorAll('#cards .card [data-ahd-strip]').forEach(el=>el.remove());
   }
+
   function scheduleHydration(delay=90){clearTimeout(state.hydrateTimer);state.hydrateTimer=setTimeout(()=>hydrateVisibleCards(),delay)}
 
   function init(){
