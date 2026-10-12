@@ -42,7 +42,7 @@ jobs:
           set -euo pipefail
           base="https://qqqbis-droid.github.io/dogson-stock-radar/data"
           critical=(close.json market.json intraday.json hourly.json daytrade.json)
-          optional=(universe.json status.json system_status.json chip_history.json chip_status.json mis_snapshots.json validation_history.json validation.json decision_history.json)
+          optional=(universe.json status.json system_status.json chip_history.json chip_status.json mis_snapshots.json validation_history.json validation.json decision_history.json portfolio_reference.json)
           mkdir -p docs/data
           for name in "${critical[@]}"; do
             tmp="docs/data/${name}.live"
