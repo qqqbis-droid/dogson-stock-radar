@@ -444,7 +444,20 @@ document.addEventListener("click",async e=>{
     return;
   }
   const tab=e.target.closest?.(".tab");
-  if(tab){state.view=tab.dataset.view;resetFilters();document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===tab));await loadView();if(isLiveAutoView())checkLiveUpdate();return}
+  if(tab){
+    state.view=tab.dataset.view;resetFilters();
+    document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===tab));
+    // Switching from a long radar list must not drop the user at the bottom
+    // of the portfolio (cloud/settings footer), seemingly hiding positions.
+    window.scrollTo(0,0);
+    document.documentElement.scrollTop=0;document.body.scrollTop=0;
+    await loadView();
+    if(state.view===tab.dataset.view){
+      window.scrollTo(0,0);
+      document.documentElement.scrollTop=0;document.body.scrollTop=0;
+    }
+    if(isLiveAutoView())checkLiveUpdate();return
+  }
 
   const quickClear=e.target.closest?.("[data-quick-filter-clear]");
   if(quickClear){state.quickFilter="";state.visibleCount=15;renderRadarSummary();renderCards();return}
