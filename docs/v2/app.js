@@ -453,8 +453,18 @@ document.addEventListener("click",async e=>{
     document.documentElement.scrollTop=0;document.body.scrollTop=0;
     await loadView();
     if(state.view===tab.dataset.view){
-      window.scrollTo(0,0);
-      document.documentElement.scrollTop=0;document.body.scrollTop=0;
+      requestAnimationFrame(()=>{
+        if(state.view!==tab.dataset.view)return;
+        if(state.view==='portfolio'){
+          const p=document.getElementById('portfolioPanel');
+          const sticky=(document.getElementById('marketPulse')?.offsetHeight||0)
+            +(document.getElementById('tabs')?.offsetHeight||0)+16;
+          if(p&&!p.hidden)window.scrollTo({top:Math.max(0,window.scrollY+p.getBoundingClientRect().top-sticky),behavior:'auto'});
+        }else{
+          window.scrollTo(0,0);
+          document.documentElement.scrollTop=0;document.body.scrollTop=0;
+        }
+      });
     }
     if(isLiveAutoView())checkLiveUpdate();return
   }
