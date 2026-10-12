@@ -17,6 +17,7 @@ let requested=[];
 const manifest=async()=>({active_build_id:'test-build',trade_date:'2026-10-12',datasets:{decision_close_index:{as_of:'2026-10-12T13:30:00+08:00'}}});
 async function j(url,ms){
  requested.push({url,ms});
+ if(url.includes('portfolio_reference.json'))return {quotes:{'9904':{close:33,trade_date:'2026-10-12',coverage:'DAILY_TECHNICAL',source:'verified dated daily history'}}};
  if(url.includes('portfolio_market_quotes.json'))return {quotes:{
    '1802':{close:63.5,trade_date:'2026-10-12',source:'TWSE'},
    '6271':{close:247.5,trade_date:'2026-10-12',source:'TWSE'},
@@ -41,12 +42,13 @@ const funcs=new Function('manifest','j','pn','console',source+'\nreturn {data,al
  assert.equal(progress[0].analyzed,0,'Quotes must paint before any stock analysis');
  assert(progress[0].quotes.includes('1802'));
  assert(progress[0].quotes.includes('6271'));
- assert(!progress[0].quotes.includes('9904'),'Stale close price must never be treated as current');
+ assert(!progress[0].quotes.includes('9904'),'Stale official close price must never be treated as current');
+ assert(progress.some(p=>p.quotes.includes('9904')),'Valid same-session daily history should fill missing official prices');
  assert.equal(result.loaded,3);
  assert(result.detail['1802'],'One failed stock shard must not hide another stock');
  assert(!result.detail['6271'],'No fabricated stock analysis after a missing shard');
  assert(result.partialSources.some(x=>x.includes('6271')),'Report the failed stock source');
  assert(requested.every(x=>x.ms>=1000&&x.ms<=10000),'All fetches should have bounded timeouts');
- assert(requested.every(x=>x.url.includes('stock-shards/close/')||x.url.includes('portfolio_market_quotes.json')));
+ assert(requested.every(x=>x.url.includes('stock-shards/close/')||x.url.includes('portfolio_market_quotes.json')||x.url.includes('portfolio_reference.json')));
  console.log('PASS: progressive official quotes first, source dates validated, independent 3-stock details and deadline bounds');
 })().catch(e=>{console.error(e);process.exitCode=1});
