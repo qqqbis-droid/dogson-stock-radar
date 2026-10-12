@@ -101,6 +101,56 @@ def collect():
     }
 
 
+def merge_completed_close(result: dict, path: Path | None) -> dict:
+    """Use today's already-validated close-build daily bars when OpenAPI lags.
+
+    These are labelled as completed daily-K evidence, NOT official exchange
+    close quotations, and never overwrite a same-session official quote.
+    """
+    if path is None or not path.is_file():
+        return result
+    try:
+        source = json.loads(path.read_text(encoding="utf-8"))
+        day = session(source.get("trade_date"))
+        rows = source.get("rows") or []
+        if not day or not isinstance(rows, list):
+            return result
+        count = 0
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            code = str(row.get("code") or "")
+            if not re.fullmatch(r"[0-9]{4,6}", code):
+                continue
+            if session(row.get("date")) != day:
+                continue
+            px = n(row.get("close"))
+            if px is None:
+                continue
+            old = result["quotes"].get(code)
+            if old and str(old.get("trade_date") or "") >= day:
+                continue
+            market = str(row.get("market") or "")
+            if market == "上市":
+                market = "TWSE"
+            elif market == "上櫃":
+                market = "TPEX"
+            result["quotes"][code] = {
+                "code": code,
+                "name": str(row.get("name") or ""),
+                "close": px,
+                "trade_date": day,
+                "market": market,
+                "source": "Radar completed-session daily K (non-official)"
+            }
+            count += 1
+        result["completed_daily_fallback"] = {"trade_date": day, "covered": count}
+        print("portfolio completed-session fallback", result["completed_daily_fallback"])
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        print("portfolio completed close ignored:", str(exc)[:180])
+    return result
+
+
 def merge_same_session(result: dict, prior_path: Path | None) -> dict:
     """Preserve verified, same-session symbols missing from a partial fetch.
 
@@ -144,8 +194,14 @@ def merge_same_session(result: dict, prior_path: Path | None) -> dict:
             return result
         merged = {code: q for code, q in accepted.items()
                   if str(q.get("trade_date") or "") == target}
-        merged.update({code: q for code, q in current.items()
-                       if str(q.get("trade_date") or "") == target})
+        for code, q in current.items():
+            if str(q.get("trade_date") or "") != target:
+                continue
+            # A previously verified same-day exchange close beats a newly
+            # retrieved daily-bar fallback, but today's exchange close wins.
+            if code in merged and q.get("source") == "Radar completed-session daily K (non-official)":
+                continue
+            merged[code] = q
         added = len(set(merged).difference(current))
         result["quotes"] = merged
         result["preserved_same_session"] = {
@@ -165,9 +221,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--prior", help="Previously published validated same-day quote snapshot")
+    ap.add_argument("--close-json", help="Latest validated completed-session close.json")
     args = ap.parse_args()
     path = Path(args.out)
-    result = merge_same_session(collect(), Path(args.prior) if args.prior else None)
+    result = merge_same_session(merge_completed_close(collect(), Path(args.close_json) if args.close_json else None), Path(args.prior) if args.prior else None)
     # Never replace a previously good public snapshot with two failed requests.
     if not result["quotes"] and path.exists():
         print("portfolio quote fetch unavailable; preserving existing snapshot", result["source_status"])
