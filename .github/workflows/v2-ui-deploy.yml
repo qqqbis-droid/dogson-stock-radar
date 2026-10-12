@@ -189,7 +189,7 @@ jobs:
             "https://qqqbis-droid.github.io/dogson-stock-radar/v2/data/portfolio_market_quotes.json?prior_run=${GITHUB_RUN_ID}" \
             -o "$prior" || rm -f "$prior"
           python /tmp/v2-source/scripts/v2/portfolio_quote_fallback.py \
-            --out /tmp/v2-source/docs/v2/data/portfolio_market_quotes.json --prior "$prior"
+            --out /tmp/v2-source/docs/v2/data/portfolio_market_quotes.json --prior "$prior" --close-json docs/data/close.json
           python - <<'PY'
           import json
           from pathlib import Path
