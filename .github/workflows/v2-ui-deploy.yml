@@ -238,6 +238,7 @@ jobs:
           cp /tmp/v2-source/scripts/v2/validate_single_writer_ui.py scripts/v2/validate_single_writer_ui.py
           cp /tmp/v2-source/scripts/v2/validate_product_surface.py scripts/v2/validate_product_surface.py
           cp /tmp/v2-source/scripts/v2/test_portfolio_ledger.js scripts/v2/test_portfolio_ledger.js
+          cp /tmp/v2-source/scripts/v2/test_search_focus_stability.cjs scripts/v2/test_search_focus_stability.cjs
           cp /tmp/v2-source/scripts/v2/build_stock_shards.py scripts/v2/build_stock_shards.py
           cp /tmp/v2-source/scripts/v2/enrich_zones.py scripts/v2/enrich_zones.py
           cp /tmp/v2-source/scripts/v2/build_capital_stock_breakdown.py scripts/v2/build_capital_stock_breakdown.py
