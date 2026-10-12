@@ -160,7 +160,7 @@
     const unheated=all.filter(isUnheatedStart).length;
     const btns=[`<button type="button" data-h60-cat="" class="${state.category||state.preset?'':'active'}">全部60K<strong>${all.length}</strong></button>`,`<button type="button" data-h60-preset="unheated" class="unheated ${state.preset==='unheated'?'active':''}">✨ 未過熱啟動<strong>${unheated}</strong></button>`];
     for(const [key,v] of Object.entries(CAT))btns.push(`<button type="button" data-h60-cat="${key}" class="${state.category===key?'active':''}">${v.icon} ${v.label}<strong>${counts[key]||0}</strong></button>`);
-    const host=$('#h60Cats');if(host)host.innerHTML=btns.join('');
+    const host=$('#h60Cats');if(host){const html=btns.join('');if(host.innerHTML!==html)host.innerHTML=html;}
   }
 
   function card(r){
@@ -181,8 +181,15 @@
       meta.textContent=(!state.expectedCloseDate||d!==state.expectedCloseDate)?`⛔ 60分K 資料日 ${d} 與盤後定格 ${state.expectedCloseDate||'未知'} 不一致，禁止混用；候選已隱藏。`:`60分K Engine 資料日 ${d}${u?` · 更新 ${u.replace('T',' ').slice(0,16)}`:''} · 目前 ${list.length} 檔。這是獨立60K技術篩選，不等同 V2 Stage。${presetText}`;
     }
     if($('#countText'))$('#countText').textContent=`60分K · ${list.length} 檔`;
-    if(host)host.innerHTML=list.length?list.map(card).join(''):'<div class="h60-empty">目前沒有符合這組 60分K 條件的股票。</div>';
-    document.dispatchEvent(new Event('radar:hourly60-rendered'));
+    if(host){const html=list.length?list.map(card).join(''):'<div class="h60-empty">目前沒有符合這組 60分K 條件的股票。</div>';
+      // Preserve DOM nodes and active input focus when the result set is unchanged.
+      // In particular never rebuild the entire list on a UI heartbeat.
+      if(host.dataset.h60RenderKey!==JSON.stringify([state.expectedCloseDate,state.mode,state.preset,state.category,state.position,state.sector,state.search,state.sort,list.map(x=>x.code)])){
+        host.innerHTML=html;
+        host.dataset.h60RenderKey=JSON.stringify([state.expectedCloseDate,state.mode,state.preset,state.category,state.position,state.sector,state.search,state.sort,list.map(x=>x.code)]);
+        document.dispatchEvent(new Event('radar:hourly60-rendered'));
+      }
+    }
   }
 
   document.addEventListener('radar:favorites-filter-changed',()=>{if(state.mode==='hourly60'&&activeView()==='close')renderCards()});
@@ -190,23 +197,29 @@
   function render(){renderCats();renderCards()}
 
   async function setMode(mode){
-    state.mode=mode==='hourly60'?'hourly60':'v2';
+    const next=mode==='hourly60'?'hourly60':'v2';
+    if(next===state.mode)return; // no artificial rerender on the same selection
+    state.mode=next;
     try{localStorage.setItem(storeKey,state.mode)}catch(_){}
     syncView();
-    if(state.mode==='hourly60'){await load();render()}
+    if(next==='hourly60'){
+      if(state.payload)render();
+      else if(!loading)await load(); // load() renders once after date validation
+    }
   }
 
   function syncView(){
     if(!mounted)return;
     const close=activeView()==='close',bar=$('#h60ModeBar'),sc=$('#h60Screener'),panel=$('#radarPanel');
-    if(bar)bar.style.display=close?'flex':'none';
-    if(!close){panel?.classList.remove('h60-screen-active');if(sc)sc.style.display='none';return}
-    [...bar.querySelectorAll('[data-h60-mode]')].forEach(b=>b.classList.toggle('active',b.dataset.h60Mode===state.mode));
-    const on=state.mode==='hourly60';
-    panel?.classList.toggle('h60-screen-active',on);
-    if(sc)sc.style.display=on?'block':'none';
-    const title=$('#rankingTitle');if(title)title.textContent=on?'60分K篩選':'明日優先';
-    if(on){load().then(render)}
+    const show60=close&&state.mode==='hourly60';
+    // Idempotent mode application. Never destroy/rebuild DOM during heartbeat,
+    // typing, focus changes or unrelated stock-card renders.
+    if(bar){const display=close?'flex':'none';if(bar.style.display!==display)bar.style.display=display;}
+    if(panel&&panel.classList.contains('h60-screen-active')!==show60)panel.classList.toggle('h60-screen-active',show60);
+    if(sc){const display=show60?'block':'none';if(sc.style.display!==display)sc.style.display=display;}
+    if(close&&bar)for(const b of bar.querySelectorAll('[data-h60-mode]'))b.classList.toggle('active',b.dataset.h60Mode===state.mode);
+    if(close){const title=$('#rankingTitle'),value=show60?'60分K篩選':'明日優先';if(title&&title.textContent!==value)title.textContent=value;}
+    if(show60&&!state.payload&&!loading)void load();
   }
 
   function openFromKeyboard(e){
@@ -215,6 +228,18 @@
     e.preventDefault();document.dispatchEvent(new CustomEvent('radar:open-stock',{detail:{code:c.dataset.code,source:'hourly60-screener'}}));
   }
 
-  function boot(){mount();document.addEventListener('keydown',openFromKeyboard);document.addEventListener('radar:view-rendered',()=>setTimeout(syncView,30));document.addEventListener('radar:data-reloaded',()=>{state.payload=null;state.expectedCloseDate='';if(activeView()==='close'&&state.mode==='hourly60')load()});document.addEventListener('click',e=>{if(e.target.closest?.('.tab'))setTimeout(syncView,80)});setInterval(syncView,1200)}
+  function boot(){
+    mount();document.addEventListener('keydown',openFromKeyboard);
+    document.addEventListener('radar:view-rendered',()=>setTimeout(syncView,30));
+    document.addEventListener('radar:cards-rendered',syncView);
+    document.addEventListener('radar:data-reloaded',()=>{
+      state.payload=null;state.expectedCloseDate='';
+      const h=$('#h60Cards');if(h)delete h.dataset.h60RenderKey;
+      if(activeView()==='close'&&state.mode==='hourly60'&&!loading)void load();
+    });
+    document.addEventListener('click',e=>{if(e.target.closest?.('.tab'))setTimeout(syncView,80)});
+    window.addEventListener('pageshow',syncView);
+    // No setInterval: the old 1.2s forced render erased cards and keyboard focus.
+  }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
