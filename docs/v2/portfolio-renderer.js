@@ -88,7 +88,7 @@ async function data(positions=[],onStage=()=>{}){
   emit();
  });
  d.quotes=quoteResult.quotes;d.phase=Object.keys(d.quotes).length?'同交易日收盤價已核對；逐檔補分析':'同日行情待補；逐檔補分析';
- if(quoteResult.missing.length)d.partialSources.push('同日收盤價 '+quoteResult.missing.join('、'));
+ // Missing prices are reported from final card evidence, including per-stock shards.
  emit(); // First meaningful result, without waiting for any analytical source.
  const build=String(m.active_build_id||'');
  if(!build)return d;
@@ -188,7 +188,7 @@ async function render(){
      +'<div><span>預估賣出費用＋證交稅</span><b>'+(fullNet?money(totalSellFees):'—')+'</b></div>'
      +'<div><span>需先檢查</span><b>'+riskCount+' 檔</b></div>'
      +'<div><span>行情覆蓋</span><b>'+known+'/'+joined.length+' 檔</b></div>'
-     +'<div><span>持股健檢</span><b>'+d.loaded+'/'+d.total+' 檔</b></div>'
+     +'<div><span>持股健檢</span><b>'+Object.keys(d.detail).length+'/'+d.total+' 檔有分析</b></div>'
      +'<div><span>更新進度</span><b>'+pesc(d.phase)+'</b></div>';
    if(sum&&d.partialSources.length)sum.insertAdjacentHTML('beforeend',
     '<div class="portfolio-coverage-alert" style="grid-column:1/-1;text-align:left;border:1px solid var(--line);background:var(--soft)">⚠️ 尚無法驗證：'
