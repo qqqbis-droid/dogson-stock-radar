@@ -302,13 +302,16 @@ jobs:
           node scripts/v2/test_close_zone_card_evidence.cjs
           node --check docs/v2/chip-freshness-provenance.js
           node --check docs/v2/unified-score-freshness-v1.js
+          node --check docs/v2/universe-search.js
+          grep -q 'unified-score-freshness-v1.js?v=20261012singleverdict1' docs/v2/index.html
+          grep -q 'universe-search.js?v=20261012singleverdict1' docs/v2/index.html
           node --check docs/v2/capital-stock-breakdown.js
           grep -q 'market-capital-renderer.js?v=20261011capitalwide2' docs/v2/index.html
           grep -q 'capital-member-fallback' docs/v2/market-capital-renderer.js
           grep -q 'cms-detail {grid-column:1/-1' docs/v2/capital-stock-breakdown.js
           grep -q 'capital-stock-breakdown.js?v=20261011breadth3' docs/v2/index.html
           python -m py_compile scripts/v2/build_capital_stock_breakdown.py
-          grep -q 'close-ops-v1.js?v=20261012zones-visible1' docs/v2/index.html
+          grep -q 'close-ops-v1.js?v=20261012singleverdict1' docs/v2/index.html
           grep -q 'hourly60-screener.js?v=20261012stabletyping1' docs/v2/index.html
           grep -q 'close-ops-v1.css?v=20261012merge2' docs/v2/index.html
           python - <<'PY'
