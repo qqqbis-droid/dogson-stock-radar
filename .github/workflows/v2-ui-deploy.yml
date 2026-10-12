@@ -297,7 +297,7 @@ jobs:
           node --check docs/v2/portfolio-fees.js
           node --check docs/v2/portfolio-renderer.js
           grep -q 'await data(positions,paint)' docs/v2/portfolio-renderer.js
-          grep -q 'portfolio-renderer.js?v=20261012progressive2' docs/v2/index.html
+          grep -q 'portfolio-renderer.js?v=20261012progressive3' docs/v2/index.html
           grep -q 'localFirst(positions,{loading:true})' docs/v2/portfolio-renderer.js
           grep -q 'Promise.allSettled' docs/v2/portfolio-renderer.js
           grep -q 'window.scrollY+p.getBoundingClientRect().top-sticky' docs/v2/app.js
