@@ -66,7 +66,29 @@ function sysRisk(d){return !!d&&(['EXIT_PRIORITY','REDUCE_WATCH'].includes(d.act
 function orderScore(p,d){if(p.reason_status==='INVALID')return 0;if(sysRisk(d))return 1;if(p.reason_status==='WEAKENING')return 2;if(p.reason_status==='UNVERIFIED')return 3;return 4}
 function focus(p,d){if(p.reason_status==='UNVERIFIED')return'原始進場／持有理由尚未核對：請補寫核心依據與結構失效條件；未驗證不能視為安全續抱。';if(p.reason_status==='INVALID')return'核心進場理由已失效：先檢查減碼或退出，不因虧損自動攤平。';if(p.reason_status==='WEAKENING')return'持有理由正在弱化：暫不新增部位，等驗證條件恢復或結構重新確認。';if(sysRisk(d))return'理由可能仍成立，但價格結構已轉弱：風險處理優先於加碼。';if(d?.action_state==='ADD_ON_CONFIRM')return'理由仍成立；若要加碼，只在確認條件成立後處理，不追高。';if(d?.action_state==='HOLD'||d?.lifecycle_stage==='TREND')return'理由仍成立且結構未失效：守結構，不因瞬間急跌或單筆大單機械停損。';return'理由仍成立；維持觀察，等觸發條件與位置更清楚再決定下一步。'}
 function card(p,d,e){const [status]=statusInfo(p),c=positionCalc(p,d,e),missing=d?.portfolio_coverage==='PRICE_ONLY'||!d?.scores?.swing_quality_score,risk=!missing&&sysRisk(d),cardTone=p.reason_status==='INVALID'||risk?'risk':p.reason_status==='WEAKENING'?'wait':'neutral',quality=d?.scores?.swing_quality_score;return `<article class="card portfolio-card ${cardTone}" data-portfolio-code="${pesc(p.code)}"><div class="card-top"><div class="identity"><span class="rank">持股 ${p.shares.toLocaleString('zh-TW')} 股</span><div><span class="code">${pesc(p.code)} ${pesc(p.name||d?.name||'')}</span><div class="muted">成本 ${tickPrice(p.avg_cost)} · ${pesc(d?.primary_group||'雷達池外／待分類')}</div></div></div><span class="badge stage">${pesc(status)}</span></div><div class="score-row"><div class="score"><span>${d?.portfolio_coverage==='PRICE_ONLY'?'收盤價':'現價'}</span><b>${tickPrice(c.px)}</b></div><div class="score"><span>未實現（扣賣出費稅）</span><b>${signedPct(c.pct)}</b></div><div class="score"><span>波段品質</span><b>${pf(quality,0)}</b></div></div><div class="action-line ${risk?'risk':'neutral'}"><span>${risk?'●':'○'}</span><b>${pesc(missing?'持有中｜官方行情補查':(PACTION[d.action_state]||d.action_state))}</b><small>${pesc(missing?'持股不受波段雷達流動性篩選排除；技術／籌碼未覆蓋，不假造分數':(PSTAGE[d.lifecycle_stage]||d.lifecycle_stage||''))}</small></div>${missing?`<div class="portfolio-reason">🔎 <b>庫存優先覆蓋</b>｜${c.px==null?'官方收盤價尚未取得':'官方收盤 '+pesc(d.portfolio_quote?.trade_date||d.quote?.trade_date||'日期待核對')}。進場成本與股數正常保存；日K、支撐壓力、技術分須另有驗證資料才會顯示。</div>`:''}<div class="portfolio-reason"><b>進場理由：</b>${pesc(p.entry_reason||'尚未填寫')}<br><b>持有理由：</b>${pesc(p.hold_reason||'尚未填寫')}<br><span class="muted">${pesc(focus(p,d))}</span></div><div class="portfolio-actions"><button type="button" class="text-btn" data-portfolio-detail="${pesc(p.code)}">查看持股結構</button><button type="button" class="text-btn" data-portfolio-edit="${pesc(p.code)}">編輯紀錄</button></div></article>`}
-async function data(){const m=await manifest();const [idx,detail,zones,evidence,quotes,names]=await Promise.all([set(m,'decision_close_index'),set(m,'decision_close_detail'),set(m,'zone_close'),set(m,'stock_detail_close'),allMarketQuotes(m),universe().catch(()=>[])]);return{m,idx:Array.isArray(idx)?idx:[],detail:detail?.items||{},zones:Array.isArray(zones)?zones:[],evidence:evidence?.items||{},quotes,names:new Map(names.map(x=>[String(x.code),x]))}}
+async function data(){
+  const m=await manifest();
+  // Each optional analytical source must fail independently. One missing stock
+  // evidence file must not erase holdings, official quotes or cost summaries.
+  const calls=[
+    ['decision_close_index',()=>set(m,'decision_close_index')],
+    ['decision_close_detail',()=>set(m,'decision_close_detail')],
+    ['zone_close',()=>set(m,'zone_close')],
+    ['stock_detail_close',()=>set(m,'stock_detail_close')],
+    ['portfolio_market_quotes',()=>allMarketQuotes(m)],
+    ['universe',()=>universe()]
+  ];
+  const settled=await Promise.allSettled(calls.map(([,run])=>run()));
+  const values=settled.map(x=>x.status==='fulfilled'?x.value:null);
+  const partialSources=calls.filter((_,i)=>settled[i].status==='rejected').map(([name])=>name);
+  if(partialSources.length)console.warn('portfolio partial quote/evidence sources',partialSources);
+  const [idx,detail,zones,evidence,quotes,names]=values;
+  return{m,idx:Array.isArray(idx)?idx:[],detail:detail?.items||{},
+    zones:Array.isArray(zones)?zones:[],evidence:evidence?.items||{},
+    quotes:quotes&&typeof quotes==='object'?quotes:{},
+    names:new Map((Array.isArray(names)?names:[]).map(x=>[String(x.code),x])),
+    partialSources};
+}
 function localFirst(positions,{error='',loading=false}={}){
  const cards=pq('#portfolioCards'),sum=pq('#portfolioSummary');
  if(!cards||!sum)return;
@@ -130,6 +152,7 @@ async function render(){
    +'<div><span>預估賣出費用＋證交稅</span><b>'+(knownNet===joined.length?money(totalSellFees):'—')+'</b></div>'
    +'<div><span>需先檢查</span><b>'+riskCount+' 檔</b></div>'
    +'<div><span>資料</span><b>'+known+'/'+joined.length+' 檔有價</b></div>';
+  if(sum&&d.partialSources?.length)sum.insertAdjacentHTML('beforeend','<div class="portfolio-coverage-alert" style="grid-column:1/-1;text-align:left;border:1px solid var(--line);background:var(--soft)">⚠️ 部分行情／技術資料尚未完成載入（'+pesc(d.partialSources.join('、'))+'），已保留本機交易與可用的官方價格；未取得的分析不視為通過。</div>');
   const missingCodes=joined.filter(x=>positionCalc(x.p,x.d,x.e).px==null).map(x=>x.p.code);
   if(sum&&missingCodes.length)sum.insertAdjacentHTML('beforeend',
    '<div class="portfolio-coverage-alert" style="grid-column:1/-1;text-align:left;border:1px solid var(--line);background:var(--soft)">⚠️ 尚未取得可核對的官方價格：'
