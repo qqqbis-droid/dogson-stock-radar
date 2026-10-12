@@ -299,19 +299,13 @@
     finally{loadingZones=false}
   }
   function decorateCards(){
+    // The ranked stock card has exactly one decision owner: close-ops-v1.js.
+    // Legacy AH decision strips were a second independent verdict and could
+    // display blank S1/R1 while the verified stock shard already had prices.
+    // Keep market/date/capital validators active, but never append duplicate
+    // per-stock conclusions to the main ranked cards.
     if(activeView()!=='close')return;
-    const cards=[...document.querySelectorAll('#cards .card[data-code]')];
-    for(const card of cards){
-      card.querySelector('[data-ahd-strip]')?.remove();
-      const d=rowMap.get(String(card.dataset.code||''));if(!d)continue;
-      const holder=document.createElement('div');holder.innerHTML=cardStrip(d);const strip=holder.firstElementChild;
-      const anchor=card.querySelector('.action-line')||card.querySelector('.quote-strip')||card.querySelector('.card-top');
-      anchor?.insertAdjacentElement('afterend',strip);
-    }
-    ensureIndexForMissing();
-    if(!closeZones){
-      const idle=window.requestIdleCallback||((fn)=>setTimeout(fn,50));idle(()=>ensureZones());
-    }
+    document.querySelectorAll('#cards .card [data-ahd-strip]').forEach(el=>el.remove());
   }
 
   function normalizeScoreExplain(){
