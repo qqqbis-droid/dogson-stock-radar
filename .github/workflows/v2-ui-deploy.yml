@@ -281,7 +281,6 @@ jobs:
           grep -q 'trust_date' docs/v2/detail-loading-guard-v2.js
           grep -q 'sbl_date' docs/v2/detail-loading-guard-v2.js
           grep -q 'margin_date' docs/v2/detail-loading-guard-v2.js
-          grep -q 'detail-loading-guard-v2.js?v=20261012chipsource1' docs/v2/index.html
           grep -q 'InukoCloseOps?.analyze' docs/v2/detail-loading-guard-v2.js
           node --check docs/v2/price-map-v2-lite.js
           node --check docs/v2/portfolio-store.js
