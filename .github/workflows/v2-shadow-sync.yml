@@ -16,7 +16,7 @@ on:
 
 permissions:
   contents: write
-  actions: read
+  actions: write
 
 concurrency:
   group: clean-build-v2-shadow-sync
@@ -154,6 +154,7 @@ jobs:
           node --check docs/v2/card-display-v3.js
 
       - name: Publish validated Shadow bundle to clean-build-v2
+        id: publish_shadow
         shell: bash
         run: |
           set -euo pipefail
@@ -176,11 +177,13 @@ jobs:
 
             if git diff --cached --quiet; then
               echo "No Shadow bundle changes"
+              echo 'changed=false' >> "$GITHUB_OUTPUT"
               exit 0
             fi
 
             git commit -m "chore(v2): sync Shadow bundle from production data [skip ci]"
             if git push origin HEAD:clean-build-v2; then
+              echo 'changed=true' >> "$GITHUB_OUTPUT"
               exit 0
             fi
 
@@ -190,3 +193,18 @@ jobs:
 
           echo "Shadow publish failed after 3 conflict-safe attempts" >&2
           exit 1
+
+      - name: Publish newly synchronized V2 bundle to GitHub Pages
+        if: steps.publish_shadow.outputs.changed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Commits from GITHUB_TOKEN do not trigger push workflows.
+          # Request a fresh Pages build only AFTER the Atomic bundle push,
+          # so the deployed per-stock chip dates match the latest source.
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/v2-ui-deploy.yml/dispatches" \
+            -f ref=main
+          echo "Dispatched V2 publication after Shadow bundle sync"
