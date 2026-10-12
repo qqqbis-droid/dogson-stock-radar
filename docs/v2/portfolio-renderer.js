@@ -75,7 +75,7 @@ function card(p,d,e){const [status]=statusInfo(p),c=positionCalc(p,d,e),missing=
 async function data(positions=[],onStage=()=>{}){
  const m=await manifest();
  const d={m,idx:[],detail:{},zones:[],evidence:{},quotes:{},names:new Map(),partialSources:[],loaded:0,total:positions.length,phase:'行情載入中'};
- const emit=()=>{try{onStage({...d,detail:{...d.detail},evidence:{...d.evidence},quotes:{...d.quotes},zones:d.zones.slice(),partialSources:d.partialSources.slice()})}catch(err){console.warn('portfolio progressive paint',err)}};
+ const emit=()=>{try{onStage({...d,detail:{...d.detail},evidence:{...d.evidence},quotes:d.quotes,zones:d.zones.slice(),partialSources:d.partialSources.slice()})}catch(err){console.warn('portfolio progressive paint',err)}};
  const quoteResult=await allMarketQuotes(m);
  d.quotes=quoteResult.quotes;d.phase=Object.keys(d.quotes).length?'收盤價已核對；逐檔補分析':'官方行情待補；逐檔補分析';
  if(!Object.keys(d.quotes).length)d.partialSources.push('官方收盤價');
