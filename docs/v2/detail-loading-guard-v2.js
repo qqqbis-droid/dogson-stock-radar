@@ -211,21 +211,36 @@
   function freshnessHtml(shard,d,e,m){
     const quoteTime=e?.quote_snapshot_time||hm(m?.datasets?.index_quote?.as_of);
     const structureTime=hm(shard.known_at||d.known_at||m?.generated_at);
-    const chipAsOf=e?.chip_date||e?.foreign_date||e?.trust_date||e?.sbl_date||e?.margin_date||null;
-    const chipDate=md(chipAsOf);
-    const baseDate=m?.trade_date||e?.quote_date||'';
-    const chipSourceDate=chipAsOf?String(chipAsOf).slice(0,10):'';
-    const baseSourceDate=baseDate?String(baseDate).slice(0,10):'';
-    const chipStale=!!(chipSourceDate&&baseSourceDate&&chipSourceDate!==baseSourceDate);
-    const qd=localStamp(e?.quote_date,quoteTime);
-    const age=qd&&!Number.isNaN(qd.getTime())?Math.max(0,Math.floor((Date.now()-qd.getTime())/60000)):null;
-    return `<div class="isd-fresh-strip"><div class="isd-fresh-line"><span>報價 <b>${esc(quoteTime||'—')}</b></span><span>結構 <b>${esc(structureTime||'—')}</b></span><span class="${chipStale?'stale':''}">籌碼 <b>${esc(chipDate)}</b>${chipStale?' ⚠️':''}</span></div><div class="isd-fresh-age">${age==null?'更新時間待確認':age<=0?'剛剛更新':`${age} 分鐘前更新`}；三種資料各看自己的來源時間，籌碼日期不再用 Build／context 時間代替。</div></div>`;
+    const actualDay=String(m?.trade_date||e?.quote_date||'').slice(0,10);
+    const sources=[
+      ['外資',e?.foreign_date],['投信',e?.trust_date],
+      ['借券',e?.sbl_date],['融資',e?.margin_date]
+    ].map(([name,value])=>({name,date:String(value||'').slice(0,10)}));
+    const validDates=sources.filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x.date));
+    const newest=validDates.reduce((max,x)=>x.date>max?x.date:max,'');
+    const fullyCurrent=sources.every(x=>x.date===actualDay);
+    const health=String(e?.chip_check_health||'UNKNOWN').toUpperCase();
+    const complete=health==='HEALTHY'||health==='OK'||health==='PASS'||health==='COMPLETE';
+    const flagged=!fullyCurrent||!complete;
+    const chipDays=sources.map(x=>x.name+' '+(x.date?md(x.date):'無資料')).join(' · ');
+    const checked=String(e?.chip_checked_at||'');
+    const chipQuality=health==='PARTIAL'?'部分完成':complete?'來源完整':health==='UNKNOWN'?'來源狀態未確認':'來源異常／待核對';
+    const chipNote=!fullyCurrent?'籌碼資料日落後或不一致，禁止將歷史資料當成今日法人動向。'
+       :!complete?'籌碼資料日為今日，但來源檢查未完全通過；不得把資料信心分數當成籌碼完整度。'
+       :'籌碼資料日一致且來源檢查完成。';
+    return '<div class="isd-fresh-strip"><div class="isd-fresh-line">'
+      +'<span>報價 <b>'+esc(quoteTime||'—')+'</b></span>'
+      +'<span>結構 <b>'+esc(structureTime||'—')+'</b></span>'
+      +'<span class="'+(flagged?'stale':'')+'">籌碼 <b>'+esc(newest?md(newest):'待核對')+'</b>'+(flagged?' ⚠️':'')+'</span>'
+      +'</div><div class="isd-fresh-age">'+esc(chipDays)+'</div>'
+      +'<div class="isd-fresh-age">來源驗證：'+esc(chipQuality)+'｜查詢：'+esc(checked?checked.slice(0,19).replace('T',' '):'待查')+'</div>'
+      +'<div class="isd-fresh-age">'+esc(chipNote)+'</div></div>';
   }
 
   function qualityHtml(shard,d,m){
     const cov=num(d.component_coverage),conf=num(d.data_confidence),missing=(d.missing_fields||[]).map(x=>MISSING[x]||x);
     const missText=missing.length?`目前未覆蓋：${missing.join('、')}。`:'目前主要證據已覆蓋。';
-    return `<div class="isd-quality"><b>資料品質</b><div class="isd-grid" style="margin-top:8px">${metric('Freshness',FRESH[d.freshness]||d.freshness||'—')}${metric('資料信心',conf==null?'—':`${fmt(conf,0)}%`)}${metric('證據覆蓋',cov==null?'—':`${fmt(cov,0)}%`)}${metric('資料快照',hm(shard.known_at||d.known_at||m?.generated_at))}</div><div class="isd-quality-note"><strong>證據覆蓋 ${cov==null?'—':`${fmt(cov,0)}%`}</strong> 是「這個模式預期需要的評分／決策證據，有多少已取得並可用」，不是「只有 ${cov==null?'部分':`${fmt(cov,0)}%`} 的資料是今天的」。${esc(missText)}</div><details class="isd-diagnostic"><summary>診斷資訊</summary><div>Build：${esc(shard.build_id||d.build_id||'—')}<br>known_at：${esc(shard.known_at||d.known_at||'—')}<br>decision context：${esc(d.decision_context_id||'—')}</div></details></div>`;
+    return `<div class="isd-quality"><b>資料品質</b><div class="isd-grid" style="margin-top:8px">${metric('Freshness',FRESH[d.freshness]||d.freshness||'—')}${metric('資料信心',conf==null?'—':`${fmt(conf,0)}%`)}${metric('證據覆蓋',cov==null?'—':`${fmt(cov,0)}%`)}${metric('資料快照',hm(shard.known_at||d.known_at||m?.generated_at))}</div><div class="isd-quality-note">「資料信心」是原 Engine 的決策證據指標，<strong>不是籌碼即時性或來源完整度</strong>。<br><strong>證據覆蓋 ${cov==null?'—':`${fmt(cov,0)}%`}</strong> 是「這個模式預期需要的評分／決策證據，有多少已取得並可用」，不是「只有 ${cov==null?'部分':`${fmt(cov,0)}%`} 的資料是今天的」。${esc(missText)}</div><details class="isd-diagnostic"><summary>診斷資訊</summary><div>Build：${esc(shard.build_id||d.build_id||'—')}<br>known_at：${esc(shard.known_at||d.known_at||'—')}<br>decision context：${esc(d.decision_context_id||'—')}</div></details></div>`;
   }
 
   function render(shard,view,box,m){
