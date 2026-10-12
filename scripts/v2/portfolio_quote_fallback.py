@@ -101,12 +101,73 @@ def collect():
     }
 
 
+def merge_same_session(result: dict, prior_path: Path | None) -> dict:
+    """Preserve verified, same-session symbols missing from a partial fetch.
+
+    Never copy an older trade date to today's holdings or prefer old quotes over
+    new, successfully retrieved official records.
+    """
+    if prior_path is None or not prior_path.is_file():
+        return result
+    try:
+        previous = json.loads(prior_path.read_text(encoding="utf-8"))
+        old_quotes = previous.get("quotes") or {}
+        old_ok = previous.get("source_status") or {}
+        if not isinstance(old_quotes, dict):
+            return result
+        # Only reuse prior snapshots from this very same official builder.
+        # Each quote must retain its market, date, and official provenance.
+        accepted = {}
+        for code, q in old_quotes.items():
+            if not isinstance(q, dict):
+                continue
+            if not re.fullmatch(r"[0-9A-Z]{4,6}", str(code)):
+                continue
+            market = str(q.get("market") or "")
+            provenance = str(q.get("source") or "")
+            if market not in ("TWSE", "TPEX"):
+                continue
+            if provenance not in ("TWSE STOCK_DAY_ALL", "TPEx daily_close_quotes"):
+                continue
+            day = session(q.get("trade_date"))
+            if day is None or n(q.get("close")) is None:
+                continue
+            if old_ok.get(market, {}).get("ok") is False:
+                continue
+            accepted[str(code)] = q
+
+        current = result.get("quotes") or {}
+        dates = [str(q.get("trade_date") or "") for q in current.values()]
+        dates += [str(q.get("trade_date") or "") for q in accepted.values()]
+        target = max(dates) if dates else ""
+        if not target:
+            return result
+        merged = {code: q for code, q in accepted.items()
+                  if str(q.get("trade_date") or "") == target}
+        merged.update({code: q for code, q in current.items()
+                       if str(q.get("trade_date") or "") == target})
+        added = len(set(merged).difference(current))
+        result["quotes"] = merged
+        result["preserved_same_session"] = {
+            "trade_date": target,
+            "from_published": added,
+            "newly_fetched": len(current),
+            "final_count": len(merged),
+        }
+        if added:
+            print("portfolio same-session preservation", result["preserved_same_session"])
+    except (ValueError, TypeError, OSError, json.JSONDecodeError) as exc:
+        print("portfolio prior snapshot ignored:", str(exc)[:180])
+    return result
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
+    ap.add_argument("--prior", help="Previously published validated same-day quote snapshot")
     args = ap.parse_args()
     path = Path(args.out)
-    result = collect()
+    result = merge_same_session(collect(), Path(args.prior) if args.prior else None)
     # Never replace a previously good public snapshot with two failed requests.
     if not result["quotes"] and path.exists():
         print("portfolio quote fetch unavailable; preserving existing snapshot", result["source_status"])
