@@ -182,7 +182,14 @@ jobs:
           set -euo pipefail
           # Independent of the liquidity-filtered swing radar. Official market
           # dates remain attached to every quote; this never manufactures scores.
-          python /tmp/v2-source/scripts/v2/portfolio_quote_fallback.py --out /tmp/v2-source/docs/v2/data/portfolio_market_quotes.json
+          # One exchange may deliver only a partial official close today.
+          # Preserve ONLY same-session validated official prices.
+          prior=/tmp/portfolio-quotes-prior.json
+          curl -fsSL --retry 2 --retry-delay 1 --max-time 14 -H 'Cache-Control: no-cache' \
+            "https://qqqbis-droid.github.io/dogson-stock-radar/v2/data/portfolio_market_quotes.json?prior_run=${GITHUB_RUN_ID}" \
+            -o "$prior" || rm -f "$prior"
+          python /tmp/v2-source/scripts/v2/portfolio_quote_fallback.py \
+            --out /tmp/v2-source/docs/v2/data/portfolio_market_quotes.json --prior "$prior"
           python - <<'PY'
           import json
           from pathlib import Path
@@ -240,6 +247,8 @@ jobs:
           cp /tmp/v2-source/scripts/v2/test_portfolio_ledger.js scripts/v2/test_portfolio_ledger.js
           cp /tmp/v2-source/scripts/v2/test_search_focus_stability.cjs scripts/v2/test_search_focus_stability.cjs
           cp /tmp/v2-source/scripts/v2/test_portfolio_progressive_quotes.cjs scripts/v2/test_portfolio_progressive_quotes.cjs
+          cp /tmp/v2-source/scripts/v2/test_portfolio_quote_preservation.py scripts/v2/test_portfolio_quote_preservation.py
+          cp /tmp/v2-source/scripts/v2/portfolio_quote_fallback.py scripts/v2/portfolio_quote_fallback.py
           cp /tmp/v2-source/scripts/v2/test_close_zone_card_evidence.cjs scripts/v2/test_close_zone_card_evidence.cjs
           cp /tmp/v2-source/scripts/v2/build_stock_shards.py scripts/v2/build_stock_shards.py
           cp /tmp/v2-source/scripts/v2/enrich_zones.py scripts/v2/enrich_zones.py
@@ -309,6 +318,7 @@ jobs:
           node --check docs/v2/hourly60-screener.js
           node scripts/v2/test_search_focus_stability.cjs
           node scripts/v2/test_portfolio_progressive_quotes.cjs
+          python scripts/v2/test_portfolio_quote_preservation.py
           node scripts/v2/test_close_zone_card_evidence.cjs
           node --check docs/v2/chip-freshness-provenance.js
           node --check docs/v2/unified-score-freshness-v1.js
