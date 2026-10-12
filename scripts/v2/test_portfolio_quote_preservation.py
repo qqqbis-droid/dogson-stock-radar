@@ -29,6 +29,20 @@ with tempfile.TemporaryDirectory() as root:
     assert "2344" not in merged["quotes"],"Stale old-day price may not be carried forward"
     assert merged["preserved_same_session"]["from_published"]==1
 
+    completed=Path(root)/"close.json"
+    completed.write_text(json.dumps({"trade_date":"2026-10-12","rows":[
+        {"code":"1802","name":"台玻","date":"2026-10-12","close":63.1,"market":"上市"},
+        {"code":"6271","name":"同欣電","date":"2026-10-12","close":247.5,"market":"上市"},
+        {"code":"9904","name":"寶成","date":"2026-10-09","close":30,"market":"上市"}
+    ]}),encoding="utf-8")
+    actual=mod.merge_completed_close({"quotes":{"1802":quote("1802","2026-10-08",63,"TWSE")}},completed)
+    assert actual["quotes"]["1802"]["close"]==63.1,"Newest completed-session daily K must replace old OpenAPI price"
+    assert actual["quotes"]["1802"]["source"].endswith("(non-official)")
+    assert actual["quotes"]["6271"]["trade_date"]=="2026-10-12"
+    assert "9904" not in actual["quotes"],"Dated fallback must not mix sessions"
+    verified=mod.merge_same_session(actual,prior)
+    assert verified["quotes"]["1802"]["source"]=="TWSE STOCK_DAY_ALL","Prior same-day official source beats fallback daily bar"
+
     newer={"quotes":{"1802":quote("1802","2026-10-13",64.5,"TWSE")}, "source_status":{}}
     now=mod.merge_same_session(newer,prior)
     assert set(now["quotes"])=={"1802"},"Older session never contaminates a newer close"
