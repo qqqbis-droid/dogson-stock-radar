@@ -72,16 +72,39 @@
     return rootHourlyPromise;
   }
 
+  // Hourly60 must refer to the same completed cash session as the close
+  // mission. An older root hourly.json is not a valid current-day fallback.
   async function hourlyFor(code,view){
+    const m=await manifest();
+    const expected=String(m?.datasets?.decision_close_summary?.as_of||'').slice(0,10);
+    const dayOf=h=>String(h?.trade_date||h?.date||'').slice(0,10);
+    const matches=h=>Boolean(h&&(!expected||dayOf(h)===expected));
+    let priorDay='';
     try{
       const obj=await dataset(view);
       const embedded=obj?.items?.[code]?.hourly60;
-      if(embedded)return embedded;
+      if(matches(embedded))return embedded;
+      if(embedded)priorDay=dayOf(embedded);
     }catch(err){
       console.warn('hourly60 embedded evidence unavailable',err);
     }
-    const root=await rootHourly();
-    return root?.items?.[code]||null;
+    try{
+      const root=await rootHourly();
+      const fallback=root?.items?.[code]||null;
+      if(matches(fallback))return fallback;
+      if(fallback)priorDay=dayOf(fallback)||priorDay;
+    }catch(err){
+      console.warn('hourly60 root evidence unavailable',err);
+    }
+    // An explicit unavailable row keeps the card visible without presenting
+    // yesterday's MA/cross/entry light as today's actionable 60K evidence.
+    return {
+      data_status:'UNAVAILABLE',
+      trade_date:priorDay||expected,
+      exclusion_reason:priorDay&&expected
+        ?'60分K資料日 '+priorDay+' 尚未追上 '+expected+' 盤後；暫停本日60K金叉／進場燈號判讀'
+        :'本日60分K來源缺失，等待同交易日資料補齊'
+    };
   }
 
   function activeView(){
