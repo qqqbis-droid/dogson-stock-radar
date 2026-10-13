@@ -113,6 +113,6 @@
  }
  document.addEventListener('radar:cards-rendered',schedule);
  document.addEventListener('DOMContentLoaded',schedule);
- document.addEventListener('radar:data-reloaded',()=>{serial++;cache.clear();});
+ document.addEventListener('radar:data-reloaded',()=>{serial++;cache.clear();schedule();});
  window.RadarIntradayQuoteRecovery={quoteFromShard,fill};
 })();
