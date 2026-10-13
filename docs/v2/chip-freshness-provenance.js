@@ -156,12 +156,18 @@
 
   function publish(){
     const previous=window.DOGSON_CLOSE_DATA_STATUS||{};
+    const priorAllowed=window.DOGSON_CLOSE_DECISION_ALLOWED;
+    const priorDate=String(previous.strictActualDate||'');
     // Strict calendar checks must never re-enable trading while the Atomic
     // context validator still reports errors, or vice versa.
     const mergedAllowed=!state.stale&&!(Array.isArray(previous.reasons)&&previous.reasons.length);
     window.DOGSON_CLOSE_DECISION_ALLOWED=mergedAllowed;
     window.DOGSON_CLOSE_DATA_STATUS={...previous,allowed:mergedAllowed,strictExpectedDate:state.expected,strictActualDate:state.actual,strictStale:state.stale};
     document.documentElement.dataset.inukoCloseStale=state.stale?'1':'0';
+    // Refresh already-rendered cards when the async close-session date gate
+    // becomes usable. Otherwise the first render can remain stuck on VERIFY.
+    if(priorAllowed!==mergedAllowed||priorDate!==state.actual)
+      document.dispatchEvent(new CustomEvent('radar:close-gate-updated',{detail:{allowed:mergedAllowed,date:state.actual}}));
   }
 
   function warningHost(){
