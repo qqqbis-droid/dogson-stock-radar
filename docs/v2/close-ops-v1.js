@@ -114,6 +114,15 @@ function writeCard(card,x){
  card.classList.remove(...colorClasses);
  card.classList.add(tone);
  card.dataset.closeTone=tone;
+ // CSS cascade alone did not paint the border on iOS despite updating the
+ // verdict row. Set the actual border directly on the owning <article>.
+ // !important protects the edge from later mobile and injected styles.
+ const edge={
+  go:'#1f5a46',wait:'#d39a2c','cp-blue':'#4b82ad',
+  risk:'#b42318',stale:'#8c9590',neutral:'#dce2dc'
+ }[tone]||'#dce2dc';
+ card.style?.setProperty('border-left','6px solid '+edge,'important');
+ card.style?.setProperty('border-inline-start','6px solid '+edge,'important');
  if(line&&label){
   line.classList.remove(...colorClasses);line.classList.add(tone);
   label.textContent=x.label;
