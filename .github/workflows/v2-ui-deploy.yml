@@ -286,6 +286,7 @@ jobs:
           cp /tmp/v2-source/scripts/v2/test_intraday_quote_recovery.cjs scripts/v2/test_intraday_quote_recovery.cjs
           cp /tmp/v2-source/scripts/v2/test_close_plan_progressive.cjs scripts/v2/test_close_plan_progressive.cjs
           cp /tmp/v2-source/scripts/v2/test_portfolio_progressive_quotes.cjs scripts/v2/test_portfolio_progressive_quotes.cjs
+          cp /tmp/v2-source/scripts/v2/test_portfolio_l_edge_sync.cjs scripts/v2/test_portfolio_l_edge_sync.cjs
           cp /tmp/v2-source/scripts/v2/test_intraday_quote_display.cjs scripts/v2/test_intraday_quote_display.cjs
           cp /tmp/v2-source/scripts/v2/test_portfolio_quote_preservation.py scripts/v2/test_portfolio_quote_preservation.py
           cp /tmp/v2-source/scripts/v2/portfolio_quote_fallback.py scripts/v2/portfolio_quote_fallback.py
@@ -339,13 +340,14 @@ jobs:
           node --check docs/v2/portfolio-fees.js
           node --check docs/v2/portfolio-renderer.js
           grep -q 'await data(positions,paint)' docs/v2/portfolio-renderer.js
-          grep -q 'portfolio-renderer.js?v=20261012progressive3' docs/v2/index.html
+          grep -q 'portfolio-renderer.js?v=20261013l-edge1' docs/v2/index.html
           grep -q 'localFirst(positions,{loading:true})' docs/v2/portfolio-renderer.js
           grep -q 'Promise.allSettled' docs/v2/portfolio-renderer.js
           grep -q 'window.scrollY+p.getBoundingClientRect().top-sticky' docs/v2/app.js
           node --check docs/v2/portfolio-ledger-ui.js
           node --check docs/v2/portfolio-quick-add.js
           node --check docs/v2/inuko-portfolio-intel-v2.js
+          grep -q 'inuko-portfolio-intel-v2.js?v=20261013l-edge1' docs/v2/index.html
           node --check docs/v2/portfolio-weekly-review.js
           node --check docs/v2/close-ops-v1.js
           node scripts/v2/test_close_plan_progressive.cjs
@@ -363,6 +365,7 @@ jobs:
           node scripts/v2/test_search_focus_stability.cjs
           node scripts/v2/test_intraday_quote_recovery.cjs
           node scripts/v2/test_portfolio_progressive_quotes.cjs
+          node scripts/v2/test_portfolio_l_edge_sync.cjs
           node scripts/v2/test_intraday_quote_display.cjs
           # Protect the single-owner stock-card quote source on every release.
           grep -q 'displayEvidenceRow(record,summaryLookup,displayDate,displayBuild)' docs/v2/app.js
