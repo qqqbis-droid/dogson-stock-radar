@@ -348,6 +348,7 @@ jobs:
           node --check docs/v2/inuko-portfolio-intel-v2.js
           node --check docs/v2/portfolio-weekly-review.js
           node --check docs/v2/close-ops-v1.js
+          node scripts/v2/test_close_plan_progressive.cjs
           node --check docs/v2/radar-favorites-v2.js
           grep -q 'radar:hourly60-rendered' docs/v2/hourly60-screener.js
           grep -q 'radar:favorites-filter-changed' docs/v2/app.js
