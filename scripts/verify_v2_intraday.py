@@ -102,9 +102,20 @@ def verify_chip_source_dates(root, manifest):
     ui = ui_path.read_text(encoding="utf-8")
     if "capital_close_context?.as_of" in ui:
         raise SystemExit("V2 freshness strip regressed: build/context as_of used as chip date")
-    if "e?.chip_date" not in ui:
-        raise SystemExit("V2 freshness strip does not consume stock evidence chip_date")
-    print("V2 chip-date truth contract verified")
+    # V2 source-date UI now shows four independent chip clocks, rather than a
+    # single legacy aggregate chip_date. This is a stronger evidence check:
+    # every actual source date must be read from that stock's evidence.
+    required_fields = (
+        "e?.foreign_date", "e?.trust_date", "e?.sbl_date", "e?.margin_date",
+    )
+    missing_fields = [field for field in required_fields if field not in ui]
+    if missing_fields:
+        raise SystemExit(
+            f"V2 freshness strip missing stock evidence source dates: {missing_fields}"
+        )
+    if "e?.chip_check_health" not in ui:
+        raise SystemExit("V2 freshness strip missing per-stock chip source health")
+    print("V2 independent foreign/trust/SBL/margin source-date truth contract verified")
 
 
 def _reference_only(rows, mission):
