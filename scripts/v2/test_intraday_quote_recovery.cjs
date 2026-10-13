@@ -19,6 +19,18 @@ const good={code:'2855',view:'intraday',build_id:b,as_of:date+'T11:43:00+08:00',
  data_confidence:60},evidence:{quote_date:date,quote_volume_lots:2902,quote_source:'TWSE MIS official snapshot'}};
 const yes=api.quoteFromShard(good,expected);
 assert.equal(yes.price,58.7);assert.equal(yes.confidence,60);assert.equal(yes.change,-1.34);
+const clockOnly=api.quoteFromShard({
+ ...good,
+ decision:{...good.decision,quote:{...good.decision.quote,quote_time:'11:00:00'}},
+ evidence:{...good.evidence,quote_date:date}
+},expected);
+assert.equal(clockOnly.price,58.7,'Clock-only MIS quote should use explicit same-session quote_date');
+const staleClock=api.quoteFromShard({
+ ...good,
+ decision:{...good.decision,quote:{...good.decision.quote,quote_time:'11:00:00'}},
+ evidence:{...good.evidence,quote_date:'2026-10-12'}
+},expected);
+assert.equal(staleClock.price,null,'Clock-only quote with previous-day date must stay unavailable');
 assert.equal(api.quoteFromShard({...good,build_id:'old-build'},expected),null);
 assert.equal(api.quoteFromShard({...good,as_of:'2026-10-12T13:30:00+08:00'},expected),null);
 assert.equal(api.quoteFromShard({...good,view:'close'},expected),null);
