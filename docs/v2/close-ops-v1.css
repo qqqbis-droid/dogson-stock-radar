@@ -43,3 +43,14 @@
 #cards .card .cp-plan-risk .cp-plan-value{font-weight:650;font-size:.72rem}
 #cards .card .action-line small{white-space:normal;text-align:right;line-height:1.35;max-width:45%}
 @media(max-width:390px){#cards .card .cp-plan-row{grid-template-columns:59px minmax(0,1fr);gap:6px;padding:8px}}
+
+/* Semantic edge colours: final verdict drives BOTH card and verdict bar.
+   Blue = verified breakout watch; amber = incomplete S1/R1 or pending,
+   green = verified layout watch; red = do-not-chase, grey = unverified. */
+#cards .card[data-close-tone="go"]{border-left-color:var(--green)}
+#cards .card[data-close-tone="wait"]{border-left-color:#d39a2c}
+#cards .card[data-close-tone="cp-blue"]{border-left-color:#4b82ad}
+#cards .card[data-close-tone="risk"]{border-left-color:var(--red)}
+#cards .card[data-close-tone="stale"]{border-left-color:#8c9590}
+#cards .card[data-close-tone="neutral"]{border-left-color:var(--line)}
+#cards .card .action-line.cp-blue{background:#eaf2f8;color:#295c83}
