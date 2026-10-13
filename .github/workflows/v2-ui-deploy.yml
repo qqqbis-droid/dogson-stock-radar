@@ -18,7 +18,9 @@ permissions:
   id-token: write
 
 concurrency:
-  group: dogson-pages
+  # UI-only Pages deployments must NOT replace queued canonical close/intraday
+  # market-data publishers. Both paths validate/preserve the newest Atomic Build.
+  group: dogson-v2-ui-pages
   # Serialize with the canonical close/intraday publishers.
   # NEVER cancel an in-progress or queued canonical close refresh; doing so
   # strands hourly60 and chip dates on the preceding trade session.
