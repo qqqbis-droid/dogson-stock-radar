@@ -35,7 +35,7 @@
      change:sameQuote?finite(q.day_change_pct??e.day_change):null,
      volume:sameQuote?finite(e.quote_volume_lots):null,
      confidence,
-     time:String(q.quote_time||e.quote_time||'').slice(11,16),
+     time:(String(q.quote_time||e.quote_time||'').includes('T')?String(q.quote_time||e.quote_time).slice(11,16):String(q.quote_time||e.quote_time||'').slice(0,5)),
      checked:asDate(e.quote_date)===expected.date,
      source:sameQuote?String(e.quote_source||'盤中逐檔快照'):'資料日期待核對'
    };
@@ -112,6 +112,7 @@
    void hydrate();
  }
  document.addEventListener('radar:cards-rendered',schedule);
+ document.addEventListener('DOMContentLoaded',schedule);
  document.addEventListener('radar:data-reloaded',()=>{serial++;cache.clear();});
  window.RadarIntradayQuoteRecovery={quoteFromShard,fill};
 })();
