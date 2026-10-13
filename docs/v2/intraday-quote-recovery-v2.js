@@ -27,7 +27,7 @@
    // MIS can provide a clock-only quote_time. In that case the explicit
    // quote_date is the provenance; never interpret HH:MM as a trade date.
    const clockDay=asDate(q.quote_time);
-   const quoteDay=/^\\d{4}-\\d{2}-\\d{2}$/.test(clockDay)?clockDay:asDate(e.quote_date);
+   const quoteDay=/^\d{4}-\d{2}-\d{2}$/.test(clockDay)?clockDay:asDate(e.quote_date);
    // Do not silently re-label a previous day's last-trade price as LIVE.
    const sameQuote=quoteDay===expected.date;
    let px=sameQuote?finite(q.price):null;
