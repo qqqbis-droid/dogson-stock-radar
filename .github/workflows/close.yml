@@ -1,6 +1,7 @@
 name: Radar - Close Update
 
 # Production refresh marker: canonical metadata + latest valid trading day rebuild.
+# Recovery 2026-10-13: rerun after nullable 5-day margin fix; retain same-day chip/60K evidence gates.
 on:
   workflow_dispatch:
   push:
