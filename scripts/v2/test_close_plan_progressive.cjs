@@ -19,7 +19,7 @@ for(const title of ['明日動作','關鍵價位','失效條件','S1 回踩觀�
 assert(js.includes('validGlobal()&&same&&confidence!=null&&confidence>=80'),'Keep same-day and confidence gate');
 assert(js.includes('zones.fresh'),'Never manufacture unsupported S1/R1');
 assert(!app.includes('closeStrategy?"明日策略核對中"'),'Permanent placeholder not allowed');
-assert(html.includes('close-ops-v1.js?v=20261013color3'),'iPhone must fetch new JS revision');
+assert(html.includes('close-ops-v1.js?v=20261013edge4'),'iPhone must fetch new JS revision');
 assert(html.includes('close-ops-v1.css?v=20261013color3'),'iPhone must fetch new CSS revision');
 assert(html.includes('app.js?v=20261013closecards2'),'iPhone must fetch updated base cards');
 assert(html.includes('chip-freshness-provenance.js?v=20261013gateupdate2'),'Close gate should recheck and rerender plans');
