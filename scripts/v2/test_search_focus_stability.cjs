@@ -4,7 +4,7 @@ assert(!/setInterval\s*\(\s*syncView/.test(h),'60K forced polling must be remove
 assert(!/load\(\)\.then\(render\)/.test(h),'Sync must not trigger forced UI renders');
 assert(h.includes('h60RenderKey'),'Unchanged 60K rows should keep existing DOM');
 assert(a.includes('isEditingRadar()')&&a.includes('viewLoadSerial'),'Inputs need async focus/race guards');
-assert(i.includes('app.js?v=20261012stabletyping1')&&i.includes('hourly60-screener.js?v=20261012stabletyping1'),'Browser cache bust missing');
+assert(/app\.js\?v=[0-9]{8}[\w-]+/.test(i)&&/hourly60-screener\.js\?v=[0-9]{8}[\w-]+/.test(i),'Both JS assets need versioned URLs; avoid tying search test to another feature release version');
 const p=h.indexOf('  function syncView(){'),q=h.indexOf('\n  function openFromKeyboard(',p);assert(p>0&&q>p);
 const fn=h.slice(p,q).replace('if(show60&&!state.payload&&!loading)void load();','if(show60&&!state.payload&&!getLoading())void load();');
 const flags=new Set(),panel={classList:{contains:k=>flags.has(k),toggle:(k,v)=>v?flags.add(k):flags.delete(k)}};
