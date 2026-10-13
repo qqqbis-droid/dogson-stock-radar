@@ -76,22 +76,28 @@ function classify(d,shard){
 function compact(x){
  const owned=x.owned?'<span class="cp-owned">💼 已持有</span>':'';
  const levels=x.support||x.resistance
-  ?'<div class="cp-levels"><div><small>回踩觀察 S1</small><b>'+esc(x.support?range(x.support):'待補（不推估）')+'</b></div><div><small>第一壓力 R1</small><b>'+esc(x.resistance?range(x.resistance):'待補（不推估）')+'</b></div></div>'
+  ?'<div class="cp-levels"><div><small>S1 回踩觀察區</small><b>'+esc(x.support?range(x.support):'待補（不推估）')+'</b></div><div><small>R1 第一壓力區</small><b>'+esc(x.resistance?range(x.resistance):'待補（不推估）')+'</b></div></div>'
   :'<div class="cp-message">尚無同日、同版本的有效支撐／壓力價區。</div>';
- const readyNote=x.ready&&x.rr!=null?'｜收盤價風報比 '+esc(fmt(x.rr,2))+' 倍'
-  :x.partial?'｜缺少一側價區，不計算風報比':'';
- const guide=x.support?'失效觀察：S1 下緣 '+esc(pp(x.support.low,'lower'))+'；確認有效跌破再重新評估，並非碰價即停損。'
-   :'沒有有效 S1，不依百分比或猜測設定停損。';
- const foot='<div class="cp-message">'+esc(x.gate)+readyNote+'</div>'
-   +'<div class="cp-risk">'+guide+'｜'+esc(x.date||'—')+' 盤後資料；隔日需核對即時報價。</div>';
- const caution=x.sessionOK?'':(x.missing?'⛔ 尚無同版本盤後證據；以下僅顯示已核對的價位。'
-  :'⚠️ 資料日期或信心檢查未通過，已核對價位僅供參考，不可直接下單。');
- const tags=(x.ready?[x.early?'🌱 起漲前段觀察':null,x.chipReady?'🔗 籌碼與族群共振已核對':null].filter(Boolean):[]);
- return '<div class="close-plan-integrated" data-close-plan>'+owned
+ const risk=x.support
+  ?'有效跌破 S1 下緣 '+pp(x.support.low,'lower')+'，且回抽未能站回，重新評估原結構；不是碰價就停損。'
+  :'S1 未驗證，不設定猜測停損價，暫不開新倉。';
+ const cautious=!x.sessionOK
+  ?(x.missing?'⛔ 尚無同版本盤後證據；所有價位僅供參考。':'⚠️ 資料日期或信心檢查未通過；不能依此下單。')
+  :null;
+ const tags=x.ready?[x.early?'🌱 起漲前段觀察':null,x.chipReady?'🔗 籌碼＋同族群共振已核對':null].filter(Boolean):[];
+ const rrText=x.ready&&x.rr!=null?' · 風報比 '+fmt(x.rr,2)+' 倍':x.partial?' · 風報比待證據補齊':'';
+ return '<section class="close-plan-integrated" data-close-plan aria-label="明日作戰">'
+  +owned
+  +'<div class="cp-plan-row"><span class="cp-plan-label">犬子結論</span><b class="cp-plan-value">'+esc(x.label)+'</b></div>'
   +'<div class="cp-explain">'+esc(x.note)+'</div>'
-  +(caution?'<div class="cp-risk">'+esc(caution)+'</div>':'')
+  +'<div class="cp-plan-row"><span class="cp-plan-label">明日動作</span><b class="cp-plan-value">'+esc(x.gate)+'</b></div>'
+  +'<div class="cp-plan-heading">關鍵價位'+esc(rrText)+'</div>'
+  +levels
+  +'<div class="cp-plan-row cp-plan-risk"><span class="cp-plan-label">失效條件</span><span class="cp-plan-value">'+esc(risk)+'</span></div>'
+  +(cautious?'<div class="cp-risk">'+esc(cautious)+'</div>':'')
   +(tags.length?'<div class="cp-tags">'+tags.map(t=>'<span>'+esc(t)+'</span>').join('')+'</div>':'')
-  +levels+foot+'</div>';
+  +'<div class="cp-risk">資料日 '+esc(x.date||'—')+' · 隔日須確認即時量價與大盤相對強弱</div>'
+  +'</section>';
 }
 function writeCard(card,x){
  if(!card?.isConnected)return;
@@ -110,9 +116,11 @@ function writeCard(card,x){
 }
 function explainPending(card){
  if(!card||card.querySelector('[data-close-plan]'))return;
+ // Keep the cautious Engine state visible while asynchronously loading the
+ // precise S1/R1 decision. Never replace every candidate with one fake status.
  const line=card.querySelector(':scope > .action-line'),label=line?.querySelector('b');
- if(label)label.textContent='明日策略核對中';
- if(line){line.classList.remove('go','wait','risk');line.classList.add('neutral')}
+ if(label&&label.textContent.trim()==='明日策略核對中')label.textContent='明日候選・條件待補';
+ if(line){line.classList.remove('go');line.classList.add('neutral')}
 }
 async function manifest(){
  const r=await fetch('./data/current_manifest.json?cp='+Date.now(),{cache:'no-store'});
@@ -149,32 +157,60 @@ async function indexForPeers(){
   try{const archives=JSON.parse(localStorage.getItem(KEY)||'[]');let values=Array.isArray(archives)?archives.filter(x=>x?.date!==D.date).slice(-24):[];values.push({date:D.date,rows:rows.filter(x=>n(x.quote?.price)>0).slice(0,60).map(x=>({code:String(x.code),close:n(x.quote.price)}))});localStorage.setItem(KEY,JSON.stringify(values.slice(-24)))}catch{}
  }catch(err){console.warn('close candidate index unavailable',err)}
 }
-let timer=0,working=false,queued=false;
+let timer=0,working=false,queued=false,observer=null;
 async function refresh(){
- if(!swingActive())return;
+ if(!swingActive()){if(observer){observer.disconnect();observer=null}return}
  if(working){queued=true;return}
  working=true;const job=++D.seq;
  try{
   if(!D.manifest||Date.now()-D.lastRefresh>60000){await manifest();D.lastRefresh=Date.now()}
+  if(job!==D.seq||!swingActive())return;
   const cards=[...document.querySelectorAll('#cards .card[data-code]:not([data-ignition]):not(.outside-pool)')];
   if(!cards.length)return;
   cards.forEach(explainPending);
-  // Load visible evidence only. A missing shard remains unverified.
   const candidates=cards.map(card=>({card,code:String(card.dataset.code||'')})).filter(x=>x.code);
-  for(let i=0;i<candidates.length;i+=6){
+  // Previously the full 85+ candidate list had to finish ALL network requests
+  // before a single card was updated. On iPhone that stranded every card in
+  // "checking" mode. Update each visible card as soon as its shard finishes.
+  const update=async(card,code)=>{
+   if(job!==D.seq||!swingActive()||!card.isConnected)return;
+   const item=await shard(code,D.build);
+   if(job!==D.seq||!swingActive()||!card.isConnected)return;
+   writeCard(card,classify(item?.decision||{code},item));
+  };
+  if(observer){observer.disconnect();observer=null}
+  if(typeof IntersectionObserver==='function'){
+   observer=new IntersectionObserver(entries=>{
+    for(const entry of entries){
+     if(!entry.isIntersecting)continue;
+     observer?.unobserve(entry.target);
+     const card=entry.target,code=String(card.dataset.code||'');
+     if(code)void update(card,code);
+    }
+   },{rootMargin:'700px 0px',threshold:0});
+   for(const {card} of candidates)observer.observe(card);
+  }else{
+   // Older embedded browsers: small progressive batches, never one final
+   // all-cards barrier before rendering verified S1/R1.
+   for(let i=0;i<candidates.length;i+=5){
     if(job!==D.seq||!swingActive())return;
-    await Promise.all(candidates.slice(i,i+6).map(async ({code})=>shard(code,D.build)));
+    await Promise.allSettled(candidates.slice(i,i+5).map(({card,code})=>update(card,code)));
+   }
   }
-  for(const {card,code} of candidates){
-   if(!card.isConnected||job!==D.seq||!swingActive())continue;
-   const d= D.cache.get(code)?.decision||{code};
-   const x=classify(d,D.cache.get(code));
-   writeCard(card,x);
-  }
-  if(!D.index)indexForPeers().then(()=>{if(swingActive())for(const card of document.querySelectorAll('#cards .card[data-code]:not([data-ignition]):not(.outside-pool)')){const code=card.dataset.code;if(D.cache.has(code))writeCard(card,classify(D.cache.get(code)?.decision||{code},D.cache.get(code)))}}).catch(()=>{});
+  if(!D.index)indexForPeers().then(()=>{
+   if(job!==D.seq||!swingActive())return;
+   for(const card of document.querySelectorAll('#cards .card[data-code]:not([data-ignition]):not(.outside-pool)')){
+    const code=card.dataset.code;
+    if(D.cache.has(code)&&card.querySelector('[data-close-plan]')){
+     const item=D.cache.get(code);
+     writeCard(card,classify(item?.decision||{code},item));
+    }
+   }
+  }).catch(()=>{});
  }catch(e){
   console.warn('integrated close plan',e);
-  for(const card of document.querySelectorAll('#cards .card[data-code]:not([data-ignition]):not(.outside-pool)'))writeCard(card,classify({code:card.dataset.code},null));
+  for(const card of document.querySelectorAll('#cards .card[data-code]:not([data-ignition]):not(.outside-pool)'))
+   writeCard(card,classify({code:card.dataset.code},null));
  }finally{working=false;if(queued){queued=false;schedule()}}
 }
 function schedule(){clearTimeout(timer);timer=setTimeout(refresh,65)}
