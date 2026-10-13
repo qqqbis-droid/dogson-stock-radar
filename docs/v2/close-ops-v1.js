@@ -133,12 +133,20 @@ async function manifest(){
 async function shard(code,build){
  if(D.cache.has(code))return D.cache.get(code);
  if(D.pending.has(code))return D.pending.get(code);
- const work=(async()=>{try{
-  const r=await fetch('./data/builds/'+encodeURIComponent(build)+'/stock-shards/close/'+encodeURIComponent(code)+'.json',{cache:'force-cache'});
-  if(!r.ok)return null;const s=await r.json();return s?.build_id===build&&s?.view==='close'&&td(s.as_of)===D.date?s:null;
- }catch{return null}})();
+ const work=(async()=>{
+  const controller=new AbortController();
+  const stop=setTimeout(()=>controller.abort(),12000);
+  try{
+   const r=await fetch('./data/builds/'+encodeURIComponent(build)+'/stock-shards/close/'+encodeURIComponent(code)+'.json',{cache:'force-cache',signal:controller.signal});
+   if(!r.ok)return null;
+   const s=await r.json();
+   return s?.build_id===build&&s?.view==='close'&&td(s.as_of)===D.date?s:null;
+  }catch(err){console.warn('close plan source unavailable',code,err);return null}
+  finally{clearTimeout(stop)}
+ })();
  D.pending.set(code,work);const s=await work;D.pending.delete(code);
- if(build===D.build)D.cache.set(code,s);return s;
+ // Never cache a transient network miss as permanent missing evidence.
+ if(s&&build===D.build)D.cache.set(code,s);return s;
 }
 async function indexForPeers(){
  if(D.index)return;
@@ -173,9 +181,14 @@ async function refresh(){
   // "checking" mode. Update each visible card as soon as its shard finishes.
   const update=async(card,code)=>{
    if(job!==D.seq||!swingActive()||!card.isConnected)return;
-   const item=await shard(code,D.build);
-   if(job!==D.seq||!swingActive()||!card.isConnected)return;
-   writeCard(card,classify(item?.decision||{code},item));
+   try{
+    const item=await shard(code,D.build);
+    if(job!==D.seq||!swingActive()||!card.isConnected)return;
+    writeCard(card,classify(item?.decision||{code},item));
+   }catch(err){
+    console.warn('close plan render failed',code,err);
+    if(job===D.seq&&swingActive()&&card.isConnected)writeCard(card,classify({code},null));
+   }
   };
   if(observer){observer.disconnect();observer=null}
   if(typeof IntersectionObserver==='function'){
