@@ -80,9 +80,9 @@ function compact(x){
   :'<div class="cp-message">尚無同日、同版本的有效支撐／壓力價區。</div>';
  const risk=x.support
   ?'有效跌破 S1 下緣 '+pp(x.support.low,'lower')+'，且回抽未能站回，重新評估原結構；不是碰價就停損。'
-  :'S1 未驗證，不設定猜測停損價，暫不開新倉。';
+  :'沒有有效 S1，不設定猜測停損價，暫不開新倉。';
  const cautious=!x.sessionOK
-  ?(x.missing?'⛔ 尚無同版本盤後證據；所有價位僅供參考。':'⚠️ 資料日期或信心檢查未通過；不能依此下單。')
+  ?(x.missing?'⛔ 尚無同版本盤後證據；所有價位僅供參考。':'⚠️ 資料日期或信心檢查未通過；不可直接下單。')
   :null;
  const tags=x.ready?[x.early?'🌱 起漲前段觀察':null,x.chipReady?'🔗 籌碼＋同族群共振已核對':null].filter(Boolean):[];
  const rrText=x.ready&&x.rr!=null?' · 風報比 '+fmt(x.rr,2)+' 倍':x.partial?' · 風報比待證據補齊':'';
