@@ -23,7 +23,7 @@ function glance(g){
  const [cls,t]=status(g),count=g.verified_count||0;
  const lead=g.largest_positive_code?' · 最大買超 '+(g.largest_positive_name||g.largest_positive_code)+' '+amt(g.largest_positive_100m):'';
  const div=g.amount_lots_diverge?' · ⚠ 金額／張數背離':'';
- return '<div class="cms-glance '+cls+'" data-cms-glance><b>'+esc(t)+'</b>｜買 '+(g.buy_count||0)+'／'+count+'、賣 '+(g.sell_count||0)+' 檔'+div+'<div>'+esc(lead.replace(/^ · /,''))+' · 有效資料 '+count+'/'+(g.member_count||0)+' 檔</div></div>';
+ return '<div class="cms-glance '+cls+'" data-cms-glance><b>'+esc(t)+'</b>｜買 '+(g.buy_count||0)+'／'+count+'、賣 '+(g.sell_count||0)+' 檔'+div+'<div>'+esc(lead.replace(/^ · /,''))+' · 有效資料 '+count+'/'+(g.member_count||0)+' 檔</div>'+(g.reconciled?'':'<div>⚠ 族群金額仍是未完全對帳的估算，不能當作族群一致流入／流出；上方覆蓋率不等於逐檔有效比例。</div>')+'</div>';
 }
 function stock(s){
  const n=num(s.estimated_amount_100m);
