@@ -327,6 +327,8 @@ jobs:
           node scripts/v2/test_intraday_quote_recovery.cjs
           node scripts/v2/test_portfolio_progressive_quotes.cjs
           node scripts/v2/test_intraday_quote_display.cjs
+          # Protect the single-owner stock-card quote source on every release.
+          grep -q 'displayEvidenceRow(record,summaryLookup,displayDate,displayBuild)' docs/v2/app.js
           grep -q 'quote.css?v=20261013clock1' docs/v2/index.html
           python scripts/v2/test_portfolio_quote_preservation.py
           node scripts/v2/test_close_zone_card_evidence.cjs
