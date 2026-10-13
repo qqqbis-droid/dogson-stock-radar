@@ -134,7 +134,10 @@ function displayEvidenceRow(row,summary,date,build){
   if(!latest||String(latest.build_id||'')!==String(build||'')||
      String(latest.as_of||'').slice(0,10)!==date)return row;
   const baseGood=validSessionQuote(row,date),summaryGood=validSessionQuote(latest,date);
-  const quote=baseGood?row.quote:summaryGood?latest.quote:row.quote;
+  // If both are same-session quotes, use the later actual quote clock.
+  const quote=baseGood&&summaryGood
+    ?(String(latest.quote.quote_time||'')>String(row.quote.quote_time||'')?latest.quote:row.quote)
+    :baseGood?row.quote:summaryGood?latest.quote:row.quote;
   const confidence=num(row?.data_confidence)==null?latest.data_confidence:row.data_confidence;
   if(quote===row.quote&&confidence===row.data_confidence)return row;
   return {...row,quote,data_confidence:confidence};
