@@ -1093,7 +1093,15 @@ def _apply_chip_score_v2(r, group_rows, trade_date):
         if ret5 >= 3 and m3 <= 2: margin += 8
         if leverage_gap >= 5: margin -= 10
         elif leverage_gap <= -3: margin += 5
-    margin_detail = f"3日 {m3:+.1f}%｜5日 {m5:+.1f}%｜{status or '狀態待補'}" if m3 is not None else "融資資料待補"
+    # Missing 5-day margin history is a legitimate partial-source state.
+    # Keep available 3-day evidence without formatting None as a float.
+    margin_detail = (
+        f"3日 {m3:+.1f}%｜5日 {m5:+.1f}%｜{status or '狀態待補'}"
+        if m3 is not None and m5 is not None
+        else f"3日 {m3:+.1f}%｜5日待補｜{status or '狀態待補'}"
+        if m3 is not None
+        else "融資資料待補"
+    )
 
     # 5) 法人共識 10%
     consensus = 50.0
