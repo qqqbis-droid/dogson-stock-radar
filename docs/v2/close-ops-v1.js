@@ -101,9 +101,21 @@ function compact(x){
 function writeCard(card,x){
  if(!card?.isConnected)return;
  const line=card.querySelector(':scope > .action-line'),label=line?.querySelector('b');
+ // Stock-card border and verdict row must derive from the SAME fully checked
+ // tomorrow-plan verdict. The base Engine card intentionally stays neutral
+ // until the same-build S1/R1 shard has been verified.
+ const tone=x.type==='NO_CHASE'?'risk'
+  :x.type==='LAYOUT'&&x.ready?'go'
+  :x.type==='BREAKOUT'&&x.ready?'cp-blue'
+  :x.type==='PARTIAL'?'wait'
+  :x.type==='VERIFY'?'stale'
+  :'neutral';
+ const colorClasses=['go','wait','risk','stale','neutral','cp-blue'];
+ card.classList.remove(...colorClasses);
+ card.classList.add(tone);
+ card.dataset.closeTone=tone;
  if(line&&label){
-  const tone=x.type==='NO_CHASE'?'risk':x.type==='VERIFY'||x.type==='PARTIAL'?'stale':x.type==='LAYOUT'||x.type==='BREAKOUT'?'wait':'neutral';
-  line.classList.remove('go','wait','risk','stale','neutral');line.classList.add(tone);
+  line.classList.remove(...colorClasses);line.classList.add(tone);
   label.textContent=x.label;
   const dot=line.querySelector('span');if(dot)dot.textContent=x.type==='VERIFY'?'!':'○';
   const sm=line.querySelector('small');if(sm)sm.textContent='犬子結論 · '+(x.date||'盤後');
