@@ -7,7 +7,7 @@ function block(start,end){
  assert(a>=0&&b>a,'Missing portfolio function: '+start);
  return src.slice(a,b);
 }
-const source=block('async function allMarketQuotes(m){','function ownedDecision(')
+const source=block('async function allMarketQuotes(m,ownedCodes=[],onStage=()=>{}){','function ownedDecision(')
  +'\n'+block('async function data(positions=[]','function localFirst(');
 assert(src.includes('new AbortController')||src.includes('new AbortController()'),'Network requests must be abortable');
 assert(!source.includes('set(m,\'decision_close_detail\')'),'Should not wait for full close detail');
