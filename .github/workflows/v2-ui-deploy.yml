@@ -129,6 +129,38 @@ jobs:
           rm -rf /tmp/v2-source/docs/v2/data
           cp -a /tmp/live-v2/data /tmp/v2-source/docs/v2/data
 
+      - name: Rebuild V2 when canonical close/chips/hourly are newer
+        shell: bash
+        run: |
+          set -euo pipefail
+          # UI-only deployment must not overwrite a newer canonical data
+          # release with a same-day but older V2 branch snapshot.
+          rebuild="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          def load(p):
+              try: return json.loads(Path(p).read_text(encoding='utf-8'))
+              except Exception: return {}
+          root=load('docs/data/system_status.json')
+          m=load('/tmp/v2-source/docs/v2/data/current_manifest.json')
+          rd=str((root.get('dates') or {}).get('close') or '')[:10]
+          vd=str(((m.get('datasets') or {}).get('decision_close_summary') or {}).get('as_of') or '')[:10]
+          rt=str(root.get('generated_at') or '')
+          vt=str(m.get('generated_at') or '')
+          must=bool(rd and (rd>vd or (rd==vd and rt>vt)))
+          print('yes' if must else 'no')
+          print(f'Canonical V2 freshness gate root_close={rd} root_generated={rt} v2_close={vd} v2_generated={vt} rebuild={must}',file=__import__('sys').stderr)
+          PY
+          )"
+          if [ "$rebuild" = "yes" ]; then
+            echo "Root market-data bundle advanced: rebuild V2 from the same root rather than publish old chip/60K layers."
+            bash scripts/include_v2_pages.sh
+            rm -rf /tmp/v2-source/docs/v2/data
+            cp -a docs/v2/data /tmp/v2-source/docs/v2/data
+          else
+            echo "V2 Atomic Bundle is already as new as the canonical root."
+          fi
+
       - name: Rebuild S/R 3.0 from newest root evidence
         shell: bash
         run: |
