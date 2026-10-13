@@ -42,6 +42,6 @@ const quoteHtml=code.slice(code.indexOf('function quoteHtml(d){'),code.indexOf('
 assert(quoteHtml.includes('成交時間')&&quoteHtml.includes('非逐筆即時'),'Display actual quote clock and its latency nature');
 assert(quoteHtml.includes('showPrice?priceFmt(p):"—"'),'Only validated same-day quote is displayed');
 const html=fs.readFileSync('docs/v2/index.html','utf8');
-assert(html.includes('app.js?v=20261013quote-integrity1'));
+assert(html.includes('app.js?v=20261013closecards2'));
 assert(html.includes('quote.css?v=20261013clock1'));
 console.log('PASS intraday quote: summary repairs missing index price and confidence, respects Atomic Build/date and Engine scoring, timestamps trade.');
