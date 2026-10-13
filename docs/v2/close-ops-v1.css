@@ -33,3 +33,13 @@
  #cards .card .rf-star{min-width:32px;flex-basis:32px;height:32px}
  #radarPanel .rf-only{font-size:.68rem;padding:7px 9px}
 }
+
+/* Restore the original four-part close decision, without a second verdict. */
+#cards .card .cp-plan-row{display:grid;grid-template-columns:65px minmax(0,1fr);gap:8px;align-items:start;margin-top:9px;padding:8px 9px;border-radius:9px;background:var(--soft)}
+#cards .card .cp-plan-label{font-size:.72rem;line-height:1.5;color:var(--muted);font-weight:750}
+#cards .card .cp-plan-value{font-size:.78rem;line-height:1.5;color:var(--ink);font-weight:800;overflow-wrap:anywhere}
+#cards .card .cp-plan-heading{font-size:.72rem;font-weight:850;line-height:1.4;color:var(--ink);margin-top:11px}
+#cards .card .cp-plan-risk{background:transparent;border:1px solid var(--line)}
+#cards .card .cp-plan-risk .cp-plan-value{font-weight:650;font-size:.72rem}
+#cards .card .action-line small{white-space:normal;text-align:right;line-height:1.35;max-width:45%}
+@media(max-width:390px){#cards .card .cp-plan-row{grid-template-columns:59px minmax(0,1fr);gap:6px;padding:8px}}
