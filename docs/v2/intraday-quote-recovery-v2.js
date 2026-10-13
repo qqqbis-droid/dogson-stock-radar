@@ -67,7 +67,7 @@
      confidence.textContent=fmt(result.confidence,0)+'%';
    }
  }
- async function hydrate(){
+ async function hydrate(renderedBuild=''){
    const view=mission();
    if(view!=='intraday'&&view!=='daytrade')return;
    const cards=[...document.querySelectorAll('#cards .card[data-code]')].filter(c=>{
@@ -84,7 +84,9 @@
    if(ticket!==serial||mission()!==view||!m?.health?.validation_passed)return;
    const meta=m.datasets?.[view==='intraday'?'decision_intraday_summary':'decision_daytrade_summary'];
    const date=asDate(meta?.as_of),build=String(m.active_build_id||'');
-   if(!date||!build)return;
+   // Never mix quotes from a newly published build with a ranking card drawn
+   // from a previous one while the main radar waits to refresh its manifest.
+   if(!date||!build||(renderedBuild&&build!==renderedBuild))return;
    for(let start=0;start<cards.length;start+=4){
      const batch=cards.slice(start,start+4);
      await Promise.allSettled(batch.map(async card=>{
@@ -107,9 +109,9 @@
      if(ticket!==serial||mission()!==view)return;
    }
  }
- function schedule(){
+ function schedule(e){
    // Never rebuild the ranked card tree, so typing/favorites/search keep focus.
-   void hydrate();
+   void hydrate(String(e?.detail?.build||''));
  }
  document.addEventListener('radar:cards-rendered',schedule);
  document.addEventListener('DOMContentLoaded',schedule);
