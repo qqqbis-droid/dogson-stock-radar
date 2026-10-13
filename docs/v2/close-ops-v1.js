@@ -88,7 +88,6 @@ function compact(x){
  const rrText=x.ready&&x.rr!=null?' · 風報比 '+fmt(x.rr,2)+' 倍':x.partial?' · 風報比待證據補齊':'';
  return '<section class="close-plan-integrated" data-close-plan aria-label="明日作戰">'
   +owned
-  +'<div class="cp-plan-row"><span class="cp-plan-label">犬子結論</span><b class="cp-plan-value">'+esc(x.label)+'</b></div>'
   +'<div class="cp-explain">'+esc(x.note)+'</div>'
   +'<div class="cp-plan-row"><span class="cp-plan-label">明日動作</span><b class="cp-plan-value">'+esc(x.gate)+'</b></div>'
   +'<div class="cp-plan-heading">關鍵價位'+esc(rrText)+'</div>'
@@ -107,7 +106,7 @@ function writeCard(card,x){
   line.classList.remove('go','wait','risk','stale','neutral');line.classList.add(tone);
   label.textContent=x.label;
   const dot=line.querySelector('span');if(dot)dot.textContent=x.type==='VERIFY'?'!':'○';
-  const sm=line.querySelector('small');if(sm)sm.textContent='明日進場核對';
+  const sm=line.querySelector('small');if(sm)sm.textContent='犬子結論 · '+(x.date||'盤後');
  }
  const prior=card.querySelector('[data-close-plan]');
  if(prior){prior.outerHTML=compact(x)}
@@ -219,6 +218,7 @@ document.addEventListener('radar:cards-rendered',schedule);
 document.addEventListener('radar:view-rendered',schedule);
 document.addEventListener('radar:data-reloaded',invalidate);
 document.addEventListener('radar:afterhours-refresh',schedule);
+ document.addEventListener('radar:close-gate-updated',schedule);
 document.addEventListener('click',e=>{if(e.target.closest('[data-close-mode],.tab'))setTimeout(schedule,100)});
 window.InukoCloseOps={version:'2.0',schedule,get(code){const s=D.cache.get(String(code));return s?classify(s.decision||{},s):null},analyze(shard){return shard?.view==='close'?classify(shard.decision||{},shard):null},isReady(){return validGlobal()}};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});else schedule();
