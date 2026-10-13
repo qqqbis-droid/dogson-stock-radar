@@ -120,6 +120,25 @@ function humanReason(text){
 }
 function humanBlock(text){return String(text||"").trim().replace(/Trigger/g,"觸發條件").replace(/風險 Gate/g,"風險條件")}
 
+function validSessionQuote(row,sessionDate){
+  const q=row?.quote||{},px=num(q.price);
+  const quoteDay=String(q.quote_time||row?.as_of||'').slice(0,10);
+  return px!=null&&px>0&&quoteDay===sessionDate;
+}
+// The full-universe ranking index can omit quotes/confidence which are already
+// present in the same-build top-15 summary. Use that evidence to fill *only*
+// display cells. Never modify action states, scores, ordering or execution gate.
+function displayEvidenceRow(row,summary,date,build){
+  const code=String(row?.code||'');
+  const latest=summary?.get(code);
+  if(!latest||String(latest.build_id||'')!==String(build||'')||
+     String(latest.as_of||'').slice(0,10)!==date)return row;
+  const baseGood=validSessionQuote(row,date),summaryGood=validSessionQuote(latest,date);
+  const quote=baseGood?row.quote:summaryGood?latest.quote:row.quote;
+  const confidence=num(row?.data_confidence)==null?latest.data_confidence:row.data_confidence;
+  if(quote===row.quote&&confidence===row.data_confidence)return row;
+  return {...row,quote,data_confidence:confidence};
+}
 function quoteHtml(d){
   const q=d.quote||{},p=num(q.price),chg=num(q.day_change_pct),cls=chg==null?"flat":chg>0?"rise":chg<0?"fall":"flat";
   let vol="量資料待補";
@@ -127,7 +146,14 @@ function quoteHtml(d){
   else if(num(q.relative_volume)!=null)vol=`量比 ${fmt(q.relative_volume,2)}x`;
   else if(num(q.volume)!=null){const unit=q.volume_unit==="SHARES"?"股":q.volume_unit==="LOTS"?"張":"";vol=`量 ${compact(q.volume)}${unit}`}
   const turnover=num(q.turnover_value_twd)!=null?`<div class="quote-turnover">成交值 ${compact(q.turnover_value_twd)}元</div>`:"";
-  return `<div class="quote-strip"><div class="quote-price">${priceFmt(p)}</div><div class="quote-change ${cls}">${signedPct(chg)}</div><div class="quote-volume">${esc(vol)}</div>${turnover}</div>`;
+  const day=missionDate(),sourceDate=String(q.quote_time||"").slice(0,10);
+  const clock=String(q.quote_time||"").slice(11,16);
+  const verified=(p!=null&&p>0&&sourceDate===day);
+  const showPrice=state.view==="close"||verified;
+  const timeNote=state.view!=="close"&&verified&&clock
+    ?`<div class="quote-asof">成交時間 ${esc(clock)} · 非逐筆即時</div>`
+    :"";
+  return `<div class="quote-strip"><div class="quote-price">${showPrice?priceFmt(p):"—"}</div><div class="quote-change ${cls}">${showPrice?signedPct(chg):"—"}</div><div class="quote-volume">${esc(vol)}</div>${turnover}${timeNote}</div>`;
 }
 function rankText(d){if(isIgnitionMode())return "🔥 點火 #"+(d.ignition_rank??"—");return `${bucketLabel[d.opportunity_bucket]||"排序"} #${d.opportunity_rank??"—"}`}
 function sectorDisplay(d){const primary=String(d?.primary_group||"").trim();if(primary)return primary;const industry=String(d?.industry||d?.industry_name||d?.official_industry||"").trim();return industry?`${industry}・官方產業代理`:"分類待補"}
@@ -403,7 +429,10 @@ function renderCards(){
   const external=q&&!hasNonSearchFilter()&&!window.RadarFavorites?.only?.()?state.externalSearch:[],shown=showAllNextDay?rows:rows.slice(0,state.visibleCount),shownCount=shown.length+external.length,prefix=activeQuick?`${activeQuick.label} · `:"";
   $("#countText").textContent=!indexLoaded&&canLoadFull&&!hasDeepFilter()?`已顯示 ${shown.length} 檔`:`${prefix}${shownCount}/${rows.length+external.length} 檔`;
 
-  const rankedHtml=shown.map(d=>{
+  const summaryLookup=new Map((summaryRows()||[]).map(d=>[String(d.code),d]));
+  const displayDate=missionDate(),displayBuild=state.manifest?.active_build_id;
+  const rankedHtml=shown.map(record=>{
+    const d=displayEvidenceRow(record,summaryLookup,displayDate,displayBuild);
     if(isIgnitionMode())return ignitionCardHtml(d,cfg);
     const s=d.scores||{},closeStrategy=state.view==="close"&&!isIgnitionMode(),tone=closeStrategy?"neutral":actionTone(d),score=scoreFor(d),reason=(d.why_now||[]).slice(0,2).map(humanReason),block=(d.blockers||[])[0],fresh=displayFreshness(d);
     return `<article class="card ${tone}" data-code="${esc(d.code)}" role="button" tabindex="0" aria-label="查看 ${esc(d.code)} ${esc(d.name)} 個股詳情"><div class="card-top"><div class="identity"><span class="rank">${esc(rankText(d))}</span><div><span class="code">${esc(d.code)} ${esc(d.name)}</span><div class="muted">${esc(sectorDisplay(d))}</div></div></div><span class="badge stage">${esc(stageLabel[d.lifecycle_stage]||d.lifecycle_stage)}</span></div>${quoteHtml(d)}<div class="action-line ${tone}"><span>${closeStrategy?"○":d.actionable?"●":"○"}</span><b>${closeStrategy?"明日策略核對中":esc(actionLabel[d.action_state]||d.action_state||"—")}</b><small>${closeStrategy?"盤後價格核對":esc(fresh)}</small></div><div class="score-row"><div class="score"><span>${esc(cfg.scoreLabel)}</span><b>${fmt(score)}</b></div><div class="score"><span>進場位置</span><b>${fmt(s.entry_position_score)}</b></div><div class="score"><span>資料信心</span><b>${fmt(d.data_confidence,0)}<small>%</small></b></div></div><div class="reason">${reason.length?reason.map(esc).join("・"):"目前無新增理由"}</div>${block?`<div class="blocker">卡點：${esc(humanBlock(block))}</div>`:""}</article>`;
