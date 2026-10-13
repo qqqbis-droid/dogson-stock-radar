@@ -36,11 +36,16 @@ function checkColor(type,ready,expected){
   const label={textContent:''},dot={textContent:''},small={textContent:''};
   const line={classList:fakeClasses(),querySelector:s=>s==='b'?label:s==='span'?dot:s==='small'?small:null};
   const prior={outerHTML:''};
-  const card={isConnected:true,dataset:{},classList:fakeClasses(),querySelector:s=>s.includes('action-line')?line:s.includes('[data-close-plan]')?prior:null};
+  const edge={};
+  const style={setProperty:(property,value,priority)=>{edge[property]={value,priority}}};
+  const card={isConnected:true,dataset:{},classList:fakeClasses(),style,querySelector:s=>s.includes('action-line')?line:s.includes('[data-close-plan]')?prior:null};
   writeCard(card,{type,ready,label:'模擬結論',date:'2026-10-13'});
   assert(card.classList.contains(expected),'Wrong left edge for '+type);
   assert(line.classList.contains(expected),'Border and text verdict must agree for '+type);
   assert.equal(card.dataset.closeTone,expected);
+  const paint={go:'#1f5a46',wait:'#d39a2c','cp-blue':'#4b82ad',risk:'#b42318',stale:'#8c9590',neutral:'#dce2dc'}[expected];
+  assert.deepEqual(edge['border-left'],{value:'6px solid '+paint,priority:'important'},'iOS needs a real inline 6px stripe for '+type);
+  assert.deepEqual(edge['border-inline-start'],{value:'6px solid '+paint,priority:'important'},'RTL-safe edge must be painted too');
   assert(css.includes('#cards .card[data-close-tone="'+expected+'"]'),'Missing color CSS for '+type);
 }
 for(const [type,ready,tone] of [
