@@ -19,10 +19,10 @@ permissions:
 
 concurrency:
   group: dogson-pages
-  # A verified V2 user-facing repair supersedes a slow, older shadow preview.
-  # Keep Pages deployments serialized, but prevent old hydrated jobs from
-  # blocking the latest build for up to 45 minutes.
-  cancel-in-progress: true
+  # Serialize with the canonical close/intraday publishers.
+  # NEVER cancel an in-progress or queued canonical close refresh; doing so
+  # strands hourly60 and chip dates on the preceding trade session.
+  cancel-in-progress: false
 
 jobs:
   deploy-v2-ui:
