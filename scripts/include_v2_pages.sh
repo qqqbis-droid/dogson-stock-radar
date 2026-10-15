@@ -31,6 +31,9 @@ test -f requirements-contract.txt
 
 python -m pip install --disable-pip-version-check -r requirements-contract.txt
 
+python scripts/v2/test_live_truth_gate.py
+node scripts/v2/test_live_rank_safety.cjs
+
 mode="$(python - <<'PY'
 import json
 from pathlib import Path
