@@ -43,6 +43,13 @@ async function allMarketQuotes(m,ownedCodes=[],onStage=()=>{}){
    if(onlyMissing&&out[symbol])continue;
    out[symbol]=q;
   }
+  // The publisher may keep the exchange's previous close separately when the
+  // latest TPEx OpenAPI snapshot lags the completed market date.
+  for(const [code,q] of Object.entries(source?.reference_quotes||{})){
+   const date=String(q?.trade_date||'').slice(0,10),symbol=String(code);
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>=day||pn(q?.close)==null||Number(q.close)<=0)continue;
+   if(!lastSeen[symbol]||String(lastSeen[symbol].trade_date)<date)lastSeen[symbol]=q;
+  }
  };
  const publish=()=>{try{onStage({...out},{...lastSeen})}catch(err){console.warn('portfolio quote progress',err)}};
  let officialError='',referenceError='';
