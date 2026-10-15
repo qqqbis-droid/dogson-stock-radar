@@ -32,7 +32,7 @@ async function allMarketQuotes(m,ownedCodes=[],onStage=()=>{}){
  const include=(source,onlyMissing=false)=>{
   for(const [code,q] of Object.entries(source?.quotes||{})){
    const date=String(q?.trade_date||'').slice(0,10),symbol=String(code);
-   if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)||pn(q?.close)==null||Number(q.close)<=0)continue;
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||pn(q?.close)==null||Number(q.close)<=0)continue;
    if(date!==day){
     // A previous close may be shown as dated reference ONLY. It must never
     // contribute to same-day portfolio valuation, exit fees or unrealized P/L.
