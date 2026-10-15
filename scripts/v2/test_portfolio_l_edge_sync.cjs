@@ -46,5 +46,5 @@ assert(base.includes("cardTone='neutral'"),'Initial stock-discovery trading risk
 assert(base.includes('style="border-left:6px solid #8c9590"'),'Incomplete loading state must be explicitly neutral');
 assert(!base.includes("cardTone=p.reason_status==='INVALID'||risk?"),'Portfolio card cannot use mixed signal colors');
 assert(html.includes('inuko-portfolio-intel-v2.js?v=20261013l-edge1'),'iPhone must fetch the patched holding model');
-assert(html.includes('portfolio-renderer.js?v=20261013l-edge1'),'iPhone must fetch neutral pending cards');
+assert(html.includes('portfolio-renderer.js?v=20261015pl-dual2'),'iPhone must fetch neutral pending cards');
 console.log('PASS: five L0-L4 holding border colors, shared grading, safe unknown, iOS inline painting, no trade-data writes');
