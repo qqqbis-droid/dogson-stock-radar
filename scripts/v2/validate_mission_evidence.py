@@ -133,13 +133,38 @@ def source_asof(payload):
 
 
 def structure_asof(payload, market_obj=None):
-    bridge = payload.get("bridge") or {} if isinstance(payload, dict) else {}
+    """Read the actual exchange-session structure clock, including HH:MM.
+
+    The source writes '10:30' for 5m structure freshness. Treating it as an
+    ISO datetime returned None and rejected genuinely fresh, gated signals.
+    Always bind clock-only values to the source's explicit trading date;
+    never infer a fresh session from a yesterday row or generated_at time.
+    """
+    if not isinstance(payload, dict):
+        return None
+    bridge = payload.get("bridge") or {}
     metrics = (market_obj or {}).get("metrics") or {}
-    return first_time(
-        bridge.get("latest_structure_time"),
-        payload.get("structure_time") if isinstance(payload, dict) else None,
-        metrics.get("structure_latest_time"),
-    )
+    session = source_date(payload)
+    for val in (bridge.get("latest_structure_time"), payload.get("structure_time"),
+                metrics.get("structure_latest_time")):
+        if val in (None, "", "-", "--"):
+            continue
+        full = parse_dt(val) if "T" in str(val) else None
+        if full:
+            if session and full.date().isoformat() == session:
+                return full
+            continue
+        clock = str(val).strip()
+        if len(clock) == 5:
+            clock += ":00"
+        if not session:
+            continue
+        try:
+            dt = datetime.fromisoformat(f"{session}T{clock}+08:00")
+            return dt.astimezone(TW)
+        except (ValueError, TypeError):
+            continue
+    return None
 
 
 def check_safety(mission, decisions, now, errors):
@@ -233,7 +258,7 @@ def validate_one(root: Path, legacy_root: Path, manifest: dict, mission: str):
             if qdt is None or quote_age is None or quote_age > MAX_QUOTE_AGE_SEC:
                 errors.append(f"live quote too old/missing: {quote_age}s")
 
-            structure_stale = sdt is None or structure_age is None or structure_age > MAX_STRUCTURE_AGE_SEC
+            structure_stale = sdt is None or structure_age is None or not (-120 <= structure_age <= MAX_STRUCTURE_AGE_SEC)
             if structure_stale:
                 actionable = [str(code) for code, row in decisions.items() if isinstance(row, dict) and row.get("actionable")]
                 if actionable:
