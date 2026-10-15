@@ -46,4 +46,13 @@ with tempfile.TemporaryDirectory() as root:
     newer={"quotes":{"1802":quote("1802","2026-10-13",64.5,"TWSE")}, "source_status":{}}
     now=mod.merge_same_session(newer,prior)
     assert set(now["quotes"])=={"1802"},"Older session never contaminates a newer close"
-print("PASS: retain only same-session TWSE/TPEx prices, prefer current official data, reject stale quotes")
+    dated=mod.attach_reference_quotes(
+        {"quotes":{"2330":quote("2330","2026-10-15",100,"TWSE")}},
+        {"5302":quote("5302","2026-10-14",9.67,"TPEX"),
+         "2330":quote("2330","2026-10-14",98,"TWSE")}
+    )
+    assert dated["reference_quotes"]["5302"]["close"]==9.67,"Official prior day must be available as a dated reference"
+    assert "5302" not in dated["quotes"],"Prior-day reference MUST NOT enter current valuation"
+    assert "2330" not in dated["reference_quotes"],"Today-priced stocks need no stale fallback"
+
+print("PASS: same-session portfolio quote valuation, separate date-stamped OTC references")
