@@ -217,19 +217,9 @@ def merge_same_session(result: dict, prior_path: Path | None) -> dict:
     return result
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--out", required=True)
-    ap.add_argument("--prior", help="Previously published validated same-day quote snapshot")
-    ap.add_argument("--close-json", help="Latest validated completed-session close.json")
-    args = ap.parse_args()
-    path = Path(args.out)
-    collected = collect()
-    # Keep older OFFICIAL prices in a separate reference-only namespace.
-    # The regular quotes dictionary remains strictly same-session so that
-    # no stale close can enter valuation or after-fee P/L.
-    dated_official = dict(collected.get("quotes") or {})
-    result = merge_same_session(merge_completed_close(collected, Path(args.close_json) if args.close_json else None), Path(args.prior) if args.prior else None)
+
+def attach_reference_quotes(result: dict, dated_official: dict) -> dict:
+    """Carry prior exchange closes for dated display only, never valuation."""
     accepted_days = sorted({str(q.get("trade_date") or "") for q in (result.get("quotes") or {}).values()})
     current_day = accepted_days[-1] if accepted_days else ""
     refs = {}
@@ -247,6 +237,24 @@ def main():
                               "source": q["source"], "market": q.get("market") or ""}
     result["reference_quotes"] = refs
     result["reference_note"] = "Dated previous-session prices only; never used in same-day holdings P/L"
+    return result
+
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--prior", help="Previously published validated same-day quote snapshot")
+    ap.add_argument("--close-json", help="Latest validated completed-session close.json")
+    args = ap.parse_args()
+    path = Path(args.out)
+    collected = collect()
+    # Keep older OFFICIAL prices in a separate reference-only namespace.
+    # The regular quotes dictionary remains strictly same-session so that
+    # no stale close can enter valuation or after-fee P/L.
+    dated_official = dict(collected.get("quotes") or {})
+    result = merge_same_session(merge_completed_close(collected, Path(args.close_json) if args.close_json else None), Path(args.prior) if args.prior else None)
+    result = attach_reference_quotes(result, dated_official)
     # Never replace a previously good public snapshot with two failed requests.
     if not result["quotes"] and path.exists():
         print("portfolio quote fetch unavailable; preserving existing snapshot", result["source_status"])
