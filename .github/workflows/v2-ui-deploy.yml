@@ -286,6 +286,7 @@ jobs:
           cp /tmp/v2-source/scripts/v2/test_intraday_quote_recovery.cjs scripts/v2/test_intraday_quote_recovery.cjs
           cp /tmp/v2-source/scripts/v2/test_close_plan_progressive.cjs scripts/v2/test_close_plan_progressive.cjs
           cp /tmp/v2-source/scripts/v2/test_portfolio_progressive_quotes.cjs scripts/v2/test_portfolio_progressive_quotes.cjs
+          cp /tmp/v2-source/scripts/v2/test_portfolio_pl_dual.cjs scripts/v2/test_portfolio_pl_dual.cjs
           cp /tmp/v2-source/scripts/v2/test_portfolio_l_edge_sync.cjs scripts/v2/test_portfolio_l_edge_sync.cjs
           cp /tmp/v2-source/scripts/v2/test_intraday_quote_display.cjs scripts/v2/test_intraday_quote_display.cjs
           cp /tmp/v2-source/scripts/v2/test_live_rank_safety.cjs scripts/v2/test_live_rank_safety.cjs
@@ -345,7 +346,7 @@ jobs:
           node --check docs/v2/portfolio-fees.js
           node --check docs/v2/portfolio-renderer.js
           grep -q 'await data(positions,paint)' docs/v2/portfolio-renderer.js
-          grep -q 'portfolio-renderer.js?v=20261013l-edge1' docs/v2/index.html
+          grep -q 'portfolio-renderer.js?v=20261015pl-dual2' docs/v2/index.html
           grep -q 'localFirst(positions,{loading:true})' docs/v2/portfolio-renderer.js
           grep -q 'Promise.allSettled' docs/v2/portfolio-renderer.js
           grep -q 'window.scrollY+p.getBoundingClientRect().top-sticky' docs/v2/app.js
@@ -370,6 +371,7 @@ jobs:
           node scripts/v2/test_search_focus_stability.cjs
           node scripts/v2/test_intraday_quote_recovery.cjs
           node scripts/v2/test_portfolio_progressive_quotes.cjs
+          node scripts/v2/test_portfolio_pl_dual.cjs
           node scripts/v2/test_portfolio_l_edge_sync.cjs
           node --check docs/v2/market-capital-renderer.js
           node scripts/v2/test_verified_sector_flow.cjs
