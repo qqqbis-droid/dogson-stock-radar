@@ -1,20 +1,20 @@
 {
   "shadow_schema_version": "1.1.0",
-  "captured_at": "2026-10-14T15:57:53+08:00",
-  "trade_date": "2026-10-14",
-  "build_id": "cb2-legacy-20261014-f42bdcbf0d",
-  "previous_build_id": "cb2-legacy-20261014-603d2da111",
+  "captured_at": "2026-10-15T15:59:19+08:00",
+  "trade_date": "2026-10-15",
+  "build_id": "cb2-legacy-20261015-d365c49234",
+  "previous_build_id": "cb2-legacy-20261015-7aae7666bc",
   "status": "PASS",
   "source_dates": [
-    "2026-10-14"
+    "2026-10-15"
   ],
   "source_counts": {
-    "close": 753,
+    "close": 759,
     "intraday": 724,
     "daytrade": 724
   },
   "canonical_counts": {
-    "close": 753,
+    "close": 759,
     "intraday": 724,
     "daytrade": 724
   },
@@ -34,8 +34,8 @@
           "sector_intraday",
           "decision_intraday_summary"
         ],
-        "startup_dataset_bytes": 112559,
-        "initial_bytes": 117704,
+        "startup_dataset_bytes": 112287,
+        "initial_bytes": 117432,
         "lazy_dataset_keys": [
           "decision_intraday_index",
           "decision_intraday_detail",
@@ -43,7 +43,7 @@
           "tradeplan_intraday",
           "tradecase_swing"
         ],
-        "lazy_dataset_bytes": 3552290
+        "lazy_dataset_bytes": 3548282
       },
       "close": {
         "startup_dataset_keys": [
@@ -51,8 +51,8 @@
           "sector_close",
           "decision_close_summary"
         ],
-        "startup_dataset_bytes": 120426,
-        "initial_bytes": 125571,
+        "startup_dataset_bytes": 120485,
+        "initial_bytes": 125630,
         "lazy_dataset_keys": [
           "decision_close_index",
           "decision_close_detail",
@@ -60,15 +60,15 @@
           "tradeplan_close",
           "tradecase_swing"
         ],
-        "lazy_dataset_bytes": 3522782
+        "lazy_dataset_bytes": 3568850
       },
       "portfolio": {
         "startup_dataset_keys": [
           "market_summary",
           "sector_close"
         ],
-        "startup_dataset_bytes": 69623,
-        "initial_bytes": 74768,
+        "startup_dataset_bytes": 69521,
+        "initial_bytes": 74666,
         "lazy_dataset_keys": [
           "portfolio_summary"
         ],
@@ -80,8 +80,8 @@
           "sector_intraday",
           "decision_daytrade_summary"
         ],
-        "startup_dataset_bytes": 125676,
-        "initial_bytes": 130821,
+        "startup_dataset_bytes": 126260,
+        "initial_bytes": 131405,
         "lazy_dataset_keys": [
           "decision_daytrade_index",
           "decision_daytrade_detail",
@@ -89,7 +89,7 @@
           "tradeplan_daytrade",
           "tradecase_daytrade"
         ],
-        "lazy_dataset_bytes": 4240741
+        "lazy_dataset_bytes": 4240719
       }
     },
     "policy": "Summary/sector/market are startup payload; index/detail/zone/plan/case remain lazy and are excluded from initial bytes."
@@ -97,52 +97,52 @@
   "distributions": {
     "close": {
       "lifecycle_stage": {
-        "FAILED": 51,
-        "LAUNCH": 47,
-        "OBSERVE": 322,
-        "PULLBACK_CONFIRMED": 40,
-        "SETUP": 31,
-        "TREND": 49,
-        "WEAKENING": 213
+        "FAILED": 106,
+        "LAUNCH": 22,
+        "OBSERVE": 200,
+        "PULLBACK_CONFIRMED": 37,
+        "SETUP": 37,
+        "TREND": 26,
+        "WEAKENING": 331
       },
       "action_state": {
-        "DO_NOT_CHASE": 73,
-        "SMALL_TEST": 84,
-        "WAIT_PULLBACK": 49,
-        "WAIT_TRIGGER": 31,
-        "WATCH": 516
+        "DO_NOT_CHASE": 40,
+        "SMALL_TEST": 59,
+        "WAIT_PULLBACK": 26,
+        "WAIT_TRIGGER": 37,
+        "WATCH": 597
       },
       "opportunity_bucket": {
-        "BREAKOUT_WATCH": 31,
-        "NEXT_DAY_READY": 84,
-        "PULLBACK_WATCH": 122,
-        "RESEARCH": 252,
-        "RISK": 264
+        "BREAKOUT_WATCH": 37,
+        "NEXT_DAY_READY": 59,
+        "PULLBACK_WATCH": 66,
+        "RESEARCH": 160,
+        "RISK": 437
       },
       "freshness": {
-        "FRESH": 753
+        "FRESH": 759
       }
     },
     "intraday": {
       "lifecycle_stage": {
-        "FAILED": 9,
-        "LAUNCH": 2,
-        "OBSERVE": 339,
-        "PULLBACK_CONFIRMED": 36,
-        "SETUP": 10,
-        "WEAKENING": 328
+        "FAILED": 60,
+        "LAUNCH": 3,
+        "OBSERVE": 323,
+        "PULLBACK_CONFIRMED": 7,
+        "SETUP": 2,
+        "WEAKENING": 329
       },
       "action_state": {
-        "DATA_STALE": 1,
-        "DO_NOT_CHASE": 89,
-        "WAIT_TRIGGER": 48,
-        "WATCH": 586
+        "DATA_STALE": 2,
+        "DO_NOT_CHASE": 161,
+        "WAIT_TRIGGER": 12,
+        "WATCH": 549
       },
       "opportunity_bucket": {
-        "RESEARCH_ONLY": 288,
-        "RISK": 337,
-        "WAIT_PULLBACK": 89,
-        "WAIT_TRIGGER": 10
+        "RESEARCH_ONLY": 172,
+        "RISK": 389,
+        "WAIT_PULLBACK": 161,
+        "WAIT_TRIGGER": 2
       },
       "freshness": {
         "FROZEN": 724
@@ -150,12 +150,12 @@
     },
     "daytrade": {
       "lifecycle_stage": {
-        "FAILED": 9,
-        "LAUNCH": 2,
-        "OBSERVE": 339,
-        "PULLBACK_CONFIRMED": 36,
-        "SETUP": 10,
-        "WEAKENING": 328
+        "FAILED": 60,
+        "LAUNCH": 3,
+        "OBSERVE": 323,
+        "PULLBACK_CONFIRMED": 7,
+        "SETUP": 2,
+        "WEAKENING": 329
       },
       "action_state": {
         "DATA_STALE": 724
