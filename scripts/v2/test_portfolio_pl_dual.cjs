@@ -24,5 +24,5 @@ assert(code.includes('signedMoney(c.pl)')&&code.includes('signedPct(c.pct)'),'Ea
 assert(code.includes("signedPct(totalPl/totalCost*100)"),'Portfolio totals need amount and %');
 assert(code.includes('reference_quote?.close>0')&&code.includes('僅供參考，不計入損益'),'Prior price must be dated and non-valuation');
 assert(code.includes('Object.entries(source?.reference_quotes||{})'),'Reference-only quotes must be processed');
-assert(html.includes('portfolio-renderer.js?v=20261015pl-dual2'),'iPhone should load fresh revision');
+assert(html.includes('portfolio-renderer.js?v=20261015plpersist3'),'iPhone should load fresh revision');
 console.log('PASS: fee-adjusted individual and total unrealized amount + percent; prior OTC prices remain non-valuating');
