@@ -290,6 +290,7 @@ jobs:
           cp /tmp/v2-source/scripts/v2/test_intraday_quote_display.cjs scripts/v2/test_intraday_quote_display.cjs
           cp /tmp/v2-source/scripts/v2/test_live_rank_safety.cjs scripts/v2/test_live_rank_safety.cjs
           cp /tmp/v2-source/scripts/v2/live_publish_patch.py scripts/v2/live_publish_patch.py
+          cp /tmp/v2-source/scripts/v2/validate_mission_evidence.py scripts/v2/validate_mission_evidence.py
           cp /tmp/v2-source/scripts/v2/test_live_truth_gate.py scripts/v2/test_live_truth_gate.py
           cp /tmp/v2-source/scripts/v2/test_portfolio_quote_preservation.py scripts/v2/test_portfolio_quote_preservation.py
           cp /tmp/v2-source/scripts/v2/portfolio_quote_fallback.py scripts/v2/portfolio_quote_fallback.py
