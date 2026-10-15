@@ -12,6 +12,11 @@ spec = importlib.util.spec_from_file_location("live_publish_patch_under_test", M
 patch = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patch)
 TW = timezone(timedelta(hours=8))
+VALIDATOR = Path(__file__).with_name("validate_mission_evidence.py")
+vspec = importlib.util.spec_from_file_location("validate_mission_evidence_under_test", VALIDATOR)
+validator = importlib.util.module_from_spec(vspec)
+vspec.loader.exec_module(validator)
+
 
 
 class TruthGateTests(unittest.TestCase):
@@ -38,6 +43,17 @@ class TruthGateTests(unittest.TestCase):
 
     def test_distant_structure_not_actionable(self):
         self.assertEqual(self.selected({**self.basic, "structure_time": "09:00"}), set())
+
+    def test_five_min_clock_accepts_today_hhmm(self):
+        source = {"trade_date": "2026-10-15",
+                  "bridge": {"latest_structure_time": "10:30"}}
+        stamp = validator.structure_asof(source)
+        self.assertEqual(stamp.isoformat(), "2026-10-15T10:30:00+08:00")
+
+    def test_five_min_clock_rejects_old_explicit_date(self):
+        source = {"trade_date": "2026-10-15",
+                  "bridge": {"latest_structure_time": "2026-10-14T10:30:00+08:00"}}
+        self.assertIsNone(validator.structure_asof(source))
 
     def test_missing_structure_becomes_stale_in_both_missions(self):
         for mission in ("intraday", "daytrade"):
