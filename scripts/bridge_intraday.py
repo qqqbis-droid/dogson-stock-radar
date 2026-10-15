@@ -165,6 +165,38 @@ def _snapshot_bars(x, snaps, trade_date):
 
 
 
+
+def _fresh_yahoo_5m(x, trade_date, now, max_delay_min=20):
+    """Accept genuine same-session Yahoo 5m bars even if no MIS tail is needed.
+
+    A current Yahoo candle can be newer than every persisted MIS trade snapshot.
+    Previously _snapshot_bars returned nbar=0 and the caller discarded these
+    observed same-day candles, leaving yesterday's structure on all cards.
+    This is an observed delayed historical candle, NOT a live last-trade price.
+    """
+    if x is None or x.empty:
+        return None
+    y = _naive_tw_index(x)
+    try:
+        td = pd.Timestamp(trade_date).date()
+        today = y[y.index.date == td]
+        if len(today) < 4:
+            return None
+        stamp = pd.Timestamp(now)
+        if stamp.tzinfo is not None:
+            stamp = stamp.tz_convert("Asia/Taipei").tz_localize(None)
+        lag_min = (stamp - today.index[-1]).total_seconds() / 60.0
+        if not (-2 <= lag_min <= max_delay_min):
+            return None
+        if today[["Close", "Volume"]].isna().any().any():
+            return None
+        if (today["Close"] <= 0).any() or (today["Volume"] < 0).any():
+            return None
+        return y
+    except Exception:
+        return None
+
+
 def _fnum(v):
     try:
         if v in (None, "", "-", "--"):
@@ -317,8 +349,16 @@ def main():
         if x is None or x.empty:
             continue
         merged, nbar, vol_ok = _snapshot_bars(x, store.get("stocks", {}).get(code, []), trade_date)
+        source = "Yahoo歷史5分K + TWSE MIS官方快照橋接"
         if nbar <= 0:
-            continue
+            # No new MIS tail is normal if Yahoo's 5m candle already caught up.
+            # Keep the date/clock/volume gate: no prior-day or speculative bar.
+            merged = _fresh_yahoo_5m(x, trade_date, bd.now_tw())
+            if merged is None:
+                continue
+            source = "Yahoo當日歷史5分K（延遲參考，非即時成交）"
+            today_bars = merged[merged.index.date == pd.Timestamp(trade_date).date()]
+            vol_ok = bool(float(today_bars["Volume"].sum()) > 0)
         try:
             t = bd.intraday_technical(merged)
         except Exception as e:
@@ -350,11 +390,11 @@ def main():
         row["structure_time"] = t.get("time")
         row["structure_date"] = str(t.get("date") or "")[:10] or None
         row["structure_close"] = t.get("close")
-        row["structure_source"] = "Yahoo歷史5分K + TWSE MIS官方快照橋接"
+        row["structure_source"] = source
         row["structure_bridge_bars"] = nbar
-        row["structure_confidence"] = "高" if nbar >= 3 and vol_ok else "中" if nbar >= 1 else "低"
+        row["structure_confidence"] = ("高" if nbar >= 3 and vol_ok else "中") if nbar >= 1 else ("中" if vol_ok else "低")
         row["structure_volume_verified"] = bool(vol_ok)
-        bridged += 1
+        bridged += 1  # verified refreshed structures (native Yahoo or MIS tail)
         volume_ok += int(bool(vol_ok))
         if t.get("time"):
             fresh_times.append(str(t.get("time"))[:5])
