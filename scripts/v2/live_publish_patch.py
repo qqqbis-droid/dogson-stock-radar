@@ -114,15 +114,17 @@ def fresh_structure_codes(payload, trade_date, now, max_age_minutes=20):
         if not code or qd != trade_date:
             continue
         structure_date = str(row.get("structure_date") or row.get("date") or "")[:10]
-        if structure_date and structure_date != trade_date:
+        # Require the confirmed SAME-DAY structure, plus the truth guard's
+        # explicit validation. Missing fields must never mean "passed".
+        if structure_date != trade_date or row.get("quote_price_validated") is not True:
             continue
-        if row.get("quote_price_validated") is False:
+        if row.get("live_truth_blocker"):
             continue
         st = parse_clock(trade_date, row.get("structure_time"))
         if not st:
             continue
         age = (now - st).total_seconds() / 60.0
-        if -5 <= age <= max_age_minutes:
+        if -2 <= age <= max_age_minutes:
             fresh.add(code)
     return fresh
 
@@ -183,11 +185,11 @@ def gate_structure_file(path: Path, fresh_codes: set[str], *, mission: str):
         if row.get("actionable") is not False:
             row["actionable"] = False
             changed = True
-        desired_action = "WATCH"
+        desired_action = "DATA_STALE"
         if row.get("action_state") != desired_action:
             row["action_state"] = desired_action
             changed = True
-        desired_bucket = "STALE" if mission == "daytrade" else "RESEARCH_ONLY"
+        desired_bucket = "STALE"
         if row.get("opportunity_bucket") != desired_bucket:
             row["opportunity_bucket"] = desired_bucket
             changed = True
