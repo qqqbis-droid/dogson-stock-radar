@@ -80,9 +80,19 @@ def collect():
     status = {}
     for market, url in SOURCES:
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "INUKO-LAB/2.0 (portfolio coverage)", "Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=24) as resp:
-                raw = json.loads(resp.read().decode("utf-8-sig"))
+            # TPEx returns a multi-MB JSON response; cloud downloads sometimes
+            # end with IncompleteRead. Retry independent full responses rather
+            # than treating partial JSON or old-session quotes as current.
+            raw = None
+            for attempt in range(3):
+                try:
+                    req = urllib.request.Request(url, headers={"User-Agent": "INUKO-LAB/2.0 (portfolio coverage)", "Accept": "application/json"})
+                    with urllib.request.urlopen(req, timeout=24) as resp:
+                        raw = json.loads(resp.read().decode("utf-8-sig"))
+                    break
+                except Exception:
+                    if attempt >= 2:
+                        raise
             if not isinstance(raw, list):
                 raise ValueError("official response is not a list")
             entries = extract(market, raw)
