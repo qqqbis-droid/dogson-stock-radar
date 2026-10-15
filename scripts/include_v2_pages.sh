@@ -62,9 +62,18 @@ def effective_date(obj):
 m=load('docs/v2/data/current_manifest.json')
 canonical=str(m.get('trade_date') or '')[:10]
 close=effective_date(load('docs/data/close.json'))
-intra=effective_date(load('docs/data/intraday.json'))
+intra_src=load('docs/data/intraday.json')
+intra=effective_date(intra_src)
 day=effective_date(load('docs/data/daytrade.json'))
-print(f'V2 overlay dates canonical={canonical} close={close} intraday={intra} daytrade={day}', file=__import__('sys').stderr)
+from datetime import datetime, timedelta
+def stamp(value):
+    try: return datetime.fromisoformat(str(value or '').replace('Z','+00:00'))
+    except (ValueError,TypeError): return None
+root_clock=stamp(intra_src.get('as_of'))
+v2_clock=stamp(m.get('generated_at'))
+root_newer=bool(root_clock and v2_clock and root_clock.tzinfo and v2_clock.tzinfo
+    and root_clock > v2_clock + timedelta(seconds=60))
+print(f'V2 overlay dates canonical={canonical} close={close} intraday={intra} daytrade={day} root_newer={root_newer}', file=__import__('sys').stderr)
 if not canonical:
     print('REBUILD')
 elif close and close > canonical:
@@ -79,7 +88,13 @@ elif close == canonical and ((intra and intra < close) or (day and day < close) 
     # advance only the close mission; stale live missions stay frozen/disabled.
     print('PRESERVE_CLOSE_ADVANCE')
 elif close and canonical > close:
-    print('PRESERVE_NEWER_CANONICAL')
+    # Same-session live MIS/5m can advance while the completed close stays on
+    # yesterday. Preserve the V2 branch only when it is at least as fresh;
+    # otherwise new 5m evidence was silently discarded and zones stayed empty.
+    if intra == canonical and day == canonical and root_newer:
+        print('REBUILD')
+    else:
+        print('PRESERVE_NEWER_CANONICAL')
 else:
     print('REBUILD')
 PY
