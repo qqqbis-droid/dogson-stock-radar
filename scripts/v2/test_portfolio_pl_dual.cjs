@@ -6,8 +6,9 @@ const code=fs.readFileSync('docs/v2/portfolio-renderer.js','utf8');
 const html=fs.readFileSync('docs/v2/index.html','utf8');
 const start=code.indexOf('function positionCalc('),stop=code.indexOf('function sysRisk(',start);
 assert(start>0&&stop>start,'Position P/L calculator unavailable');
-const calc=new Function('pn','window',code.slice(start,stop)+'\nreturn positionCalc;')(
+const calc=new Function('pn','currentPrice','window',code.slice(start,stop)+'\nreturn positionCalc;')(
  v=>v==null||v===''||!Number.isFinite(Number(v))?null:Number(v),
+ (d,e)=>Number(d?.quote?.price||e?.close)||null,
  {InukoFeeEngine:{estimate:({shares,price})=>({net:shares*price-10,commission:5,tax:5})}}
 );
 let holding={code:'5302',shares:500,avg_cost:10.05};
