@@ -79,7 +79,25 @@ function patchSummary(){
     const code=card.dataset.portfolioCode,p=s.get?.(code),scores=card.querySelectorAll('.score-row .score');if(!p||!scores.length)continue;
     const px=numText(scores[0]?.querySelector('b')?.textContent);if(!(px>0))continue;
     const est=estimatePosition(p,px);totalCost+=est.cost||0;totalNet+=est.net||0;known++;
-    const pnl=scores[1]?.querySelector('b');if(pnl&&est.pct!=null&&pnl.textContent!==signedPct(est.pct))pnl.textContent=signedPct(est.pct);
+    const pnl=scores[1]?.querySelector('b');
+    if(pnl&&est.pl!=null&&est.pct!=null){
+      // Keep BOTH the dollar amount and percentage. Replacing the whole
+      // textContent erased the main renderer's amount and its <small> node
+      // whenever the broker adapter's MutationObserver fired after paint.
+      const amount=pnl.querySelector('.portfolio-pl-amount');
+      const percent=pnl.querySelector('.portfolio-pl-pct');
+      const nextAmount=signedMoney(est.pl),nextPct=signedPct(est.pct);
+      if(amount&&percent){
+        if(amount.textContent!==nextAmount)amount.textContent=nextAmount;
+        if(percent.textContent!==nextPct)percent.textContent=nextPct;
+      }else if(pnl.classList.contains('portfolio-pl-breakdown')){
+        // Gracefully upgrade a still-cached old card, without deleting P&L.
+        const a=document.createElement('span'),b=document.createElement('small');
+        a.className='portfolio-pl-amount';a.textContent=nextAmount;
+        b.className='portfolio-pl-pct';b.textContent=nextPct;
+        pnl.replaceChildren(a,b);
+      }
+    }
   }
   if(!known)return;
   const cost=findSummary('成本合計')?.querySelector('b'),pl=findSummary('估計損益')?.querySelector('b');
