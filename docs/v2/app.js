@@ -158,7 +158,7 @@ function quoteHtml(d){
     :"";
   return `<div class="quote-strip"><div class="quote-price">${showPrice?priceFmt(p):"—"}</div><div class="quote-change ${cls}">${showPrice?signedPct(chg):"—"}</div><div class="quote-volume">${esc(vol)}</div>${turnover}${timeNote}</div>`;
 }
-function rankText(d){if(isIgnitionMode())return "🔥 點火 #"+(d.ignition_rank??"—");return `${bucketLabel[d.opportunity_bucket]||"排序"} #${d.opportunity_rank??"—"}`}
+function rankText(d){if(isIgnitionMode())return "🔥 點火 #"+(d.ignition_rank??"—");if(["intraday","daytrade"].includes(state.view)&&d.action_state==="DATA_STALE")return "資料待驗 · 不列排名";return `${bucketLabel[d.opportunity_bucket]||"排序"} #${d.opportunity_rank??"—"}`}
 function sectorDisplay(d){const primary=String(d?.primary_group||"").trim();if(primary)return primary;const industry=String(d?.industry||d?.industry_name||d?.official_industry||"").trim();return industry?`${industry}・官方產業代理`:"分類待補"}
 function sectorFilterKey(d){return String(d?.primary_group||d?.industry||d?.industry_name||d?.official_industry||"").trim()}
 
@@ -422,6 +422,17 @@ function renderCards(){
   }
   let rows=rowsForView();
   const originalCount=rows.length,q=state.search.trim().toLowerCase(),cfg=missionConfig[state.view],indexLoaded=fullIndexLoaded(),canLoadFull=Boolean(cfg.index&&state.manifest?.datasets?.[cfg.index]),activeQuick=activeQuickItem();
+  const liveMission=["intraday","daytrade"].includes(state.view);
+  // Never use stale, price-less data as a top-ranked recommendation by
+  // default. Search, filters and favourites still permit forensic inspection.
+  const noExplicitSelection=!q&&!hasNonSearchFilter()&&!window.RadarFavorites?.only?.();
+  if(liveMission&&noExplicitSelection){
+    rows=rows.filter(d=>d.action_state!=="DATA_STALE"
+      &&d.freshness==="LIVE"
+      &&num(d.quote?.price)!=null&&num(d.quote?.price)>0
+      &&num(d.data_confidence)>=60
+      &&num(d.scores?.[cfg.scoreKey])!=null);
+  }
   if(q)rows=rows.filter(d=>String(d.code||"").toLowerCase().includes(q)||String(d.name||"").toLowerCase().includes(q));
   rows=applyQuickRows(rows);
   if(state.filterStage)rows=rows.filter(d=>isIgnitionMode()?d.ignition_stage===state.filterStage:d.lifecycle_stage===state.filterStage);
@@ -441,7 +452,10 @@ function renderCards(){
     return `<article class="card ${tone}" data-code="${esc(d.code)}" role="button" tabindex="0" aria-label="查看 ${esc(d.code)} ${esc(d.name)} 個股詳情"><div class="card-top"><div class="identity"><span class="rank">${esc(rankText(d))}</span><div><span class="code">${esc(d.code)} ${esc(d.name)}</span><div class="muted">${esc(sectorDisplay(d))}</div></div></div><span class="badge stage">${esc(stageLabel[d.lifecycle_stage]||d.lifecycle_stage)}</span></div>${quoteHtml(d)}<div class="action-line ${tone}"><span>${closeStrategy?"○":d.actionable?"●":"○"}</span><b>${closeStrategy?(d.action_state==="DO_NOT_CHASE"?"先不追價":d.action_state==="EXIT_PRIORITY"||d.action_state==="REDUCE_WATCH"?"風險優先":d.action_state==="WAIT_PULLBACK"?"等待回踩":d.action_state==="WAIT_TRIGGER"?"等待突破":"明日候選・條件待補"):esc(actionLabel[d.action_state]||d.action_state||"—")}</b><small>${closeStrategy?"S1／R1 詳情載入中":esc(fresh)}</small></div><div class="score-row"><div class="score"><span>${esc(cfg.scoreLabel)}</span><b>${fmt(score)}</b></div><div class="score"><span>進場位置</span><b>${fmt(s.entry_position_score)}</b></div><div class="score"><span>資料信心</span><b>${fmt(d.data_confidence,0)}<small>%</small></b></div></div><div class="reason">${reason.length?reason.map(esc).join("・"):"目前無新增理由"}</div>${block?`<div class="blocker">卡點：${esc(humanBlock(block))}</div>`:""}</article>`;
   }).join("");
   const outsideHtml=external.map(outsideCard).join("");
-  $("#cards").innerHTML=(rankedHtml+outsideHtml)||`<div class="empty-state"><b>${esc(emptyMessage(rows,external))}</b><p>原始雷達池 ${originalCount} 檔；空結果會保留並說明，不會自動放寬成假訊號。</p></div>`;
+  const liveUnavailable=liveMission&&noExplicitSelection&&originalCount>0&&!shown.length;
+  $("#cards").innerHTML=(rankedHtml+outsideHtml)||(liveUnavailable
+    ?`<div class="empty-state" data-live-evidence-gate><b>今天尚無通過同日成交價與5分結構驗證的${state.view==="daytrade"?"當沖":"盤中"}候選</b><p>官方快照可能已有更新，但成交價、5分K及分數仍待補齊；原始 ${originalCount} 檔僅供研究，不列成可操作排名。可使用搜尋核對個股；資料未驗證前不提供買進訊號。</p></div>`
+    :`<div class="empty-state"><b>${esc(emptyMessage(rows,external))}</b><p>原始雷達池 ${originalCount} 檔；空結果會保留並說明，不會自動放寬成假訊號。</p></div>`);
 
   const loadMore=$("#loadMore");
   if(showAllNextDay){loadMore.classList.add("hidden")}
