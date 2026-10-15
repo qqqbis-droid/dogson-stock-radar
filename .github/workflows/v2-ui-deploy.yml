@@ -293,6 +293,7 @@ jobs:
           cp /tmp/v2-source/scripts/v2/validate_mission_evidence.py scripts/v2/validate_mission_evidence.py
           cp /tmp/v2-source/scripts/v2/test_live_truth_gate.py scripts/v2/test_live_truth_gate.py
           cp /tmp/v2-source/scripts/v2/test_portfolio_quote_preservation.py scripts/v2/test_portfolio_quote_preservation.py
+          cp /tmp/v2-source/scripts/v2/test_verified_sector_flow.cjs scripts/v2/test_verified_sector_flow.cjs
           cp /tmp/v2-source/scripts/v2/portfolio_quote_fallback.py scripts/v2/portfolio_quote_fallback.py
           cp /tmp/v2-source/scripts/v2/test_close_zone_card_evidence.cjs scripts/v2/test_close_zone_card_evidence.cjs
           cp /tmp/v2-source/scripts/v2/build_stock_shards.py scripts/v2/build_stock_shards.py
@@ -370,6 +371,8 @@ jobs:
           node scripts/v2/test_intraday_quote_recovery.cjs
           node scripts/v2/test_portfolio_progressive_quotes.cjs
           node scripts/v2/test_portfolio_l_edge_sync.cjs
+          node --check docs/v2/market-capital-renderer.js
+          node scripts/v2/test_verified_sector_flow.cjs
           node scripts/v2/test_intraday_quote_display.cjs
           node scripts/v2/test_live_rank_safety.cjs
           python scripts/v2/test_live_truth_gate.py
@@ -384,7 +387,7 @@ jobs:
           grep -q 'unified-score-freshness-v1.js?v=20261012singleverdict1' docs/v2/index.html
           grep -q 'universe-search.js?v=20261012singleverdict1' docs/v2/index.html
           node --check docs/v2/capital-stock-breakdown.js
-          grep -q 'market-capital-renderer.js?v=20261011capitalwide2' docs/v2/index.html
+          grep -q 'market-capital-renderer.js?v=20261015verifiedflow2' docs/v2/index.html
           grep -q 'capital-member-fallback' docs/v2/market-capital-renderer.js
           grep -q 'cms-detail {grid-column:1/-1' docs/v2/capital-stock-breakdown.js
           grep -q 'capital-stock-breakdown.js?v=20261013verifyflow1' docs/v2/index.html
