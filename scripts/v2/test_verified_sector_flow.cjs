@@ -1,0 +1,24 @@
+#!/usr/bin/env node
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const source=fs.readFileSync('docs/v2/market-capital-renderer.js','utf8');
+const page=fs.readFileSync('docs/v2/index.html','utf8');
+const start=source.indexOf('function closeRankInfo(');
+const end=source.indexOf('function flowAuditText(',start);
+assert(start>=0&&end>start,'Missing canonical close-ranking verification function');
+const check=new Function('mn',source.slice(start,end)+'\nreturn closeRankInfo;')(
+ v=>v==null||v===''||!Number.isFinite(Number(v))?null:Number(v));
+const row={primary_group:'塑膠工業',latest_date:'2026-10-14',today_amount_100m:150.6403};
+const complete={trade_date:'2026-10-15',groups:{塑膠工業:{reconciled:true,verified_count:12,member_count:12}}};
+assert.equal(check(row,complete,'2026-10-15').confirmed,false,'Oct 14 estimate must not enter Oct 15 confirmed flow');
+assert.equal(check({...row,latest_date:'2026-10-15'},complete,'2026-10-15').confirmed,true,'Same-day fully reconciled row can enter confirmed flow');
+assert.equal(check({...row,latest_date:'2026-10-15'},{trade_date:'2026-10-15',groups:{塑膠工業:{reconciled:false,verified_count:12,member_count:12}}},'2026-10-15').confirmed,false,'Unreconciled sectors cannot rank');
+assert.equal(check({...row,latest_date:'2026-10-15'},{trade_date:'2026-10-15',groups:{塑膠工業:{reconciled:true,verified_count:9,member_count:12}}},'2026-10-15').confirmed,false,'Partial member coverage cannot rank');
+let x=check({...row,latest_date:'2026-10-15'},{trade_date:'2026-10-15',groups:{塑膠工業:{reconciled:false,verified_count:0,member_count:0}}},'2026-10-15');
+assert.equal(x.confirmed,false);assert.equal(x.ratio,null,'No denominator must never mean 100% coverage');
+assert.equal(check({...row,latest_date:'2026-10-15'},null,'2026-10-15').confirmed,false,'Missing reconciliation dataset fails closed');
+assert(source.includes('歷史估算資料涵蓋')&&source.includes('非逐檔覆蓋率'),'Historical coverage must be separately labeled');
+assert(source.includes('目前沒有通過完整對帳的族群，暫停已驗證流入／流出排行榜'),'Empty verified leaderboard must be shown truthfully');
+assert(source.includes('法人來源日')&&source.includes('未對帳估算參考（非已驗證排行）'),'Every unverified sector must have its actual source date');
+assert(page.includes('market-capital-renderer.js?v=20261015verifiedflow2'),'iPhone must fetch current corrected capital renderer');
+console.log('PASS: daily source date, per-stock coverage, full reconciliation, and separate estimated flows');
