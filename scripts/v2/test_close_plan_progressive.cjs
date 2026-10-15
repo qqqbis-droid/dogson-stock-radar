@@ -21,7 +21,7 @@ assert(js.includes('zones.fresh'),'Never manufacture unsupported S1/R1');
 assert(!app.includes('closeStrategy?"明日策略核對中"'),'Permanent placeholder not allowed');
 assert(html.includes('close-ops-v1.js?v=20261013edge4'),'iPhone must fetch new JS revision');
 assert(html.includes('close-ops-v1.css?v=20261013color3'),'iPhone must fetch new CSS revision');
-assert(html.includes('app.js?v=20261013closecards2'),'iPhone must fetch updated base cards');
+assert(html.includes('app.js?v=20261015livegate1'),'iPhone must fetch updated base cards');
 assert(html.includes('chip-freshness-provenance.js?v=20261013gateupdate2'),'Close gate should recheck and rerender plans');
 assert(css.includes('.cp-plan-row')&&css.includes('.cp-plan-heading'),'Four-part plan styling present');
 
