@@ -224,7 +224,29 @@ def main():
     ap.add_argument("--close-json", help="Latest validated completed-session close.json")
     args = ap.parse_args()
     path = Path(args.out)
-    result = merge_same_session(merge_completed_close(collect(), Path(args.close_json) if args.close_json else None), Path(args.prior) if args.prior else None)
+    collected = collect()
+    # Keep older OFFICIAL prices in a separate reference-only namespace.
+    # The regular quotes dictionary remains strictly same-session so that
+    # no stale close can enter valuation or after-fee P/L.
+    dated_official = dict(collected.get("quotes") or {})
+    result = merge_same_session(merge_completed_close(collected, Path(args.close_json) if args.close_json else None), Path(args.prior) if args.prior else None)
+    accepted_days = sorted({str(q.get("trade_date") or "") for q in (result.get("quotes") or {}).values()})
+    current_day = accepted_days[-1] if accepted_days else ""
+    refs = {}
+    for code, q in dated_official.items():
+        day = str(q.get("trade_date") or "")
+        if (code not in result.get("quotes", {}) and current_day and day < current_day
+                and q.get("source") in ("TWSE STOCK_DAY_ALL", "TPEx daily_close_quotes")
+                and n(q.get("close")) is not None):
+            try:
+                old_age = (datetime.fromisoformat(current_day) - datetime.fromisoformat(day)).days
+            except ValueError:
+                continue
+            if 0 < old_age <= 10:
+                refs[code] = {"code": code, "close": q["close"], "trade_date": day,
+                              "source": q["source"], "market": q.get("market") or ""}
+    result["reference_quotes"] = refs
+    result["reference_note"] = "Dated previous-session prices only; never used in same-day holdings P/L"
     # Never replace a previously good public snapshot with two failed requests.
     if not result["quotes"] and path.exists():
         print("portfolio quote fetch unavailable; preserving existing snapshot", result["source_status"])
