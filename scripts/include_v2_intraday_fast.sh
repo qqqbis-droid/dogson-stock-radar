@@ -15,6 +15,9 @@ git archive FETCH_HEAD docs/v2 scripts/v2 contracts requirements-contract.txt | 
 
 python -m pip install --disable-pip-version-check -r requirements-contract.txt
 
+python scripts/v2/test_live_truth_gate.py
+node scripts/v2/test_live_rank_safety.cjs
+
 # Intraday/daytrade reuse the latest completed EOD chip background. Copy only
 # provenance/source dates from close so the UI can distinguish source date from
 # the last actual source check; never invent a newer chip clock.
