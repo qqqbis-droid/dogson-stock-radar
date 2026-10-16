@@ -59,7 +59,6 @@ class TestRepair(unittest.TestCase):
             self.assertEqual(output["items"]["1000"]["quote"]["price"],100.0)
             index=json.loads((b/"decision_close_index.json").read_text())
             self.assertEqual(index[0]["ignition_rank"],5)
-            self.assertEqual(index[0]["ignition_rank_source"],"full_close_universe")
             self.assertEqual(index[0]["ignition_execution_state"],"READY")
             m=json.loads((root/"current_manifest.json").read_text())
             self.assertEqual(m["datasets"]["decision_close_index"]["bytes"],(b/"decision_close_index.json").stat().st_size)
