@@ -14,7 +14,11 @@ import hashlib
 import json
 import math
 from pathlib import Path
+import sys
 
+SOURCE_ROOT = Path(__file__).resolve().parents[2]
+if str(SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SOURCE_ROOT))
 from scripts.v2.legacy_adapter import ignition_execution
 
 PARTS = ("structure", "volume_acceleration", "sector_resonance",
