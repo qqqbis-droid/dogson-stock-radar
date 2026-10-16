@@ -12,5 +12,5 @@ assert(app.includes('&&num(d.data_confidence)>=60'),'Require minimum confidence'
 assert(app.includes('&&num(d.scores?.[cfg.scoreKey])!=null'),'Reject empty score recommendations');
 assert(app.includes('const noExplicitSelection=!q&&!hasNonSearchFilter()&&!window.RadarFavorites?.only?.()'),'Individual search must retain unverified stocks for inspection');
 assert(app.includes('資料待驗 · 不列排名'),'Do not rank stale 1101 as a selected opportunity');
-assert(html.includes('app.js?v=20261015livegate1'),'iPhone must refresh revised app bundle');
+assert(html.includes('app.js?v=20261016ignitionrestore1'),'iPhone must refresh revised app bundle');
 console.log('PASS: live screens show only verified candidates by default, retain search and honest unavailable state');
