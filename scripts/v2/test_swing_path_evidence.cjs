@@ -75,7 +75,7 @@ const partial=evalPath(make(zones),{plan:{type:'PARTIAL',gate:'暫不建立新�
 assert.equal(partial.kind,'verify');
 assert(path.h60valid&&path.chipSame);
 assert(css.includes('@media(max-width:510px)'),'Mobile route must be two-column');
-for(const tag of ['<script src="./swing-path-v1.js?v=20261016route1">','swing-path-v1.css?v=20261016route1','close-ops-v1.js?v=20261016route1','detail-loading-guard-v2.js?v=20261016route1'])
+for(const tag of ['<script src="./swing-path-v1.js?v=20261016route2">','swing-path-v1.css?v=20261016route1','close-ops-v1.js?v=20261016route1','detail-loading-guard-v2.js?v=20261016route1'])
  assert(html.includes(tag),'Missing deployed cache-busted asset: '+tag);
 assert(close.includes('window.InukoSwingPath.evaluate(shard'),'Close card must use shared route');
 assert(detail.includes('window.InukoSwingPath?.detailHtml?.(path)'),'Direct single-stock detail must use same route');
