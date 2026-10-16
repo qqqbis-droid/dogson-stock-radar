@@ -60,7 +60,10 @@ function evaluate(shard,{expectedBuild='',expectedDate='',plan=null,view='close'
    if(['VERIFY','PARTIAL'].includes(planType)||!support||!resistance){
      phase='價位證據待補';kind='verify';
      action='S1／R1 尚未完整核對，暫不建立新倉';
-   }else if(overheated||planType==='NO_CHASE'){
+   }else if(planType==='NO_CHASE'||(!planType&&overheated)){
+     // The verified close-card verdict owns the final risk/action headline;
+     // hourly 60m caution is reflected by a failed evidence gate, not a
+     // competing second verdict in the expanded detail.
      phase='風險優先／先不追價';kind='risk';
      action='暫停追價；等待風險改善後重新評估';
    }else if(['PULLBACK_TEST','PULLBACK_CONFIRMED'].includes(d.lifecycle_stage)||['WAIT_PULLBACK'].includes(d.action_state)||planType==='LAYOUT'){
