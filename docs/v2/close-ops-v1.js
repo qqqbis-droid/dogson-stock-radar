@@ -9,7 +9,7 @@ const fmt=(v,d=1)=>n(v)==null?'—':Number(v).toLocaleString('zh-TW',{maximumFra
 const tick=x=>x<10?.01:x<50?.05:x<100?.1:x<500?.5:x<1000?1:5;
 function pp(v,edge){const x=n(v);if(x==null||x<=0)return'—';const t=tick(x),k=edge==='lower'?Math.floor((x+1e-9)/t):edge==='upper'?Math.ceil((x-1e-9)/t):Math.round(x/t);return fmt(k*t,t<.1?2:t<1?1:0)}
 const range=z=>z?pp(z.low,'lower')+'～'+pp(z.high,'upper'):'—';
-const D={manifest:null,build:'',date:'',cache:new Map(),pending:new Map(),seq:0,loading:false,mode:'',lastRefresh:0,index:null,peers:null};
+const D={manifest:null,build:'',date:'',cache:new Map(),pending:new Map(),seq:0,loading:false,mode:'',lastRefresh:0,index:null,peers:null,lanes:null,auditBusy:false,auditAgain:false};
 const KEY='dogson.close.public-candidate-history.v1';
 const screenActive=()=>document.querySelector('.tab.active')?.dataset.view==='close'&&!document.querySelector('#radarPanel')?.classList.contains('h60-screen-active');
 const swingActive=()=>screenActive()&&document.querySelector('[data-close-mode="swing"]')?.classList.contains('active');
@@ -79,6 +79,45 @@ function classify(d,shard){
    });
  }
  return result;
+}
+// Second-stage classification always delegates to the SAME S1/R1 and R:R
+// verdict that paints the left border of each card. It never re-scores stocks.
+const laneFromPlan=p=>p.type==="LAYOUT"&&p.ready?"LAYOUT":(["BREAKOUT","WATCH"].includes(p.type)&&p.sessionOK?"WAIT":"BLOCKED");
+const laneSnapshot=()=>D.lanes?.build===D.build?D.lanes:null;
+async function auditLanes(force=false){
+  if(!swingActive()||!D.index||typeof window.InukoNextDayElite!=="function")return;
+  if(D.auditBusy){if(force)D.auditAgain=true;return}
+  if(!force&&laneSnapshot()?.ready)return;
+  D.auditBusy=true;
+  const build=D.build;
+  try{
+    const elite=D.index.filter(d=>window.InukoNextDayElite(d));
+    const byCode={},counts={LAYOUT:0,WAIT:0,BLOCKED:0};
+    // Small bounded batches avoid saturating Safari and reuse the card shard cache.
+    for(let i=0;i<elite.length;i+=6){
+      if(build!==D.build||!swingActive())return;
+      const batch=await Promise.all(elite.slice(i,i+6).map(async row=>{
+        const code=String(row.code||"");
+        const evidence=await shard(code,build);
+        return {code,plan:classify(evidence?.decision||{code},evidence)};
+      }));
+      for(const item of batch){
+        const lane=laneFromPlan(item.plan);
+        byCode[item.code]=lane;counts[lane]++;
+      }
+    }
+    if(build!==D.build||!swingActive())return;
+    const next={build,ready:true,total:elite.length,counts,byCode};
+    const before=laneSnapshot();
+    D.lanes=next;
+    const changed=!before?.ready||before.total!==next.total||
+      Object.keys(counts).some(k=>before.counts?.[k]!==counts[k])||
+      Object.keys(byCode).some(k=>before.byCode?.[k]!==byCode[k]);
+    if(changed)document.dispatchEvent(new CustomEvent("radar:close-plan-lanes-updated",{detail:{build,total:next.total,counts:{...counts}}}));
+  }finally{
+    D.auditBusy=false;
+    if(D.auditAgain){D.auditAgain=false;void auditLanes(true)}
+  }
 }
 function compact(x){
  // Phase, next barrier, action and invalidation only: avoid duplicate plan
@@ -160,7 +199,7 @@ async function manifest(){
  const r=await fetch('./data/current_manifest.json?cp='+Date.now(),{cache:'no-store'});
  if(!r.ok)throw Error('盤後 manifest '+r.status);
  const m=await r.json();if(!m.health?.validation_passed||!m.active_build_id)throw Error('盤後 Atomic Bundle 尚未驗證');
- if(D.build!==m.active_build_id){D.cache.clear();D.pending.clear();D.index=null;D.peers=null}
+ if(D.build!==m.active_build_id){D.cache.clear();D.pending.clear();D.index=null;D.peers=null;D.lanes=null}
  D.manifest=m;D.build=m.active_build_id;D.date=td(m.datasets?.decision_close_summary?.as_of);
  if(!D.date)throw Error('缺少盤後交易日');
  return m;
@@ -196,6 +235,7 @@ async function indexForPeers(){
     if(!['SETUP','LAUNCH','PULLBACK_TEST','PULLBACK_CONFIRMED'].includes(d.lifecycle_stage))continue;
     const key=String(d.primary_group||'');if(key)counts.set(key,(counts.get(key)||0)+1)}
   D.peers=counts;
+  void auditLanes();
   try{const archives=JSON.parse(localStorage.getItem(KEY)||'[]');let values=Array.isArray(archives)?archives.filter(x=>x?.date!==D.date).slice(-24):[];values.push({date:D.date,rows:rows.filter(x=>n(x.quote?.price)>0).slice(0,60).map(x=>({code:String(x.code),close:n(x.quote.price)}))});localStorage.setItem(KEY,JSON.stringify(values.slice(-24)))}catch{}
  }catch(err){console.warn('close candidate index unavailable',err)}
 }
@@ -261,13 +301,13 @@ async function refresh(){
  }finally{working=false;if(queued){queued=false;schedule()}}
 }
 function schedule(){clearTimeout(timer);timer=setTimeout(refresh,65)}
-function invalidate(){D.manifest=null;D.build='';D.date='';D.cache.clear();D.index=null;D.peers=null;D.lastRefresh=0;schedule()}
+function invalidate(){D.manifest=null;D.build='';D.date='';D.cache.clear();D.index=null;D.peers=null;D.lanes=null;D.lastRefresh=0;schedule()}
 document.addEventListener('radar:cards-rendered',schedule);
 document.addEventListener('radar:view-rendered',schedule);
 document.addEventListener('radar:data-reloaded',invalidate);
 document.addEventListener('radar:afterhours-refresh',schedule);
- document.addEventListener('radar:close-gate-updated',schedule);
+ document.addEventListener('radar:close-gate-updated',()=>{schedule();if(D.index)void auditLanes(true)});
 document.addEventListener('click',e=>{if(e.target.closest('[data-close-mode],.tab'))setTimeout(schedule,100)});
-window.InukoCloseOps={version:'2.0',schedule,get(code){const s=D.cache.get(String(code));return s?classify(s.decision||{},s):null},analyze(shard){return shard?.view==='close'?classify(shard.decision||{},shard):null},isReady(){return validGlobal()}};
+window.InukoCloseOps={version:'2.0',schedule,laneSnapshot,indexRows(){return D.index},laneFor(code){return laneSnapshot()?.byCode?.[String(code)]||null},get(code){const s=D.cache.get(String(code));return s?classify(s.decision||{},s):null},analyze(shard){return shard?.view==='close'?classify(shard.decision||{},shard):null},isReady(){return validGlobal()}};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});else schedule();
 })();

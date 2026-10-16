@@ -27,11 +27,11 @@ const quickFilterConfig={
     {key:"TREND_MONITOR",label:"趨勢追蹤",icon:"↗",note:"結構仍在延續",kind:"bucket",values:["TREND_MONITOR"],tone:"trend"},
     {key:"RISK",label:"風險",icon:"!",note:"先看風險訊號",kind:"bucket",values:["RISK"],tone:"risk"}
   ]},
-  close:{title:"明日作戰快篩",subtitle:"明日候選依條件全數列入，不設檔數上限",items:[
-    {key:"NEXT_DAY_READY",label:"明日候選",icon:"✦",note:"品質≥75・位置≥65・信心≥80",kind:"bucket",values:["NEXT_DAY_READY"],tone:"go"},
-    {key:"LAUNCH",label:"剛啟動",icon:"↗",note:"結構剛轉強",kind:"stage",values:["LAUNCH"],tone:"trend"},
-    {key:"PULLBACK",label:"回踩",icon:"↘",note:"等承接確認",kind:"stage",values:["PULLBACK_TEST","PULLBACK_CONFIRMED"],tone:"wait"},
-    {key:"RISK",label:"風險",icon:"!",note:"明天先處理風險",kind:"bucket",values:["RISK"],tone:"risk"}
+  close:{title:"明日作戰｜進場分流",subtitle:"品質初篩 ≠ 明日可買；依同日 S1／R1 與風險報酬比完成第二層審核",items:[
+    {key:"PLAN_LAYOUT",label:"布局優先",icon:"✓",note:"位置與風報比通過，隔日仍須量價確認",kind:"plan",lane:"LAYOUT",tone:"go"},
+    {key:"PLAN_WAIT",label:"等待觸發",icon:"⏳",note:"等突破、回踩或確認條件",kind:"plan",lane:"WAIT",tone:"wait"},
+    {key:"PLAN_BLOCKED",label:"暫不進場",icon:"!",note:"壓力近、風報比不足或資料未驗證",kind:"plan",lane:"BLOCKED",tone:"risk"},
+    {key:"NEXT_DAY_READY",label:"品質合格",icon:"✦",note:"僅第一層品質池，不代表明天可買",kind:"elite",values:["NEXT_DAY_READY"],tone:"neutral"}
   ]},
   daytrade:{title:"當沖執行快篩",subtitle:"先分執行狀態，再搭配位置與族群",items:[
     {key:"ACTIONABLE_NOW",label:"可執行",icon:"◎",note:"條件同步較完整",kind:"bucket",values:["ACTIONABLE_NOW"],tone:"go"},
@@ -163,7 +163,7 @@ function quoteHtml(d){
     :"";
   return `<div class="quote-strip"><div class="quote-price">${showPrice?priceFmt(p):"—"}</div><div class="quote-change ${cls}">${showPrice?signedPct(chg):"—"}</div><div class="quote-volume">${esc(vol)}</div>${turnover}${timeNote}</div>`;
 }
-function rankText(d){if(isIgnitionMode())return verifiedIgnition(d)?"🔥 點火 #"+d.ignition_rank:"🔥 點火資料待驗";if(["intraday","daytrade"].includes(state.view)&&d.action_state==="DATA_STALE")return "資料待驗 · 不列排名";return `${bucketLabel[d.opportunity_bucket]||"排序"} #${d.opportunity_rank??"—"}`}
+function rankText(d){if(isIgnitionMode())return verifiedIgnition(d)?"🔥 點火 #"+d.ignition_rank:"🔥 點火資料待驗";if(state.view==="close"&&d.opportunity_bucket==="NEXT_DAY_READY")return "品質候選 #"+(d.opportunity_rank??"—");if(["intraday","daytrade"].includes(state.view)&&d.action_state==="DATA_STALE")return "資料待驗 · 不列排名";return `${bucketLabel[d.opportunity_bucket]||"排序"} #${d.opportunity_rank??"—"}`}
 function sectorDisplay(d){const primary=String(d?.primary_group||"").trim();if(primary)return primary;const industry=String(d?.industry||d?.industry_name||d?.official_industry||"").trim();return industry?`${industry}・官方產業代理`:"分類待補"}
 function sectorFilterKey(d){return String(d?.primary_group||d?.industry||d?.industry_name||d?.official_industry||"").trim()}
 
@@ -178,10 +178,13 @@ function isNextDayElite(d){
     && !["WEAKENING","FAILED"].includes(d?.lifecycle_stage)
     && !["DO_NOT_CHASE","REDUCE_WATCH","EXIT_PRIORITY","DATA_STALE"].includes(d?.action_state);
 }
+// Shared by the verified second-stage auditor and the quality-filter UI.
+window.InukoNextDayElite=isNextDayElite;
 function quickMatch(d){
   const q=activeQuickItem();
   if(!q)return true;
   if(isIgnitionMode()&&q.kind==="ignition_stage")return q.values.includes(d.ignition_stage);
+  if(state.view==="close"&&q.kind==="plan")return isNextDayElite(d)&&window.InukoCloseOps?.laneFor?.(d.code)===q.lane;
   if(state.view==="close"&&q.key==="NEXT_DAY_READY")return isNextDayElite(d);
   return q.kind==="stage"?q.values.includes(d.lifecycle_stage):q.values.includes(d.opportunity_bucket);
 }
@@ -192,7 +195,11 @@ function applyQuickRows(rows){
 }
 function quickValue(item,buckets,stages){
   if(isIgnitionMode()&&item.kind==="ignition_stage")return (rowsForView()||[]).filter(d=>item.values.includes(d.ignition_stage)).length;
-  if(state.view==="close"&&item.key==="NEXT_DAY_READY")return (rowsForView()||[]).filter(isNextDayElite).length;
+  if(state.view==="close"&&(item.kind==="plan"||item.key==="NEXT_DAY_READY")){
+    const audit=window.InukoCloseOps?.laneSnapshot?.();
+    if(!audit?.ready||audit.build!==state.manifest?.active_build_id)return "…";
+    return item.kind==="plan"?Number(audit.counts?.[item.lane]||0):Number(audit.total||0);
+  }
   const source=item.kind==="stage"?stages:buckets;
   return item.values.reduce((sum,key)=>sum+Number(source?.[key]||0),0);
 }
@@ -305,7 +312,16 @@ function renderRadarSummary(){
   box.hidden=false;
   const cfg=missionConfig[state.view],spec=quickSpec(),s=state.cache.radar_stats?.missions?.[cfg.stats]||{},b=s.buckets||{},g=s.stages||{},active=activeQuickItem();
   if(!spec){box.innerHTML="";return}
-  box.innerHTML=`<div class="quick-filter-head"><div><b>${esc(spec.title)}</b><span>${esc(spec.subtitle)}</span></div>${active?'<button type="button" class="quick-filter-clear" data-quick-filter-clear>清除快篩 ×</button>':'<span class="quick-filter-tip">點一下篩選</span>'}</div><div class="quick-filter-grid">${spec.items.map(item=>{const selected=state.quickFilter===item.key,value=quickValue(item,b,g);return `<button type="button" class="quick-filter-card ${esc(item.tone)}${selected?" active":""}" data-quick-filter="${esc(item.key)}" aria-pressed="${selected?"true":"false"}"><span class="quick-filter-title"><i>${esc(item.icon)}</i><b>${esc(item.label)}</b><em>${selected?"✓":""}</em></span><strong>${Number(value).toLocaleString("zh-TW")}</strong><small>${esc(item.note)}</small></button>`}).join("")}</div>`;
+  const audit=state.view==="close"&&!isIgnitionMode()?window.InukoCloseOps?.laneSnapshot?.():null;
+  const audited=!!(audit?.ready&&audit.build===state.manifest?.active_build_id);
+  const subtitle=state.view==="close"&&!isIgnitionMode()?(audited
+    ?`第一層品質合格 ${audit.total} 檔，已全數完成第二層作戰核對；布局優先仍須隔日確認`
+    :"正在核對候選股的支撐／壓力及進場風報比；完成前不顯示可布局數字"):spec.subtitle;
+  box.innerHTML=`<div class="quick-filter-head"><div><b>${esc(spec.title)}</b><span>${esc(subtitle)}</span></div>${active?'<button type="button" class="quick-filter-clear" data-quick-filter-clear>清除快篩 ×</button>':'<span class="quick-filter-tip">點一下篩選</span>'}</div><div class="quick-filter-grid">${spec.items.map(item=>{
+    const selected=state.quickFilter===item.key,value=quickValue(item,b,g);
+    const waiting=state.view==="close"&&!isIgnitionMode()&&(item.kind==="plan"||item.kind==="elite")&&!audited;
+    return `<button type="button" class="quick-filter-card ${esc(item.tone)}${selected?" active":""}" data-quick-filter="${esc(item.key)}" aria-pressed="${selected?"true":"false"}" ${waiting?'disabled aria-disabled="true"':''}><span class="quick-filter-title"><i>${esc(item.icon)}</i><b>${esc(item.label)}</b><em>${selected?"✓":""}</em></span><strong>${typeof value==="number"?value.toLocaleString("zh-TW"):esc(value)}</strong><small>${waiting?"逐檔核對中":esc(item.note)}</small></button>`;
+  }).join("")}</div>`;
 }
 function renderStageFilter(){
   const el=$("#stageFilter");if(!el)return;const current=state.filterStage;
@@ -582,6 +598,16 @@ $("#actionFilter")?.addEventListener("change",async e=>{state.filterAction=e.tar
 $("#positionFilter")?.addEventListener("change",async e=>{state.filterPosition=e.target.value;const need=["NEAR_SUPPORT","NEAR_RESISTANCE"].includes(state.filterPosition);if(state.filterPosition)await applyDeepFilter({needDetail:need});else renderCards()});
 $("#sectorFilter")?.addEventListener("focus",async()=>{if(state.view!=="portfolio"){await ensureIndex();renderSectorFilter()}});
 $("#sectorFilter")?.addEventListener("change",async e=>{state.filterSector=e.target.value;if(state.filterSector)await applyDeepFilter();else renderCards()});
+
+// Count only completed, same-build shard audits. Reuse the validated index,
+// so iPhone does not download a second megabyte just to open the three lanes.
+document.addEventListener("radar:close-plan-lanes-updated",()=>{
+  const audit=window.InukoCloseOps?.laneSnapshot?.();
+  if(state.view!=="close"||isIgnitionMode()||!audit?.ready||audit.build!==state.manifest?.active_build_id)return;
+  const index=window.InukoCloseOps?.indexRows?.();
+  if(!state.cache.decision_close_index&&Array.isArray(index))state.cache.decision_close_index=index;
+  renderSectorFilter();renderRadarSummary();renderCards();
+});
 
 boot().catch(err=>{
   console.error(err);
