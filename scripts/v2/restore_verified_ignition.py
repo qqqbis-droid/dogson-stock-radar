@@ -103,7 +103,6 @@ def patch_row(row, raw):
     # rather than silently promoting ranks within a reduced V2 radar pool.
     source_rank = number(raw.get("ignition_rank_v2"))
     row["ignition_rank"] = int(source_rank) if source_rank is not None and source_rank >= 1 and source_rank.is_integer() else None
-    row["ignition_rank_source"] = "full_close_universe" if row["ignition_rank"] is not None else "needs_rebuild"
     row["ignition_signal_action"] = raw.get("ignition_signal_action_v2") or raw.get("ignition_action_v2")
     ex = ignition_execution(
         row["ignition_stage"], row["ignition_signal_action"], scores["ignition_score"],
@@ -164,7 +163,6 @@ def run(root: Path, legacy: Path):
         # these ranks apply ONLY to this V2 subset, never the full TW universe.
         for rank, row in enumerate(scored, 1):
             row["ignition_rank"] = rank
-            row["ignition_rank_source"] = "v2_radar_pool"
     for row in items.values():
         if row not in scored:
             row["ignition_rank"] = None
@@ -184,7 +182,7 @@ def run(root: Path, legacy: Path):
                           "ignition_gate_cap", "ignition_gate_flags", "ignition_breakout_distance_pct",
                           "ignition_breakout_distance_atr", "ignition_candidate", "ignition_signal_action",
                           "ignition_action", "ignition_execution_state", "ignition_execution_ready",
-                          "ignition_execution_note", "ignition_rank", "ignition_rank_source"):
+                          "ignition_execution_note", "ignition_rank"):
                 if field=="scores":
                     row.setdefault("scores", {})["ignition_score"] = src["scores"].get("ignition_score")
                 else:
