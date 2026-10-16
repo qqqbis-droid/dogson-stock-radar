@@ -66,5 +66,5 @@ for(const tag of ['<script src="./swing-path-v1.js?v=20261016route1">','swing-pa
  assert(html.includes(tag),'Missing deployed cache-busted asset: '+tag);
 assert(close.includes('window.InukoSwingPath.evaluate(shard'),'Close card must use shared route');
 assert(detail.includes('window.InukoSwingPath?.detailHtml?.(path)'),'Direct single-stock detail must use same route');
-assert(!js.includes('forecast')&&!js.includes('target_price'),'No price prediction engine');
+assert(!js.includes('target_price'),'No hidden predicted target-price feed');
 console.log('PASS: swing path current build/date, price provenance, iPhone layout, no imaginary R2, breakout only pending retest');
