@@ -69,7 +69,7 @@ class RestoreTests(unittest.TestCase):
             a=mod.load(mod.filepath(root,m["datasets"][key]))[0]
             self.assertEqual(a["scores"]["ignition_score"],81)
             self.assertEqual(a["ignition_rank"],5)
-            self.assertEqual(a["ignition_recovered_from_build"],OLD)
+            self.assertNotIn("ignition_recovered_from_build",a)
         evidence=mod.load(mod.filepath(root,m["datasets"]["stock_detail_close"]))["items"]["1101"]
         self.assertEqual(evidence["ignition_components_v2"]["structure"]["score"],20)
         self.assertEqual(mod.restore(root)["restored"],0)
