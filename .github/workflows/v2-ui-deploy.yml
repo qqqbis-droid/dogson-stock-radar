@@ -320,6 +320,7 @@ jobs:
           cp /tmp/v2-source/scripts/v2/restore_verified_ignition.py scripts/v2/restore_verified_ignition.py
           cp /tmp/v2-source/scripts/v2/test_verified_ignition_rehydration.py scripts/v2/test_verified_ignition_rehydration.py
           cp /tmp/v2-source/scripts/v2/legacy_adapter.py scripts/v2/legacy_adapter.py
+          cp /tmp/v2-source/scripts/v2/engine.py scripts/v2/engine.py
           cp /tmp/v2-source/scripts/v2/test_portfolio_progressive_quotes.cjs scripts/v2/test_portfolio_progressive_quotes.cjs
           cp /tmp/v2-source/scripts/v2/test_portfolio_pl_dual.cjs scripts/v2/test_portfolio_pl_dual.cjs
           cp /tmp/v2-source/scripts/v2/test_portfolio_pl_persistence.cjs scripts/v2/test_portfolio_pl_persistence.cjs
