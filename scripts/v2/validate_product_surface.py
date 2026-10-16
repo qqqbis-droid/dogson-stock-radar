@@ -89,7 +89,7 @@ def main():
                    'kind:"plan",lane:"BLOCKED"', 'key:"NEXT_DAY_READY",label:"品質合格"',
                    "window.InukoNextDayElite=isNextDayElite",
                    "radar:close-plan-lanes-updated", "if(!audit?.ready",
-                   "if(state.view==="close"&&q.kind==="plan")"):
+                   'if(state.view=="close"&&q.kind=="plan")'):
         require(app, needle, "audited tomorrow lane filters", errors)
     for needle in ("const laneFromPlan=", "async function auditLanes(",
                    "const elite=D.index.filter(d=>window.InukoNextDayElite(d))",
