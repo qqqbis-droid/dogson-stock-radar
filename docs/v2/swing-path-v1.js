@@ -104,8 +104,10 @@ function evaluate(shard,{expectedBuild='',expectedDate='',plan=null,view='close'
    {name:'法人與借券',passed:chipPass,desc:'同日外資連買與借券減少'},
    {name:'相對大盤',passed:marketPass,desc:'同交易日相對強弱需有獨立證據'}
  ];
- const promotionReady=checks.every(c=>c.passed)
-   &&e.breakout_confirmed===true&&e.retest_confirmed===true;
+ const promotionReady=Boolean(known&&support&&resistance&&checks.every(c=>c.passed)
+   &&e.breakout_confirmed===true&&e.retest_confirmed===true
+   &&!overheated&&!['VERIFY','PARTIAL','NO_CHASE'].includes(String(plan?.type||'')));
+ if(promotionReady){phase='突破回測雙確認';kind='trend'}
  const sourceGood=Boolean(known&&support&&resistance);
  const steps=[
   {name:'目前價格',value:known?price(quote):'待核對',state:known?'observed':'missing',hint:date?'資料日 '+date:'等待同日價格'},
