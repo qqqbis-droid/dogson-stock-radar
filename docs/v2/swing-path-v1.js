@@ -36,11 +36,11 @@ function zoneEvidence(z){
    validated:FRESH.has(z.freshness)
  };
 }
-function evaluate(shard,{expectedBuild='',expectedDate='',plan=null,view='close'}={}){
+function evaluate(shard,{expectedBuild='',expectedDate='',plan=null,view='close',allowed=true}={}){
  const d=shard?.decision||{},e=shard?.evidence||{};
  const date=day(shard?.as_of),build=String(shard?.build_id||'');
  const quote=n(d?.quote?.price),confidence=n(d?.data_confidence);
- const known=Boolean(shard&&build&&(expectedBuild?build===expectedBuild:true)
+ const known=Boolean(allowed===true&&shard&&build&&(expectedBuild?build===expectedBuild:true)
    &&date&&(expectedDate?date===day(expectedDate):true)
    &&quote>0&&confidence!=null&&confidence>=80);
  const support=known?usable(shard,date,'SUPPORT','S1'):null;
