@@ -200,6 +200,11 @@ jobs:
           set -euo pipefail
           python /tmp/v2-source/scripts/v2/normalize_close_snapshot_by_close_date.py --root /tmp/v2-source/docs/v2/data
           python /tmp/v2-source/scripts/v2/restore_ignition_from_previous.py --root /tmp/v2-source/docs/v2/data
+          # The prior-build rescue is only a fallback. The authoritative six-part
+          # CLOSE model is in the root same-session scored dataset. Match
+          # dates/prices before restoring, never derive ignition from swing.
+          python /tmp/v2-source/scripts/v2/restore_verified_ignition.py --root /tmp/v2-source/docs/v2/data --legacy-close docs/data/close.json
+          python /tmp/v2-source/scripts/v2/enrich_stock_detail_context.py --legacy-root docs/data --root /tmp/v2-source/docs/v2/data
           python /tmp/v2-source/scripts/v2/test_capital_stock_breakdown.py
           python /tmp/v2-source/scripts/v2/build_capital_stock_breakdown.py --root /tmp/v2-source/docs/v2/data --registry /tmp/v2-source/contracts/registries/sector_registry.json
           python /tmp/v2-source/scripts/v2/validate_bundle.py --root /tmp/v2-source/docs/v2/data
@@ -228,7 +233,13 @@ jobs:
                       mismatches.append(f'{code}:{key}:{row.get(key)}!={d.get(key)}')
           if mismatches:
               raise SystemExit('close card/detail mismatch after normalization: '+', '.join(mismatches[:20]))
-          print('Close card/detail semantic parity OK', {'rows':len(idx),'details':len(det)})
+          scored=[r for r in idx if isinstance((r.get('scores') or {}).get('ignition_score'), (int,float)) and r.get('ignition_model_version')=='inuko-ignition-v2.0' and r.get('ignition_rank') is not None]
+          if len(scored)<max(10,int(len(idx)*0.60)):
+              raise SystemExit(f'Ignition production gate: only {len(scored)}/{len(idx)} rows carry scored validated 2.0 data')
+          summary=json.loads(resolve(m['datasets']['decision_close_summary']).read_text(encoding='utf-8'))
+          if not summary or any(not isinstance((r.get('scores') or {}).get('ignition_score'), (int,float)) for r in summary):
+              raise SystemExit('Ignition production gate: close summary still contains blank ignition score')
+          print('Close card/detail semantic parity OK', {'rows':len(idx),'details':len(det),'ignition_scored':len(scored)})
           PY
 
       - name: Add official full-market portfolio close quotes
@@ -306,6 +317,9 @@ jobs:
           cp /tmp/v2-source/scripts/v2/test_swing_path_evidence.cjs scripts/v2/test_swing_path_evidence.cjs
           cp /tmp/v2-source/scripts/v2/restore_ignition_from_previous.py scripts/v2/restore_ignition_from_previous.py
           cp /tmp/v2-source/scripts/v2/test_ignition_restore.py scripts/v2/test_ignition_restore.py
+          cp /tmp/v2-source/scripts/v2/restore_verified_ignition.py scripts/v2/restore_verified_ignition.py
+          cp /tmp/v2-source/scripts/v2/test_verified_ignition_rehydration.py scripts/v2/test_verified_ignition_rehydration.py
+          cp /tmp/v2-source/scripts/v2/legacy_adapter.py scripts/v2/legacy_adapter.py
           cp /tmp/v2-source/scripts/v2/test_portfolio_progressive_quotes.cjs scripts/v2/test_portfolio_progressive_quotes.cjs
           cp /tmp/v2-source/scripts/v2/test_portfolio_pl_dual.cjs scripts/v2/test_portfolio_pl_dual.cjs
           cp /tmp/v2-source/scripts/v2/test_portfolio_pl_persistence.cjs scripts/v2/test_portfolio_pl_persistence.cjs
@@ -382,6 +396,7 @@ jobs:
           test -s docs/v2/swing-path-v1.css
           node scripts/v2/test_swing_path_evidence.cjs
           python scripts/v2/test_ignition_restore.py
+          python -m unittest scripts.v2.test_verified_ignition_rehydration
           node scripts/v2/test_close_plan_progressive.cjs
           node --check docs/v2/radar-favorites-v2.js
           grep -q 'radar:hourly60-rendered' docs/v2/hourly60-screener.js
