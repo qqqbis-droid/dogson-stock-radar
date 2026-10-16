@@ -97,7 +97,12 @@ function actionTone(d){
   if(["WAIT_TRIGGER","WAIT_PULLBACK","DO_NOT_CHASE"].includes(d.action_state))return"wait";
   return"neutral";
 }
-function scoreFor(d){if(isIgnitionMode())return d.scores?.ignition_score;const cfg=missionConfig[state.view],s=d.scores||{};return s[cfg.scoreKey]}
+function verifiedIgnition(d){
+  return d?.ignition_model_version==="inuko-ignition-v2.0"
+    &&num(d.scores?.ignition_score)!=null
+    &&num(d.ignition_rank)>0&&num(d.ignition_confidence)!=null;
+}
+function scoreFor(d){if(isIgnitionMode())return verifiedIgnition(d)?d.scores.ignition_score:null;const cfg=missionConfig[state.view],s=d.scores||{};return s[cfg.scoreKey]}
 function summaryRows(){const cfg=missionConfig[state.view];return cfg?.summary?(state.cache[cfg.summary]||[]):[]}
 function missionPhase(){if(state.view==="close")return"CLOSE_FREEZE";if(state.view==="portfolio")return"POST_CLOSE";return summaryRows()[0]?.session_phase||state.manifest?.session_phase}
 function missionDate(){const cfg=missionConfig[state.view],meta=cfg?.summary?state.manifest?.datasets?.[cfg.summary]:null;return String(meta?.as_of||state.manifest?.trade_date||"").slice(0,10)}
@@ -158,7 +163,7 @@ function quoteHtml(d){
     :"";
   return `<div class="quote-strip"><div class="quote-price">${showPrice?priceFmt(p):"—"}</div><div class="quote-change ${cls}">${showPrice?signedPct(chg):"—"}</div><div class="quote-volume">${esc(vol)}</div>${turnover}${timeNote}</div>`;
 }
-function rankText(d){if(isIgnitionMode())return "🔥 點火 #"+(d.ignition_rank??"—");if(["intraday","daytrade"].includes(state.view)&&d.action_state==="DATA_STALE")return "資料待驗 · 不列排名";return `${bucketLabel[d.opportunity_bucket]||"排序"} #${d.opportunity_rank??"—"}`}
+function rankText(d){if(isIgnitionMode())return verifiedIgnition(d)?"🔥 點火 #"+d.ignition_rank:"🔥 點火資料待驗";if(["intraday","daytrade"].includes(state.view)&&d.action_state==="DATA_STALE")return "資料待驗 · 不列排名";return `${bucketLabel[d.opportunity_bucket]||"排序"} #${d.opportunity_rank??"—"}`}
 function sectorDisplay(d){const primary=String(d?.primary_group||"").trim();if(primary)return primary;const industry=String(d?.industry||d?.industry_name||d?.official_industry||"").trim();return industry?`${industry}・官方產業代理`:"分類待補"}
 function sectorFilterKey(d){return String(d?.primary_group||d?.industry||d?.industry_name||d?.official_industry||"").trim()}
 
@@ -351,7 +356,11 @@ function rowsForView(){
   const cfg=missionConfig[state.view];if(state.view==="portfolio")return[];
   const rows=state.cache[cfg.index]||state.cache[cfg.summary]||[];
   if(!isIgnitionMode())return rows;
-  return [...rows].sort((a,b)=>(num(b.scores?.ignition_score)??-1)-(num(a.scores?.ignition_score)??-1)||(num(b.ignition_confidence)??0)-(num(a.ignition_confidence)??0)||String(a.code).localeCompare(String(b.code)));
+  // A close swing score and generic 100% confidence are NOT ignition scores.
+  // Hide unscored entries from ignition discovery; explicit code/name search
+  // still permits inspecting missing model evidence without ranking it.
+  const pool=state.search.trim()?rows:rows.filter(verifiedIgnition);
+  return [...pool].sort((a,b)=>(num(b.scores?.ignition_score)??-1)-(num(a.scores?.ignition_score)??-1)||(num(b.ignition_confidence)??0)-(num(a.ignition_confidence)??0)||String(a.code).localeCompare(String(b.code)));
 }
 function hasDeepFilter(){return Boolean(state.search.trim()||state.quickFilter||state.filterStage||state.filterAction||state.filterPosition||state.filterSector)}
 function hasNonSearchFilter(){return Boolean(state.quickFilter||state.filterStage||state.filterAction||state.filterPosition||state.filterSector)}
@@ -394,21 +403,21 @@ function outsideCard(x){
 }
 
 function ignitionCardHtml(d,cfg){
-  const s=d.scores||{},tone=actionTone(d),score=scoreFor(d),fresh=displayFreshness(d);
+  const s=d.scores||{},ok=verifiedIgnition(d),tone=ok?actionTone(d):"stale",score=scoreFor(d),fresh=displayFreshness(d);
   const reason=(d.ignition_reasons||[]).slice(0,2).map(humanReason);
   const gate=(d.ignition_gate_flags||[])[0]||"";
-  const stage=ignitionStageLabel[d.ignition_stage]||d.ignition_stage||"資料待補";
-  const action=d.ignition_action||"點火資料待補";
-  const confidence=d.ignition_confidence??d.data_confidence;
+  const stage=ok?(ignitionStageLabel[d.ignition_stage]||d.ignition_stage||"資料待補"):"模型待補";
+  const action=ok?(d.ignition_action||"等條件驗證"):"點火模型缺失・不列排名";
+  const confidence=ok?d.ignition_confidence:null;
   const atr=num(d.ignition_breakout_distance_atr);
   const dist=atr!=null?(" · 距突破點 "+fmt(atr,1)+" ATR"):"";
-  const dot=d.ignition_execution_ready===true?"●":"○";
-  const executionNote=!d.ignition_execution_ready&&d.ignition_execution_note?String(d.ignition_execution_note):"";
+  const dot=ok&&d.ignition_execution_ready===true?"●":"○";
+  const executionNote=!ok?"缺少有效點火分數與同日來源，僅供研究；不作交易訊號":(!d.ignition_execution_ready&&d.ignition_execution_note?String(d.ignition_execution_note):"");
   return '<article class="card '+tone+'" data-ignition="1" data-code="'+esc(d.code)+'" role="button" tabindex="0" aria-label="查看 '+esc(d.code)+" "+esc(d.name)+' 個股詳情">'
     +'<div class="card-top"><div class="identity"><span class="rank">'+esc(rankText(d))+'</span><div><span class="code">'+esc(d.code)+" "+esc(d.name)+'</span><div class="muted">'+esc(sectorDisplay(d))+'</div></div></div><span class="badge stage">'+esc(stage)+'</span></div>'
     +quoteHtml(d)
     +'<div class="action-line '+tone+'"><span>'+dot+'</span><b>'+esc(action)+'</b><small>'+esc(fresh)+'</small></div>'
-    +'<div class="score-row"><div class="score"><span>點火分數</span><b>'+fmt(score)+'</b></div><div class="score"><span>進場位置</span><b>'+fmt(s.entry_position_score)+'</b></div><div class="score"><span>點火信心</span><b>'+fmt(confidence,0)+'<small>%</small></b></div></div>'
+    +'<div class="score-row"><div class="score"><span>點火分數</span><b>'+fmt(score)+'</b></div><div class="score"><span>進場位置</span><b>'+fmt(s.entry_position_score)+'</b></div><div class="score"><span>點火信心</span><b>'+(confidence==null?'—':fmt(confidence,0)+'<small>%</small>')</b></div></div>'
     +'<div class="reason">'+(reason.length?reason.map(esc).join("・"):"目前無新增點火理由")+esc(dist)+'</div>'
     +(executionNote?'<div class="blocker">執行：'+esc(executionNote)+'</div>':(gate?'<div class="blocker">Gate：'+esc(humanBlock(gate))+'</div>':""))
     +'</article>';
@@ -453,7 +462,10 @@ function renderCards(){
   }).join("");
   const outsideHtml=external.map(outsideCard).join("");
   const liveUnavailable=liveMission&&noExplicitSelection&&originalCount>0&&!shown.length;
-  $("#cards").innerHTML=(rankedHtml+outsideHtml)||(liveUnavailable
+  const ignitionUnavailable=isIgnitionMode()&&!q&&!shown.length;
+  $("#cards").innerHTML=(rankedHtml+outsideHtml)||(ignitionUnavailable
+    ?'<div class="empty-state" data-ignition-evidence-gate><b>本交易日點火模型分數尚未恢復</b><p>一般波段排名不是點火排名。等待同日模型與六項分數恢復驗證後才顯示點火候選；可透過搜尋檢視個股，但缺分數不產生試單建議。</p></div>'
+    :liveUnavailable
     ?`<div class="empty-state" data-live-evidence-gate><b>今天尚無通過同日成交價與5分結構驗證的${state.view==="daytrade"?"當沖":"盤中"}候選</b><p>官方快照可能已有更新，但成交價、5分K及分數仍待補齊；原始 ${originalCount} 檔僅供研究，不列成可操作排名。可使用搜尋核對個股；資料未驗證前不提供買進訊號。</p></div>`
     :`<div class="empty-state"><b>${esc(emptyMessage(rows,external))}</b><p>原始雷達池 ${originalCount} 檔；空結果會保留並說明，不會自動放寬成假訊號。</p></div>`);
 
