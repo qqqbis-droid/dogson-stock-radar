@@ -79,9 +79,25 @@ def main():
         require(app, needle, "radar interaction", errors)
 
     require(html, "quick-filter.css", "quick filter stylesheet", errors)
-    for needle in ("盤中雷達快篩", "明日作戰快篩", "當沖執行快篩", "data-quick-filter", "quickFilterConfig"):
+    for needle in ("盤中雷達快篩", "明日作戰｜進場分流", "當沖執行快篩", "data-quick-filter", "quickFilterConfig"):
         require(app, needle, "radar quick filter", errors)
-    require(app, 'values:["PULLBACK_TEST","PULLBACK_CONFIRMED"]', "close pullback quick-filter union", errors)
+    # The 2026-10-16 flow deliberately replaced stage-only shortcuts with an
+    # actionable second-stage audit. Verify that the four tiles partition the
+    # SAME quality pool, and that missing same-build evidence fails closed.
+    close_ops = text("close-ops-v1.js")
+    for needle in ('kind:"plan",lane:"LAYOUT"', 'kind:"plan",lane:"WAIT"',
+                   'kind:"plan",lane:"BLOCKED"', 'key:"NEXT_DAY_READY",label:"品質合格"',
+                   "window.InukoNextDayElite=isNextDayElite",
+                   "radar:close-plan-lanes-updated", "if(!audit?.ready",
+                   "if(state.view==="close"&&q.kind==="plan")"):
+        require(app, needle, "audited tomorrow lane filters", errors)
+    for needle in ("const laneFromPlan=", "async function auditLanes(",
+                   "const elite=D.index.filter(d=>window.InukoNextDayElite(d))",
+                   "const evidence=await shard(code,build)",
+                   "plan:classify(evidence?.decision||{code},evidence)",
+                   "if(build!==D.build||!swingActive())return",
+                   "laneSnapshot,indexRows()", "D.lanes=next"):
+        require(close_ops, needle, "same-build final-verdict lane audit", errors)
     require(app, "NEXT_DAY_ELITE", "next-day elite policy", errors)
     require(app, "qualityMin:75", "next-day quality gate", errors)
     require(app, "positionMin:65", "next-day position gate", errors)

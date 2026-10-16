@@ -54,4 +54,25 @@ for(const [type,ready,tone] of [
  ['NO_CHASE',false,'risk'],['VERIFY',false,'stale'],['WATCH',false,'neutral']
 ])checkColor(type,ready,tone);
 
-console.log('PASS: progressive verified mobile close cards, S1/R1 and single tomorrow battle plan, semantic border colors');
+// The three lanes partition the original quality shortlist; they may never
+// turn missing/invalid zone data or a no-chase verdict into "layout ready".
+const laneSource=js.split('\n').find(line=>line.startsWith('const laneFromPlan='));
+assert(laneSource,'Same-verdict lane mapping must exist');
+const laneFromPlan=new Function(laneSource+';return laneFromPlan;')();
+for(const [plan,lane] of [
+  [{type:'LAYOUT',ready:true,sessionOK:true},'LAYOUT'],
+  [{type:'LAYOUT',ready:false,sessionOK:true},'BLOCKED'],
+  [{type:'BREAKOUT',ready:true,sessionOK:true},'WAIT'],
+  [{type:'WATCH',ready:false,sessionOK:true},'WAIT'],
+  [{type:'BREAKOUT',ready:false,sessionOK:false},'BLOCKED'],
+  [{type:'NO_CHASE',ready:true,sessionOK:true},'BLOCKED'],
+  [{type:'PARTIAL',ready:false,sessionOK:true},'BLOCKED'],
+  [{type:'VERIFY',ready:false,sessionOK:false},'BLOCKED']
+]) assert.equal(laneFromPlan(plan),lane,'Wrong no-chase gate for '+plan.type);
+for(const lane of ['LAYOUT','WAIT','BLOCKED']){
+  assert(app.includes('kind:"plan",lane:"'+lane+'"'),'Missing actionable lane '+lane);
+}
+assert(js.includes('const evidence=await shard(code,build)'),'Never publish a lane without checking same-session evidence');
+assert(js.includes('plan:classify(evidence?.decision||{code},evidence)'),'Counts and borders must share one final verdict');
+assert(js.includes('radar:close-plan-lanes-updated'),'Only publish counts after complete audit');
+console.log('PASS: progressive close cards, same-source 3-lane audit, fail-closed safety and mobile colors');
