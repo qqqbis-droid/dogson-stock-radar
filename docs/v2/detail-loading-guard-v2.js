@@ -257,11 +257,23 @@
     const stage=ignite?(d.ignition_stage||'點火資料待補'):(STAGE[d.lifecycle_stage]||d.lifecycle_stage||'—');
     const action=singlePlan?.label||(ignite?(d.ignition_action||'觀察'):(ACTION[d.action_state]||d.action_state||'—'));
     const desc=singlePlan?singlePlan.note+' '+singlePlan.gate:heroText(view,d);
+    // One source for the compact close card and detail route, bound to the
+    // same immutable shard and explicit trading session. The daytrade page
+    // does not inherit swing-path interpretation.
+    const routeEnabled=(view==='close'&&!ignite)||view==='intraday';
+    const routeDate=String(m?.datasets?.[view==='close'?'decision_close_summary':'decision_intraday_summary']?.as_of||'').slice(0,10);
+    const path=routeEnabled&&window.InukoSwingPath?.evaluate?.(shard,{
+      expectedBuild:m.active_build_id,expectedDate:routeDate,view,
+      allowed:view==='close'?singlePlan?.sessionOK===true:(d.freshness==='LIVE'&&d.session_phase==='LIVE'),
+      plan:singlePlan
+    });
+    const pathHtml=path&&window.InukoSwingPath?.detailHtml?.(path)||'';
     box.title.textContent=`${d.code||shard.code} ${d.name||e?.name||''}`.trim();
     box.body.innerHTML=`<div class="isd-context">${esc(context)}詳情 · ${esc(ignite?(d.ignition_stage||'—'):(d.opportunity_bucket||'—'))} · ${esc(rank)}</div>
       <div class="isd-hero"><div><span class="isd-badge">${esc(stage)}</span><h2>${esc(action)}</h2><p>${esc(desc)}</p></div><div class="isd-light ${tone}">${esc(lt)}</div></div>
       <div class="isd-score">${scoreTile(ms,mv)}${scoreTile('進場位置',fmt(d.scores?.entry_position_score))}${scoreTile(ignite?'點火信心':'資料信心',`${fmt(ignite?d.ignition_confidence:d.data_confidence,0)}%`)}</div>
       ${freshnessHtml(shard,d,e,m)}
+      ${pathHtml}
       <div class="isd-section"><h3>支撐 / 壓力</h3><div class="isd-zones">${supports.map(zoneHtml).join('')}${resistances.map(zoneHtml).join('')||'<div class="isd-muted">目前沒有可用支撐／壓力區。</div>'}</div></div>
       <div class="isd-section"><h3>為什麼現在看它</h3>${tags(ignite?(d.ignition_reasons||[]):[...(d.why_now||[]),...(e?.stage_signals||[])],'目前沒有足夠的新理由。')}</div>
       <div class="isd-section"><h3>${ignite?'點火 Gate／卡點':'現在卡在哪裡'}</h3>${tags(ignite?(d.ignition_gate_flags||[]):(d.blockers||[]),'目前沒有額外卡點。')}</div>
