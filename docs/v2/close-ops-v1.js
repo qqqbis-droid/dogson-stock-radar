@@ -70,10 +70,24 @@ function classify(d,shard){
  }else if(early&&engine.actionable===true){
   type='LAYOUT';label='等待布局';note='原模型條件具備，但隔日仍須等價位與量價確認。';gate='等待支撐附近有效承接';
  }
- return {code,type,label,note,gate,owned,rr,support:same?support:null,resistance:same?resistance:null,chipReady,early,confidence,
+ const result={code,type,label,note,gate,owned,rr,support:same?support:null,resistance:same?resistance:null,chipReady,early,confidence,
    ready:good,sessionOK,partial:same&&!zones.fresh,block:restricted,missing:!same,date:D.date};
+ if(typeof window!=='undefined'&&window.InukoSwingPath?.evaluate){
+   result.path=window.InukoSwingPath.evaluate(shard,{
+     expectedBuild:D.build,expectedDate:D.date,view:'close',allowed:sessionOK,
+     plan:{type,label,note,gate}
+   });
+ }
+ return result;
 }
 function compact(x){
+ // Phase, next barrier, action and invalidation only: avoid duplicate plan
+ // panels and unverified targets. Legacy layout remains a safe fallback.
+ if(x.path&&typeof window!=='undefined'&&window.InukoSwingPath?.compactHtml)
+   return '<section class="close-plan-integrated" data-close-plan aria-label="明日作戰">'
+     +(x.owned?'<span class="cp-owned">💼 已持有</span>':'')
+     +window.InukoSwingPath.compactHtml(x.path)
+     +'</section>';
  const owned=x.owned?'<span class="cp-owned">💼 已持有</span>':'';
  const levels=x.support||x.resistance
   ?'<div class="cp-levels"><div><small>S1 回踩觀察區</small><b>'+esc(x.support?range(x.support):'待補（不推估）')+'</b></div><div><small>R1 第一壓力區</small><b>'+esc(x.resistance?range(x.resistance):'待補（不推估）')+'</b></div></div>'
