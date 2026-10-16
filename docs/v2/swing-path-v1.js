@@ -87,6 +87,25 @@ function evaluate(shard,{expectedBuild='',expectedDate='',plan=null,view='close'
  const invalidation=support
    ?'有效跌破 S1 下緣 '+price(support.low)+' 並回抽站不回，且量價轉弱時重評；非觸價即停損'
    :'S1 尚未核對，不設定猜測停損或買進價';
+ // Explicit state-machine gates: every source must be both current and
+ // independently supported. A price crossing alone never upgrades the stage.
+ const volume=n(e.vol_x)??n(d.quote?.relative_volume);
+ const volumePass=Boolean(known&&resistance&&quote>=resistance.high&&volume>=1
+   &&(e.break20===true||e.break3===true));
+ const hourPass=Boolean(h60valid&&H.ma20_60>H.ma60_60&&H.entry_light!=='RED');
+ const chipPass=Boolean(chipSame&&day(e.sbl_date)===date&&
+   e.foreign_3buy===true&&e.sbl_3down===true);
+ const relative=e?.relative_multiframe||{};
+ const marketPass=Boolean(day(relative.trade_date)===date&&
+   (relative.outperforming_market===true||relative.relative_strength_positive===true));
+ const checks=[
+   {name:'價格＋量能',passed:volumePass,desc:'R1 上緣、成交量與有效突破結構'},
+   {name:'60分K結構',passed:hourPass,desc:'同日 20T／60T 多方排列且沒有紅燈'},
+   {name:'法人與借券',passed:chipPass,desc:'同日外資連買與借券減少'},
+   {name:'相對大盤',passed:marketPass,desc:'同交易日相對強弱需有獨立證據'}
+ ];
+ const promotionReady=checks.every(c=>c.passed)
+   &&e.breakout_confirmed===true&&e.retest_confirmed===true;
  const sourceGood=Boolean(known&&support&&resistance);
  const steps=[
   {name:'目前價格',value:known?price(quote):'待核對',state:known?'observed':'missing',hint:date?'資料日 '+date:'等待同日價格'},
@@ -94,7 +113,7 @@ function evaluate(shard,{expectedBuild='',expectedDate='',plan=null,view='close'
   {name:'回測承接',value:resistance?'R1 角色轉換待確認':'不可推估',state:'future',hint:'突破後回測守住才可升級；未自動判定'},
   {name:'後續觀察｜R2',value:extension?fmtRange(extension):'待補，不預測',state:extension?'future':'missing',hint:extension?'須重新驗證，不當目標價':'沒有同日 R2 證據'}
  ];
- return {date,build,quote,confidence,known,sourceGood,support,resistance,extension,h60ok,h60valid,chipSame,phase,kind,action,next,invalidation,steps,view};
+ return {date,build,quote,confidence,known,sourceGood,support,resistance,extension,h60ok,h60valid,chipSame,phase,kind,action,next,invalidation,steps,view,checks,promotionReady};
 }
 function compactHtml(p){
  if(!p)return '';
@@ -124,6 +143,9 @@ function detailHtml(p){
   +'<p class="swing-path-note">現在的位置 → 首要關卡 → 回測驗證 → 後續觀察；關卡不是保證會到的目標。</p>'
   +'<div class="swing-path-steps">'+steps+'</div>'
   +'<div class="swing-path-action"><b>現在需要做什麼</b><span>'+esc(p.action)+'</span></div>'
+  +'<div class="swing-path-checks"><b>關卡升級需四項同時核對</b><div>'
+  +p.checks.map(c=>'<span class="'+(c.passed?'passed':'pending')+'">'+(c.passed?'✓ ':'○ ')+esc(c.name)+' · '+esc(c.desc)+'</span>').join('')
+  +'</div><small>'+esc(p.promotionReady?'完整觸發與回測證據已核對，仍須自行確認盤面':'尚未取得完整突破＋回測雙確認，不能升級成已成立訊號')+'</small></div>'
   +'<div class="swing-path-action risk"><b>結構失效條件</b><span>'+esc(p.invalidation)+'</span></div>'
   +'<details class="swing-path-sources"><summary>關卡來源與驗證狀態</summary><div class="swing-path-sources-grid">'
   +sourceCard(p.support,'S1')+sourceCard(p.resistance,'R1')+sourceCard(p.extension,'R2')
