@@ -45,7 +45,10 @@ function evaluate(shard,{expectedBuild='',expectedDate='',plan=null,view='close'
    &&quote>0&&confidence!=null&&confidence>=80);
  const support=known?usable(shard,date,'SUPPORT','S1'):null;
  const resistance=known?usable(shard,date,'RESISTANCE','R1'):null;
- const extension=known?usable(shard,date,'RESISTANCE','R2'):null;
+ const proposedR2=known?usable(shard,date,'RESISTANCE','R2'):null;
+ // A later barrier is meaningful only after a valid preceding R1. Suppress
+ // duplicate/overlapping R2 and any orphaned remote price.
+ const extension=resistance&&proposedR2&&n(proposedR2.low)>n(resistance.high)?proposedR2:null;
  const H=e?.hourly60||{};
  const h60ok=day(H.trade_date)===date&&String(H.data_status||'')==='OK';
  const h60valid=h60ok&&n(H.ma20_60)!=null&&n(H.ma60_60)!=null;
