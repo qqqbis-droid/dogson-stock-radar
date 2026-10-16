@@ -126,6 +126,23 @@ jobs:
           for name in market-detail.json sector-members.json; do
             curl -fsSL --retry 2 --retry-delay 1 --max-time 20 -H 'Cache-Control: no-cache' "${live_base}/${name}?ts=$(date +%s%N)" -o "/tmp/live-v2/data/${name}" || rm -f "/tmp/live-v2/data/${name}"
           done
+          # The current web manifest may expose only the active Build.
+          # Keep the branch's previous validated same-day Build so that
+          # incomplete late UI overlays cannot permanently erase ignition.
+          python - <<'PY'
+          import json,shutil
+          from pathlib import Path
+          source=Path('/tmp/v2-source/docs/v2/data')
+          published=Path('/tmp/live-v2/data')
+          m=json.loads((published/'current_manifest.json').read_text(encoding='utf-8'))
+          prior=str(m.get('previous_good_build_id') or '')
+          if prior:
+              p=source/'builds'/prior
+              d=published/'builds'/prior
+              if p.is_dir() and not d.exists():
+                  shutil.copytree(p,d)
+                  print('Preserved previous same-day ignition source',prior)
+          PY
           rm -rf /tmp/v2-source/docs/v2/data
           cp -a /tmp/live-v2/data /tmp/v2-source/docs/v2/data
 
@@ -182,6 +199,7 @@ jobs:
         run: |
           set -euo pipefail
           python /tmp/v2-source/scripts/v2/normalize_close_snapshot_by_close_date.py --root /tmp/v2-source/docs/v2/data
+          python /tmp/v2-source/scripts/v2/restore_ignition_from_previous.py --root /tmp/v2-source/docs/v2/data
           python /tmp/v2-source/scripts/v2/test_capital_stock_breakdown.py
           python /tmp/v2-source/scripts/v2/build_capital_stock_breakdown.py --root /tmp/v2-source/docs/v2/data --registry /tmp/v2-source/contracts/registries/sector_registry.json
           python /tmp/v2-source/scripts/v2/validate_bundle.py --root /tmp/v2-source/docs/v2/data
@@ -286,6 +304,8 @@ jobs:
           cp /tmp/v2-source/scripts/v2/test_intraday_quote_recovery.cjs scripts/v2/test_intraday_quote_recovery.cjs
           cp /tmp/v2-source/scripts/v2/test_close_plan_progressive.cjs scripts/v2/test_close_plan_progressive.cjs
           cp /tmp/v2-source/scripts/v2/test_swing_path_evidence.cjs scripts/v2/test_swing_path_evidence.cjs
+          cp /tmp/v2-source/scripts/v2/restore_ignition_from_previous.py scripts/v2/restore_ignition_from_previous.py
+          cp /tmp/v2-source/scripts/v2/test_ignition_restore.py scripts/v2/test_ignition_restore.py
           cp /tmp/v2-source/scripts/v2/test_portfolio_progressive_quotes.cjs scripts/v2/test_portfolio_progressive_quotes.cjs
           cp /tmp/v2-source/scripts/v2/test_portfolio_pl_dual.cjs scripts/v2/test_portfolio_pl_dual.cjs
           cp /tmp/v2-source/scripts/v2/test_portfolio_pl_persistence.cjs scripts/v2/test_portfolio_pl_persistence.cjs
@@ -361,6 +381,7 @@ jobs:
           node --check docs/v2/swing-path-v1.js
           test -s docs/v2/swing-path-v1.css
           node scripts/v2/test_swing_path_evidence.cjs
+          python scripts/v2/test_ignition_restore.py
           node scripts/v2/test_close_plan_progressive.cjs
           node --check docs/v2/radar-favorites-v2.js
           grep -q 'radar:hourly60-rendered' docs/v2/hourly60-screener.js
