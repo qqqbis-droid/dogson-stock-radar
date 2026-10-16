@@ -417,7 +417,7 @@ function ignitionCardHtml(d,cfg){
     +'<div class="card-top"><div class="identity"><span class="rank">'+esc(rankText(d))+'</span><div><span class="code">'+esc(d.code)+" "+esc(d.name)+'</span><div class="muted">'+esc(sectorDisplay(d))+'</div></div></div><span class="badge stage">'+esc(stage)+'</span></div>'
     +quoteHtml(d)
     +'<div class="action-line '+tone+'"><span>'+dot+'</span><b>'+esc(action)+'</b><small>'+esc(fresh)+'</small></div>'
-    +'<div class="score-row"><div class="score"><span>點火分數</span><b>'+fmt(score)+'</b></div><div class="score"><span>進場位置</span><b>'+fmt(s.entry_position_score)+'</b></div><div class="score"><span>點火信心</span><b>'+(confidence==null?'—':fmt(confidence,0)+'<small>%</small>')</b></div></div>'
+    +'<div class="score-row"><div class="score"><span>點火分數</span><b>'+fmt(score)+'</b></div><div class="score"><span>進場位置</span><b>'+fmt(s.entry_position_score)+'</b></div><div class="score"><span>點火信心</span><b>'+(confidence==null?'—':fmt(confidence,0)+'<small>%</small>')+'</b></div></div>'
     +'<div class="reason">'+(reason.length?reason.map(esc).join("・"):"目前無新增點火理由")+esc(dist)+'</div>'
     +(executionNote?'<div class="blocker">執行：'+esc(executionNote)+'</div>':(gate?'<div class="blocker">Gate：'+esc(humanBlock(gate))+'</div>':""))
     +'</article>';
