@@ -93,8 +93,6 @@ def restore(root: Path):
         nd["scores"]["ignition_score"]=src["scores"]["ignition_score"]
         for field in IGNITION_FIELDS:
             if field in src:nd[field]=src[field]
-        nd["ignition_recovered_from_build"]=prior
-        nd["ignition_source_known_at"]=src.get("known_at") or ""
         current_rows[code]=nd
         restored[code]=nd
     if not restored:
@@ -131,7 +129,6 @@ def restore(root: Path):
                 newer=dict(newer)
                 for k,v in olde.items():
                     if k.startswith("ignition_"):newer[k]=v
-                newer["ignition_recovered_from_build"]=prior
                 new_items[code]=newer
                 count+=1
             current_evidence["items"]=new_items
