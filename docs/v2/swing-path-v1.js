@@ -65,15 +65,14 @@ function evaluate(shard,{expectedBuild='',expectedDate='',plan=null,view='close'
      phase=planType==='LAYOUT'?'前高突破・回測已確認':'前高突破・等待回測';
      kind=planType==='LAYOUT'?'pullback':'breakout';
      action=String(plan?.gate||'等待近20日平台與 S1 回測守住，不追價');
+   }else if(planType==='NO_CHASE'||(!planType&&overheated)){
+     // Risk must take priority over missing R1, or the compact path would
+     // misleadingly say "data pending" on a verified no-chase stock.
+     phase='風險優先／先不追價';kind='risk';
+     action='暫停追價；等待風險改善後重新評估';
    }else if(['VERIFY','PARTIAL'].includes(planType)||!support||!resistance){
      phase='價位證據待補';kind='verify';
      action='S1／R1 尚未完整核對，暫不建立新倉';
-   }else if(planType==='NO_CHASE'||(!planType&&overheated)){
-     // The verified close-card verdict owns the final risk/action headline;
-     // hourly 60m caution is reflected by a failed evidence gate, not a
-     // competing second verdict in the expanded detail.
-     phase='風險優先／先不追價';kind='risk';
-     action='暫停追價；等待風險改善後重新評估';
    }else if(['PULLBACK_TEST','PULLBACK_CONFIRMED'].includes(d.lifecycle_stage)||['WAIT_PULLBACK'].includes(d.action_state)||planType==='LAYOUT'){
      phase='回測承接待確認';kind='pullback';
      action='等 S1 回測有效守住、量價與60分K同步，再評估進場';
