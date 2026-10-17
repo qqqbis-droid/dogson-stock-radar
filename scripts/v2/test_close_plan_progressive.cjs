@@ -56,7 +56,7 @@ for(const [type,ready,tone] of [
 
 // The three lanes partition the original quality shortlist; they may never
 // turn missing/invalid zone data or a no-chase verdict into "layout ready".
-const laneSource=js.split('\n').find(line=>line.startsWith('const laneFromPlan='));
+const laneSource=js.slice(js.indexOf('const laneFromPlan='),js.indexOf('const laneSnapshot='));
 assert(laneSource,'Same-verdict lane mapping must exist');
 const laneFromPlan=new Function(laneSource+';return laneFromPlan;')();
 for(const [plan,lane] of [
