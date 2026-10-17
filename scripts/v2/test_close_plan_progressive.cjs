@@ -6,6 +6,7 @@ const fs=require('node:fs');
 const assert=require('node:assert/strict');
 const read=p=>fs.readFileSync(p,'utf8');
 const js=read('docs/v2/close-ops-v1.js');
+const swing=read('docs/v2/swing-path-v1.js');
 const app=read('docs/v2/app.js');
 const css=read('docs/v2/close-ops-v1.css');
 const html=read('docs/v2/index.html');
@@ -75,4 +76,21 @@ for(const lane of ['LAYOUT','WAIT','PENDING','BLOCKED']){
 assert(js.includes('const evidence=await shard(code,build)'),'Never publish a lane without checking same-session evidence');
 assert(js.includes('plan:classify(evidence?.decision||{code},evidence)'),'Counts and borders must share one final verdict');
 assert(js.includes('radar:close-plan-lanes-updated'),'Only publish counts after complete audit');
-console.log('PASS: progressive close cards, same-source 3-lane audit, fail-closed safety and mobile colors');
+// A genuine 20-day platform breakout can be examined without a fabricated R1.
+// It must NEVER become a long entry just because the resistance source is empty.
+const openSkySrc=js.slice(js.indexOf('function breakoutWithoutR1('),js.indexOf('function classify('));
+assert(openSkySrc.startsWith('function breakoutWithoutR1('));
+const openSky=new Function('n',openSkySrc+';return breakoutWithoutR1;')(v=>v==null||v===''||!Number.isFinite(Number(v))?null:Number(v));
+const evidence={platform_high20:100,break20:true,recent_breakout_age:0,vol_x:1.5,close_position_pct:82,dist20:3};
+const engine={actionable:true,quote:{relative_volume:1.5},lifecycle_stage:'LAUNCH'};
+const zones={supportFresh:true,resistanceFresh:false,support:{low:98}};
+assert.deepEqual(openSky(evidence,engine,zones,102),{platform:100,riskPct:(102-98)/102*100,confirmed:false});
+assert.equal(openSky(evidence,engine,{...zones,supportFresh:false},102),null,'No S1 may never bypass the safety gate');
+assert.equal(openSky({...evidence,break20:false,recent_breakout_age:null},engine,zones,102),null,'Unknown breakout is not historical high');
+assert.equal(openSky({...evidence,dist20:11},engine,zones,102),null,'Chasing extended positions must fail closed');
+assert.equal(openSky({...evidence,vol_x:0.8},engine,zones,102),null,'Low-volume breakouts must fail closed');
+assert.equal(openSky(evidence,engine,{...zones,support:{low:90}},102),null,'Wide downside risk must fail closed');
+assert.equal(openSky({...evidence,retest_confirmed:true,breakout_confirmed:true}, {...engine,lifecycle_stage:'PULLBACK_CONFIRMED'},zones,102).confirmed,true,'Two independent breakout/retest proofs may move to layout');
+assert(swing.includes('下一關｜前高回測'),'Use observed platform, never a made-up R1 target');
+assert(swing.includes('不得把缺少 R1 解讀成無上漲阻力'),'Open-high mode must disclose source limitations');
+console.log('PASS: progressive close cards, verified no-R1 breakout/retest route and preserved safety gates');

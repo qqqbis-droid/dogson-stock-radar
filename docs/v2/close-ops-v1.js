@@ -28,6 +28,24 @@ function findZones(shard,price,date,build){
  return {support:valid(support)?support:null,resistance:valid(resistance)?resistance:null,
     supportFresh:valid(support),resistanceFresh:valid(resistance),fresh:valid(support)&&valid(resistance)};
 }
+// R1 can legitimately have no validated overhead structure after a breakout.
+// Never claim an all-time high from a 20-day history window; use the observed
+// platform as a RETEST reference only, not an invented upside target.
+function breakoutWithoutR1(ev,engine,zones,price){
+  if(!zones.supportFresh||zones.resistanceFresh||!zones.support)return null;
+  const platform=n(ev.platform_high20),age=n(ev.recent_breakout_age);
+  const relVol=n(ev.vol_x)??n(engine.quote?.relative_volume);
+  const closePosition=n(ev.close_position_pct),dist20=n(ev.dist20);
+  const s1=n(zones.support.low);
+  const riskPct=price>0&&s1!=null?(price-s1)/price*100:null;
+  const recent=age!=null&&age>=0&&age<=3;
+  const structural=platform!=null&&platform>0&&price>platform&&recent
+    &&(ev.break20===true||age>0)&&engine.actionable===true;
+  if(!structural||relVol==null||relVol<1.2||closePosition==null||closePosition<65
+     ||dist20==null||dist20<0||dist20>7||riskPct==null||riskPct<0||riskPct>6)return null;
+  return {platform,riskPct,confirmed:engine.lifecycle_stage==='PULLBACK_CONFIRMED'
+    &&ev.retest_confirmed===true&&ev.breakout_confirmed===true};
+}
 function classify(d,shard){
  const ev=shard?.evidence||{},engine=shard?.decision||d||{},code=String(engine.code||d?.code||''),price=n(engine.quote?.price??d?.quote?.price),date=D.date;
  const zones=findZones(shard,price,date,D.build),support=zones.support,resistance=zones.resistance;
@@ -38,7 +56,8 @@ function classify(d,shard){
  // Price structures are independently valid: R1 may be absent even if S1 is
  // confirmed. Never erase an existing S1 when a separate R1 is missing.
  const sessionOK=validGlobal()&&same&&confidence!=null&&confidence>=80&&price!=null;
- const good=sessionOK&&zones.fresh;
+ const openSky=sessionOK?breakoutWithoutR1(ev,engine,zones,price):null;
+ const good=sessionOK&&(zones.fresh||Boolean(openSky));
  const riskover=Array.isArray(engine.risk_overlays)?engine.risk_overlays:[];
  const restricted=riskover.some(x=>['TRADING_RESTRICTION','LIQUIDITY_RISK','DATA_QUALITY_RISK'].includes(String(x)));
  const overheated=engine.action_state==='DO_NOT_CHASE'||engine.no_chase===true||riskover.includes('OVERHEAT')||(n(ev.dist20)!=null&&n(ev.dist20)>8);
@@ -53,12 +72,25 @@ function classify(d,shard){
  let type='WATCH',label='暫時觀察',note='尚未出現足夠的進場條件，等待量價與結構同步。',gate='等關鍵條件確認';
  if(!sessionOK){
   type='VERIFY';label='資料待驗證';note=same?'盤後資料信心或全域資料日期尚未確認；已驗證的價位只供參考，不作為下單指令。':'個股盤後來源尚未取得或交易日不一致，暫不使用任何價位下單。';gate='完成同交易日資料核對後再評估';
- }else if(!zones.supportFresh||!zones.resistanceFresh){
-  type='PARTIAL';label=!zones.supportFresh?'支撐待補':'壓力待補';
-  note=!zones.supportFresh?'沒有有效 S1 支撐，不硬設停損；已有的 R1 僅供觀察。':'同日 S1 已核對，但缺少有效 R1，無法計算進場風報比；不推估突破價。';
-  gate='價位證據補齊前，暫不建立新倉';
+ }else if(!zones.supportFresh){
+  type='PARTIAL';label='支撐待補';note='缺少同日有效 S1，無法設定可核對的結構失效條件。';
+  gate='S1 證據補齊前，暫不建立新倉';
  }else if(restricted||overheated||impaired){
   type='NO_CHASE';label='先不追價';note=restricted?'有交易限制、流動性或資料品質風險，暫不列新倉。':impaired?'原始結構已轉弱或風險優先，暫不列新倉。':'過熱／不追價條件已成立。';gate='等待風險解除並重新驗證';
+ }else if(!zones.resistanceFresh&&openSky){
+  if(openSky.confirmed){
+    type='LAYOUT';label='前高突破・回測確認';
+    note='已具備同日突破及經驗證的回測證據；上方沒有有效 R1，不能當作無限上漲空間。';
+    gate='隔日回測支撐不破、相對大盤與量價再確認，才評估分批布局';
+  }else{
+    type='BREAKOUT';label='前高突破・等待回測';
+    note='同日突破近20日平台、量價與支撐風險檢查通過；R1 尚無有效證據，改走突破／回測路徑，不假設目標價。';
+    gate='等原平台與 S1 回測守住，且量價維持，再評估試單；不追當下急拉';
+  }
+ }else if(!zones.resistanceFresh){
+  type='PARTIAL';label='壓力待補';
+  note='目前沒有有效 R1，且未通過獨立的突破量價／位置／支撐風險驗證；不得假設已創歷史新高。';
+  gate='等待資料補齊或突破、回踩條件通過後再重新評估';
  }else if(resistance&&price>=resistance.low){
   type='NO_CHASE';label='先不追價';note='收盤價已接觸第一壓力區；R1 是壓力，不是直接買進價。';gate='突破後回測確認才重新評估';
  }else if(rr!=null&&rr<1.5){
@@ -70,12 +102,12 @@ function classify(d,shard){
  }else if(early&&engine.actionable===true){
   type='LAYOUT';label='等待布局';note='原模型條件具備，但隔日仍須等價位與量價確認。';gate='等待支撐附近有效承接';
  }
- const result={code,type,label,note,gate,owned,rr,support:same?support:null,resistance:same?resistance:null,chipReady,early,confidence,
+ const result={code,type,label,note,gate,owned,rr,openSky:Boolean(openSky)&&!restricted&&!overheated&&!impaired,breakoutLevel:openSky?.platform??null,support:same?support:null,resistance:same?resistance:null,chipReady,early,confidence,
    ready:good,sessionOK,partial:same&&!zones.fresh,block:restricted,missing:!same,date:D.date};
  if(typeof window!=='undefined'&&window.InukoSwingPath?.evaluate){
    result.path=window.InukoSwingPath.evaluate(shard,{
      expectedBuild:D.build,expectedDate:D.date,view:'close',allowed:sessionOK,
-     plan:{type,label,note,gate}
+     plan:{type,label,note,gate,openSky:result.openSky,breakoutLevel:result.breakoutLevel}
    });
  }
  return result;
