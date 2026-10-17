@@ -27,10 +27,11 @@ const quickFilterConfig={
     {key:"TREND_MONITOR",label:"趨勢追蹤",icon:"↗",note:"結構仍在延續",kind:"bucket",values:["TREND_MONITOR"],tone:"trend"},
     {key:"RISK",label:"風險",icon:"!",note:"先看風險訊號",kind:"bucket",values:["RISK"],tone:"risk"}
   ]},
-  close:{title:"明日作戰｜進場分流",subtitle:"品質初篩 ≠ 明日可買；依同日 S1／R1 與風險報酬比完成第二層審核",items:[
+  close:{title:"明日作戰｜進場分流",subtitle:"資料待補與風險否決分開列；依同日 S1／R1 與風險報酬比完成第二層審核",items:[
     {key:"PLAN_LAYOUT",label:"布局優先",icon:"✓",note:"位置與風報比通過，隔日仍須量價確認",kind:"plan",lane:"LAYOUT",tone:"go"},
     {key:"PLAN_WAIT",label:"等待觸發",icon:"⏳",note:"等突破、回踩或確認條件",kind:"plan",lane:"WAIT",tone:"wait"},
-    {key:"PLAN_BLOCKED",label:"暫不進場",icon:"!",note:"壓力近、風報比不足或資料未驗證",kind:"plan",lane:"BLOCKED",tone:"risk"},
+    {key:"PLAN_PENDING",label:"資料待補",icon:"?",note:"S1／R1 缺漏或尚未驗證；只觀察、不開新倉",kind:"plan",lane:"PENDING",tone:"wait"},
+    {key:"PLAN_BLOCKED",label:"暫不進場",icon:"!",note:"已確認追價風險、風報比不足或結構失效",kind:"plan",lane:"BLOCKED",tone:"risk"},
     {key:"NEXT_DAY_READY",label:"品質合格",icon:"✦",note:"僅第一層品質池，不代表明天可買",kind:"elite",values:["NEXT_DAY_READY"],tone:"neutral"}
   ]},
   daytrade:{title:"當沖執行快篩",subtitle:"先分執行狀態，再搭配位置與族群",items:[
@@ -315,7 +316,7 @@ function renderRadarSummary(){
   const audit=state.view==="close"&&!isIgnitionMode()?window.InukoCloseOps?.laneSnapshot?.():null;
   const audited=!!(audit?.ready&&audit.build===state.manifest?.active_build_id);
   const subtitle=state.view==="close"&&!isIgnitionMode()?(audited
-    ?`第一層品質合格 ${audit.total} 檔，已全數完成第二層作戰核對；布局優先仍須隔日確認`
+    ?`第一層品質合格 ${audit.total} 檔；資料待補不等於已確認有風險，所有新倉仍須隔日量價驗證`
     :"正在核對候選股的支撐／壓力及進場風報比；完成前不顯示可布局數字"):spec.subtitle;
   box.innerHTML=`<div class="quick-filter-head"><div><b>${esc(spec.title)}</b><span>${esc(subtitle)}</span></div>${active?'<button type="button" class="quick-filter-clear" data-quick-filter-clear>清除快篩 ×</button>':'<span class="quick-filter-tip">點一下篩選</span>'}</div><div class="quick-filter-grid">${spec.items.map(item=>{
     const selected=state.quickFilter===item.key,value=quickValue(item,b,g);

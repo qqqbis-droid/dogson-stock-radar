@@ -86,12 +86,13 @@ def main():
     # SAME quality pool, and that missing same-build evidence fails closed.
     close_ops = text("close-ops-v1.js")
     for needle in ('kind:"plan",lane:"LAYOUT"', 'kind:"plan",lane:"WAIT"',
-                   'kind:"plan",lane:"BLOCKED"', 'key:"NEXT_DAY_READY",label:"品質合格"',
+                   'kind:"plan",lane:"PENDING"', 'kind:"plan",lane:"BLOCKED"',
+                   'key:"NEXT_DAY_READY",label:"品質合格"',
                    "window.InukoNextDayElite=isNextDayElite",
                    "radar:close-plan-lanes-updated", "if(!audit?.ready",
                    'if(state.view==="close"&&q.kind==="plan")'):
         require(app, needle, "audited tomorrow lane filters", errors)
-    for needle in ("const laneFromPlan=", "async function auditLanes(",
+    for needle in ("const laneFromPlan=", 'if(["VERIFY","PARTIAL"].includes(p?.type)||!p?.sessionOK)return "PENDING"', "async function auditLanes(",
                    "const elite=D.index.filter(d=>window.InukoNextDayElite(d))",
                    "const evidence=await shard(code,build)",
                    "plan:classify(evidence?.decision||{code},evidence)",

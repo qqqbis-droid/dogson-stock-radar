@@ -61,15 +61,15 @@ assert(laneSource,'Same-verdict lane mapping must exist');
 const laneFromPlan=new Function(laneSource+';return laneFromPlan;')();
 for(const [plan,lane] of [
   [{type:'LAYOUT',ready:true,sessionOK:true},'LAYOUT'],
-  [{type:'LAYOUT',ready:false,sessionOK:true},'BLOCKED'],
+  [{type:'LAYOUT',ready:false,sessionOK:true},'PENDING'],
   [{type:'BREAKOUT',ready:true,sessionOK:true},'WAIT'],
   [{type:'WATCH',ready:false,sessionOK:true},'WAIT'],
-  [{type:'BREAKOUT',ready:false,sessionOK:false},'BLOCKED'],
+  [{type:'BREAKOUT',ready:false,sessionOK:false},'PENDING'],
   [{type:'NO_CHASE',ready:true,sessionOK:true},'BLOCKED'],
-  [{type:'PARTIAL',ready:false,sessionOK:true},'BLOCKED'],
-  [{type:'VERIFY',ready:false,sessionOK:false},'BLOCKED']
+  [{type:'PARTIAL',ready:false,sessionOK:true},'PENDING'],
+  [{type:'VERIFY',ready:false,sessionOK:false},'PENDING']
 ]) assert.equal(laneFromPlan(plan),lane,'Wrong no-chase gate for '+plan.type);
-for(const lane of ['LAYOUT','WAIT','BLOCKED']){
+for(const lane of ['LAYOUT','WAIT','PENDING','BLOCKED']){
   assert(app.includes('kind:"plan",lane:"'+lane+'"'),'Missing actionable lane '+lane);
 }
 assert(js.includes('const evidence=await shard(code,build)'),'Never publish a lane without checking same-session evidence');

@@ -82,7 +82,15 @@ function classify(d,shard){
 }
 // Second-stage classification always delegates to the SAME S1/R1 and R:R
 // verdict that paints the left border of each card. It never re-scores stocks.
-const laneFromPlan=p=>p.type==="LAYOUT"&&p.ready?"LAYOUT":(["BREAKOUT","WATCH"].includes(p.type)&&p.sessionOK?"WAIT":"BLOCKED");
+// 'Data not proved' must never masquerade as an adverse risk verdict.
+// Both states forbid new orders; only known adverse R:R / overheating gets BLOCKED.
+const laneFromPlan=p=>{
+  if(["VERIFY","PARTIAL"].includes(p?.type)||!p?.sessionOK)return "PENDING";
+  if(p.type==="NO_CHASE")return "BLOCKED";
+  if(p.type==="LAYOUT")return p.ready?"LAYOUT":"PENDING";
+  if(["BREAKOUT","WATCH"].includes(p.type))return "WAIT";
+  return "PENDING";
+};
 const laneSnapshot=()=>D.lanes?.build===D.build?D.lanes:null;
 async function auditLanes(force=false){
   if(!swingActive()||!D.index||typeof window.InukoNextDayElite!=="function")return;
@@ -92,7 +100,7 @@ async function auditLanes(force=false){
   const build=D.build;
   try{
     const elite=D.index.filter(d=>window.InukoNextDayElite(d));
-    const byCode={},counts={LAYOUT:0,WAIT:0,BLOCKED:0};
+    const byCode={},counts={LAYOUT:0,WAIT:0,PENDING:0,BLOCKED:0};
     // Small bounded batches avoid saturating Safari and reuse the card shard cache.
     for(let i=0;i<elite.length;i+=6){
       if(build!==D.build||!swingActive())return;
