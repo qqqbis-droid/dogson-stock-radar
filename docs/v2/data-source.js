@@ -120,7 +120,7 @@
       if(!document.getElementById('inukoBrokerMatchScript')){
         const broker=document.createElement('script');
         broker.id='inukoBrokerMatchScript';
-        broker.src='./portfolio-broker-match.js?v=20261015plpersist3';
+        broker.src='./portfolio-broker-match.js?v=20261015plpersist3&etf=20261020a';
         document.head.appendChild(broker);
       }
       if(!document.getElementById('inukoPortfolioPriorityLadderScript')){

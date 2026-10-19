@@ -86,7 +86,8 @@ assert(S.lookupName('00685l')==='群益臺灣加權正2','00685L ETF title fallb
 assert(S.lookupName('00631L')==='元大台灣50正2','00631L ETF title fallback');
 S.addTransaction({code:'00685l',name:S.lookupName('00685L'),side:'BUY',shares:25,price:75.5,trade_date:'2026-09-08',reason:'實際成交測試'});
 const etf=S.get('00685L');
-assert(etf.code==='00685L'&&etf.shares===25&&etf.avg_cost===75.5,'ETF identifier must preserve letter and leading zero');
+assert(etf.code==='00685L'&&etf.shares===25,'ETF identifier must preserve letter and leading zero');
+assert(S.exportData().transactions.some(t=>t.code==='00685L'&&t.price===75.5),'Original ETF execution price must be preserved independently from fee-adjusted average cost');
 assert(S.get('00685l').code==='00685L','ETF lowercase should normalize');
 assert(S.history('00685L').length===1,'ETF transaction history should resolve');
 const savedEtf=S.exportData();
