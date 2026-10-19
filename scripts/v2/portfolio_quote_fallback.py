@@ -130,7 +130,7 @@ def merge_completed_close(result: dict, path: Path | None) -> dict:
             if not isinstance(row, dict):
                 continue
             code = str(row.get("code") or "")
-            if not re.fullmatch(r"[0-9]{4,6}", code):
+            if not re.fullmatch(r"[0-9A-Z]{4,6}", code):
                 continue
             if session(row.get("date")) != day:
                 continue

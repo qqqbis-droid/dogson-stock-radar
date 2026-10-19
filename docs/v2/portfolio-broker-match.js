@@ -109,7 +109,9 @@ function patchSummary(){
 }
 function patchDetail(){
   const dialog=$('#portfolioDetailDialog');if(!dialog?.open)return;
-  const title=$('#portfolioDetailTitle')?.textContent||'',code=(title.match(/\b\d{4}\b/)||[])[0],p=window.RadarPortfolioStore?.get?.(code);if(!p)return;
+  const title=$('#portfolioDetailTitle')?.textContent||'';
+  const code=dialog.dataset.portfolioCode||((title.match(/^\s*([0-9A-Z-]{4,12})(?=\s|$)/i)||[])[1]||'').toUpperCase();
+  const p=window.RadarPortfolioStore?.get?.(code);if(!p)return;
   const cells=[...dialog.querySelectorAll('.portfolio-detail-grid>div')],priceCell=cells.find(x=>(x.querySelector('span')?.textContent||'').trim()==='現價'),plCell=cells.find(x=>(x.querySelector('span')?.textContent||'').trim()==='估計損益');
   const px=numText(priceCell?.querySelector('b')?.textContent);if(!(px>0)||!plCell)return;
   const est=estimatePosition(p,px),b=plCell.querySelector('b'),text=`${signedMoney(est.pl)} · ${signedPct(est.pct)}`;if(b&&b.textContent!==text)b.textContent=text;

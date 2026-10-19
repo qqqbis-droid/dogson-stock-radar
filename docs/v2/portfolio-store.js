@@ -4,6 +4,15 @@ const PORTFOLIO_SCHEMA='2.0.0';
 function nowIso(){return new Date().toISOString()}
 function cleanText(v,max=800){return String(v??'').trim().slice(0,max)}
 function cleanCode(v){return cleanText(v,12).toUpperCase().replace(/[^0-9A-Z-]/g,'')}
+// TWSE-confirmed fallbacks: the equity-universe file excludes many ETFs.
+// Unlisted symbols still remain addable with a user-entered name.
+const KNOWN_ETF_NAMES=Object.freeze({
+  '00685L':'群益臺灣加權正2',
+  '00631L':'元大台灣50正2',
+  '00632R':'元大台灣50反1',
+  '00981A':'主動統一台股增長'
+});
+function lookupName(code){return KNOWN_ETF_NAMES[cleanCode(code)]||''}
 function cleanNumber(v){const n=Number(v);return Number.isFinite(n)?n:null}
 function uid(){return`tx_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,9)}`}
 
@@ -140,4 +149,4 @@ function validateLedger(data){const txs=sortedTx(data);pairedTxs(txs);const bala
 function importData(payload){let data;if(payload&&Array.isArray(payload.transactions)){data={schema_version:PORTFOLIO_SCHEMA,transactions:payload.transactions.map(normalizeTx).filter(Boolean),meta:payload.meta||{}};if(data.transactions.length!==payload.transactions.length)throw new Error('備份中有無效成交紀錄，已停止匯入')}else if(payload&&Array.isArray(payload.positions))data=migrateLegacy(payload);else throw new Error('備份格式不正確');validateLedger(data);return write(data)}
 function storageInfo(){return{key:PORTFOLIO_KEY,schema:PORTFOLIO_SCHEMA,scope:'device-local',cloud_sync:false,public_repo:false,model:'transaction-ledger'}}
 
-window.RadarPortfolioStore={key:PORTFOLIO_KEY,schema:PORTFOLIO_SCHEMA,isTradingDay,latestTradingDay,verifyFillDate,list,listAll,get,history,addTransaction,addDaytradeRoundTrip,deleteTransaction,updateTransactionDiscipline,updateMeta,upsert,remove,clear,exportData,importData,storageInfo};
+window.RadarPortfolioStore={key:PORTFOLIO_KEY,schema:PORTFOLIO_SCHEMA,lookupName,isTradingDay,latestTradingDay,verifyFillDate,list,listAll,get,history,addTransaction,addDaytradeRoundTrip,deleteTransaction,updateTransactionDiscipline,updateMeta,upsert,remove,clear,exportData,importData,storageInfo};

@@ -166,6 +166,18 @@ def main():
     for needle in ("entry_reason", "hold_reason", "validation_condition", "failure_condition", "strategy"):
         require(store, needle, "portfolio store schema", errors)
         require(portfolio, needle, "portfolio renderer", errors)
+    # iOS numeric keyboards cannot type ETF letters (e.g. 00685L, 00631L).
+    require(html, 'name="code" required type="text" inputmode="text"', "alphanumeric legacy portfolio code field", errors)
+    require(ledger, 'name="code" type="text" required inputmode="text"', "alphanumeric trade entry", errors)
+    require(ledger, 'autocapitalize="characters"', "iPhone ETF keyboard", errors)
+    require(ledger, "canonicalCode", "code lookup normalization", errors)
+    require(ledger, "store()?.lookupName?.(code)", "ETF name lookup", errors)
+    require(store, "function lookupName(code)", "ETF code/name fallback", errors)
+    require(store, "'00685L':'群益臺灣加權正2'", "00685L TWSE name", errors)
+    require(store, "'00631L':'元大台灣50正2'", "00631L TWSE name", errors)
+    broker = text("portfolio-broker-match.js")
+    require(broker, "dialog.dataset.portfolioCode", "ETF-specific broker detail", errors)
+    require(portfolio, "dialog.dataset.portfolioCode=p.code", "ETF detail identity", errors)
     require(html, 'name="shares"', "portfolio shares field", errors)
     require(html, 'min="1"', "portfolio one-share rule", errors)
     require(html, "不會寫入公開 GitHub", "portfolio privacy disclosure", errors)

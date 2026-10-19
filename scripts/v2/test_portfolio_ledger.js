@@ -81,6 +81,20 @@ window.InukoFeeEngine=null;
 const withoutFee=calcFn({code:'1802',shares:1000,avg_cost:66.6},{quote:{price:63.9}},null);
 assert(withoutFee.pl===null&&near(withoutFee.value,63900),'missing fee engine must never mislabel gross as net PnL');
 window.InukoFeeEngine={estimate:fees};
+// Preserve Taiwan alphanumeric ETF identifiers, zero prefix and trading history.
+assert(S.lookupName('00685l')==='群益臺灣加權正2','00685L ETF title fallback');
+assert(S.lookupName('00631L')==='元大台灣50正2','00631L ETF title fallback');
+S.addTransaction({code:'00685l',name:S.lookupName('00685L'),side:'BUY',shares:25,price:75.5,trade_date:'2026-09-08',reason:'實際成交測試'});
+const etf=S.get('00685L');
+assert(etf.code==='00685L'&&etf.shares===25&&etf.avg_cost===75.5,'ETF identifier must preserve letter and leading zero');
+assert(S.get('00685l').code==='00685L','ETF lowercase should normalize');
+assert(S.history('00685L').length===1,'ETF transaction history should resolve');
+const savedEtf=S.exportData();
+S.importData(savedEtf);
+assert(S.get('00685L').shares===25,'ETF symbol must survive backup/cloud ledger import');
+S.addDaytradeRoundTrip({code:'00631l',name:S.lookupName('00631L'),shares:100,buy_price:245,sell_price:245.5,trade_date:'2026-09-09'});
+assert(S.history('00631L').length===2,'ETF daytrade history should resolve');
+console.log('PASS: 00685L / 00631L transactions and symbol persistence');
 console.log('broker-comparable net liquidation PnL regression test PASS');
 
 console.log('holdings isolation, holiday, discipline, cloud-format import and fee-aware mixed-position tests PASS');

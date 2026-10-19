@@ -33,13 +33,16 @@ with tempfile.TemporaryDirectory() as root:
     completed.write_text(json.dumps({"trade_date":"2026-10-12","rows":[
         {"code":"1802","name":"台玻","date":"2026-10-12","close":63.1,"market":"上市"},
         {"code":"6271","name":"同欣電","date":"2026-10-12","close":247.5,"market":"上市"},
-        {"code":"9904","name":"寶成","date":"2026-10-09","close":30,"market":"上市"}
+        {"code":"9904","name":"寶成","date":"2026-10-09","close":30,"market":"上市"},
+        {"code":"00685L","name":"群益臺灣加權正2","date":"2026-10-12","close":88.2,"market":"上市"}
     ]}),encoding="utf-8")
     actual=mod.merge_completed_close({"quotes":{"1802":quote("1802","2026-10-08",63,"TWSE")}},completed)
     assert actual["quotes"]["1802"]["close"]==63.1,"Newest completed-session daily K must replace old OpenAPI price"
     assert actual["quotes"]["1802"]["source"].endswith("(non-official)")
     assert actual["quotes"]["6271"]["trade_date"]=="2026-10-12"
     assert "9904" not in actual["quotes"],"Dated fallback must not mix sessions"
+    assert actual["quotes"]["00685L"]["close"]==88.2,"Dated verified ETF daily bar must keep alphanumeric code"
+    assert actual["quotes"]["00685L"]["source"].endswith("(non-official)"),"ETF daily-K fallback must not masquerade as official close"
     verified=mod.merge_same_session(actual,prior)
     assert verified["quotes"]["1802"]["source"]=="TWSE STOCK_DAY_ALL","Prior same-day official source beats fallback daily bar"
 
