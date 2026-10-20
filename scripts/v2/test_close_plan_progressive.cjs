@@ -55,14 +55,15 @@ function checkColor(type,ready,expected){
   assert(line.classList.contains(expected),'Border and text verdict must agree for '+type);
   assert.equal(card.dataset.closeTone,expected);
   const paint={go:'#1f5a46',wait:'#d39a2c','cp-blue':'#4b82ad',risk:'#b42318',stale:'#8c9590',neutral:'#dce2dc'}[expected];
-  assert.deepEqual(edge['border-left'],{value:'6px solid '+paint,priority:'important'},'iOS needs a real inline 6px stripe for '+type);
-  assert.deepEqual(edge['border-inline-start'],{value:'6px solid '+paint,priority:'important'},'RTL-safe edge must be painted too');
+  const width=expected==='risk'?'4px':expected==='neutral'?'1px':'3px';
+  assert.deepEqual(edge['border-left'],{value:width+' solid '+paint,priority:'important'},'iOS needs a restrained actual stripe for '+type);
+  assert.deepEqual(edge['border-inline-start'],{value:width+' solid '+paint,priority:'important'},'RTL-safe edge must be painted too');
   assert(css.includes('#cards .card[data-close-tone="'+expected+'"]'),'Missing color CSS for '+type);
 }
 for(const [type,ready,tone] of [
  ['LAYOUT',true,'go'],['BREAKOUT',true,'cp-blue'],
  ['LAYOUT',false,'neutral'],['PARTIAL',false,'wait'],
- ['NO_CHASE',false,'risk'],['VERIFY',false,'stale'],['WATCH',false,'neutral']
+ ['NO_CHASE',false,'wait'],['VERIFY',false,'stale'],['WATCH',false,'neutral']
 ])checkColor(type,ready,tone);
 
 // The three lanes partition the original quality shortlist; they may never
@@ -86,6 +87,8 @@ for(const lane of ['LAYOUT','WAIT','PENDING','BLOCKED']){
 assert(js.includes('const evidence=await shard(code,build)'),'Never publish a lane without checking same-session evidence');
 assert(js.includes('plan:classify(evidence?.decision||{code},evidence)'),'Counts and borders must share one final verdict');
 assert(js.includes('radar:close-plan-lanes-updated'),'Only publish counts after complete audit');
+assert(js.includes("x.type==='NO_CHASE'?(x.block===true?'risk':'wait')"),'Cautious no-chase is amber; restricted trade remains red');
+assert(js.includes("card.classList.add('inuko-has-plan')"),'Once the validated plan arrives hide the duplicate candidate rationale in layout');
 // A genuine 20-day platform breakout can be examined without a fabricated R1.
 // It must NEVER become a long entry just because the resistance source is empty.
 const openSkySrc=js.slice(js.indexOf('function breakoutWithoutR1('),js.indexOf('function classify('));

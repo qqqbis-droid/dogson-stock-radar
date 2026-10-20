@@ -429,7 +429,7 @@ function radarCardScores(metrics){
  return '<div class="score-row">'+metrics.map(x=>'<div class="score"><span>'+esc(x.label)+'</span><b>'+x.value+'</b></div>').join('')+'</div>';
 }
 function radarActionLine(tone,verdict,meta,dot='○'){
- return '<div class="action-line '+esc(tone)+'"><span>'+esc(dot)+'</span><b>'+esc(verdict)+'</b><small>'+esc(meta)+'</small></div>';
+ return '<div class="action-line '+esc(tone)+'"><span class="action-symbol" aria-hidden="true">'+esc(dot)+'</span><b>'+esc(verdict)+'</b><small>'+esc(meta)+'</small></div>';
 }
 function radarOneLine(reason,header='觀察'){
  const val=String(reason||'').trim();return '<div class="reason"><span>'+esc(header)+'</span>'+esc(val||'尚無新的觸發證據')+'</div>';
@@ -442,7 +442,7 @@ function ignitionCardHtml(d,cfg){
  const confidence=ok?fmt(d.ignition_confidence,0)+"%":"—";
  const explanation=(d.ignition_execution_note||d.ignition_gate_flags?.[0]||"").trim();
  const reason=(d.ignition_reasons||[])[0];
- return '<article class="card inuko-stock-card '+tone+'" data-ignition="1" data-code="'+esc(d.code)+'" role="button" tabindex="0" aria-label="查看 '+esc(d.code)+' '+esc(d.name)+' 個股詳情">'
+ return '<article class="card inuko-stock-card inuko-editorial-card '+tone+'" data-ignition="1" data-code="'+esc(d.code)+'" role="button" tabindex="0" aria-label="查看 '+esc(d.code)+' '+esc(d.name)+' 個股詳情">'
   +radarCardIdentity(d,stage)+quoteHtml(d)
   +radarActionLine(tone,action,displayFreshness(d),ok&&d.ignition_execution_ready===true?"●":"○")
   +radarCardScores([{label:"點火分數",value:fmt(scoreFor(d))},{label:"進場位置",value:fmt(s.entry_position_score)},{label:"點火信心",value:confidence}])
@@ -490,7 +490,7 @@ function renderCards(){
       ?d.action_state==="DO_NOT_CHASE"?"先不追價":d.action_state==="EXIT_PRIORITY"||d.action_state==="REDUCE_WATCH"?"風險優先":d.action_state==="WAIT_PULLBACK"?"等待回踩":d.action_state==="WAIT_TRIGGER"?"等待突破":"候選・待核對"
       :actionLabel[d.action_state]||d.action_state||"資料待補";
     const scores=[{label:cfg.scoreLabel,value:fmt(score)},{label:"進場位置",value:fmt(s.entry_position_score)},{label:"資料信心",value:fmt(d.data_confidence,0)+"%"}];
-    return '<article class="card inuko-stock-card '+tone+'" data-code="'+esc(d.code)+'" role="button" tabindex="0" aria-label="查看 '+esc(d.code)+' '+esc(d.name)+' 個股詳情">'
+    return '<article class="card inuko-stock-card inuko-editorial-card '+tone+'" data-inuko-swing="'+(closeStrategy?'1':'0')+'" data-code="'+esc(d.code)+'" role="button" tabindex="0" aria-label="查看 '+esc(d.code)+' '+esc(d.name)+' 個股詳情">'
       +radarCardIdentity(d,stageLabel[d.lifecycle_stage]||d.lifecycle_stage)
       +quoteHtml(d)+radarActionLine(tone,verdict,closeStrategy?"盤後策略核對中":fresh,d.actionable&&!closeStrategy?"●":"○")
       +radarCardScores(scores)

@@ -162,11 +162,13 @@ async function auditLanes(force=false){
 function compact(x){
  const level=(rank,z)=>'<span class="cp-mini-level"><small>'+rank+'</small><b>'+esc(z?range(z):'待驗')+'</b></span>';
  const note=x.type==='VERIFY'?'同日證據待核對':x.type==='PARTIAL'?'關鍵價區待補':x.gate||'等待量價確認';
+ const overlap=!!(x.support&&x.resistance&&n(x.support.high)!=null&&n(x.resistance.low)!=null&&n(x.support.high)>=n(x.resistance.low));
  const breakout=x.openSky&&!x.resistance&&x.breakoutLevel!=null
   ?'<span class="cp-mini-level"><small>前高平台</small><b>'+esc(pp(x.breakoutLevel))+'</b></span>':level('R1 壓力',x.resistance);
  return '<section class="close-plan-integrated cp-mini" data-close-plan aria-label="明日作戰">'
-  +'<div class="cp-mini-head"><span>關鍵價位</span><span>已核對 '+esc(x.date||'待驗')+'</span></div>'
+  +'<div class="cp-mini-head"><span>關鍵價位</span><span>'+esc(x.sessionOK?'已核對':'待核對')+'</span></div>'
   +'<div class="cp-mini-levels">'+level('S1 支撐',x.support)+breakout+'</div>'
+  +(overlap?'<div class="cp-mini-overlap">支撐與壓力區間重疊，待量價確認</div>':'')
   +'<p class="cp-mini-watch"><b>明日留意</b>'+esc(note)+'</p>'
   +'</section>';
 }
@@ -176,7 +178,7 @@ function writeCard(card,x){
  // Stock-card border and verdict row must derive from the SAME fully checked
  // tomorrow-plan verdict. The base Engine card intentionally stays neutral
  // until the same-build S1/R1 shard has been verified.
- const tone=x.type==='NO_CHASE'?'risk'
+ const tone=x.type==='NO_CHASE'?(x.block===true?'risk':'wait')
   :x.type==='LAYOUT'&&x.ready?'go'
   :x.type==='BREAKOUT'&&x.ready?'cp-blue'
   :x.type==='PARTIAL'?'wait'
@@ -193,18 +195,20 @@ function writeCard(card,x){
   go:'#1f5a46',wait:'#d39a2c','cp-blue':'#4b82ad',
   risk:'#b42318',stale:'#8c9590',neutral:'#dce2dc'
  }[tone]||'#dce2dc';
- card.style?.setProperty('border-left','6px solid '+edge,'important');
- card.style?.setProperty('border-inline-start','6px solid '+edge,'important');
+ const edgeWidth=tone==='risk'?'4px':tone==='neutral'?'1px':'3px';
+ card.style?.setProperty('border-left',edgeWidth+' solid '+edge,'important');
+ card.style?.setProperty('border-inline-start',edgeWidth+' solid '+edge,'important');
  if(line&&label){
   line.classList.remove(...colorClasses);line.classList.add(tone);
   label.textContent=x.label;
   const dot=line.querySelector('span');if(dot)dot.textContent=x.type==='VERIFY'?'!':'○';
-  const sm=line.querySelector('small');if(sm)sm.textContent='犬子結論 · '+(x.date||'盤後');
+  const sm=line.querySelector('small');if(sm)sm.textContent=x.type==='VERIFY'?'資料待核對':'盤後策略';
  }
  const prior=card.querySelector('[data-close-plan]');
  if(prior){prior.outerHTML=compact(x)}
  else{const reason=card.querySelector(':scope > .reason'),footer=card.querySelector(':scope > .inuko-card-foot');if(reason)reason.insertAdjacentHTML('beforebegin',compact(x));else if(footer)footer.insertAdjacentHTML('beforebegin',compact(x));else card.insertAdjacentHTML('beforeend',compact(x))}
  card.dataset.closeDecision=x.type;
+ card.classList.add('inuko-has-plan');
 }
 function explainPending(card){
  if(!card||card.querySelector('[data-close-plan]'))return;
