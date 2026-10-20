@@ -74,8 +74,15 @@ assert.equal(missingPrice.known,false);
 const partial=evalPath(make(zones),{plan:{type:'PARTIAL',gate:'暫不建立新倉'}});
 assert.equal(partial.kind,'verify');
 assert(path.h60valid&&path.chipSame);
+assert(path.lens&&path.lens.pct>0&&path.lens.pct<100);
+assert(lib.detailHtml(path).includes('價格結構位置'));
+assert(lib.detailHtml(path).includes('獨立證據 2 類'));
+assert(!noR.lens,'Never invent price location when R1 is absent');
+assert(lib.detailHtml(noR).includes('價格位置待核對'));
+assert(!lib.detailHtml(older).includes('價格結構位置'));
+assert(path.facts.length>=0);
 assert(css.includes('@media(max-width:510px)'),'Mobile route must be two-column');
-for(const tag of ['<script src="./swing-path-v1.js?v=20261017openhigh1">','swing-path-v1.css?v=20261016route1','close-ops-v1.js?v=20261016route1','detail-loading-guard-v2.js?v=20261016route1'])
+for(const tag of ['<script src="./swing-path-v1.js?v=20261020lens1">','swing-path-v1.css?v=20261020lens1','close-ops-v1.js?v=20261016route1','detail-loading-guard-v2.js?v=20261016route1'])
  assert(html.includes(tag),'Missing deployed cache-busted asset: '+tag);
 assert(close.includes('window.InukoSwingPath.evaluate(shard'),'Close card must use shared route');
 assert(detail.includes('window.InukoSwingPath?.detailHtml?.(path)'),'Direct single-stock detail must use same route');

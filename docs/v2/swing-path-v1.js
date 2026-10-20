@@ -36,6 +36,41 @@ function zoneEvidence(z){
    validated:FRESH.has(z.freshness)
  };
 }
+function zoneDistance(z,quote){
+ if(!z||!(quote>0))return null;
+ return quote<z.low?(z.low-quote)/quote*100:quote>z.high?(z.high-quote)/quote*100:0;
+}
+function positionLens(quote,support,resistance){
+ if(!(quote>0)||!support||!resistance||!(resistance.high>support.low))return null;
+ const low=n(support.low),high=n(resistance.high);
+ if(low==null||high==null||high<=low)return null;
+ return {low,high,pct:Math.max(0,Math.min(100,(quote-low)/(high-low)*100)),
+  rawPct:(quote-low)/(high-low)*100,
+  position:quote>high?'區間上方':quote<low?'區間下方':(quote-low)/(high-low)>=.8?'靠近上緣':(quote-low)/(high-low)<=.2?'靠近下緣':'區間中段',
+  nearSupport:zoneDistance(support,quote),nearResistance:zoneDistance(resistance,quote)};
+}
+function evidenceScore(z){
+ if(!z)return null;
+ const families=Array.isArray(z.evidence_families)?[...new Set(z.evidence_families.filter(Boolean))]:[];
+ const confidence=n(z.confidence),strength=n(z.strength);
+ return {families,independent:families.length,confidence,strength,
+  labels:(Array.isArray(z.evidence)?z.evidence:[]).filter(Boolean).slice(0,8)};
+}
+function marketFacts(shard,known,date){
+ const e=shard?.evidence||{},q=shard?.decision?.quote||{};
+ if(!known)return [];
+ const val=(x,d=2)=>Number(x).toLocaleString('zh-TW',{maximumFractionDigits:d});
+ const facts=[];
+ const volume=n(e.vol_x)??n(q.relative_volume);
+ if(volume!=null)facts.push({name:'相對量',value:val(volume)+'×',meaning:volume>=1.5?'量能放大':volume<.8?'量能偏低':'量能一般'});
+ const change=n(q.day_change_pct);
+ if(change!=null)facts.push({name:'當日漲跌',value:(change>0?'+':'')+val(change)+'%',meaning:'當日價格變化，不代表原因'});
+ const rsi=n(e.rsi14)??n(e.rsi_14);
+ if(rsi!=null)facts.push({name:'RSI(14)',value:val(rsi,1),meaning:rsi>=70?'偏熱':rsi>=50?'相對偏強':'動能偏弱'});
+ if(e.foreign_date&&day(e.foreign_date)===date&&n(e.foreign_net)!=null)
+  facts.push({name:'外資',value:val(e.foreign_net,0),meaning:'同日淨買賣（單位依來源）'});
+ return facts.slice(0,4);
+}
 function evaluate(shard,{expectedBuild='',expectedDate='',plan=null,view='close',allowed=true}={}){
  const d=shard?.decision||{},e=shard?.evidence||{};
  const date=day(shard?.as_of),build=String(shard?.build_id||'');
@@ -50,6 +85,9 @@ function evaluate(shard,{expectedBuild='',expectedDate='',plan=null,view='close'
  // duplicate/overlapping R2 and any orphaned remote price.
  const extension=resistance&&proposedR2&&n(proposedR2.low)>n(resistance.high)?proposedR2:null;
  const openSky=known&&plan?.openSky===true&&!resistance&&support&&n(plan?.breakoutLevel)>0;
+ const lens=known?positionLens(quote,support,resistance):null;
+ const zoneDiagnostics=[['S1',support],['R1',resistance],['R2',extension]].map(([rank,z])=>({rank,zone:z,metrics:evidenceScore(z),distance:known?zoneDistance(z,quote):null}));
+ const facts=marketFacts(shard,known,date);
  const H=e?.hourly60||{};
  const h60ok=day(H.trade_date)===date&&String(H.data_status||'')==='OK';
  const h60valid=h60ok&&n(H.ma20_60)!=null&&n(H.ma60_60)!=null;
@@ -127,7 +165,7 @@ function evaluate(shard,{expectedBuild='',expectedDate='',plan=null,view='close'
   {name:'回測承接',value:openSky?'原平台／S1 待驗':resistance?'R1 角色轉換待確認':'不可推估',state:'future',hint:openSky?'回踩支撐、量價與大盤相對強弱確認後才能考慮布局':'突破後回測守住才可升級；未自動判定'},
   {name:openSky?'後續觀察｜上方':'後續觀察｜R2',value:openSky?'尚無有效歷史壓力':extension?fmtRange(extension):'待補，不預測',state:extension?'future':'missing',hint:openSky?'不得把缺少 R1 解讀成無上漲阻力或預設目標價':extension?'須重新驗證，不當目標價':'沒有同日 R2 證據'}
  ];
- return {date,build,quote,confidence,known,sourceGood,support,resistance,extension,h60ok,h60valid,chipSame,phase,kind,action,next,invalidation,steps,view,checks,promotionReady};
+ return {date,build,quote,confidence,known,sourceGood,support,resistance,extension,lens,zoneDiagnostics,facts,h60ok,h60valid,chipSame,phase,kind,action,next,invalidation,steps,view,checks,promotionReady};
 }
 function compactHtml(p){
  if(!p)return '';
@@ -139,30 +177,40 @@ function compactHtml(p){
    +'<p>資料日 '+esc(p.date||'待核對')+' · 僅採有效 S1／R1 或經驗證前20日平台，不預測遠端價格</p>'
    +'</section>';
 }
-function sourceCard(z,rank){
+function sourceCard(z,rank,quote){
+ const metric=evidenceScore(z),distance=zoneDistance(z,quote);
+ const gap=distance==null?'':distance===0?'｜現價在區間內':'｜距離 '+(distance>0?'+':'')+distance.toFixed(1)+'%';
+ const counts=metric?.independent?'｜獨立證據 '+metric.independent+' 類':'｜證據種類待補';
+ const trust=metric?.confidence!=null?'｜結構信心 '+metric.confidence.toFixed(0)+'/100':'';
+
  const source=zoneEvidence(z);
  return '<div class="swing-source-card">'
   +'<b>'+esc(rank)+'</b><strong>'+esc(fmtRange(z))+'</strong>'
-  +'<span>'+esc(source.status)+'</span>'
+  +'<span>'+esc(source.status)+esc(gap)+'</span>'
   +'<small>來源：'+esc(source.source)+'｜資料日 '+esc(source.date||'待核對')+'</small>'
-  +'<small>結構依據：'+esc(source.text)+'</small>'
+  +'<small>結構依據：'+esc(source.text)+esc(counts)+esc(trust)+'</small>'
   +'<small>觸發：'+esc(z?.validation_condition||'待量價／收盤確認')+'</small>'
   +'</div>';
 }
 function detailHtml(p){
+ const lens=p.lens;
+ const positionHtml=lens?'<div class="swing-location"><div class="swing-location-head"><b>價格結構位置</b><span>'+esc(price(lens.low))+'～'+esc(price(lens.high))+'</span></div><div class="swing-location-track" role="img" aria-label="在已驗證支撐與壓力區間中位於'+esc(lens.pct.toFixed(0))+'%"><i style="left:'+lens.pct.toFixed(1)+'%"></i></div><div class="swing-location-caption"><span>'+esc(lens.position)+' · '+lens.pct.toFixed(0)+'%</span><span>距 R1 '+(lens.nearResistance==null?'—':lens.nearResistance.toFixed(1)+'%')+'</span></div><small>僅反映同日有效 S1／R1 的位置，非超買判定或買賣建議。</small></div>'
+  :'<div class="swing-location pending"><b>價格位置待核對</b><small>未具備同版本 S1 與 R1；不虛構區間比例，創高股改看回測路徑。</small></div>';
+ const facts=p.facts?.length?'<div class="swing-facts"><b>今日發生什麼？（事實，非因果）</b><div>'+p.facts.map(f=>'<span><small>'+esc(f.name)+'</small><strong>'+esc(f.value)+'</strong><small>'+esc(f.meaning)+'</small></span>').join('')+'</div><small>只列資料日 '+esc(p.date)+' 有效來源；新聞與法人日期不符不推論原因。</small></div>':'';
+
  if(!p)return '';
  const steps=p.steps.map((s,i)=>'<div class="swing-path-step '+esc(s.state)+'"><span class="swing-path-count">'+(i+1)+'</span><span>'+esc(s.name)+'</span><b>'+esc(s.value)+'</b><small>'+esc(s.hint)+'</small></div>').join('');
  return '<section class="swing-path-detail isd-section" data-swing-path aria-label="犬子波段路徑">'
   +'<header><h3>犬子波段路徑</h3><span class="swing-path-stage '+esc(p.kind)+'">'+esc(p.phase)+'</span></header>'
   +'<p class="swing-path-note">現在的位置 → 首要關卡 → 回測驗證 → 後續觀察；關卡不是保證會到的目標。</p>'
-  +'<div class="swing-path-steps">'+steps+'</div>'
+  +positionHtml+facts+'<div class="swing-path-steps">'+steps+'</div>'
   +'<div class="swing-path-action"><b>現在需要做什麼</b><span>'+esc(p.action)+'</span></div>'
   +'<div class="swing-path-checks"><b>關卡升級需四項同時核對</b><div>'
   +p.checks.map(c=>'<span class="'+(c.passed?'passed':'pending')+'">'+(c.passed?'✓ ':'○ ')+esc(c.name)+' · '+esc(c.desc)+'</span>').join('')
   +'</div><small>'+esc(p.promotionReady?'完整觸發與回測證據已核對，仍須自行確認盤面':'尚未取得完整突破＋回測雙確認，不能升級成已成立訊號')+'</small></div>'
   +'<div class="swing-path-action risk"><b>結構失效條件</b><span>'+esc(p.invalidation)+'</span></div>'
   +'<details class="swing-path-sources"><summary>關卡來源與驗證狀態</summary><div class="swing-path-sources-grid">'
-  +sourceCard(p.support,'S1')+sourceCard(p.resistance,'R1')+sourceCard(p.extension,'R2')
+  +sourceCard(p.support,'S1',p.quote)+sourceCard(p.resistance,'R1',p.quote)+sourceCard(p.extension,'R2',p.quote)
   +'</div><p class="swing-path-note">60分K：'+esc(p.h60valid?'同交易日結構可核對，仍須確認收盤與交叉方向':'未取得同交易日完整20T／60T證據')
   +'；法人：'+esc(p.chipSame?'外資與投信日期一致，仍需檢查方向及借券':'法人日期不一致，禁止當日共振結論')
   +'。模型生成價區不是直接交易指令；缺失價區不補猜。</p></details>'

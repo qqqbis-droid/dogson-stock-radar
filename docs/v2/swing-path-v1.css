@@ -42,3 +42,17 @@
 .swing-path-checks span.pending{border-left:3px solid #bd955b}
 .swing-path-checks small{display:block;margin-top:8px;font-size:.7rem;line-height:1.4;color:var(--muted)}
 @media(max-width:510px){.swing-path-checks>div{grid-template-columns:1fr}}
+
+/* Price-location explanation and independent evidence: presentation only. */
+.swing-location{margin-top:10px;border:1px solid var(--line);border-radius:11px;padding:12px;background:var(--soft)}
+.swing-location-head,.swing-location-caption{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:.73rem}
+.swing-location-head span,.swing-location-caption,.swing-location>small,.swing-facts>small{color:var(--muted)}
+.swing-location-track{height:9px;border-radius:999px;background:linear-gradient(90deg,#318b79,#8ba66c,#d3a33f);margin:15px 7px;position:relative}
+.swing-location-track i{position:absolute;top:50%;height:17px;width:17px;border:3px solid var(--card);border-radius:50%;background:#d6a22e;transform:translate(-50%,-50%);box-sizing:border-box}
+.swing-location>small,.swing-facts>small{font-size:.65rem;line-height:1.5;display:block;margin-top:8px}
+.swing-facts{border:1px solid var(--line);border-radius:11px;padding:10px;margin-top:10px}
+.swing-facts>b{font-size:.8rem}
+.swing-facts>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:9px}
+.swing-facts>div>span{display:flex;flex-direction:column;gap:4px;border-radius:8px;background:var(--soft);padding:8px;min-width:0}
+.swing-facts strong{font-size:.9rem;overflow-wrap:anywhere}.swing-facts span small{font-size:.65rem;color:var(--muted)}
+@media(max-width:510px){.swing-facts>div{grid-template-columns:repeat(2,minmax(0,1fr))}}
