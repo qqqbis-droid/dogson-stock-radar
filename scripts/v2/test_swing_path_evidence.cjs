@@ -90,6 +90,7 @@ assert.equal(evalPath(make(zones),{allowed:false,plan:{type:'LAYOUT',ready:true,
 assert.equal(evalPath(make(zones),{plan:{type:'LAYOUT',ready:false,sessionOK:true}}).threeQ.lane,'WAIT','Unconfirmed setup cannot claim ready');
 const threeHtml=lib.threeQuestionHtml(ready3);
 assert(threeHtml.includes('現在值得出手嗎？')&&threeHtml.includes('明天要盯哪個訊號？')&&threeHtml.includes('看錯時怎麼辦？'));
+assert(threeHtml.includes('明日決策'),'Research board decision starts with one compact verdict');
 assert(threeHtml.includes('非自動買賣指令')||threeHtml.includes('不是自動買賣指令'));
 assert(!lib.threeQuestionHtml(risk3).includes('布局優先・待觸發'));
 assert(!lib.threeQuestionHtml(null));
@@ -101,7 +102,7 @@ assert(bridge.includes("if(view==='close'&&!ignite&&path)"),'Only close swing ge
 assert(bridge.includes("return;\n    }\n    box.body.innerHTML="),'Legacy live, ignition and daytrade must keep full detail');
 assert(bridge.includes('data-inuko-research')&&bridge.includes('data-inuko-technical')&&bridge.includes('data-inuko-provenance'),'Expanded evidence must remain available');
 assert(!js.slice(js.indexOf('function detailHtml(')).includes('<div class="swing-path-steps">'),'4-card repeat must be removed');
-assert(html.includes('detail-loading-guard-v2.js?v=20261016route1&layout=20261020b'),'Mobile detail script version must defeat prior cache while respecting production contract');
+assert(html.includes('detail-loading-guard-v2.js?v=20261016route1&layout=20261020b&design=20261020b'),'Mobile detail script must bypass old cache');
 assert(path.lens&&path.lens.pct>0&&path.lens.pct<100);
 assert(lib.detailHtml(path).includes('價格結構位置'));
 assert(lib.detailHtml(path).includes('S1｜防守')&&lib.detailHtml(path).includes('R1｜壓力'));
@@ -114,7 +115,7 @@ assert(!lib.detailHtml(older).includes('價格結構位置'));
 assert(path.facts.length>=0);
 assert(css.includes('@media(max-width:510px)'),'Mobile route must be two-column');
 assert(css.includes('.inuko-dossier>summary'),'Research disclosures must be thumb-friendly');
-for(const tag of ['<script src="./swing-path-v1.js?v=20261020layout2">','swing-path-v1.css?v=20261020layout2','close-ops-v1.js?v=20261016route1','detail-loading-guard-v2.js?v=20261016route1'])
+for(const tag of ['<script src="./swing-path-v1.js?v=20261020layout2&design=20261020b">','swing-path-v1.css?v=20261020layout2','close-ops-v1.js?v=20261016route1','detail-loading-guard-v2.js?v=20261016route1'])
  assert(html.includes(tag),'Missing deployed cache-busted asset: '+tag);
 assert(close.includes('window.InukoSwingPath.evaluate(shard'),'Close card must use shared route');
 assert(detail.includes('window.InukoSwingPath?.detailHtml?.(path)'),'Direct single-stock detail must use same route');

@@ -192,7 +192,7 @@ function threeQuestionHtml(p){
  if(!p)return '';
  const t=p.threeQ||threeQuestionModel(p,null);
  return '<section class="inuko-threeq isd-section" data-inuko-threeq aria-label="犬子三問決策摘要">'
-  +'<header><b>🦴 明日決策</b><small>結論 · 觸發 · 風險</small></header>'
+  +'<header><b>明日決策</b><small>01 / PLAN</small></header>'
   +'<div class="inuko-threeq-list">'
   +'<div class="inuko-threeq-item '+esc(t.lane.toLowerCase())+'"><span class="inuko-threeq-index">01</span>'
   +'<div><small>01｜現在值得出手嗎？</small><strong>'+esc(t.label)+'</strong><p>'+esc(t.reason)+'</p></div></div>'

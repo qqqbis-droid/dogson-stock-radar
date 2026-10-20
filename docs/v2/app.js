@@ -419,25 +419,36 @@ function outsideCard(x){
   return `<article class="card neutral outside-pool" data-code="${esc(x.code)}" role="button" tabindex="0"><div class="card-top"><div class="identity"><span class="rank">全市場 · 未排名</span><div><span class="code">${esc(x.code)} ${esc(x.name)}</span><div class="muted">${esc(x.sector_group||x.industry_name||"分類待補")} · ${esc(x.market||"")}</div></div></div><span class="badge stage">未進排名池</span></div><div class="action-line neutral"><span>○</span><b>不產生執行分</b><small>全市場搜尋</small></div><div class="reason">${esc(x._outsideReason||"目前不在雷達排名池。")}</div></article>`;
 }
 
+function radarCardIdentity(d,stage){
+ return '<div class="card-top"><div class="identity"><span class="rank">'+esc(rankText(d))+'</span>'
+  +'<div class="card-identity-text"><span class="code">'+esc(d.code)+' '+esc(d.name)+'</span>'
+  +'<div class="muted">'+esc(sectorDisplay(d))+'</div></div></div>'
+  +'<span class="badge stage">'+esc(stage||'待驗')+'</span></div>';
+}
+function radarCardScores(metrics){
+ return '<div class="score-row">'+metrics.map(x=>'<div class="score"><span>'+esc(x.label)+'</span><b>'+x.value+'</b></div>').join('')+'</div>';
+}
+function radarActionLine(tone,verdict,meta,dot='○'){
+ return '<div class="action-line '+esc(tone)+'"><span>'+esc(dot)+'</span><b>'+esc(verdict)+'</b><small>'+esc(meta)+'</small></div>';
+}
+function radarOneLine(reason,header='觀察'){
+ const val=String(reason||'').trim();return '<div class="reason"><span>'+esc(header)+'</span>'+esc(val||'尚無新的觸發證據')+'</div>';
+}
+
 function ignitionCardHtml(d,cfg){
-  const s=d.scores||{},ok=verifiedIgnition(d),tone=ok?actionTone(d):"stale",score=scoreFor(d),fresh=displayFreshness(d);
-  const reason=(d.ignition_reasons||[]).slice(0,2).map(humanReason);
-  const gate=(d.ignition_gate_flags||[])[0]||"";
-  const stage=ok?(ignitionStageLabel[d.ignition_stage]||d.ignition_stage||"資料待補"):"模型待補";
-  const action=ok?(d.ignition_action||"等條件驗證"):"點火模型缺失・不列排名";
-  const confidence=ok?d.ignition_confidence:null;
-  const atr=num(d.ignition_breakout_distance_atr);
-  const dist=atr!=null?(" · 距突破點 "+fmt(atr,1)+" ATR"):"";
-  const dot=ok&&d.ignition_execution_ready===true?"●":"○";
-  const executionNote=!ok?"缺少有效點火分數與同日來源，僅供研究；不作交易訊號":(!d.ignition_execution_ready&&d.ignition_execution_note?String(d.ignition_execution_note):"");
-  return '<article class="card '+tone+'" data-ignition="1" data-code="'+esc(d.code)+'" role="button" tabindex="0" aria-label="查看 '+esc(d.code)+" "+esc(d.name)+' 個股詳情">'
-    +'<div class="card-top"><div class="identity"><span class="rank">'+esc(rankText(d))+'</span><div><span class="code">'+esc(d.code)+" "+esc(d.name)+'</span><div class="muted">'+esc(sectorDisplay(d))+'</div></div></div><span class="badge stage">'+esc(stage)+'</span></div>'
-    +quoteHtml(d)
-    +'<div class="action-line '+tone+'"><span>'+dot+'</span><b>'+esc(action)+'</b><small>'+esc(fresh)+'</small></div>'
-    +'<div class="score-row"><div class="score"><span>點火分數</span><b>'+fmt(score)+'</b></div><div class="score"><span>進場位置</span><b>'+fmt(s.entry_position_score)+'</b></div><div class="score"><span>點火信心</span><b>'+(confidence==null?'—':fmt(confidence,0)+'<small>%</small>')+'</b></div></div>'
-    +'<div class="reason">'+(reason.length?reason.map(esc).join("・"):"目前無新增點火理由")+esc(dist)+'</div>'
-    +(executionNote?'<div class="blocker">執行：'+esc(executionNote)+'</div>':(gate?'<div class="blocker">Gate：'+esc(humanBlock(gate))+'</div>':""))
-    +'</article>';
+ const s=d.scores||{},ok=verifiedIgnition(d),tone=ok?actionTone(d):"stale";
+ const stage=ok?(ignitionStageLabel[d.ignition_stage]||d.ignition_stage||"模型待驗"):"模型待驗";
+ const action=ok?(d.ignition_action||"等條件驗證"):"點火分數待驗";
+ const confidence=ok?fmt(d.ignition_confidence,0)+"%":"—";
+ const explanation=(d.ignition_execution_note||d.ignition_gate_flags?.[0]||"").trim();
+ const reason=(d.ignition_reasons||[])[0];
+ return '<article class="card inuko-stock-card '+tone+'" data-ignition="1" data-code="'+esc(d.code)+'" role="button" tabindex="0" aria-label="查看 '+esc(d.code)+' '+esc(d.name)+' 個股詳情">'
+  +radarCardIdentity(d,stage)+quoteHtml(d)
+  +radarActionLine(tone,action,displayFreshness(d),ok&&d.ignition_execution_ready===true?"●":"○")
+  +radarCardScores([{label:"點火分數",value:fmt(scoreFor(d))},{label:"進場位置",value:fmt(s.entry_position_score)},{label:"點火信心",value:confidence}])
+  +radarOneLine(reason?humanReason(reason):"待突破與量能同步")
+  +(explanation?'<div class="blocker"><span>條件</span>'+esc(explanation)+'</div>':'')
+  +'<div class="inuko-card-foot"><span>資料日 '+esc(missionDate())+'</span><span>查看完整研究 ↗</span></div></article>';
 }
 function renderCards(){
   if(state.view==="portfolio"){
@@ -475,7 +486,17 @@ function renderCards(){
     const d=displayEvidenceRow(record,summaryLookup,displayDate,displayBuild);
     if(isIgnitionMode())return ignitionCardHtml(d,cfg);
     const s=d.scores||{},closeStrategy=state.view==="close"&&!isIgnitionMode(),tone=closeStrategy?"neutral":actionTone(d),score=scoreFor(d),reason=(d.why_now||[]).slice(0,2).map(humanReason),block=(d.blockers||[])[0],fresh=displayFreshness(d);
-    return `<article class="card ${tone}" data-code="${esc(d.code)}" role="button" tabindex="0" aria-label="查看 ${esc(d.code)} ${esc(d.name)} 個股詳情"><div class="card-top"><div class="identity"><span class="rank">${esc(rankText(d))}</span><div><span class="code">${esc(d.code)} ${esc(d.name)}</span><div class="muted">${esc(sectorDisplay(d))}</div></div></div><span class="badge stage">${esc(stageLabel[d.lifecycle_stage]||d.lifecycle_stage)}</span></div>${quoteHtml(d)}<div class="action-line ${tone}"><span>${closeStrategy?"○":d.actionable?"●":"○"}</span><b>${closeStrategy?(d.action_state==="DO_NOT_CHASE"?"先不追價":d.action_state==="EXIT_PRIORITY"||d.action_state==="REDUCE_WATCH"?"風險優先":d.action_state==="WAIT_PULLBACK"?"等待回踩":d.action_state==="WAIT_TRIGGER"?"等待突破":"明日候選・條件待補"):esc(actionLabel[d.action_state]||d.action_state||"—")}</b><small>${closeStrategy?"S1／R1 詳情載入中":esc(fresh)}</small></div><div class="score-row"><div class="score"><span>${esc(cfg.scoreLabel)}</span><b>${fmt(score)}</b></div><div class="score"><span>進場位置</span><b>${fmt(s.entry_position_score)}</b></div><div class="score"><span>資料信心</span><b>${fmt(d.data_confidence,0)}<small>%</small></b></div></div><div class="reason">${reason.length?reason.map(esc).join("・"):"目前無新增理由"}</div>${block?`<div class="blocker">卡點：${esc(humanBlock(block))}</div>`:""}</article>`;
+    const verdict=closeStrategy
+      ?d.action_state==="DO_NOT_CHASE"?"先不追價":d.action_state==="EXIT_PRIORITY"||d.action_state==="REDUCE_WATCH"?"風險優先":d.action_state==="WAIT_PULLBACK"?"等待回踩":d.action_state==="WAIT_TRIGGER"?"等待突破":"候選・待核對"
+      :actionLabel[d.action_state]||d.action_state||"資料待補";
+    const scores=[{label:cfg.scoreLabel,value:fmt(score)},{label:"進場位置",value:fmt(s.entry_position_score)},{label:"資料信心",value:fmt(d.data_confidence,0)+"%"}];
+    return '<article class="card inuko-stock-card '+tone+'" data-code="'+esc(d.code)+'" role="button" tabindex="0" aria-label="查看 '+esc(d.code)+' '+esc(d.name)+' 個股詳情">'
+      +radarCardIdentity(d,stageLabel[d.lifecycle_stage]||d.lifecycle_stage)
+      +quoteHtml(d)+radarActionLine(tone,verdict,closeStrategy?"盤後策略核對中":fresh,d.actionable&&!closeStrategy?"●":"○")
+      +radarCardScores(scores)
+      +radarOneLine(reason[0]||"",closeStrategy?"入選理由":"盤面觀察")
+      +(!closeStrategy&&block?'<div class="blocker"><span>卡點</span>'+esc(humanBlock(block))+'</div>':'')
+      +'<div class="inuko-card-foot"><span>資料日 '+esc(missionDate())+'</span><span>查看完整研究 ↗</span></div></article>';
   }).join("");
   const outsideHtml=external.map(outsideCard).join("");
   const liveUnavailable=liveMission&&noExplicitSelection&&originalCount>0&&!shown.length;

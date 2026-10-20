@@ -119,3 +119,45 @@
  .inuko-levels{grid-template-columns:repeat(2,minmax(0,1fr))}
  .inuko-decision-layout .swing-path-sources-grid{grid-template-columns:1fr}
 }
+
+/* INUKO editorial research board v3: existing light cream / forest / ochre. */
+.inuko-research-board{color:var(--ink)}
+.inuko-research-board .inuko-research-mast{padding:8px 0 16px;border-bottom:1px solid var(--line)}
+.inuko-research-kicker{font-size:.63rem;letter-spacing:.12em;font-weight:900;color:var(--green)}
+.inuko-research-kicker span{letter-spacing:0;font-weight:600;color:var(--muted)}
+.inuko-research-mast-row{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-top:14px}
+.inuko-research-mast small{font-size:.65rem;color:var(--muted)}
+.inuko-research-mast h2{margin:3px 0 6px;font-size:1.24rem;line-height:1.3;letter-spacing:-.025em}
+.inuko-research-mast p{font-size:.68rem;color:var(--muted);margin:0;line-height:1.4}
+.inuko-research-quote{text-align:right;flex:0 0 auto}
+.inuko-research-quote small,.inuko-research-quote span{display:block}
+.inuko-research-quote strong{display:block;font-size:1.53rem;letter-spacing:-.045em;line-height:1.2;font-variant-numeric:tabular-nums}
+.inuko-research-quote span{font-size:.7rem;font-weight:800;margin-top:3px}
+.inuko-research-board .inuko-threeq{border:0;border-bottom:1px solid var(--line);border-radius:0;margin:0;padding:18px 0 13px;background:transparent}
+.inuko-research-board .inuko-threeq header b{font-size:.94rem;font-weight:900}
+.inuko-research-board .inuko-threeq header small{font-size:.62rem;letter-spacing:.08em}
+.inuko-research-board .inuko-threeq-item{border-left:0!important;padding:9px 0;grid-template-columns:22px minmax(0,1fr);gap:8px;background:none}
+.inuko-research-board .inuko-threeq-index{font-size:.69rem;font-weight:750;color:var(--green)}
+.inuko-research-board .inuko-threeq-item strong{font-size:.82rem;line-height:1.4}
+.inuko-research-board .inuko-threeq-item small{font-size:.67rem;line-height:1.4;margin-bottom:2px}
+.inuko-research-board .inuko-threeq-item p{font-size:.71rem;line-height:1.45;margin:2px 0 0;color:var(--muted)}
+.inuko-research-board .inuko-threeq footer{font-size:.63rem}
+.inuko-research-board .isd-score.inuko-research-metrics{display:flex;justify-content:space-between;gap:8px;margin:0;padding:14px 0 16px;border-bottom:1px solid var(--line)}
+.inuko-research-board .isd-score.inuko-research-metrics>div{background:transparent;border:0;border-radius:0;flex:1;padding:0;text-align:left}
+.inuko-research-board .isd-score.inuko-research-metrics>div:not(:last-child){border-right:1px solid var(--line)}
+.inuko-research-board .isd-score.inuko-research-metrics span{font-size:.63rem}
+.inuko-research-board .isd-score.inuko-research-metrics b{font-size:1.03rem;margin-top:3px}
+.inuko-research-board .swing-path-detail{border:0;background:none;border-radius:0;padding:16px 0;margin:0}
+.inuko-research-board .swing-path-detail>header h3{font-size:.94rem}
+.inuko-research-board .inuko-levels{margin-top:12px;gap:10px}
+.inuko-research-board .inuko-level{border:0;background:var(--soft);border-radius:10px;padding:11px}
+.inuko-research-board .inuko-level strong{font-size:1rem}
+.inuko-research-board .swing-location{border:0;background:none;padding:8px 0;margin:12px 0 6px}
+.inuko-research-board .swing-facts{border:0;border-top:1px solid var(--line);border-radius:0;margin:12px 0 0;padding:13px 0 4px}
+.inuko-research-board .swing-facts>div>span{background:none;border-right:1px solid var(--line);border-radius:0}
+.inuko-research-board .swing-path-checks,.inuko-research-board .swing-path-sources{border:1px solid var(--line);border-radius:10px;background:var(--card);margin:9px 0 0}
+.inuko-research-board .inuko-dossier{border:0;border-top:1px solid var(--line);border-radius:0;margin:0;background:none}
+.inuko-research-board .inuko-dossier>summary{padding:15px 0;font-size:.81rem}
+.inuko-research-board .inuko-dossier>div{padding:0 0 15px}
+.inuko-research-board .inuko-research-section{padding:10px 0}
+@media(max-width:390px){.inuko-research-mast h2{font-size:1.11rem}.inuko-research-quote strong{font-size:1.34rem}.inuko-research-board .inuko-threeq-item p{font-size:.69rem}}

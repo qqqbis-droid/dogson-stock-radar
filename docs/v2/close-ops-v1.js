@@ -160,35 +160,14 @@ async function auditLanes(force=false){
   }
 }
 function compact(x){
- // Phase, next barrier, action and invalidation only: avoid duplicate plan
- // panels and unverified targets. Legacy layout remains a safe fallback.
- if(x.path&&typeof window!=='undefined'&&window.InukoSwingPath?.compactHtml)
-   return '<section class="close-plan-integrated" data-close-plan aria-label="明日作戰">'
-     +(x.owned?'<span class="cp-owned">💼 已持有</span>':'')
-     +window.InukoSwingPath.compactHtml(x.path)
-     +'</section>';
- const owned=x.owned?'<span class="cp-owned">💼 已持有</span>':'';
- const levels=x.support||x.resistance
-  ?'<div class="cp-levels"><div><small>S1 回踩觀察區</small><b>'+esc(x.support?range(x.support):'待補（不推估）')+'</b></div><div><small>R1 第一壓力區</small><b>'+esc(x.resistance?range(x.resistance):'待補（不推估）')+'</b></div></div>'
-  :'<div class="cp-message">尚無同日、同版本的有效支撐／壓力價區。</div>';
- const risk=x.support
-  ?'有效跌破 S1 下緣 '+pp(x.support.low,'lower')+'，且回抽未能站回，重新評估原結構；不是碰價就停損。'
-  :'沒有有效 S1，不設定猜測停損價，暫不開新倉。';
- const cautious=!x.sessionOK
-  ?(x.missing?'⛔ 尚無同版本盤後證據；所有價位僅供參考。':'⚠️ 資料日期或信心檢查未通過；不可直接下單。')
-  :null;
- const tags=x.ready?[x.early?'🌱 起漲前段觀察':null,x.chipReady?'🔗 籌碼＋同族群共振已核對':null].filter(Boolean):[];
- const rrText=x.ready&&x.rr!=null?' · 風報比 '+fmt(x.rr,2)+' 倍':x.partial?' · 風報比待證據補齊':'';
- return '<section class="close-plan-integrated" data-close-plan aria-label="明日作戰">'
-  +owned
-  +'<div class="cp-explain">'+esc(x.note)+'</div>'
-  +'<div class="cp-plan-row"><span class="cp-plan-label">明日動作</span><b class="cp-plan-value">'+esc(x.gate)+'</b></div>'
-  +'<div class="cp-plan-heading">關鍵價位'+esc(rrText)+'</div>'
-  +levels
-  +'<div class="cp-plan-row cp-plan-risk"><span class="cp-plan-label">失效條件</span><span class="cp-plan-value">'+esc(risk)+'</span></div>'
-  +(cautious?'<div class="cp-risk">'+esc(cautious)+'</div>':'')
-  +(tags.length?'<div class="cp-tags">'+tags.map(t=>'<span>'+esc(t)+'</span>').join('')+'</div>':'')
-  +'<div class="cp-risk">資料日 '+esc(x.date||'—')+' · 隔日須確認即時量價與大盤相對強弱</div>'
+ const level=(rank,z)=>'<span class="cp-mini-level"><small>'+rank+'</small><b>'+esc(z?range(z):'待驗')+'</b></span>';
+ const note=x.type==='VERIFY'?'同日證據待核對':x.type==='PARTIAL'?'關鍵價區待補':x.gate||'等待量價確認';
+ const breakout=x.openSky&&!x.resistance&&x.breakoutLevel!=null
+  ?'<span class="cp-mini-level"><small>前高平台</small><b>'+esc(pp(x.breakoutLevel))+'</b></span>':level('R1 壓力',x.resistance);
+ return '<section class="close-plan-integrated cp-mini" data-close-plan aria-label="明日作戰">'
+  +'<div class="cp-mini-head"><span>關鍵價位</span><span>已核對 '+esc(x.date||'待驗')+'</span></div>'
+  +'<div class="cp-mini-levels">'+level('S1 支撐',x.support)+breakout+'</div>'
+  +'<p class="cp-mini-watch"><b>明日留意</b>'+esc(note)+'</p>'
   +'</section>';
 }
 function writeCard(card,x){
@@ -224,7 +203,7 @@ function writeCard(card,x){
  }
  const prior=card.querySelector('[data-close-plan]');
  if(prior){prior.outerHTML=compact(x)}
- else{const score=card.querySelector(':scope > .score-row'),before=card.querySelector(':scope > .reason');if(score)score.insertAdjacentHTML('afterend',compact(x));else if(before)before.insertAdjacentHTML('beforebegin',compact(x));else card.insertAdjacentHTML('beforeend',compact(x))}
+ else{const reason=card.querySelector(':scope > .reason'),footer=card.querySelector(':scope > .inuko-card-foot');if(reason)reason.insertAdjacentHTML('beforebegin',compact(x));else if(footer)footer.insertAdjacentHTML('beforebegin',compact(x));else card.insertAdjacentHTML('beforeend',compact(x))}
  card.dataset.closeDecision=x.type;
 }
 function explainPending(card){

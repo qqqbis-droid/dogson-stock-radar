@@ -244,6 +244,7 @@
     return `<div class="isd-quality"><b>資料品質</b><div class="isd-grid" style="margin-top:8px">${metric('Freshness',FRESH[d.freshness]||d.freshness||'—')}${metric('資料信心',conf==null?'—':`${fmt(conf,0)}%`)}${metric('證據覆蓋',cov==null?'—':`${fmt(cov,0)}%`)}${metric('資料快照',hm(shard.known_at||d.known_at||m?.generated_at))}</div><div class="isd-quality-note">「資料信心」是原 Engine 的決策證據指標，<strong>不是籌碼即時性或來源完整度</strong>。<br><strong>證據覆蓋 ${cov==null?'—':`${fmt(cov,0)}%`}</strong> 是「這個模式預期需要的評分／決策證據，有多少已取得並可用」，不是「只有 ${cov==null?'部分':`${fmt(cov,0)}%`} 的資料是今天的」。${esc(missText)}</div><details class="isd-diagnostic"><summary>診斷資訊</summary><div>Build：${esc(shard.build_id||d.build_id||'—')}<br>known_at：${esc(shard.known_at||d.known_at||'—')}<br>decision context：${esc(d.decision_context_id||'—')}</div></details></div>`;
   }
 
+  function sectorDisplayFromDetail(d,e){return d.primary_group||e?.primary_group||d.industry||e?.industry||'產業待補';}
   function render(shard,view,box,m){
     const d=shard.decision||{},e=shard.evidence||null,zones=Array.isArray(shard.zones)?shard.zones:[];
     const supports=zones.filter(z=>z.side==='SUPPORT').slice(0,2),resistances=zones.filter(z=>z.side==='RESISTANCE').slice(0,2);
@@ -280,10 +281,19 @@
       const upgrades=[...new Set((d.upgrade_conditions||[]).filter(Boolean))];
       const risks=[...new Set([...(d.risk_flags||[]),...(e?.stage_risks||[]),...(e?.overheat_reasons||[])].filter(Boolean))];
       const study=(heading,values,fallback)=>`<div class="inuko-research-section"><h4>${esc(heading)}</h4>${tags(values,fallback)}</div>`;
-      box.body.innerHTML=`<div class="inuko-decision-layout" data-inuko-decision-layout>
-        <div class="isd-context">盤後波段｜${esc(routeDate)} · ${esc(rank)}</div>
+      const trustedClose=path.known&&Number(d.quote?.price)>0;
+      const closing=trustedClose?price(d.quote.price):'—';
+      const dayChange=trustedClose&&num(d.quote?.day_change_pct)!=null
+        ?(Number(d.quote.day_change_pct)>0?'+':'')+fmt(d.quote.day_change_pct,2)+'%':'—';
+      const changeTone=trustedClose&&Number(d.quote.day_change_pct)>0?'rise':trustedClose&&Number(d.quote.day_change_pct)<0?'fall':'';
+      box.body.innerHTML=`<div class="inuko-decision-layout inuko-research-board" data-inuko-decision-layout>
+        <div class="inuko-research-mast">
+          <div class="inuko-research-kicker">INUKO RESEARCH <span>／盤後波段 · ${esc(routeDate)}</span></div>
+          <div class="inuko-research-mast-row"><div><small>研究標的</small><h2>${esc(d.code||shard.code)} ${esc(d.name||e?.name||'')}</h2><p>${esc(rank)} · ${esc(sectorDisplayFromDetail(d,e))}</p></div>
+          <div class="inuko-research-quote"><small>收盤價</small><strong>${esc(closing)}</strong><span class="${changeTone}">${esc(dayChange)}</span></div></div>
+        </div>
         ${swingThreeQ}
-        <div class="isd-score">${scoreTile(ms,mv)}${scoreTile('進場位置',fmt(d.scores?.entry_position_score))}${scoreTile('資料信心',`${fmt(d.data_confidence,0)}%`)}</div>
+        <div class="isd-score inuko-research-metrics">${scoreTile(ms,mv)}${scoreTile('進場位置',fmt(d.scores?.entry_position_score))}${scoreTile('資料信心',`${fmt(d.data_confidence,0)}%`)}</div>
         ${pathHtml}
         <details class="inuko-dossier" data-inuko-research><summary>研究依據｜理由、卡點與風險</summary><div>
           ${study('入選理由',why,'尚無新的入選理由')}

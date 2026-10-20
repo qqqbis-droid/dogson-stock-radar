@@ -54,3 +54,16 @@
 #cards .card[data-close-tone="stale"]{border-left-color:#8c9590}
 #cards .card[data-close-tone="neutral"]{border-left-color:var(--line)}
 #cards .card .action-line.cp-blue{background:#eaf2f8;color:#295c83}
+
+/* Research board verified next-day levels: no second conclusion panel. */
+#cards .inuko-stock-card .close-plan-integrated.cp-mini{margin:11px 0 0;padding:10px 0 0;border-top:1px dashed var(--line);background:none}
+#cards .inuko-stock-card .cp-mini-head{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:.63rem;font-weight:650}
+#cards .inuko-stock-card .cp-mini-head span:first-child{font-weight:850;color:var(--ink)}
+#cards .inuko-stock-card .cp-mini-levels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px}
+#cards .inuko-stock-card .cp-mini-level{display:block;min-width:0}
+#cards .inuko-stock-card .cp-mini-level small{font-size:.65rem;color:var(--muted);display:block}
+#cards .inuko-stock-card .cp-mini-level b{font-size:.89rem;display:block;margin-top:3px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+#cards .inuko-stock-card .cp-mini-level:first-child b{color:var(--green)}
+#cards .inuko-stock-card .cp-mini-level:last-child b{color:var(--amber)}
+#cards .inuko-stock-card .cp-mini-watch{font-size:.69rem;line-height:1.5;margin:8px 0 0;color:var(--ink)}
+#cards .inuko-stock-card .cp-mini-watch b{color:var(--muted);font-size:.65rem;margin-right:7px}
