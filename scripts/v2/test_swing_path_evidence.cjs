@@ -96,6 +96,7 @@ const bridge=fs.readFileSync('docs/v2/detail-loading-guard-v2.js','utf8');
 assert(bridge.includes("view==='close'&&!ignite&&path"),'3Q only on close swing; daytrade and ignition remain untouched');
 assert(bridge.includes("view==='close'&&!ignite?'':"),'Do not print redundant old action hero');
 assert(bridge.includes('${swingThreeQ}${originalHero}'),'3Q must precede scoring and deep details');
+assert(html.includes('detail-loading-guard-v2.js?v=20261016route1&threeq=20261020a'),'Mobile detail script version must defeat prior cache while respecting production contract');
 assert(path.lens&&path.lens.pct>0&&path.lens.pct<100);
 assert(lib.detailHtml(path).includes('價格結構位置'));
 assert(lib.detailHtml(path).includes('獨立證據 2 類'));
