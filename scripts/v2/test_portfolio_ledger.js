@@ -126,7 +126,11 @@ const beforeDaytrades=brokerAggregate({transactions:tx1802.slice(0,6),meta:{}},'
 assert(near(isolated.avg_cost,beforeDaytrades.avg_cost),'Completed daytrades cannot change swing cost basis');
 const feeSrc=fs.readFileSync('docs/v2/portfolio-fees.js','utf8');
 assert(feeSrc.includes('trade_avg_cost:shares>0?tradeAvg:0'),'Canonical fee wrapper must display separate executed average');
-assert(rendererSrc.includes('成交均價 ${tickPrice(p.trade_avg_cost??p.avg_cost)}'),'Portfolio card must distinguish executed and fee-inclusive averages');
+assert(rendererSrc.includes('成交均價 ${costPrice(p.trade_avg_cost??p.avg_cost)}'),'Portfolio card must distinguish executed and fee-inclusive averages');
+const rs=rendererSrc.indexOf('function costPrice('),re=rendererSrc.indexOf('function range(',rs);
+assert(rs>=0&&re>rs,'Dedicated average cost formatter must exist');
+const avgCostFormat=new Function('pn',rendererSrc.slice(rs,re)+';return costPrice;')(v=>v==null||!Number.isFinite(Number(v))?null:Number(v));
+assert(avgCostFormat(66.5)==='66.50'&&avgCostFormat(66.594)==='66.59','Do not round weighted holding costs to tradable price ticks');
 console.log('PASS: 台玻 10/08 swing cost remains 66.5 despite 10/14 and 10/19 daytrades');
 
 console.log('broker-comparable net liquidation PnL regression test PASS');
