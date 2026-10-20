@@ -274,6 +274,35 @@
     // conclusion hero to avoid repeating the same action twice.
     const originalHero=view==='close'&&!ignite?'':`<div class="isd-hero"><div><span class="isd-badge">${esc(stage)}</span><h2>${esc(action)}</h2><p>${esc(desc)}</p></div><div class="isd-light ${tone}">${esc(lt)}</div></div>`;
     box.title.textContent=`${d.code||shard.code} ${d.name||e?.name||''}`.trim();
+    if(view==='close'&&!ignite&&path){
+      const why=[...new Set([...(d.why_now||[]),...(e?.stage_signals||[])].filter(Boolean))];
+      const blockers=[...new Set((d.blockers||[]).filter(Boolean))];
+      const upgrades=[...new Set((d.upgrade_conditions||[]).filter(Boolean))];
+      const risks=[...new Set([...(d.risk_flags||[]),...(e?.stage_risks||[]),...(e?.overheat_reasons||[])].filter(Boolean))];
+      const study=(heading,values,fallback)=>`<div class="inuko-research-section"><h4>${esc(heading)}</h4>${tags(values,fallback)}</div>`;
+      box.body.innerHTML=`<div class="inuko-decision-layout" data-inuko-decision-layout>
+        <div class="isd-context">盤後波段｜${esc(routeDate)} · ${esc(rank)}</div>
+        ${swingThreeQ}
+        <div class="isd-score">${scoreTile(ms,mv)}${scoreTile('進場位置',fmt(d.scores?.entry_position_score))}${scoreTile('資料信心',`${fmt(d.data_confidence,0)}%`)}</div>
+        ${pathHtml}
+        <details class="inuko-dossier" data-inuko-research><summary>研究依據｜理由、卡點與風險</summary><div>
+          ${study('入選理由',why,'尚無新的入選理由')}
+          ${study('目前卡點',blockers,'未發現額外卡點')}
+          ${study('升級所需證據',upgrades,'尚無其他升級條件')}
+          ${study('其他風險訊號',risks,'未發現額外風險旗標')}
+          <p class="inuko-dossier-note">詳細條件供研究；最終操作以上方「明日決策」與同日收盤判斷為準。</p>
+        </div></details>
+        <details class="inuko-dossier" data-inuko-technical><summary>完整技術・籌碼與評分</summary><div>
+          ${evidenceHtml(e,view)}
+          ${explainHtml(d,e,view)}
+        </div></details>
+        <details class="inuko-dossier" data-inuko-provenance><summary>資料日期與品質驗證</summary><div>
+          ${freshnessHtml(shard,d,e,m)}
+          ${qualityHtml(shard,d,m)}
+        </div></details>
+      </div>`;
+      return;
+    }
     box.body.innerHTML=`<div class="isd-context">${esc(context)}詳情 · ${esc(ignite?(d.ignition_stage||'—'):(d.opportunity_bucket||'—'))} · ${esc(rank)}</div>
       ${swingThreeQ}${originalHero}
       <div class="isd-score">${scoreTile(ms,mv)}${scoreTile('進場位置',fmt(d.scores?.entry_position_score))}${scoreTile(ignite?'點火信心':'資料信心',`${fmt(ignite?d.ignition_confidence:d.data_confidence,0)}%`)}</div>
