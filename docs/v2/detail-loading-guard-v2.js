@@ -268,9 +268,14 @@
       plan:singlePlan
     });
     const pathHtml=path&&window.InukoSwingPath?.detailHtml?.(path)||'';
+    const swingThreeQ=view==='close'&&!ignite&&path
+      ?window.InukoSwingPath?.threeQuestionHtml?.(path)||'':'';
+    // Only the close/swing route gets the 3Q summary. Suppress its old
+    // conclusion hero to avoid repeating the same action twice.
+    const originalHero=view==='close'&&!ignite?'':`<div class="isd-hero"><div><span class="isd-badge">${esc(stage)}</span><h2>${esc(action)}</h2><p>${esc(desc)}</p></div><div class="isd-light ${tone}">${esc(lt)}</div></div>`;
     box.title.textContent=`${d.code||shard.code} ${d.name||e?.name||''}`.trim();
     box.body.innerHTML=`<div class="isd-context">${esc(context)}詳情 · ${esc(ignite?(d.ignition_stage||'—'):(d.opportunity_bucket||'—'))} · ${esc(rank)}</div>
-      <div class="isd-hero"><div><span class="isd-badge">${esc(stage)}</span><h2>${esc(action)}</h2><p>${esc(desc)}</p></div><div class="isd-light ${tone}">${esc(lt)}</div></div>
+      ${swingThreeQ}${originalHero}
       <div class="isd-score">${scoreTile(ms,mv)}${scoreTile('進場位置',fmt(d.scores?.entry_position_score))}${scoreTile(ignite?'點火信心':'資料信心',`${fmt(ignite?d.ignition_confidence:d.data_confidence,0)}%`)}</div>
       ${freshnessHtml(shard,d,e,m)}
       ${pathHtml}

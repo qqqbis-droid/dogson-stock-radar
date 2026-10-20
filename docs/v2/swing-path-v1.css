@@ -56,3 +56,18 @@
 .swing-facts>div>span{display:flex;flex-direction:column;gap:4px;border-radius:8px;background:var(--soft);padding:8px;min-width:0}
 .swing-facts strong{font-size:.9rem;overflow-wrap:anywhere}.swing-facts span small{font-size:.65rem;color:var(--muted)}
 @media(max-width:510px){.swing-facts>div{grid-template-columns:repeat(2,minmax(0,1fr))}}
+ 
+/* INUKO three questions: own trade workflow, no clone of outside S/R cards. */
+.inuko-threeq{border:1px solid var(--line);border-radius:16px;padding:12px;background:var(--card);margin:7px 0 12px}
+.inuko-threeq>header{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px}
+.inuko-threeq>header b{font-size:1rem}.inuko-threeq>header small,.inuko-threeq footer{font-size:.68rem;color:var(--muted);line-height:1.55}
+.inuko-threeq-list{display:grid;gap:8px}
+.inuko-threeq-item{display:grid;grid-template-columns:32px minmax(0,1fr);gap:10px;align-items:start;border:1px solid var(--line);border-radius:12px;padding:11px;background:var(--soft);border-left:4px solid #8c9590}
+.inuko-threeq-item.ready{border-left-color:#1f5a46}
+.inuko-threeq-item.wait{border-left-color:#d39a2c}
+.inuko-threeq-item.blocked{border-left-color:#b42318}
+.inuko-threeq-index{font-weight:900;font-size:.78rem;color:var(--muted);padding-top:2px}
+.inuko-threeq-item small{display:block;color:var(--muted);font-size:.7rem;margin-bottom:5px}
+.inuko-threeq-item strong{display:block;font-size:.94rem;line-height:1.45;overflow-wrap:anywhere}
+.inuko-threeq-item p{margin:5px 0 0;font-size:.74rem;line-height:1.6;overflow-wrap:anywhere}
+.inuko-threeq footer{display:block;margin-top:10px}

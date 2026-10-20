@@ -165,7 +165,41 @@ function evaluate(shard,{expectedBuild='',expectedDate='',plan=null,view='close'
   {name:'回測承接',value:openSky?'原平台／S1 待驗':resistance?'R1 角色轉換待確認':'不可推估',state:'future',hint:openSky?'回踩支撐、量價與大盤相對強弱確認後才能考慮布局':'突破後回測守住才可升級；未自動判定'},
   {name:openSky?'後續觀察｜上方':'後續觀察｜R2',value:openSky?'尚無有效歷史壓力':extension?fmtRange(extension):'待補，不預測',state:extension?'future':'missing',hint:openSky?'不得把缺少 R1 解讀成無上漲阻力或預設目標價':extension?'須重新驗證，不當目標價':'沒有同日 R2 證據'}
  ];
- return {date,build,quote,confidence,known,sourceGood,support,resistance,extension,lens,zoneDiagnostics,facts,h60ok,h60valid,chipSame,phase,kind,action,next,invalidation,steps,view,checks,promotionReady};
+ const path={date,build,quote,confidence,known,sourceGood,support,resistance,extension,lens,zoneDiagnostics,facts,h60ok,h60valid,chipSame,phase,kind,action,next,invalidation,steps,view,checks,promotionReady};
+ // Decision ownership stays with InukoCloseOps.classify; this is only its
+ // three-question presentation, never a second trade/score engine.
+ path.threeQ=threeQuestionModel(path,plan);
+ return path;
+}
+function threeQuestionModel(p,plan){
+ const type=String(plan?.type||'');
+ const valid=Boolean(p?.known&&plan?.sessionOK===true);
+ let lane='PENDING',label='資料待補';
+ if(valid){
+   if(type==='NO_CHASE'){lane='BLOCKED';label='暫不進場'}
+   else if(type==='VERIFY'||type==='PARTIAL'){lane='PENDING';label='資料待補'}
+   else if(type==='LAYOUT'&&plan.ready===true&&p.sourceGood){lane='READY';label='布局優先・待觸發'}
+   else if(['LAYOUT','BREAKOUT','WATCH'].includes(type)&&p.sourceGood){lane='WAIT';label='等待觸發'}
+ }
+ const reason=valid&&plan?.note?String(plan.note):'需要同日、同版本、同交易日的決策與價區資料；尚不能開新倉。';
+ return {lane,label,reason,watch:p?.next||'關鍵價格待驗',
+   gate:p?.action||'資料核對完成前，先觀察不下單',
+   fail:p?.invalidation||'結構失效條件待核對',
+   date:p?.date||'',sourceGood:Boolean(p?.sourceGood)};
+}
+function threeQuestionHtml(p){
+ if(!p)return '';
+ const t=p.threeQ||threeQuestionModel(p,null);
+ return '<section class="inuko-threeq isd-section" data-inuko-threeq aria-label="犬子三問決策摘要">'
+  +'<header><b>🦴 犬子三問</b><small>先看結論，再核對證據</small></header>'
+  +'<div class="inuko-threeq-list">'
+  +'<div class="inuko-threeq-item '+esc(t.lane.toLowerCase())+'"><span class="inuko-threeq-index">01</span>'
+  +'<div><small>現在值得出手嗎？</small><strong>'+esc(t.label)+'</strong><p>'+esc(t.reason)+'</p></div></div>'
+  +'<div class="inuko-threeq-item"><span class="inuko-threeq-index">02</span>'
+  +'<div><small>明天要盯哪個訊號？</small><strong>'+esc(t.watch)+'</strong><p>'+esc(t.gate)+'</p></div></div>'
+  +'<div class="inuko-threeq-item"><span class="inuko-threeq-index">03</span>'
+  +'<div><small>如果看錯，什麼情況重評？</small><strong>結構失效要有確認</strong><p>'+esc(t.fail)+'</p></div></div>'
+  +'</div><footer>盤後資料 '+esc(t.date||'待核對')+' · 隔日需重新核對量價、大盤與籌碼；不是自動買賣指令。</footer></section>';
 }
 function compactHtml(p){
  if(!p)return '';
@@ -216,5 +250,5 @@ function detailHtml(p){
   +'。模型生成價區不是直接交易指令；缺失價區不補猜。</p></details>'
   +'</section>';
 }
-window.InukoSwingPath={version:'1.0',evaluate,compactHtml,detailHtml,zoneEvidence};
+window.InukoSwingPath={version:'1.0',evaluate,compactHtml,detailHtml,threeQuestionHtml,threeQuestionModel,zoneEvidence};
 })();
