@@ -286,27 +286,32 @@
       const dayChange=trustedClose&&num(d.quote?.day_change_pct)!=null
         ?(Number(d.quote.day_change_pct)>0?'+':'')+fmt(d.quote.day_change_pct,2)+'%':'—';
       const changeTone=trustedClose&&Number(d.quote.day_change_pct)>0?'rise':trustedClose&&Number(d.quote.day_change_pct)<0?'fall':'';
-      box.body.innerHTML=`<div class="inuko-decision-layout inuko-research-board" data-inuko-decision-layout>
+      box.body.innerHTML=`<div class="inuko-decision-layout inuko-research-board inuko-detail-v4" data-inuko-decision-layout>
         <div class="inuko-research-mast">
-          <div class="inuko-research-kicker">INUKO RESEARCH <span>／盤後波段 · ${esc(routeDate)}</span></div>
-          <div class="inuko-research-mast-row"><div><small>研究標的</small><h2>${esc(d.code||shard.code)} ${esc(d.name||e?.name||'')}</h2><p>${esc(rank)} · ${esc(sectorDisplayFromDetail(d,e))}</p></div>
-          <div class="inuko-research-quote"><small>收盤價</small><strong>${esc(closing)}</strong><span class="${changeTone}">${esc(dayChange)}</span></div></div>
+          <div class="inuko-research-kicker"><b>盤後研究</b><span>資料日 ${esc(routeDate||'待核對')}</span></div>
+          <div class="inuko-research-mast-row">
+            <div class="inuko-research-quote"><small>收盤價</small><strong>${esc(closing)}</strong><span class="${changeTone}">${esc(dayChange)}</span></div>
+            <div class="inuko-research-byline">${esc(rank)}<span>${esc(sectorDisplayFromDetail(d,e))}</span></div>
+          </div>
         </div>
         ${swingThreeQ}
         <div class="isd-score inuko-research-metrics">${scoreTile(ms,mv)}${scoreTile('進場位置',fmt(d.scores?.entry_position_score))}${scoreTile('資料信心',`${fmt(d.data_confidence,0)}%`)}</div>
         ${pathHtml}
-        <details class="inuko-dossier" data-inuko-research><summary>研究依據｜理由、卡點與風險</summary><div>
+        <div class="inuko-research-index"><span>深入研究</span><small>點選分類展開</small></div>
+        <details class="inuko-dossier" data-inuko-research><summary><span class="inuko-accordion-num">01</span><span>交易理由與風險<small>入選、卡點與失效條件</small></span></summary><div>
+          ${window.InukoSwingPath?.researchEvidenceHtml?.(path)||''}
           ${study('入選理由',why,'尚無新的入選理由')}
           ${study('目前卡點',blockers,'未發現額外卡點')}
           ${study('升級所需證據',upgrades,'尚無其他升級條件')}
           ${study('其他風險訊號',risks,'未發現額外風險旗標')}
           <p class="inuko-dossier-note">詳細條件供研究；最終操作以上方「明日決策」與同日收盤判斷為準。</p>
         </div></details>
-        <details class="inuko-dossier" data-inuko-technical><summary>完整技術・籌碼與評分</summary><div>
+        <details class="inuko-dossier" data-inuko-technical><summary><span class="inuko-accordion-num">02</span><span>技術、籌碼與評分<small>60分K、指標及分數明細</small></span></summary><div>
+          <div class="inuko-hourly60-slot" data-hourly60-slot></div>
           ${evidenceHtml(e,view)}
           ${explainHtml(d,e,view)}
         </div></details>
-        <details class="inuko-dossier" data-inuko-provenance><summary>資料日期與品質驗證</summary><div>
+        <details class="inuko-dossier" data-inuko-provenance><summary><span class="inuko-accordion-num">03</span><span>資料品質與來源<small>更新時間、資料完整度及診斷</small></span></summary><div>
           ${freshnessHtml(shard,d,e,m)}
           ${qualityHtml(shard,d,m)}
         </div></details>

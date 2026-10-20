@@ -1,0 +1,230 @@
+/* INUKO finished research interior v4. One visual grammar for the stock modal.
+   S/R evidence, technical indicators and all trading rules remain owned by JS. */
+#detailDialog:has(.inuko-detail-v4) .dialog-head{
+  background:var(--card);border-bottom:1px solid var(--line);
+}
+#detailDialog:has(.inuko-detail-v4) #detailBody{
+  padding:16px 17px calc(22px + env(safe-area-inset-bottom));
+  background:var(--card);
+}
+#detailBody .inuko-detail-v4{font-size:13px;line-height:1.5;color:var(--ink)}
+#detailBody .inuko-detail-v4 .inuko-research-mast{
+  border:0;padding:1px 0 14px;margin-bottom:0;border-bottom:1px solid var(--line);
+}
+#detailBody .inuko-detail-v4 .inuko-research-kicker{
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+  letter-spacing:.06em;font-size:11px;color:var(--green);
+}
+#detailBody .inuko-detail-v4 .inuko-research-kicker b{font-size:12px;font-weight:900}
+#detailBody .inuko-detail-v4 .inuko-research-kicker span{font-size:10px;letter-spacing:0;color:var(--muted)}
+#detailBody .inuko-detail-v4 .inuko-research-mast-row{
+  margin-top:9px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
+}
+#detailBody .inuko-detail-v4 .inuko-research-quote{
+  text-align:left;display:flex;gap:9px;align-items:baseline;flex-wrap:wrap;flex:0 1 auto;
+}
+#detailBody .inuko-detail-v4 .inuko-research-quote small{
+  flex:0 0 100%;font-size:10px;color:var(--muted);line-height:1.15;
+}
+#detailBody .inuko-detail-v4 .inuko-research-quote strong{
+  font-size:31px;line-height:1.1;letter-spacing:-.045em;white-space:nowrap;font-weight:900;
+}
+#detailBody .inuko-detail-v4 .inuko-research-quote span{
+  font-size:13px;font-weight:850;margin:0;white-space:nowrap;
+}
+#detailBody .inuko-detail-v4 .inuko-research-quote span.rise{color:var(--up)}
+#detailBody .inuko-detail-v4 .inuko-research-quote span.fall{color:var(--down)}
+#detailBody .inuko-detail-v4 .inuko-research-byline{
+  display:flex;flex-direction:column;gap:3px;
+  font-size:10px;color:var(--muted);line-height:1.35;text-align:right;
+}
+#detailBody .inuko-detail-v4 .inuko-research-byline span{font-size:10px;color:var(--muted)}
+#detailBody .inuko-detail-v4 .inuko-threeq{
+  background:none;border:0;border-bottom:1px solid var(--line);
+  border-radius:0;padding:15px 0 14px;margin:0;
+}
+#detailBody .inuko-detail-v4 .inuko-decision-header{
+  display:flex;justify-content:space-between;gap:9px;align-items:center;
+}
+#detailBody .inuko-detail-v4 .inuko-section-overline{
+  font-size:12px;color:var(--ink);font-weight:900;
+}
+#detailBody .inuko-detail-v4 .inuko-decision-verdict{
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--soft);border-radius:999px;padding:4px 10px;
+  font-size:12px;line-height:1.3;font-weight:850;color:var(--muted);
+}
+#detailBody .inuko-detail-v4 .inuko-decision-verdict.ready{color:var(--green);background:color-mix(in srgb,var(--green) 9%,var(--card))}
+#detailBody .inuko-detail-v4 .inuko-decision-verdict.wait,
+#detailBody .inuko-detail-v4 .inuko-decision-verdict.blocked{color:var(--amber);background:color-mix(in srgb,var(--amber) 9%,var(--card))}
+#detailBody .inuko-detail-v4 .inuko-decision-verdict.pending{color:var(--muted)}
+#detailBody .inuko-detail-v4 .inuko-decision-summary{
+  font-size:12px;line-height:1.55;margin:9px 0 13px;color:var(--muted);
+}
+#detailBody .inuko-detail-v4 .inuko-decision-conditions{
+  display:grid;gap:0;padding:3px 11px;background:var(--soft);border-radius:12px;
+}
+#detailBody .inuko-detail-v4 .inuko-decision-item{
+  display:grid;grid-template-columns:76px minmax(0,1fr);
+  gap:2px 9px;padding:10px 0;
+}
+#detailBody .inuko-detail-v4 .inuko-decision-item+.inuko-decision-item{border-top:1px solid var(--line)}
+#detailBody .inuko-detail-v4 .inuko-decision-key{
+  color:var(--muted);font-size:11px;font-weight:750;grid-row:1/3;
+  padding-top:2px;line-height:1.45;
+}
+#detailBody .inuko-detail-v4 .inuko-decision-item b{
+  font-size:13px;line-height:1.4;overflow-wrap:anywhere;color:var(--ink);
+}
+#detailBody .inuko-detail-v4 .inuko-decision-item p{
+  margin:2px 0 0;font-size:11px;line-height:1.5;color:var(--muted);
+  overflow-wrap:anywhere;
+}
+#detailBody .inuko-detail-v4 .inuko-threeq footer{
+  display:block;margin:8px 0 0;font-size:10px;color:var(--muted);line-height:1.5;
+}
+#detailBody .inuko-detail-v4 .isd-score.inuko-research-metrics{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;
+  margin:0;padding:12px 0 14px;border:0;border-bottom:1px solid var(--line);
+}
+#detailBody .inuko-detail-v4 .isd-score.inuko-research-metrics>div{
+  border:0;border-radius:0;background:none;min-width:0;padding:0 9px 0 0;
+  text-align:left;
+}
+#detailBody .inuko-detail-v4 .isd-score.inuko-research-metrics>div+div{padding-left:11px}
+#detailBody .inuko-detail-v4 .isd-score.inuko-research-metrics>div:not(:last-child){border-right:1px solid var(--line)}
+#detailBody .inuko-detail-v4 .isd-score.inuko-research-metrics span{font-size:10px;color:var(--muted);white-space:normal;line-height:1.35}
+#detailBody .inuko-detail-v4 .isd-score.inuko-research-metrics b{font-size:17px;margin:4px 0 0;color:var(--ink);line-height:1.2}
+#detailBody .inuko-detail-v4 .swing-path-detail{
+  border:0;border-radius:0;background:none;margin:0;padding:15px 0 16px;
+}
+#detailBody .inuko-detail-v4 .swing-path-detail>header{
+  display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:0 0 10px;
+}
+#detailBody .inuko-detail-v4 .swing-path-detail>header h3{font-size:13px;margin:0;font-weight:900}
+#detailBody .inuko-detail-v4 .inuko-date{font-size:10px;color:var(--muted);letter-spacing:.08em}
+#detailBody .inuko-detail-v4 .inuko-levels{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:0;
+}
+#detailBody .inuko-detail-v4 .inuko-level{
+  background:var(--soft);border:0;border-radius:12px;padding:12px 11px;min-width:0;
+}
+#detailBody .inuko-detail-v4 .inuko-level:first-child{box-shadow:inset 3px 0 var(--green)}
+#detailBody .inuko-detail-v4 .inuko-level:last-child{box-shadow:inset 3px 0 var(--amber)}
+#detailBody .inuko-detail-v4 .inuko-level span{font-size:10px;color:var(--muted)}
+#detailBody .inuko-detail-v4 .inuko-level strong{
+  display:block;margin:4px 0 3px;font-size:16px;line-height:1.3;
+  font-variant-numeric:tabular-nums;overflow-wrap:anywhere;
+}
+#detailBody .inuko-detail-v4 .inuko-level:first-child strong{color:var(--green)}
+#detailBody .inuko-detail-v4 .inuko-level:last-child strong{color:var(--amber)}
+#detailBody .inuko-detail-v4 .inuko-level small{font-size:10px;line-height:1.4;color:var(--muted)}
+#detailBody .inuko-detail-v4 .inuko-range-note{
+  margin:9px 0 0;font-size:10px;line-height:1.45;color:var(--amber);
+}
+#detailBody .inuko-detail-v4 .swing-location{
+  padding:11px 0 5px;margin:0;border:0;background:none;
+}
+#detailBody .inuko-detail-v4 .swing-location-head,
+#detailBody .inuko-detail-v4 .swing-location-caption{font-size:10px;color:var(--muted)}
+#detailBody .inuko-detail-v4 .swing-location-track{margin:12px 7px;height:7px}
+#detailBody .inuko-detail-v4 .swing-location-track i{width:15px;height:15px}
+#detailBody .inuko-detail-v4 .swing-facts{
+  border:0;border-top:1px solid var(--line);padding:10px 0 2px;margin:8px 0 0;
+}
+#detailBody .inuko-detail-v4 .swing-facts>b{font-size:12px}
+#detailBody .inuko-detail-v4 .swing-facts>b small{font-size:10px;color:var(--muted);font-weight:500}
+#detailBody .inuko-detail-v4 .swing-facts>div{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin:8px 0 0;
+}
+#detailBody .inuko-detail-v4 .swing-facts>div>span{
+  background:none;border-radius:0;min-width:0;padding:2px 10px 2px 0;
+}
+#detailBody .inuko-detail-v4 .swing-facts>div>span+span{border-left:1px solid var(--line);padding-left:10px}
+#detailBody .inuko-detail-v4 .swing-facts small{font-size:10px;color:var(--muted)}
+#detailBody .inuko-detail-v4 .swing-facts strong{font-size:13px;line-height:1.35}
+#detailBody .inuko-detail-v4 .inuko-research-index{
+  display:flex;align-items:baseline;justify-content:space-between;
+  border-top:1px solid var(--line);padding:14px 0 8px;
+}
+#detailBody .inuko-detail-v4 .inuko-research-index span{font-weight:900;font-size:13px}
+#detailBody .inuko-detail-v4 .inuko-research-index small{font-size:10px;color:var(--muted)}
+#detailBody .inuko-detail-v4 .inuko-dossier{
+  border:1px solid var(--line);border-radius:12px;background:var(--card);
+  margin:0 0 9px;overflow:hidden;box-shadow:none;
+}
+#detailBody .inuko-detail-v4 .inuko-dossier>summary{
+  display:flex;align-items:center;gap:12px;padding:13px 12px;
+  list-style:none;cursor:pointer;color:var(--ink);font-weight:800;
+  font-size:13px;line-height:1.45;
+}
+#detailBody .inuko-detail-v4 .inuko-dossier>summary::-webkit-details-marker{display:none}
+#detailBody .inuko-detail-v4 .inuko-dossier>summary:after{
+  content:'+';margin-left:auto;color:var(--green);
+  font-size:18px;font-weight:550;line-height:1;
+}
+#detailBody .inuko-detail-v4 .inuko-dossier[open]>summary:after{content:'−'}
+#detailBody .inuko-detail-v4 .inuko-dossier>summary>span:nth-child(2){flex:1;min-width:0}
+#detailBody .inuko-detail-v4 .inuko-dossier>summary small{
+  display:block;font-size:10px;line-height:1.4;margin-top:2px;
+  color:var(--muted);font-weight:500;
+}
+#detailBody .inuko-detail-v4 .inuko-accordion-num{
+  color:var(--green);font-size:12px;font-weight:900;line-height:1.3;align-self:flex-start;padding-top:2px;
+}
+#detailBody .inuko-detail-v4 .inuko-dossier>div{
+  padding:0 12px 13px;border-top:1px solid var(--line);
+}
+#detailBody .inuko-detail-v4 .inuko-research-section{
+  padding:10px 0;border-top:1px solid var(--line);margin:0;
+}
+#detailBody .inuko-detail-v4 .inuko-research-section:first-child{border-top:0}
+#detailBody .inuko-detail-v4 .inuko-research-section h4{
+  font-size:12px;line-height:1.4;margin:2px 0 8px;font-weight:850;
+}
+#detailBody .inuko-detail-v4 .isd-tags{gap:6px}
+#detailBody .inuko-detail-v4 .isd-tags span{
+  font-size:11px;line-height:1.42;padding:5px 7px;
+  border-radius:7px;background:var(--soft);
+}
+#detailBody .inuko-detail-v4 .inuko-research-proof{margin:12px 0 7px}
+#detailBody .inuko-detail-v4 .swing-path-checks,
+#detailBody .inuko-detail-v4 .swing-path-sources{
+  background:var(--soft);border:1px solid var(--line);border-radius:10px;margin:8px 0;
+}
+#detailBody .inuko-detail-v4 .swing-path-checks>summary,
+#detailBody .inuko-detail-v4 .swing-path-sources>summary{
+  padding:11px 12px;font-size:11px;line-height:1.4;font-weight:850;
+}
+#detailBody .inuko-detail-v4 .swing-path-sources-grid{gap:8px}
+#detailBody .inuko-detail-v4 .swing-source-card{
+  border:0;border-top:1px solid var(--line);border-radius:0;
+  padding:11px 0;background:none;
+}
+#detailBody .inuko-detail-v4 .inuko-dossier .h60-v2{
+  margin:11px 0 12px;border:1px solid var(--line);border-radius:12px;
+  box-shadow:none;background:var(--card);
+}
+#detailBody .inuko-detail-v4 .h60-v2-head{padding:11px 10px}
+#detailBody .inuko-detail-v4 .h60-v2-main{padding:10px}
+#detailBody .inuko-detail-v4 .h60-v2-grid{gap:7px;padding:0 10px 10px}
+#detailBody .inuko-detail-v4 .h60-v2-grid>div{padding:8px}
+#detailBody .inuko-detail-v4 .h60-v2-note{margin:0 10px 10px}
+#detailBody .inuko-detail-v4 .isd-grid{gap:7px}
+#detailBody .inuko-detail-v4 .isd-grid>div{border:0;border-radius:9px;background:var(--soft);padding:9px}
+#detailBody .inuko-detail-v4 .isd-explain{
+  border:1px solid var(--line);background:var(--card);margin:12px 0 0;
+}
+#detailBody .inuko-detail-v4 .isd-explain>summary{font-size:12px}
+#detailBody .inuko-detail-v4 .isd-quality{border:0;padding:10px 0;background:none}
+#detailBody .inuko-detail-v4 .isd-fresh-strip{margin:12px 0 2px}
+@media(max-width:430px){
+  #detailDialog:has(.inuko-detail-v4) #detailBody{padding:14px 13px calc(20px + env(safe-area-inset-bottom))}
+  #detailBody .inuko-detail-v4 .inuko-research-quote strong{font-size:28px}
+  #detailBody .inuko-detail-v4 .inuko-research-mast-row{gap:8px}
+  #detailBody .inuko-detail-v4 .inuko-research-byline{font-size:10px}
+  #detailBody .inuko-detail-v4 .inuko-decision-item{grid-template-columns:66px minmax(0,1fr);gap:2px 7px}
+  #detailBody .inuko-detail-v4 .inuko-level{padding:10px 9px}
+  #detailBody .inuko-detail-v4 .inuko-level strong{font-size:14px}
+  #detailBody .inuko-detail-v4 .swing-facts>div{grid-template-columns:repeat(2,minmax(0,1fr))}
+}

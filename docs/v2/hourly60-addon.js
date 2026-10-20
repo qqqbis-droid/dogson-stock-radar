@@ -159,6 +159,8 @@
   function insert(html){
     const body=document.getElementById('detailBody');
     if(!body||body.querySelector('[data-hourly60-v2]'))return;
+    const slot=body.querySelector('.inuko-detail-v4 [data-hourly60-slot]');
+    if(slot){slot.insertAdjacentHTML('beforeend',html);return;}
     const blocks=[...body.querySelectorAll('.detail-block')];
     const target=blocks.find(b=>/技術|籌碼|即時執行證據|即時量價/.test(b.querySelector('h3')?.textContent||''));
     if(target)target.insertAdjacentHTML('beforebegin',html);

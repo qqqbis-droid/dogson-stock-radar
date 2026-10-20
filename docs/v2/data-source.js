@@ -60,7 +60,7 @@
   // separate evidence layers. The detail add-on can fall back to the canonical
   // root hourly Engine so UI-only data preservation can never hide the 60K card.
   const h60=document.createElement("script");
-  h60.src=`./hourly60-addon.js?v=20261002h60b`;
+  h60.src=`./hourly60-addon.js?v=20261020inside4`;
   h60.defer=true;
   document.head.appendChild(h60);
 

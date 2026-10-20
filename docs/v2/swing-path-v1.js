@@ -8,6 +8,9 @@ const day=v=>String(v||'').slice(0,10);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 const price=v=>n(v)==null?'—':Number(v).toLocaleString('zh-TW',{maximumFractionDigits:Math.abs(Number(v))<10?2:Math.abs(Number(v))<100?2:Math.abs(Number(v))<1000?1:0});
 const fmtRange=z=>!z?'待補（不推估）':n(z.low)===n(z.high)?price(z.low):price(z.low)+'～'+price(z.high);
+const tick=v=>v<10?.01:v<50?.05:v<100?.1:v<500?.5:v<1000?1:5;
+const tickEdge=(v,dir)=>{const x=n(v);if(x==null||x<=0)return'—';const t=tick(x),q=dir==='low'?Math.floor((x+1e-9)/t):Math.ceil((x-1e-9)/t);return price(q*t)};
+const displayedRange=z=>!z?'待補（不推估）':tickEdge(z.low,'low')+'～'+tickEdge(z.high,'high');
 const RISK=new Set(['EXIT_PRIORITY','REDUCE_WATCH','DO_NOT_CHASE','DATA_STALE']);
 const STALE=new Set(['INVALID','STALE','SUPERSEDED']);
 const FRESH=new Set(['FRESH','FROZEN']);
@@ -176,14 +179,16 @@ function threeQuestionModel(p,plan){
  const valid=Boolean(p?.known&&plan?.sessionOK===true);
  let lane='PENDING',label='資料待補';
  if(valid){
-   if(type==='NO_CHASE'){lane='BLOCKED';label='暫不進場'}
+   if(type==='NO_CHASE'){lane='BLOCKED';label='先不追價'}
    else if(type==='VERIFY'||type==='PARTIAL'){lane='PENDING';label='資料待補'}
    else if(type==='LAYOUT'&&plan.ready===true&&p.sourceGood){lane='READY';label='布局優先・待觸發'}
    else if(['LAYOUT','BREAKOUT','WATCH'].includes(type)&&p.sourceGood){lane='WAIT';label='等待觸發'}
  }
  const fullReason=valid&&plan?.note?String(plan.note):'需要同日同版本的證據；目前不可開新倉。';
  const reason=fullReason.split(/[。；]/)[0].trim()||fullReason;
- return {lane,label,reason,watch:p?.next||'關鍵價格待驗',
+ if(valid&&plan?.label)label=String(plan.label);
+ const watch=p?.resistance&&String(p?.next||'').startsWith('R1 ')?'R1 '+displayedRange(p.resistance):(p?.next||'關鍵價格待驗');
+ return {lane,label,reason,watch,
    gate:p?.action||'資料核對完成前，先觀察不下單',
    fail:p?.invalidation||'結構失效條件待核對',
    date:p?.date||'',sourceGood:Boolean(p?.sourceGood)};
@@ -191,16 +196,14 @@ function threeQuestionModel(p,plan){
 function threeQuestionHtml(p){
  if(!p)return '';
  const t=p.threeQ||threeQuestionModel(p,null);
- return '<section class="inuko-threeq isd-section" data-inuko-threeq aria-label="犬子三問決策摘要">'
-  +'<header><b>明日決策</b><small>01 / PLAN</small></header>'
-  +'<div class="inuko-threeq-list">'
-  +'<div class="inuko-threeq-item '+esc(t.lane.toLowerCase())+'"><span class="inuko-threeq-index">01</span>'
-  +'<div><small>01｜現在值得出手嗎？</small><strong>'+esc(t.label)+'</strong><p>'+esc(t.reason)+'</p></div></div>'
-  +'<div class="inuko-threeq-item"><span class="inuko-threeq-index">02</span>'
-  +'<div><small>02｜明天要盯哪個訊號？</small><strong>'+esc(t.watch)+'</strong><p>'+esc(t.gate)+'</p></div></div>'
-  +'<div class="inuko-threeq-item"><span class="inuko-threeq-index">03</span>'
-  +'<div><small>03｜看錯時怎麼辦？</small><strong>有效跌破才重新評估</strong><p>'+esc(t.fail)+'</p></div></div>'
-  +'</div><footer>資料日 '+esc(t.date||'待核對')+'｜隔日確認量價與大盤；不是自動買賣指令。</footer></section>';
+ return '<section class="inuko-threeq isd-section" data-inuko-threeq aria-label="明日決策">'
+  +'<div class="inuko-decision-header"><span class="inuko-section-overline">明日決策</span>'
+  +'<strong class="inuko-decision-verdict '+esc(t.lane.toLowerCase())+'">'+esc(t.label)+'</strong></div>'
+  +'<p class="inuko-decision-summary">'+esc(t.reason)+'</p>'
+  +'<div class="inuko-decision-conditions">'
+  +'<div class="inuko-decision-item"><span class="inuko-decision-key">觀察關卡</span><b>'+esc(t.watch)+'</b><p>'+esc(t.gate)+'</p></div>'
+  +'<div class="inuko-decision-item"><span class="inuko-decision-key">失效確認</span><b>有效跌破後再評估</b><p>'+esc(t.fail)+'</p></div>'
+  +'</div><footer>資料日 '+esc(t.date||'待核對')+' · 隔日重新核對量價；不是自動買賣指令。</footer></section>';
 }
 function compactHtml(p){
  if(!p)return '';
@@ -230,33 +233,33 @@ function sourceCard(z,rank,quote){
 function detailHtml(p){
  if(!p)return '';
  const lens=p.lens;
- const level=(title,z,hint)=>'<div class="inuko-level"><span>'+esc(title)+'</span><strong>'+esc(fmtRange(z))+'</strong><small>'+esc(hint)+'</small></div>';
- const zones='<div class="inuko-levels">'
-  +level('S1｜防守',p.support,p.support?'有效跌破下緣才重評':'支撐資料待核對')
-  +level(p.resistance?'R1｜壓力':p.next?.includes('突破平台')?'前高｜回測':'R1｜待補',
-    p.resistance,p.resistance?'站穩後再核對回測':p.next?.includes('突破平台')?'只看已知平台，不猜目標':'缺少已驗證上方價區')
-  +'</div>';
- const positionHtml=lens
-  ?'<div class="swing-location"><div class="swing-location-head"><b>價格結構位置</b><span>'+esc(lens.position)+'｜'+lens.pct.toFixed(0)+'%</span></div>'
-   +'<div class="swing-location-track" role="img" aria-label="結構區間位置 '+lens.pct.toFixed(0)+'%"><i style="left:'+lens.pct.toFixed(1)+'%"></i></div>'
-   +'<div class="swing-location-caption"><span>'+esc(price(lens.low))+'</span><span>'+esc(price(lens.high))+'</span></div>'
-   +'<small>區間位置不等於買點；突破後仍須量價及回測確認。</small></div>'
-  :'<div class="swing-location pending"><b>價格位置待核對</b><small>缺少有效 S1／R1 時不補猜；符合條件的前高突破另看回測。</small></div>';
- const facts=p.facts?.length?'<div class="swing-facts"><b>當日訊號 <small>｜只列已確認事實</small></b><div>'
-  +p.facts.map(f=>'<span><small>'+esc(f.name)+'</small><strong>'+esc(f.value)+'</strong></span>').join('')
-  +'</div></div>':'';
+ const level=(name,z,hint)=>'<div class="inuko-level"><span>'+esc(name)+'</span><strong>'+esc(displayedRange(z))+'</strong><small>'+esc(hint)+'</small></div>';
+ const zones='<div class="inuko-levels">'+level('S1｜防守',p.support,p.support?'跌破仍須確認':'支撐待驗')
+  +level(p.resistance?'R1｜壓力':'R1｜待補',p.resistance,p.resistance?'突破後觀察回測':'不猜上方價區')+'</div>';
+ const position=lens?'<div class="swing-location"><div class="swing-location-head"><b>區間位置</b><span>'+esc(lens.position)+' · '+lens.pct.toFixed(0)+'%</span></div>'
+  +'<div class="swing-location-track" role="img" aria-label="區間位置 '+lens.pct.toFixed(0)+'%"><i style="left:'+lens.pct.toFixed(1)+'%"></i></div>'
+  +'<div class="swing-location-caption"><span>'+esc(price(lens.low))+'</span><span>'+esc(price(lens.high))+'</span></div></div>'
+  :'<div class="swing-location pending"><b>價格位置待核對</b><small>缺少有效 S1／R1，不推估。</small></div>';
+ const s=p.support,r=p.resistance;
+ const connected=s&&r&&n(s.high)!=null&&n(r.low)!=null&&n(tickEdge(s.high,'high'))>=n(tickEdge(r.low,'low'));
+ const overlap=connected?'<p class="inuko-range-note">'+esc(n(s.high)>=n(r.low)?'S1／R1 原始價區交疊；以量價確認為主。':'顯示價區向外取整後相接；來源明細保留原始數字。')+'</p>':'';
+ const facts=p.facts?.length?'<div class="swing-facts"><b>當日重點 <small>｜已核對數據</small></b><div>'
+  +p.facts.map(f=>'<span><small>'+esc(f.name)+'</small><strong>'+esc(f.value)+'</strong></span>').join('')+'</div></div>':'';
+ return '<section class="swing-path-detail isd-section" data-swing-path aria-label="價格結構與當日重點">'
+  +'<header><h3>價格結構</h3><span class="inuko-date">S1 / R1</span></header>'
+  +zones+overlap+position+facts+'</section>';
+}
+function researchEvidenceHtml(p){
+ if(!p)return '';
  const passed=p.checks.filter(c=>c.passed).length;
  const checks='<details class="swing-path-checks"><summary>突破與回測驗證｜'+passed+'/'+p.checks.length+' 項通過</summary><div>'
   +p.checks.map(c=>'<span class="'+(c.passed?'passed':'pending')+'">'+(c.passed?'✓ ':'○ ')+esc(c.name)+' · '+esc(c.desc)+'</span>').join('')
-  +'</div><small>'+esc(p.promotionReady?'已核對完整突破與回測證據，仍須確認即時盤面':'尚未取得完整突破＋回測雙確認，不能升級成已成立訊號')+'</small></details>';
- const sources='<details class="swing-path-sources"><summary>關卡來源與驗證狀態</summary><div class="swing-path-sources-grid">'
+  +'</div><small>'+esc(p.promotionReady?'完整突破與回測證據已核對，仍須確認即時盤面':'尚未取得完整突破＋回測雙確認，不能升級成已成立訊號')+'</small></details>';
+ const source='<details class="swing-path-sources"><summary>關卡來源與驗證狀態</summary><div class="swing-path-sources-grid">'
   +sourceCard(p.support,'S1',p.quote)+sourceCard(p.resistance,'R1',p.quote)+sourceCard(p.extension,'R2',p.quote)
-  +'</div><p class="swing-path-note">60分K：'+esc(p.h60valid?'同日可核對':'同日證據待補')
-  +'｜籌碼：'+esc(p.chipSame?'日期一致，方向仍需確認':'日期未同步')
-  +'。模型結構整理不是直接買賣價；無效價區不補猜。</p></details>';
- return '<section class="swing-path-detail isd-section" data-swing-path aria-label="價格結構與驗證">'
-  +'<header><h3>價格結構</h3><span class="inuko-date">'+esc(p.date||'資料日待核對')+'</span></header>'
-  +zones+positionHtml+facts+checks+sources+'</section>';
+  +'</div><p class="swing-path-note">60分K：'+esc(p.h60valid?'同日可核對':'同日待補')+'｜籌碼：'+esc(p.chipSame?'日期一致':'日期未同步')
+  +'。明細保留原始價位；模型整理不等於買賣價。</p></details>';
+ return '<div class="inuko-research-proof" data-inuko-research-proof>'+checks+source+'</div>';
 }
-window.InukoSwingPath={version:'1.0',evaluate,compactHtml,detailHtml,threeQuestionHtml,threeQuestionModel,zoneEvidence};
+window.InukoSwingPath={version:'1.0',evaluate,compactHtml,detailHtml,researchEvidenceHtml,threeQuestionHtml,threeQuestionModel,zoneEvidence};
 })();
