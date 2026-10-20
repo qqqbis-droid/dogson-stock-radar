@@ -150,7 +150,26 @@ assert.equal(researchVerification(null,date).mode,'unverified');
 assert(bridge.includes('researchAuditHtml(shard)'),'Close research must expose audit rows from the actual shard');
 assert(bridge.includes('逐項研究尚未產生'),'Legacy shards without the audit must fail closed, not show no risks');
 const {spawnSync}=require('node:child_process');
-const auditTest=spawnSync('python',['scripts/v2/test_research_audit.py'],{encoding:'utf8'});
+const auditProbe=String.raw`from scripts.v2.build_stock_shards import research_checks
+day='2026-10-20'
+d={'trade_date':day,'risk_overlays':[]}
+e={'chip_check_health':'PARTIAL','foreign_date':day,'foreign_net_latest':10791777,
+   'trust_date':day,'trust_net_latest':-922757,'sbl_date':day,'sbl_3down':True,
+   'margin_date':day,'margin_status':'正常','close':32.4,'ma20':31.66,
+   'rsi':57.77,'hourly60':None}
+r=research_checks(d,e,day)
+rows={x['key']:x for x in r['checks']}
+assert r['pending_count']==3, r
+assert rows['chip_sources']['status']=='pending'
+assert rows['hourly60']['status']=='pending'
+assert rows['restriction']['status']=='pending'
+assert rows['foreign']['status']=='observed'
+assert rows['trust']['status']=='observed'
+assert research_checks(d,None,None)['observed_count']==0
+assert research_checks({'trade_date':day,'risk_overlays':['TRADING_RESTRICTION']},e,day)['warning_count']==1
+print('research audit passed')
+`;
+const auditTest=spawnSync('python',['-c',auditProbe],{encoding:'utf8'});
 assert.equal(auditTest.status,0,'Shard research audit safety test failed: '+auditTest.stdout+' '+auditTest.stderr);
 assert(!js.includes('target_price'),'No hidden predicted target-price feed');
 console.log('PASS: swing path current build/date, price provenance, iPhone layout, no imaginary R2, breakout only pending retest');
