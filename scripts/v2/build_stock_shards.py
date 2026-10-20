@@ -152,6 +152,120 @@ def selected_zones(
     return filtered
 
 
+
+def research_checks(decision: dict[str, Any], evidence: Any, evidence_date: Any) -> dict[str, Any]:
+    """Publish evidence-specific audit, not new trade verdicts or fake risk flags.
+
+    Status observed means a data point was observed (possibly adverse), NOT a
+    pass. Unknown/missing inputs are explicitly pending; no blank-list safety claims.
+    """
+    e = evidence if isinstance(evidence, dict) else {}
+    trade_date = str(decision.get("trade_date") or "")[:10]
+    evidence_day = str(evidence_date or "")[:10]
+    rows = []
+
+    def add(key, label, status, description, source_date=""):
+        assert status in {"observed", "pending", "warning"}
+        rows.append({"key": key, "label": label, "status": status,
+                     "detail": str(description), "source_date": str(source_date or "")[:10]})
+
+    def checked_date(field):
+        value = str(e.get(field) or "")[:10]
+        return bool(trade_date and value == trade_date), value
+
+    def number(value):
+        try:
+            if isinstance(value, bool) or value is None or value == "":
+                return None
+            x = float(value)
+            return x if x == x and abs(x) != float("inf") else None
+        except (ValueError, TypeError):
+            return None
+
+    market_aligned = bool(trade_date and evidence_day == trade_date)
+    health = str(e.get("chip_check_health") or "UNKNOWN").upper()
+    dates_aligned = all(checked_date(k)[0] for k in
+                        ("foreign_date", "trust_date", "sbl_date", "margin_date"))
+    if health in {"OK", "HEALTHY", "PASS", "COMPLETE"} and dates_aligned:
+        add("chip_sources", "籌碼來源查核", "observed", "資料日期一致，來源健康狀態通過", trade_date)
+    elif health == "PARTIAL":
+        add("chip_sources", "籌碼來源查核", "pending",
+            "PARTIAL：資料日期可一致，但來源查核仍有未完成部分；須再核對原始來源", trade_date)
+    else:
+        add("chip_sources", "籌碼來源查核", "pending",
+            "來源狀態未知、未完成或資料日期不一致；不可視為全面通過", trade_date)
+
+    for key, title, datekey, netkey in (
+        ("foreign", "外資買賣方向", "foreign_date", "foreign_net_latest"),
+        ("trust", "投信買賣方向", "trust_date", "trust_net_latest"),
+    ):
+        good, source_date = checked_date(datekey)
+        v = number(e.get(netkey))
+        if good and v is not None:
+            direction = "淨買" if v > 0 else "淨賣" if v < 0 else "持平"
+            add(key, title, "observed", direction+"（未標示金額或張數單位；不推定主力動向）", source_date)
+        else:
+            add(key, title, "pending", "缺少同日有效法人淨買賣數據", source_date)
+
+    good, source_date = checked_date("sbl_date")
+    sbl = e.get("sbl_3down")
+    sbl_change = number(e.get("sbl_3change_pct"))
+    if good and isinstance(sbl, bool):
+        direction = "連三日減少" if sbl else "未符合連三日減少條件"
+        detail = direction + (f"；三日變動 {sbl_change:+.2f}%" if sbl_change is not None else "")
+        add("sbl", "借券趨勢", "observed", detail, source_date)
+    else:
+        add("sbl", "借券趨勢", "pending", "借券三日趨勢或日期未提供", source_date)
+
+    good, source_date = checked_date("margin_date")
+    margin = str(e.get("margin_status") or "").strip()
+    if good and margin:
+        add("margin", "融資狀態", "observed", "來源標記："+margin+"（不等同風險排除）", source_date)
+    else:
+        add("margin", "融資狀態", "pending", "缺少同日融資狀態標記", source_date)
+
+    h60 = e.get("hourly60")
+    h60 = h60 if isinstance(h60, dict) else {}
+    hday = str(h60.get("trade_date") or "")[:10]
+    hstatus = str(h60.get("data_status") or "").upper()
+    if market_aligned and hday == trade_date and hstatus in {"OK", "READY", "VALID"}:
+        light = str(h60.get("entry_light_label") or h60.get("entry_light") or "資料可用")
+        add("hourly60", "60分K結構", "observed",
+            "模組訊號："+light+"（不能當作交易許可）", hday)
+    else:
+        add("hourly60", "60分K結構", "pending",
+            "尚無同交易日可用的60分K輸出；不能推定均線交叉或進場燈號", hday)
+
+    px = number(e.get("close"))
+    ma20 = number(e.get("ma20"))
+    rsi = number(e.get("rsi"))
+    if market_aligned and px is not None and ma20 is not None and ma20 > 0 and rsi is not None:
+        add("technical", "日K技術狀態", "observed",
+            f"收盤 {px:g}，20MA {ma20:.2f}，RSI {rsi:.1f}；僅為量價事實",
+            evidence_day)
+    else:
+        add("technical", "日K技術狀態", "pending",
+            "缺少同日收盤價、20MA 或 RSI，無法完整對照", evidence_day)
+
+    overlays = set(str(x) for x in (decision.get("risk_overlays") or []))
+    if "TRADING_RESTRICTION" in overlays:
+        add("restriction", "交易限制", "warning", "既有模型標記交易限制；需核對交易所公告", trade_date)
+    else:
+        add("restriction", "交易限制", "pending",
+            "現有個股快照未包含可獨立核對的處置／注意股公告；不能判定沒有交易限制", trade_date)
+
+    return {
+        "version": "research-audit-v1",
+        "trade_date": trade_date,
+        "evidence_date": evidence_day,
+        "source_status": health,
+        "checks": rows,
+        "observed_count": sum(x["status"] == "observed" for x in rows),
+        "pending_count": sum(x["status"] == "pending" for x in rows),
+        "warning_count": sum(x["status"] == "warning" for x in rows),
+        "semantics": "觀測不等於通過；待補不等於安全；本清單不修改交易決策或分數",
+    }
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-root", default="docs/v2/data")
@@ -227,6 +341,8 @@ def main() -> None:
                 "zones": picked,
                 "evidence": evidence.get(code),
             }
+            if view == "close":
+                payload["research_checks"] = research_checks(decision, evidence.get(code), evidence_obj.get("trade_date"))
             encoded = (json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
             if len(encoded) > args.max_shard_bytes:
                 raise SystemExit(f"shard too large: {view}/{code}.json {len(encoded)} bytes")

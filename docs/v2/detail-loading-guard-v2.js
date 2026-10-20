@@ -257,6 +257,24 @@
       :dateText+'；來源尚未完整通過查核，不能以100%評分信心代替來源完整度。';
     return {mode,label,note,aligned,health};
   }
+  function researchAuditHtml(shard){
+    const audit=shard?.research_checks;
+    const checks=Array.isArray(audit?.checks)?audit.checks:[];
+    if(!checks.length)return '<div class="inuko-audit-unavailable"><b>逐項研究尚未產生</b><p>此批次未附上各項證據的查核結果；不以空清單推論沒有卡點或風險。</p></div>';
+    const observed=checks.filter(c=>c?.status==='observed').length;
+    const pending=checks.filter(c=>c?.status==='pending').length;
+    const warning=checks.filter(c=>c?.status==='warning').length;
+    const statusName=x=>x==='observed'?'已觀測':x==='warning'?'警示':'待補查';
+    return '<section class="inuko-research-audit" data-inuko-research-audit>'
+      +'<header><b>模型逐項查核</b><small>已觀測 '+observed+'｜待補 '+pending+'｜警示 '+warning+'</small></header>'
+      +'<p class="inuko-audit-explain">已觀測只表示取得證據，不等於通過或零風險。</p>'
+      +'<div class="inuko-audit-rows">'+checks.map(c=>{
+        const status=['observed','pending','warning'].includes(c.status)?c.status:'pending';
+        return '<div class="inuko-audit-row '+status+'"><div class="inuko-audit-row-head"><b>'+esc(c.label)+'</b><span>'+statusName(status)+'</span></div>'
+          +'<p>'+esc(c.detail)+'</p>'+(c.source_date?'<small>證據日期 '+esc(c.source_date)+'</small>':'')+'</div>';
+      }).join('')+'</div>'
+      +'<footer>'+esc(audit.semantics||'待補與已觀測為不同狀態，不能互相替代')+'</footer></section>';
+  }
   function sectorDisplayFromDetail(d,e){return d.primary_group||e?.primary_group||d.industry||e?.industry||'產業待補';}
   function render(shard,view,box,m){
     const d=shard.decision||{},e=shard.evidence||null,zones=Array.isArray(shard.zones)?shard.zones:[];
@@ -317,6 +335,7 @@
         <div class="inuko-research-index"><span>深入研究</span><small>點選分類展開</small></div>
         <details class="inuko-dossier" data-inuko-research><summary><span class="inuko-accordion-num">01</span><span>交易理由與風險<small>入選、卡點與失效條件</small></span></summary><div>
           ${verificationHtml}
+          ${researchAuditHtml(shard)}
           ${window.InukoSwingPath?.researchEvidenceHtml?.(path)||''}
           ${study('入選理由',why,'模型尚未列出入選理由，須核對資料')}
           ${study('目前卡點',blockers,'模型未列出額外卡點（非全面排除）')}
