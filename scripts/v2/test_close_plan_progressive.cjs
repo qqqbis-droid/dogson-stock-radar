@@ -17,7 +17,7 @@ assert(js.includes('writeCard(card,classify(item?.decision||{code},item))'),'Upd
 assert(!js.includes('for(let i=0;i<candidates.length;i+=6)'),'Do not block all cards behind the full candidate list');
 // The redesigned card exposes one concise action and the two validated
 // price levels. Stop asserting the retired four redundant plan panels.
-for(const title of ['明日留意','關鍵價位','S1 支撐','R1 壓力','已核對'])
+for(const title of ['明日留意','關鍵價位','S1 支撐','R1 壓力','已驗證'])
   assert(js.includes(title),'Missing verified close-card summary: '+title);
 assert(!js.slice(js.indexOf('function compact('),js.indexOf('function writeCard(')).includes('swing-path-compact'),
   'Retired four-grid must not duplicate the verified verdict');
