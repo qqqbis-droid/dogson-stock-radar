@@ -96,6 +96,39 @@ assert(S.get('00685L').shares===25,'ETF symbol must survive backup/cloud ledger 
 S.addDaytradeRoundTrip({code:'00631l',name:S.lookupName('00631L'),shares:100,buy_price:245,sell_price:245.5,trade_date:'2026-09-09'});
 assert(S.history('00631L').length===2,'ETF daytrade history should resolve');
 console.log('PASS: 00685L / 00631L transactions and symbol persistence');
+
+// Real broker regression: 10/08 original 1000 @66.5; partial exits leave
+// exactly 100 swing shares. Completed 10/14 and 10/19 daytrade pairs MUST NOT
+// move the remaining swing cost, even when their prices differ materially.
+const tx1802=[
+  {code:'1802',name:'台玻',trade_date:'2026-10-08',side:'BUY',shares:1000,price:66.5},
+  {code:'1802',trade_date:'2026-10-13',side:'SELL',shares:200,price:61},
+  {code:'1802',trade_date:'2026-10-13',side:'SELL',shares:200,price:60.9},
+  {code:'1802',trade_date:'2026-10-14',side:'SELL',shares:200,price:67.1},
+  {code:'1802',trade_date:'2026-10-14',side:'SELL',shares:200,price:67},
+  {code:'1802',trade_date:'2026-10-14',side:'SELL',shares:100,price:65.8},
+  {code:'1802',trade_date:'2026-10-14',side:'BUY',shares:1000,price:65.8,source:'DAYTRADE_FILL',daytrade_pair_id:'1802d1'},
+  {code:'1802',trade_date:'2026-10-14',side:'SELL',shares:1000,price:67.9,source:'DAYTRADE_FILL',daytrade_pair_id:'1802d1'},
+  {code:'1802',trade_date:'2026-10-19',side:'BUY',shares:1000,price:68,source:'DAYTRADE_FILL',daytrade_pair_id:'1802d2'},
+  {code:'1802',trade_date:'2026-10-19',side:'SELL',shares:1000,price:66.7,source:'DAYTRADE_FILL',daytrade_pair_id:'1802d2'}
+];
+const brokerSrc=fs.readFileSync('docs/v2/portfolio-broker-match.js','utf8');
+const bs=brokerSrc.indexOf('function aggregate(data,code){'),be=brokerSrc.indexOf('function estimatePosition(',bs);
+assert(bs>0&&be>bs,'Broker override must expose audited aggregation');
+const brokerAggregate=new Function('estimateTx',brokerSrc.slice(bs,be)+'\nreturn aggregate;')(fees);
+const isolated=brokerAggregate({transactions:tx1802,meta:{1802:{name:'台玻'}}},'1802');
+assert(isolated.shares===100,'Two roundtrip daytrades must leave 100 swing shares');
+assert(near(isolated.trade_avg_cost,66.5),'Remaining original shares must retain the 66.5 execution basis');
+assert(isolated.avg_cost>66.5&&isolated.avg_cost<66.8,'Fee-inclusive original cost should be about 66.6, never 67.9');
+assert(isolated.daytrade_count===2&&isolated.transaction_count===10,'Account for both daytrades and all actual fills');
+assert(near(isolated.realized_pl,isolated.swing_realized_pl+isolated.daytrade_realized_pl),'Realized swing/daytrade P&L must reconcile');
+const beforeDaytrades=brokerAggregate({transactions:tx1802.slice(0,6),meta:{}},'1802');
+assert(near(isolated.avg_cost,beforeDaytrades.avg_cost),'Completed daytrades cannot change swing cost basis');
+const feeSrc=fs.readFileSync('docs/v2/portfolio-fees.js','utf8');
+assert(feeSrc.includes('trade_avg_cost:shares>0?tradeAvg:0'),'Canonical fee wrapper must display separate executed average');
+assert(rendererSrc.includes('成交均價 ${tickPrice(p.trade_avg_cost??p.avg_cost)}'),'Portfolio card must distinguish executed and fee-inclusive averages');
+console.log('PASS: 台玻 10/08 swing cost remains 66.5 despite 10/14 and 10/19 daytrades');
+
 console.log('broker-comparable net liquidation PnL regression test PASS');
 
 console.log('holdings isolation, holiday, discipline, cloud-format import and fee-aware mixed-position tests PASS');

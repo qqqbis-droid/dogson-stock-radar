@@ -30,24 +30,65 @@ function estimateTx(t,p=feeProfile()){
   const net=side==='BUY'?gross+commission:gross-commission-tax;
   return{gross,commission,tax,net,daytrade:isDaytradeTx(t)};
 }
+// A broker-matched fill may be daytrade while a swing holding of the SAME
+// code remains open. Such an explicitly paired round trip contributes to
+// realized daytrade P/L, but NEVER to swing shares or averaged buy cost.
 function aggregate(data,code){
   const c=String(code||'').toUpperCase();
-  const txs=(data?.transactions||[]).filter(t=>String(t.code||'').toUpperCase()===c).slice().sort((a,b)=>String(a.trade_date||'').localeCompare(String(b.trade_date||''))||String(a.created_at||'').localeCompare(String(b.created_at||''))||String(a.id||'').localeCompare(String(b.id||'')));
-  let shares=0,avg=0,realized=0,buyValue=0,sellValue=0,buyFees=0,sellFees=0,sellTax=0,cycle=0,lastBuy=null,lastSell=null;
-  for(const t of txs){
-    const q=Number(t.shares)||0,fees=estimateTx(t);
-    if(String(t.side||'').toUpperCase()==='BUY'){
-      if(shares===0)cycle+=1;
-      const previousCost=avg*shares;
-      avg=(previousCost+fees.net)/(shares+q);
-      shares+=q;buyValue+=fees.gross;buyFees+=fees.commission;lastBuy={...t,...fees};
+  const txs=(data?.transactions||[]).filter(t=>String(t.code||'').toUpperCase()===c).slice().sort((a,b)=>String(a.trade_date||'').localeCompare(String(b.trade_date||''))
+    ||String(a.created_at||'').localeCompare(String(b.created_at||''))
+    ||String(a.id||'').localeCompare(String(b.id||'')));
+  let shares=0,avg=0,tradeAvg=0,swingRealized=0,daytradeRealized=0,
+    buyValue=0,sellValue=0,buyFees=0,sellFees=0,sellTax=0,
+    cycle=0,lastBuy=null,lastSell=null,daytradeCount=0;
+  const pairs=new Map();
+  for(const tx of txs){
+    const pairId=String(tx.daytrade_pair_id||'');
+    if(!pairId)continue;
+    if(!pairs.has(pairId))pairs.set(pairId,{});
+    const pair=pairs.get(pairId);
+    if(pair[tx.side])throw Error('重複當沖成交方向：'+pairId);
+    pair[tx.side]=tx;
+  }
+  for(const [id,pair] of pairs){
+    const buy=pair.BUY,sell=pair.SELL;
+    if(!buy||!sell||buy.code!==sell.code||buy.shares!==sell.shares
+      ||buy.trade_date!==sell.trade_date)
+      throw Error('當沖買賣資料不完整：'+id);
+    const b=estimateTx(buy),s=estimateTx(sell);
+    daytradeRealized+=s.net-b.net;daytradeCount++;
+    buyValue+=b.gross;sellValue+=s.gross;buyFees+=b.commission;
+    sellFees+=s.commission;sellTax+=s.tax;
+  }
+  for(const tx of txs){
+    if(tx.daytrade_pair_id)continue; // prevent daytrade contaminating swing basis
+    const q=Number(tx.shares)||0,f=estimateTx(tx);
+    if(String(tx.side||'').toUpperCase()==='BUY'){
+      if(shares===0)cycle++;
+      avg=(avg*shares+f.net)/(shares+q);
+      tradeAvg=(tradeAvg*shares+q*Number(tx.price))/(shares+q);
+      shares+=q;buyValue+=f.gross;buyFees+=f.commission;lastBuy={...tx,...f};
     }else{
-      if(q>shares)throw new Error(`${c} 在 ${t.trade_date||'未填日期'} 的減碼超過當時持股`);
-      realized+=fees.net-(avg*q);shares-=q;sellValue+=fees.gross;sellFees+=fees.commission;sellTax+=fees.tax;lastSell={...t,...fees};if(shares===0)avg=0;
+      if(q>shares)throw Error(c+' 在 '+(tx.trade_date||'未填日期')+' 的減碼超過當時波段持股');
+      swingRealized+=f.net-avg*q;shares-=q;
+      sellValue+=f.gross;sellFees+=f.commission;sellTax+=f.tax;
+      lastSell={...tx,...f};if(shares===0){avg=0;tradeAvg=0}
     }
   }
-  const m=data?.meta?.[c]||{},firstBuy=txs.find(t=>String(t.side||'').toUpperCase()==='BUY');
-  return{code:c,name:m.name||lastBuy?.name||firstBuy?.name||'',shares,avg_cost:shares>0?avg:0,entry_date:firstBuy?.trade_date||'',entry_reason:firstBuy?.reason||'',hold_reason:m.hold_reason||'',reason_status:m.reason_status||'VALID',validation_condition:m.validation_condition||'',failure_condition:m.failure_condition||'',strategy:m.strategy||'',note:m.note||'',realized_pl:realized,buy_value:buyValue,sell_value:sellValue,buy_fees:buyFees,sell_fees:sellFees,sell_tax:sellTax,total_fees:buyFees+sellFees+sellTax,transaction_count:txs.length,cycle_count:cycle,last_buy:lastBuy,last_sell:lastSell,closed:shares===0&&txs.length>0,created_at:firstBuy?.created_at||'',updated_at:m.updated_at||data?.updated_at||new Date().toISOString()};
+  const m=data?.meta?.[c]||{},firstBuy=txs.find(tx=>tx.side==='BUY'&&!tx.daytrade_pair_id);
+  return{code:c,name:m.name||lastBuy?.name||firstBuy?.name||'',
+    shares,avg_cost:shares>0?avg:0,trade_avg_cost:shares>0?tradeAvg:0,
+    entry_date:firstBuy?.trade_date||'',entry_reason:firstBuy?.reason||'',
+    hold_reason:m.hold_reason||'',reason_status:m.reason_status||'UNVERIFIED',
+    validation_condition:m.validation_condition||'',failure_condition:m.failure_condition||'',
+    strategy:m.strategy||'',note:m.note||'',realized_pl:swingRealized+daytradeRealized,
+    swing_realized_pl:swingRealized,daytrade_realized_pl:daytradeRealized,
+    daytrade_count:daytradeCount,buy_value:buyValue,sell_value:sellValue,
+    buy_fees:buyFees,sell_fees:sellFees,sell_tax:sellTax,
+    total_fees:buyFees+sellFees+sellTax,transaction_count:txs.length,
+    cycle_count:cycle,last_buy:lastBuy,last_sell:lastSell,
+    closed:shares===0&&txs.length>0,created_at:firstBuy?.created_at||'',
+    updated_at:m.updated_at||data?.updated_at||new Date().toISOString()};
 }
 function estimatePosition(p,price){
   const px=Number(price),shares=Number(p?.shares)||0,cost=Number(p?.avg_cost||0)*shares;
