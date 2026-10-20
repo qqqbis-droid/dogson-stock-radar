@@ -228,3 +228,16 @@
   #detailBody .inuko-detail-v4 .inuko-level strong{font-size:14px}
   #detailBody .inuko-detail-v4 .swing-facts>div{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+/* Source verification is separate from decision-confidence percentage. */
+#detailBody .inuko-detail-v4 .inuko-source-verification{
+  padding:10px 12px;margin:12px 0 6px;border-radius:10px;
+  border-left:3px solid var(--amber);background:var(--soft);
+}
+#detailBody .inuko-detail-v4 .inuko-source-verification.complete{border-left-color:var(--green)}
+#detailBody .inuko-detail-v4 .inuko-source-verification b{
+  display:block;font-weight:850;font-size:12px;line-height:1.4;color:var(--ink);
+}
+#detailBody .inuko-detail-v4 .inuko-source-verification p{
+  margin:5px 0 0;font-size:11px;line-height:1.5;color:var(--muted);
+}

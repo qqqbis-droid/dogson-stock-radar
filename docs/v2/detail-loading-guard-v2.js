@@ -244,6 +244,19 @@
     return `<div class="isd-quality"><b>資料品質</b><div class="isd-grid" style="margin-top:8px">${metric('Freshness',FRESH[d.freshness]||d.freshness||'—')}${metric('資料信心',conf==null?'—':`${fmt(conf,0)}%`)}${metric('證據覆蓋',cov==null?'—':`${fmt(cov,0)}%`)}${metric('資料快照',hm(shard.known_at||d.known_at||m?.generated_at))}</div><div class="isd-quality-note">「資料信心」是原 Engine 的決策證據指標，<strong>不是籌碼即時性或來源完整度</strong>。<br><strong>證據覆蓋 ${cov==null?'—':`${fmt(cov,0)}%`}</strong> 是「這個模式預期需要的評分／決策證據，有多少已取得並可用」，不是「只有 ${cov==null?'部分':`${fmt(cov,0)}%`} 的資料是今天的」。${esc(missText)}</div><details class="isd-diagnostic"><summary>診斷資訊</summary><div>Build：${esc(shard.build_id||d.build_id||'—')}<br>known_at：${esc(shard.known_at||d.known_at||'—')}<br>decision context：${esc(d.decision_context_id||'—')}</div></details></div>`;
   }
 
+  function researchVerification(e,tradeDate){
+    const health=String(e?.chip_check_health||'UNKNOWN').toUpperCase();
+    const dates=['foreign_date','trust_date','sbl_date','margin_date'].map(k=>String(e?.[k]||'').slice(0,10));
+    const aligned=Boolean(/^\d{4}-\d{2}-\d{2}$/.test(String(tradeDate||''))&&dates.every(x=>x===tradeDate));
+    const complete=['HEALTHY','OK','PASS','COMPLETE'].includes(health);
+    const mode=aligned&&complete?'complete':health==='PARTIAL'?'partial':'unverified';
+    const label=mode==='complete'?'籌碼來源：已完成查核'
+      :mode==='partial'?'籌碼來源：部分完成':'籌碼來源：待核對';
+    const dateText=aligned?'四類籌碼資料日期一致':'部分資料日未核對或不一致';
+    const note=mode==='complete'?dateText+'；清單沒有新增旗標，仍不代表零風險。'
+      :dateText+'；來源尚未完整通過查核，不能以100%評分信心代替來源完整度。';
+    return {mode,label,note,aligned,health};
+  }
   function sectorDisplayFromDetail(d,e){return d.primary_group||e?.primary_group||d.industry||e?.industry||'產業待補';}
   function render(shard,view,box,m){
     const d=shard.decision||{},e=shard.evidence||null,zones=Array.isArray(shard.zones)?shard.zones:[];
@@ -281,6 +294,10 @@
       const upgrades=[...new Set((d.upgrade_conditions||[]).filter(Boolean))];
       const risks=[...new Set([...(d.risk_flags||[]),...(e?.stage_risks||[]),...(e?.overheat_reasons||[])].filter(Boolean))];
       const study=(heading,values,fallback)=>`<div class="inuko-research-section"><h4>${esc(heading)}</h4>${tags(values,fallback)}</div>`;
+      const verified=researchVerification(e,routeDate);
+      const verificationHtml=`<aside class="inuko-source-verification ${esc(verified.mode)}" data-inuko-chip-health="${esc(verified.health)}">
+        <b>${esc(verified.label)}</b><p>${esc(verified.note)}</p>
+      </aside>`;
       const trustedClose=path.known&&Number(d.quote?.price)>0;
       const closing=trustedClose?price(d.quote.price):'—';
       const dayChange=trustedClose&&num(d.quote?.day_change_pct)!=null
@@ -299,11 +316,12 @@
         ${pathHtml}
         <div class="inuko-research-index"><span>深入研究</span><small>點選分類展開</small></div>
         <details class="inuko-dossier" data-inuko-research><summary><span class="inuko-accordion-num">01</span><span>交易理由與風險<small>入選、卡點與失效條件</small></span></summary><div>
+          ${verificationHtml}
           ${window.InukoSwingPath?.researchEvidenceHtml?.(path)||''}
-          ${study('入選理由',why,'尚無新的入選理由')}
-          ${study('目前卡點',blockers,'未發現額外卡點')}
-          ${study('升級所需證據',upgrades,'尚無其他升級條件')}
-          ${study('其他風險訊號',risks,'未發現額外風險旗標')}
+          ${study('入選理由',why,'模型尚未列出入選理由，須核對資料')}
+          ${study('目前卡點',blockers,'模型未列出額外卡點（非全面排除）')}
+          ${study('升級所需證據',upgrades,'模型未提供其他升級條件（仍依明日決策）')}
+          ${study('其他風險訊號',risks,'模型未列出額外風險旗標（不代表零風險）')}
           <p class="inuko-dossier-note">詳細條件供研究；最終操作以上方「明日決策」與同日收盤判斷為準。</p>
         </div></details>
         <details class="inuko-dossier" data-inuko-technical><summary><span class="inuko-accordion-num">02</span><span>技術、籌碼與評分<small>60分K、指標及分數明細</small></span></summary><div>
