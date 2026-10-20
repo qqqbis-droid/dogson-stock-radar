@@ -18,6 +18,13 @@ const ta=shard('1609',[z('SUPPORT','S1',38.39,38.73),z('RESISTANCE','R1',39.72,4
 const u=classify(ta.decision,ta),html=compact(u);
 assert(html.includes('明日留意')&&html.includes('關鍵價位'),'Next-day concise card must include one action and the validated levels');
 assert(!html.includes('cp-plan-row'),'Do not rebuild the repeated four-part panel');
+// Display rounding may make separate source bands touch or visually overlap.
+const shownTouch=compact({...u,support:{low:19.15,high:19.53},resistance:{low:19.58,high:19.74}});
+assert(shownTouch.includes('跳動單位取整而相接'),'Rendered tick levels must explain display-only contact');
+const sourceOverlap=compact({...u,support:{low:19.15,high:19.60},resistance:{low:19.55,high:19.75}});
+assert(sourceOverlap.includes('支撐與壓力價區交疊'),'True overlap should be disclosed without changing any verdict');
+const spaced=compact({...u,support:{low:19.15,high:19.35},resistance:{low:19.65,high:19.75}});
+assert(!spaced.includes('cp-mini-overlap'),'Unrelated zones must never produce a false overlap alert');
 assert.equal(u.type,'NO_CHASE','Poor close-to-R1 reward/risk should veto entry');
 assert.equal(u.ready,true);
 assert(html.includes('38.35～38.75'),html.slice(0,400));

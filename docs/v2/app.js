@@ -165,7 +165,12 @@ function quoteHtml(d){
   return `<div class="quote-strip"><div class="quote-price">${showPrice?priceFmt(p):"—"}</div><div class="quote-change ${cls}">${showPrice?signedPct(chg):"—"}</div><div class="quote-volume">${esc(vol)}</div>${turnover}${timeNote}</div>`;
 }
 function rankText(d){if(isIgnitionMode())return verifiedIgnition(d)?"🔥 點火 #"+d.ignition_rank:"🔥 點火資料待驗";if(state.view==="close"&&d.opportunity_bucket==="NEXT_DAY_READY")return "品質候選 #"+(d.opportunity_rank??"—");if(["intraday","daytrade"].includes(state.view)&&d.action_state==="DATA_STALE")return "資料待驗 · 不列排名";return `${bucketLabel[d.opportunity_bucket]||"排序"} #${d.opportunity_rank??"—"}`}
-function sectorDisplay(d){const primary=String(d?.primary_group||"").trim();if(primary)return primary;const industry=String(d?.industry||d?.industry_name||d?.official_industry||"").trim();return industry?`${industry}・官方產業代理`:"分類待補"}
+function sectorDisplay(d){
+ const primary=String(d?.primary_group||"").trim();
+ if(primary)return primary;
+ const industry=String(d?.industry||d?.industry_name||d?.official_industry||d?.sector_name||d?.official_sector||"").trim();
+ return industry?industry:"分類待補";
+}
 function sectorFilterKey(d){return String(d?.primary_group||d?.industry||d?.industry_name||d?.official_industry||"").trim()}
 
 function quickSpec(){return isIgnitionMode()?ignitionQuickFilter:(quickFilterConfig[state.view]||null)}
@@ -420,9 +425,12 @@ function outsideCard(x){
 }
 
 function radarCardIdentity(d,stage){
- return '<div class="card-top"><div class="identity"><span class="rank">'+esc(rankText(d))+'</span>'
+ // Ranking and same-row sector are context, not a competing second headline.
+ const sector=sectorDisplay(d);
+ return '<div class="card-top"><div class="identity">'
   +'<div class="card-identity-text"><span class="code">'+esc(d.code)+' '+esc(d.name)+'</span>'
-  +'<div class="muted">'+esc(sectorDisplay(d))+'</div></div></div>'
+  +'<div class="muted inuko-card-byline"><span class="rank">'+esc(rankText(d))+'</span>'
+  +'<span class="inuko-sector"> · '+esc(sector)+'</span></div></div></div>'
   +'<span class="badge stage">'+esc(stage||'待驗')+'</span></div>';
 }
 function radarCardScores(metrics){

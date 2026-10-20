@@ -162,13 +162,20 @@ async function auditLanes(force=false){
 function compact(x){
  const level=(rank,z)=>'<span class="cp-mini-level"><small>'+rank+'</small><b>'+esc(z?range(z):'待驗')+'</b></span>';
  const note=x.type==='VERIFY'?'同日證據待核對':x.type==='PARTIAL'?'關鍵價區待補':x.gate||'等待量價確認';
- const overlap=!!(x.support&&x.resistance&&n(x.support.high)!=null&&n(x.resistance.low)!=null&&n(x.support.high)>=n(x.resistance.low));
+ const sHigh=x.support?n(x.support.high):null,rLow=x.resistance?n(x.resistance.low):null;
+ const zoneSourceOverlap=sHigh!=null&&rLow!=null&&sHigh>=rLow;
+ // UI values are rounded outward to TWSE tick-size bands. A display-only
+ // intersection should be disclosed as display rounding, not as raw overlap.
+ const shownHigh=sHigh!=null?n(String(pp(sHigh,'upper')).replace(/,/g,'')):null;
+ const shownLow=rLow!=null?n(String(pp(rLow,'lower')).replace(/,/g,'')):null;
+ const displayedOverlap=shownHigh!=null&&shownLow!=null&&shownHigh>=shownLow;
+ const overlapLabel=zoneSourceOverlap?'支撐與壓力價區交疊，留意量價確認':'顯示價區因跳動單位取整而相接，原始區間未交疊';
  const breakout=x.openSky&&!x.resistance&&x.breakoutLevel!=null
   ?'<span class="cp-mini-level"><small>前高平台</small><b>'+esc(pp(x.breakoutLevel))+'</b></span>':level('R1 壓力',x.resistance);
  return '<section class="close-plan-integrated cp-mini" data-close-plan aria-label="明日作戰">'
-  +'<div class="cp-mini-head"><span>關鍵價位</span><span>'+esc(x.sessionOK?'已核對':'待核對')+'</span></div>'
+  +'<div class="cp-mini-head"><span>關鍵價位</span><span>'+esc(x.sessionOK?'已驗證':'待核對')+'</span></div>'
   +'<div class="cp-mini-levels">'+level('S1 支撐',x.support)+breakout+'</div>'
-  +(overlap?'<div class="cp-mini-overlap">支撐與壓力區間重疊，待量價確認</div>':'')
+  +(displayedOverlap?'<div class="cp-mini-overlap" role="note">'+esc(overlapLabel)+'</div>':'')
   +'<p class="cp-mini-watch"><b>明日留意</b>'+esc(note)+'</p>'
   +'</section>';
 }

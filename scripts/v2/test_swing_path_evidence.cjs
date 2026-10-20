@@ -115,7 +115,7 @@ assert(!lib.detailHtml(older).includes('價格結構位置'));
 assert(path.facts.length>=0);
 assert(css.includes('@media(max-width:510px)'),'Mobile route must be two-column');
 assert(css.includes('.inuko-dossier>summary'),'Research disclosures must be thumb-friendly');
-assert(html.includes('inuko-editorial-v3.css?v=20261020c'),'The final editorial layer must be active in production');
+assert(html.includes('inuko-editorial-v3.css?v=20261020d'),'The final editorial layer must be active in production');
 assert(html.indexOf('inuko-editorial-v3.css?v=20261020c')>html.indexOf('modern-v2.css'),'Editorial CSS should be loaded after old generic styles');
 assert(require('node:fs').readFileSync('docs/v2/inuko-editorial-v3.css','utf8').includes('#cards .inuko-editorial-card .quote-strip'),'The large boxed quote in iPhone screenshots must be removed');
 for(const tag of ['<script src="./swing-path-v1.js?v=20261020layout2&design=20261020b">','swing-path-v1.css?v=20261020layout2','close-ops-v1.js?v=20261016route1','detail-loading-guard-v2.js?v=20261016route1'])

@@ -93,3 +93,54 @@
  #cards .inuko-editorial-card .score b{font-size:14px}
  #cards .inuko-editorial-card .rf-star{flex-basis:30px;min-width:30px;height:30px}
 }
+
+/* INUKO Editorial v3.1 — 10/20 iPhone review. Compact density, same theme. */
+#cards .card.inuko-editorial-card{padding:12px 14px 10px;contain-intrinsic-size:260px}
+#cards .inuko-editorial-card .identity{display:block;flex:1;min-width:0}
+#cards .inuko-editorial-card .card-identity-text .muted.inuko-card-byline{
+ display:flex;flex-wrap:wrap;gap:0;align-items:baseline;margin-top:4px;
+ font-size:10px;line-height:1.3;color:var(--muted);
+}
+#cards .inuko-editorial-card .inuko-card-byline .rank{
+ display:inline;min-height:0;padding:0;margin:0;color:var(--muted);
+ font-size:10px;line-height:1.3;font-weight:700;white-space:normal;
+}
+#cards .inuko-editorial-card .inuko-card-byline .inuko-sector{
+ display:inline;color:var(--muted);font-size:10px;line-height:1.3;
+}
+#cards .inuko-editorial-card .badge.stage{
+ border:0;box-shadow:none;background:transparent;color:var(--muted);
+ padding:4px 2px;font-size:10px;font-weight:650;line-height:1.25;
+ text-align:right;max-width:39%;
+}
+#cards .inuko-editorial-card .quote-strip{margin-top:10px;gap:4px 8px}
+#cards .inuko-editorial-card .quote-price{font-size:25px}
+#cards .inuko-editorial-card .action-line,
+#cards .inuko-editorial-card .action-line.go,
+#cards .inuko-editorial-card .action-line.wait,
+#cards .inuko-editorial-card .action-line.risk,
+#cards .inuko-editorial-card .action-line.stale,
+#cards .inuko-editorial-card .action-line.cp-blue{
+ margin-top:9px;padding:8px 0 7px;
+}
+#cards .inuko-editorial-card .score-row{padding:5px 0 1px}
+#cards .inuko-editorial-card .score b{margin-top:2px}
+#cards .inuko-editorial-card .close-plan-integrated.cp-mini{
+ margin-top:7px;padding-top:8px;
+}
+#cards .inuko-editorial-card .cp-mini-levels{margin-top:7px}
+#cards .inuko-editorial-card .cp-mini-level b{margin-top:2px}
+#cards .inuko-editorial-card .cp-mini-watch{margin-top:6px}
+#cards .inuko-editorial-card .cp-mini-overlap{
+ display:block;border-left:2px solid var(--amber);
+ background:color-mix(in srgb,var(--amber) 7%,var(--card));
+ padding:5px 7px;margin-top:8px;border-radius:0 5px 5px 0;
+ font-size:10px;line-height:1.4;color:var(--amber);
+}
+#cards .inuko-editorial-card .inuko-card-foot{margin-top:8px;padding-top:8px}
+#cards .inuko-editorial-card .reason,#cards .inuko-editorial-card .blocker{margin-top:5px}
+@media(max-width:410px){
+ #cards .card.inuko-editorial-card{padding:11px 12px 9px}
+ #cards .inuko-editorial-card .quote-price{font-size:24px}
+ #cards .inuko-editorial-card .badge.stage{font-size:9px}
+}

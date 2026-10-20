@@ -33,8 +33,10 @@ assert(app.includes('inuko-stock-card')&&app.includes('radarCardIdentity'), 'Bot
 assert(app.includes('radarCardScores')&&app.includes('radarActionLine'), 'Decision and score layout must be shared');
 assert(read('docs/v2/app.css').includes('inuko-stock-card'), 'Brand styling must follow existing cream/forest tokens');
 assert(read('docs/v2/detail-loading-guard-v2.js').includes('inuko-research-mast'), 'Internal research masthead must be installed');
+assert(app.includes('inuko-card-byline')&&app.includes('inuko-sector'),'Ranking and classification must share a subtitle row');
+assert(read('docs/v2/inuko-editorial-v3.css').includes('.inuko-card-byline .rank'),'Desktop and iPhone byline must be compact');
 assert(read('docs/v2/swing-path-v1.css').includes('.inuko-research-board'), 'Internal/external styles must agree');
-assert(html.includes('design=20261020c'), 'iPhone must bypass stale UI assets');
+assert(html.includes('design=20261020d'), 'iPhone must bypass stale UI assets');
 
 const writeSource=js.slice(js.indexOf('function writeCard('),js.indexOf('function explainPending('));
 assert(writeSource.startsWith('function writeCard('),'Card verdict updater must exist');
