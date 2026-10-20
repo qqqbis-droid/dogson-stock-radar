@@ -15,8 +15,12 @@ assert(js.includes('observer.observe(card)'),'Each stock card must be observed i
 assert(js.includes('const item=await shard(code,D.build)'),'Each stock must receive its own validated shard');
 assert(js.includes('writeCard(card,classify(item?.decision||{code},item))'),'Update a card immediately after its own data returns');
 assert(!js.includes('for(let i=0;i<candidates.length;i+=6)'),'Do not block all cards behind the full candidate list');
-for(const title of ['明日動作','關鍵價位','失效條件','S1 回踩觀察區','R1 第一壓力區'])
-  assert(js.includes(title),'Missing required close-card section: '+title);
+// The redesigned card exposes one concise action and the two validated
+// price levels. Stop asserting the retired four redundant plan panels.
+for(const title of ['明日留意','關鍵價位','S1 支撐','R1 壓力','已核對'])
+  assert(js.includes(title),'Missing verified close-card summary: '+title);
+assert(!js.slice(js.indexOf('function compact('),js.indexOf('function writeCard(')).includes('swing-path-compact'),
+  'Retired four-grid must not duplicate the verified verdict');
 assert(js.includes('validGlobal()&&same&&confidence!=null&&confidence>=80'),'Keep same-day and confidence gate');
 assert(js.includes('zones.fresh'),'Never manufacture unsupported S1/R1');
 assert(!app.includes('closeStrategy?"明日策略核對中"'),'Permanent placeholder not allowed');
@@ -24,7 +28,13 @@ assert(html.includes('close-ops-v1.js?v=20261016route1'),'iPhone must fetch new 
 assert(html.includes('close-ops-v1.css?v=20261013color3'),'iPhone must fetch new CSS revision');
 assert(html.includes('app.js?v=20261016ignitionrestore1'),'iPhone must fetch updated base cards');
 assert(html.includes('chip-freshness-provenance.js?v=20261013gateupdate2'),'Close gate should recheck and rerender plans');
-assert(css.includes('.cp-plan-row')&&css.includes('.cp-plan-heading'),'Four-part plan styling present');
+assert(css.includes('.cp-mini-levels')&&css.includes('.cp-mini-watch'),'One-line action and two-level layout styling present');
+assert(app.includes('inuko-stock-card')&&app.includes('radarCardIdentity'), 'Both radar modes must reuse branded card identity');
+assert(app.includes('radarCardScores')&&app.includes('radarActionLine'), 'Decision and score layout must be shared');
+assert(read('docs/v2/app.css').includes('inuko-stock-card'), 'Brand styling must follow existing cream/forest tokens');
+assert(read('docs/v2/detail-loading-guard-v2.js').includes('inuko-research-mast'), 'Internal research masthead must be installed');
+assert(read('docs/v2/swing-path-v1.css').includes('.inuko-research-board'), 'Internal/external styles must agree');
+assert(html.includes('design=20261020b'), 'iPhone must bypass stale UI assets');
 
 const writeSource=js.slice(js.indexOf('function writeCard('),js.indexOf('function explainPending('));
 assert(writeSource.startsWith('function writeCard('),'Card verdict updater must exist');
