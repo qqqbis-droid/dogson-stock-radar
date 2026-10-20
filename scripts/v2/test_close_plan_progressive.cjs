@@ -34,7 +34,7 @@ assert(app.includes('radarCardScores')&&app.includes('radarActionLine'), 'Decisi
 assert(read('docs/v2/app.css').includes('inuko-stock-card'), 'Brand styling must follow existing cream/forest tokens');
 assert(read('docs/v2/detail-loading-guard-v2.js').includes('inuko-research-mast'), 'Internal research masthead must be installed');
 assert(read('docs/v2/swing-path-v1.css').includes('.inuko-research-board'), 'Internal/external styles must agree');
-assert(html.includes('design=20261020b'), 'iPhone must bypass stale UI assets');
+assert(html.includes('design=20261020c'), 'iPhone must bypass stale UI assets');
 
 const writeSource=js.slice(js.indexOf('function writeCard('),js.indexOf('function explainPending('));
 assert(writeSource.startsWith('function writeCard('),'Card verdict updater must exist');
