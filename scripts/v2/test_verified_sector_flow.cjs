@@ -43,5 +43,8 @@ assert(source.includes('eligible.filter(t=>t.info.rankAmount>0)'),'Rank only ver
 assert(source.includes('未具排名資格')&&source.includes('不依金額排序'),'Incomplete sectors must remain outside the ranking');
 assert(source.includes('不使用不完整樣本')&&!source.includes('sampleCards.join('),'Never rank partial samples');
 assert(source.includes('法人來源日')&&source.includes('歷史估算涵蓋（非逐檔有效）'),'Preserve actual legacy source disclosure');
-assert(page.includes('market-capital-renderer.js?v=20261021fullrank2'),'Mobile cache must load complete-sector-first renderer');
+assert(source.includes('犬子雷達追蹤池'),'Sector rank must disclose tracked-universe denominator');
+assert(source.includes('intervalSection(')&&source.includes('非官方保證界限'),'Uncertainty must not be sold as certified ordering');
+assert(source.includes('同日成交額占比變化')&&source.includes('非法人買賣'),'Independent turnover proxy is not institutional ranking');
+assert(page.includes('market-capital-renderer.js?v=20261021sectorengine1'),'Mobile cache must load complete-sector-first renderer');
 console.log('PASS: same-date full-sector inflow/outflow ranking, full-member rebuild, no partial ranks or stale totals');
