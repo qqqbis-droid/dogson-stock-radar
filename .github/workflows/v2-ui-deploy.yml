@@ -475,7 +475,7 @@ jobs:
           grep -q 'market-capital-renderer.js?v=20261022auditfold1' docs/v2/index.html
           grep -q 'capital-member-fallback' docs/v2/market-capital-renderer.js
           grep -q 'cms-detail {grid-column:1/-1' docs/v2/capital-stock-breakdown.js
-          grep -q 'capital-stock-breakdown.js?v=20261022recalc2' docs/v2/index.html
+          grep -q 'capital-stock-breakdown.js?v=20261022wavescorelink1' docs/v2/index.html
           python -m py_compile scripts/v2/build_capital_stock_breakdown.py
           grep -q 'close-ops-v1.js?v=20261016route1' docs/v2/index.html
           grep -q 'hourly60-screener.js?v=20261012stabletyping1' docs/v2/index.html
