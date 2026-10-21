@@ -139,16 +139,64 @@
     return intradayEvidence(e);
   }
 
+
+  const SWING_SUBMODELS=[
+    ['technical','技術',50,['trend','breakout','volume_price','momentum','relative','risk_quality']],
+    ['chip','籌碼',25,['foreign','trust','sbl','margin','consensus','price_chip','sector_inst']],
+    ['sector','族群',15,['breadth','leaders','persistence','capital_resonance','structure','taxonomy']],
+    ['liquidity','流動性',10,['avg_turnover','stability','price_impact','continuity','crowding']]
+  ];
+  function auditOriginalSwingV2(d,e){
+    const problems=[],segments=[];
+    if(!e||!d)return {complete:false,problems:['原始資料未載入'],segments};
+    for(const [kind,label,max,required] of SWING_SUBMODELS){
+      const parts=e[kind+'_components_v2'];
+      const model=e[kind+'_model_version'];
+      const displayed=num(e[kind+'_score_v2']);
+      if(model!=='inuko-'+kind+'-v2.0')problems.push(label+'版本缺失');
+      if(!parts||typeof parts!=='object'){problems.push(label+'細項缺失');continue;}
+      const actual=required.map(k=>parts[k]),missing=required.filter(k=>!parts[k]);
+      if(missing.length)problems.push(label+'缺少 '+missing.join('、'));
+      const numbers=actual.map(x=>num(x&&(kind==='chip'?x.points:x.score)));
+      const limits=actual.map(x=>num(x&&(kind==='chip'?x.weight:x.max)));
+      if(numbers.some(x=>x===null)||limits.some(x=>x===null))problems.push(label+'原始分數或上限不完整');
+      let unscaled=numbers.reduce((a,x)=>a+(x===null?0:x),0);
+      const fullMax=limits.reduce((a,x)=>a+(x===null?0:x),0);
+      const expectedMax=kind==='chip'?100:max;
+      const sourceScore=kind==='chip'?Math.round((unscaled/4+Number.EPSILON)*10)/10:Math.round((unscaled+Number.EPSILON)*10)/10;
+      // Exact per-item decimals can round by 0.1 against the engine's
+      // (Python) one-decimal/bankers rounding; never alter engine outputs.
+      if(Math.abs(fullMax-expectedMax)>0.01)problems.push(label+'子項滿分不符');
+      if(displayed===null||Math.abs(sourceScore-displayed)>0.11)problems.push(label+'子項加總不符');
+      if(displayed!==null&&(displayed<0||displayed>max+0.01))problems.push(label+'分數超界');
+      segments.push({kind,label,max,score:displayed,items:required.length,rawTotal:unscaled,rawMax:fullMax,sourceScore});
+    }
+    const srcSwing=num(d?.scores?.swing_quality_score);
+    const componentItems=d?.components?.swing?.items||[];
+    const weighted=componentItems.reduce((a,x)=>a+(num(x?.contribution)||0),0);
+    if(componentItems.length!==4||Math.abs(weighted-(srcSwing??-100))>0.25)problems.push('引擎四大權重貢獻與總分不符');
+    if(segments.length===4&&componentItems.length===4){
+      for(const segment of segments){
+        const component=componentItems.find(x=>x.key===segment.kind);
+        if(!component||Math.abs((num(component.raw_score)??-100)-(segment.score??-200))>0.15)
+          problems.push(segment.label+'模型分與引擎原始分不符');
+      }
+    }
+    return {complete:problems.length===0,problems,segments,score:srcSwing,weightedTotal:weighted};
+  }
+
   function v2BreakdownCard(label,total,max,parts,order,kind){
     if(!parts||typeof parts!=='object')return'';
     const rows=order.map(k=>{
       const p=parts[k]; if(!p)return'';
       const points=kind==='chip'?num(p.points):num(p.score);
       const denom=kind==='chip'?num(p.weight):num(p.max);
-      const sub=kind==='chip'&&num(p.score)!=null?` · 子分 ${fmt(p.score,0)}/100`:'';
+      const sub=kind==='chip'&&num(p.score)!=null?` · 指標分 ${fmt(p.score,0)}/100`:'';
       return `<div class="isd-exp-item"><b>${points==null?'—':`${fmt(points,1)}/${fmt(denom,0)}`}</b><span>${esc(p.label||k)}</span>${p.detail||sub?`<span class="isd-exp-detail">${esc((p.detail||'')+sub)}</span>`:''}</div>`;
     }).join('');
-    return `<div class="isd-exp-card"><div class="isd-exp-head"><b>${esc(label)}</b><strong>${fmt(total,1)}/${fmt(max,0)}</strong></div>${rows||'<div class="isd-muted">2.0 分項證據待補。</div>'}</div>`;
+    const note=kind==='chip'&&parts
+      ?'<div class="isd-chip-conversion">籌碼七項以原始 100 點計算，總和 ÷ 4 換算到波段品質 25 分；不是將七項原始點數直接加到 25 分。</div>':'';
+    return `<div class="isd-exp-card"><div class="isd-exp-head"><b>${esc(label)}</b><strong>${fmt(total,1)}/${fmt(max,0)}</strong></div>${note}${rows||'<div class="isd-muted">2.0 分項證據待補。</div>'}</div>`;
   }
 
   function explainHtml(d,e,view){
@@ -183,10 +231,12 @@
       const hasSector2=e.sector_model_version==='inuko-sector-v2.0'&&e.sector_components_v2;
       const hasLiquidity2=e.liquidity_model_version==='inuko-liquidity-v2.0'&&e.liquidity_components_v2;
       if(hasTech2||hasChip2||hasSector2||hasLiquidity2){
-        const v2Full=Boolean(hasTech2&&hasChip2&&hasSector2&&hasLiquidity2);
+        const audit=auditOriginalSwingV2(d,e);
+        const v2Full=audit.complete;
+        const evidenceDate=esc(String(e.trade_date||e.source_trade_date||d.trade_date||'待核對').slice(0,10));
         const modelStatus=v2Full
-          ?'<div class="isd-model-provenance complete"><b>原始波段評分 2.0｜24 項引擎明細</b><span>技術 6＋籌碼 7＋族群 6＋流動性 5。保留原始指標、權重、分項分數與資料來源；畫面不另外配分。</span></div>'
-          :'<div class="isd-model-provenance partial"><b>部分 2.0 評分資料尚未齊全</b><span>僅顯示有原始版本標記的子模型；其他項目不得當成完整 2.0 計分。</span></div>';
+          ?`<div class="isd-model-provenance complete" data-score-audit="complete"><b>原始波段評分 2.0｜24 項引擎明細</b><span>資料日 ${evidenceDate}｜技術 6＋籌碼 7＋族群 6＋流動性 5。四項加權分數及所有細項已與引擎總分核對；不另行配分。</span></div>`
+          :`<div class="isd-model-provenance partial" data-score-audit="partial"><b>2.0 分項尚未完整核對</b><span>保留原始引擎總分，不用舊解釋補湊。待核對：${esc(audit.problems.slice(0,5).join('；')||'必要模型證據未齊')}。</span></div>`;
         const tech=hasTech2?v2BreakdownCard('技術 2.0',e.technical_score_v2,50,e.technical_components_v2,['trend','breakout','volume_price','momentum','relative','risk_quality'],'technical'):'';
         const chip=hasChip2?v2BreakdownCard('籌碼 2.0',e.chip_score_v2,25,e.chip_components_v2,['foreign','trust','sbl','margin','consensus','price_chip','sector_inst'],'chip'):'';
         const sector=hasSector2?v2BreakdownCard(`族群 2.0 · ${e.sector_verdict_v2||''}`,e.sector_score_v2,15,e.sector_components_v2,['breadth','leaders','persistence','capital_resonance','structure','taxonomy'],'technical'):'';
@@ -199,7 +249,7 @@
           const p=x[k]; if(!p)return'';
           return `<div class="isd-exp-card"><div class="isd-exp-head"><b>${esc({sector:'族群',liquidity:'流動性',entry_position:'進場位置'}[k]||k)}</b><strong>${fmt(p.score)}/${fmt(p.max,0)}</strong></div>${(p.items||[]).map(i=>`<div class="isd-exp-item"><b>${num(i.points)>0?'+':''}${fmt(i.points)}</b><span>${esc(i.label||'')}</span>${i.detail?`<span class="isd-exp-detail">${esc(i.detail)}</span>`:''}</div>`).join('')}</div>`;
         }).join(''):'';
-        return `<details class="isd-explain"><summary>評分依據｜為什麼是這個分數</summary><div class="isd-exp"><div class="isd-muted">波段品質＝技術50＋籌碼25＋族群15＋流動性10；進場位置另計100。技術6分項、籌碼7分項、族群6分項、流動性5分項各自計分，不重複灌分。</div>${modelStatus}${tech}${chip}${sector}${liquidity}${rest}<div class="isd-muted">族群只評估整體共振；個股相對族群強弱留在技術2.0。法人族群共振留在籌碼2.0。流動性採飽和式評分，不因單日爆量或超大型成交額無限加分。</div></div></details>`;
+        return `<details class="isd-explain" data-original-swing-v2><summary>完整波段評分 2.0｜24 項細分</summary><div class="isd-exp"><div class="isd-muted">波段品質＝技術50＋籌碼25＋族群15＋流動性10；進場位置另計100。技術6分項、籌碼7分項、族群6分項、流動性5分項各自計分，不重複灌分。</div>${modelStatus}${tech}${chip}${sector}${liquidity}${rest}<div class="isd-muted">族群只評估整體共振；個股相對族群強弱留在技術2.0。法人族群共振留在籌碼2.0。流動性採飽和式評分，不因單日爆量或超大型成交額無限加分。</div></div></details>`;
       }
     }
 
@@ -338,9 +388,9 @@
         </div>
         ${swingThreeQ}
         <div class="isd-score inuko-research-metrics">${scoreTile(ms,mv)}${scoreTile('進場位置',fmt(d.scores?.entry_position_score))}${scoreTile('資料信心',`${fmt(d.data_confidence,0)}%`)}</div>
-        <div class="inuko-score-source-status" aria-label="評分來源版本">${e?.technical_model_version==='inuko-tech-v2.0'&&e?.chip_model_version==='inuko-chip-v2.0'&&e?.sector_model_version==='inuko-sector-v2.0'&&e?.liquidity_model_version==='inuko-liquidity-v2.0'
-          ?'波段評分 2.0｜原始 24 項可核對'
-          :'歷史基準分數｜原始 2.0 子項未齊；請展開評分依據'}</div>
+        <div class="inuko-score-source-status" aria-label="評分來源版本">${auditOriginalSwingV2(d,e).complete
+          ?'波段評分 2.0｜24 項原始細分已核對'
+          :'原始評分細項待核對｜總分照引擎原值保留'}</div>
         ${pathHtml}
         <div class="inuko-research-index"><span>深入研究</span><small>點選分類展開</small></div>
         <details class="inuko-dossier" data-inuko-research><summary><span class="inuko-accordion-num">01</span><span>交易理由與風險<small>入選、卡點與失效條件</small></span></summary><div>

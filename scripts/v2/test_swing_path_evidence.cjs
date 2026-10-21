@@ -149,9 +149,12 @@ assert.equal(researchVerification({...partialSource,foreign_date:'2026-10-15',ch
 assert.equal(researchVerification(null,date).mode,'unverified');
 assert(bridge.includes('researchAuditHtml(shard)'),'Close research must expose audit rows from the actual shard');
 assert(bridge.includes('原始波段評分 2.0｜24 項引擎明細'),'Full-scoring source must show the original 24 scoring items');
+assert(bridge.includes('data-original-swing-v2'),'Original 2.0 24-item panel must be accessible');
+assert(bridge.includes('籌碼七項以原始 100 點計算'),'Chip item weights must explain 100 to 25 conversion');
+assert(bridge.includes('auditOriginalSwingV2(d,e)'),'Do not declare model complete based solely on the four version labels');
 assert(bridge.includes('歷史分數與解釋（非完整 2.0）'),'Legacy frozen scores must not be relabeled as complete 2.0');
 assert(bridge.includes('原始 2.0 子項未齊'),'Headline must expose incomplete submodel coverage');
-assert(bridge.includes('v2Full=Boolean(hasTech2&&hasChip2&&hasSector2&&hasLiquidity2)'),'Score completeness must require all four source model versions');
+assert(bridge.includes('const v2Full=audit.complete'),'Complete claim must verify all 24 items and engine totals');
 assert(bridge.includes('逐項研究尚未產生'),'Legacy shards without the audit must fail closed, not show no risks');
 const {spawnSync}=require('node:child_process');
 const auditProbe=String.raw`from scripts.v2.build_stock_shards import research_checks

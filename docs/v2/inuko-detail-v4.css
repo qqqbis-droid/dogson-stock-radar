@@ -266,3 +266,19 @@
 #detailBody .inuko-detail-v4 .isd-model-provenance.complete{border-left-color:var(--green)}
 #detailBody .inuko-detail-v4 .isd-model-provenance>b{display:block;font-size:12px;font-weight:850;margin-bottom:5px}
 #detailBody .inuko-detail-v4 .isd-model-provenance>span{display:block;font-size:11px;line-height:1.5;color:var(--muted)}
+
+/* Complete 2.0 scoring ledger, clear chip 100-point to 25-point conversion. */
+#detailBody .inuko-detail-v4 [data-original-swing-v2]>summary{
+  color:var(--green);font-weight:850;font-size:12px;padding:12px;
+}
+#detailBody .inuko-detail-v4 .isd-chip-conversion{
+  font-size:11px;color:var(--muted);line-height:1.55;
+  margin:9px 0 11px;padding:8px 10px;border-left:3px solid var(--amber);
+  background:var(--soft);border-radius:3px 8px 8px 3px;
+}
+#detailBody .inuko-detail-v4 .isd-exp-item b{
+  font-variant-numeric:tabular-nums;
+  min-width:55px;font-size:12px;
+}
+#detailBody .inuko-detail-v4 .isd-exp-item{grid-template-columns:55px minmax(0,1fr);gap:5px 9px}
+#detailBody .inuko-detail-v4 .isd-exp-detail{font-size:11px;line-height:1.5}
