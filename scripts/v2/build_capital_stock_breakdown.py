@@ -132,6 +132,9 @@ def build(root, registry):
         neutral = len(good) - bought - sold
         sum_amount = sum(r["estimated_amount_100m"] for r in good)
         sum_lots = sum(r["net_lots"] for r in good)
+        # Same-day audited subset: never claim it is the full sector net.
+        sample_ratio = len(good) / count * 100 if count else None
+        sample_eligible = bool(len(good) >= 3 and sample_ratio is not None and sample_ratio >= 60)
         source_amount, source_lots = number(x.get("today_amount_100m")), number(x.get("today_lots"))
         # Existing cards round lots to tenths, monetary units to four decimals.
         delta_amount = sum_amount - source_amount if source_amount is not None else None
@@ -169,6 +172,12 @@ def build(root, registry):
             "group": group, "trade_date": close_date, "member_count": count,
             "verified_count": len(good), "buy_count": bought,
             "sell_count": sold, "flat_count": neutral,
+            "sample_trade_date": close_date if good else None,
+            "sample_amount_100m": round(sum_amount, 8) if good else None,
+            "sample_lots": round(sum_lots, 4) if good else None,
+            "sample_coverage_pct": round(sample_ratio, 2) if sample_ratio is not None else None,
+            "sample_eligible": sample_eligible,
+            "sample_scope": "SAME_DAY_MATCHED_STOCKS_ONLY",
             "buy_ratio_pct": round(bought / len(good) * 100, 2) if good else None,
             "largest_positive_code": leader["code"] if leader else None,
             "largest_positive_name": leader["name"] if leader else None,
@@ -184,6 +193,7 @@ def build(root, registry):
         "build_id": build_id, "trade_date": close_date,
         "as_of": datasets["capital_close_context"].get("as_of"),
         "method": "foreign/trust official net shares per stock multiplied by same-day closing price; amount is an estimate",
+        "sample_rule": "at least 3 same-day stocks with at least 60% of listed members; sample net is not full-sector net",
         "groups": out, "group_count": len(out), "verified_stock_count": valid_count,
         "unreconciled_group_count": mismatch_count,
     }
