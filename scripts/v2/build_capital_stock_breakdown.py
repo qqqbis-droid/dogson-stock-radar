@@ -135,13 +135,31 @@ def build(root, registry):
         # Same-day audited subset: never claim it is the full sector net.
         sample_ratio = len(good) / count * 100 if count else None
         sample_eligible = bool(len(good) >= 3 and sample_ratio is not None and sample_ratio >= 60)
+        source_day = str(x.get("latest_date") or "")[:10]
         source_amount, source_lots = number(x.get("today_amount_100m")), number(x.get("today_lots"))
         # Existing cards round lots to tenths, monetary units to four decimals.
         delta_amount = sum_amount - source_amount if source_amount is not None else None
         delta_lots = sum_lots - source_lots if source_lots is not None else None
-        matched = (len(good) == count and count > 0 and
+        # Source aggregate's "today" can actually be the previous trading day.
+        # Never reconcile or rank it against a newer trade session.
+        matched = (source_day == close_date and len(good) == count and count > 0 and
                    delta_amount is not None and abs(delta_amount) <= .012 and
                    delta_lots is not None and abs(delta_lots) <= .2)
+        full_members = count > 0 and len(good) == count
+        if matched:
+            rank_status = "RECONCILED"
+        elif full_members and source_day and source_day < close_date:
+            # All registered constituents have today's official foreign/trust
+            # shares and same-day closes. Rebuild today's total from all stocks;
+            # the older group aggregate is not used or called reconciled.
+            rank_status = "REBUILT_ALL_MEMBERS"
+        elif full_members and source_day == close_date:
+            # A same-day aggregate conflicting with fully dated members is a
+            # real integrity failure: never silently choose a side.
+            rank_status = "CONFLICT"
+        else:
+            rank_status = "INCOMPLETE"
+        rank_eligible = rank_status in {"RECONCILED", "REBUILT_ALL_MEMBERS"}
         if not matched:
             mismatch_count += 1
         valid_count += len(good)
@@ -184,7 +202,14 @@ def build(root, registry):
             "largest_positive_100m": round(leader["estimated_amount_100m"], 4) if leader else None,
             "largest_positive_share_pct": round(concentration, 1) if concentration is not None else None,
             "amount_lots_diverge": opposed,
-            "reconciled": matched, "delta_amount_100m": round(delta_amount, 5) if delta_amount is not None else None,
+            "reconciled": matched,
+            "rank_eligible": rank_eligible, "rank_status": rank_status,
+            "rank_trade_date": close_date if rank_eligible else None,
+            "rank_amount_100m": round(sum_amount, 8) if rank_eligible else None,
+            "rank_lots": round(sum_lots, 4) if rank_eligible else None,
+            "aggregate_source_date": source_day or None,
+            "rank_full_member_coverage": full_members,
+            "delta_amount_100m": round(delta_amount, 5) if delta_amount is not None else None,
             "delta_lots": round(delta_lots, 3) if delta_lots is not None else None,
             "verdict": verdict, "stocks": rows,
         }
@@ -194,6 +219,7 @@ def build(root, registry):
         "as_of": datasets["capital_close_context"].get("as_of"),
         "method": "foreign/trust official net shares per stock multiplied by same-day closing price; amount is an estimate",
         "sample_rule": "at least 3 same-day stocks with at least 60% of listed members; sample net is not full-sector net",
+        "rank_rule": "ALL listed constituents require same-date foreign, trust and closing price. Full group aggregate must reconcile when its own source date matches; older aggregate is never used for today's rank.",
         "groups": out, "group_count": len(out), "verified_stock_count": valid_count,
         "unreconciled_group_count": mismatch_count,
     }
