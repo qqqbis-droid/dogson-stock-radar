@@ -70,6 +70,10 @@ jobs:
             cp .shadow-pages/data/intraday.json .shadow-main-data/intraday.json
             cp .shadow-pages/data/daytrade.json .shadow-main-data/daytrade.json
             cp .shadow-pages/data/market.json .shadow-main-data/market.json
+            # Hourly evidence must travel with the same verified deployment snapshot.
+            if [[ -s .shadow-pages/data/hourly.json ]]; then
+              cp .shadow-pages/data/hourly.json .shadow-main-data/hourly.json
+            fi
             echo "Shadow source: exact Pages artifact from upstream run ${{ github.event.workflow_run.id }}"
           else
             base="https://qqqbis-droid.github.io/dogson-stock-radar/data"
@@ -78,6 +82,9 @@ jobs:
                 "${base}/${name}.json?shadow_run=${GITHUB_RUN_ID}" \
                 -o ".shadow-main-data/${name}.json"
             done
+            curl -fsSL --retry 3 -H 'Cache-Control: no-cache' \
+              "${base}/hourly.json?shadow_run=${GITHUB_RUN_ID}" \
+              -o ".shadow-main-data/hourly.json" || echo "Hourly public snapshot missing; checking verified official artifact"
             echo "Shadow source: currently deployed GitHub Pages"
           fi
 
@@ -137,8 +144,40 @@ jobs:
               raise SystemExit(f"Verified market context does not match verified close {vday}")
           shutil.copyfile(verified/"close.json",live/"close.json")
           shutil.copyfile(verified/"market.json",live/"market.json")
+          official_hourly=verified/"hourly.json"
+          if official_hourly.is_file() and official_hourly.stat().st_size>0:
+              hourly=json.loads(official_hourly.read_text(encoding="utf-8"))
+              hday=str(hourly.get("trade_date") or "")[:10]
+              rows=hourly.get("all_rows") or hourly.get("rows") or []
+              if not hday or hday>vday or not rows:
+                  raise SystemExit(f"Official hourly source invalid: hourly={hday}, close={vday}, rows={len(rows)}")
+              shutil.copyfile(official_hourly,live/"hourly.json")
+              print("Hourly evidence sourced from official Close artifact:",{"hourly_date":hday,"close_date":vday,"rows":len(rows),"same_session":hday==vday})
+          elif not (live/"hourly.json").is_file():
+              print("WARNING: official artifact has no 60K evidence; historical card will be unavailable")
+          # Data is explicitly dated, never promoted to the newer close session.
+
           print("Full scoring EOD source:",{"date":vday,"stocks":len(official.get("rows") or []),
                 "source":"verified successful Radar - Close Update Pages artifact"})
+          PY
+
+      - name: Verify last known 60K source provenance
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          close=json.loads(Path('.shadow-main-data/close.json').read_text(encoding='utf-8'))
+          hpath=Path('.shadow-main-data/hourly.json')
+          if hpath.is_file():
+              hourly=json.loads(hpath.read_text(encoding='utf-8'))
+              cday=str(close.get('trade_date') or '')[:10]
+              hday=str(hourly.get('trade_date') or '')[:10]
+              if not hday or not cday or hday>cday:
+                  raise SystemExit(f'Hourly future-date mismatch: {hday} vs {cday}')
+              print('60K last known valid session:',hday,'close:',cday,'historical:',hday<cday)
+          else:
+              print('60K source unavailable: no snapshot will be invented')
           PY
 
       - name: Verify original Wave Score 2.0 in downloaded source
