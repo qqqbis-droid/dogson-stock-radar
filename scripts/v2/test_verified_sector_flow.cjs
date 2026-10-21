@@ -141,3 +141,64 @@ assert(source.includes('data-capital-recheck')&&source.includes('data-capital-ra
 console.log('PASS: inflow/outflow Top 3 visible; all other original positions collapsible without changing scores');
 
 console.log('PASS: version-visible, self-healing iPhone capital ranking plus strict same-build ledger validation');
+
+
+// Capital-sector constituent links use the SAME authoritative, atomic close
+// wave score as the existing per-stock swing-detail modal.
+const detailSource=fs.readFileSync('docs/v2/capital-stock-breakdown.js','utf8');
+const start=detailSource.indexOf('function officialSwing(');
+const end=detailSource.indexOf('function paintScores(',start);
+assert(start>=0&&end>start,'Official build-matched score accessor not found');
+const swingScore=new Function('num',detailSource.slice(start,end)+'\nreturn officialSwing;')(
+ v=>v==null||v===''||!Number.isFinite(Number(v))?null:Number(v));
+const build='build-test';
+assert.equal(swingScore({build_id:build,scores:{swing_quality_score:63.7}},build),63.7);
+assert.equal(swingScore({build_id:build,scores:{swing_quality_score:0}},build),0,'Zero is a real, not missing, score');
+for(const x of [{build_id:'different',scores:{swing_quality_score:85}},
+                {build_id:build,scores:{}},{build_id:build,scores:{swing_quality_score:null}},
+                {build_id:build,scores:{swing_quality_score:101}}]){
+ assert.equal(swingScore(x,build),null,'Stale, missing or invalid scores must be hidden');
+}
+const cardStart=detailSource.indexOf('function stock(s){');
+const cardEnd=detailSource.indexOf('function detail(g){',cardStart);
+assert(cardStart>=0&&cardEnd>cardStart,'Per-stock amount card missing');
+const makeStock=new Function('num','amt','esc','fmt','lots',
+ detailSource.slice(cardStart,cardEnd)+'\nreturn stock;')(
+ v=>v==null||v===''||!Number.isFinite(Number(v))?null:Number(v),
+ v=>String(v),v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;'),
+ v=>String(v),v=>String(v));
+const html=makeStock({code:'2317',name:'鴻海',estimated_amount_100m:76.43,valid:true,
+ net_lots:30000,foreign_lots:29500,trust_lots:500,close_price:250});
+assert(html.includes('data-cms-stock-card="2317"'),'Whole stock amount tile is the click target');
+assert(html.includes('data-cms-wave-score="2317"'),'Wave quality badge belongs to matching stock code');
+assert(html.includes('波段分數：待載入'),'Async data must never invent a score');
+assert(html.includes('data-stock-code="2317"'),'Keyboard-accessible stock-name button must remain');
+assert(detailSource.includes("scoreMeta=m.datasets?.decision_close_index"),'Read existing 24-item Wave 2.0 index, never recalculate score');
+assert(detailSource.includes("String(source.as_of||'').slice(0,10)!==requestedDay"),'Score trade day must match stock flows');
+assert(detailSource.includes("r.build_id!==requestedBuild"),'Do not mix index from another atomic build');
+assert(detailSource.includes("detail:{code,view:'close',closeMode:'swing'}"),
+ 'Tile must open existing CLOSE swing detail, not a generic link');
+assert(detailSource.includes("host.addEventListener('click',e=>")&&detailSource.includes('e.preventDefault();e.stopPropagation()'),
+ 'Capture stock taps before parent sector collapses');
+assert(detailSource.includes("scoreEpoch++")&&detailSource.includes('scoresByCode=null'),
+ 'New data builds must invalidate old score badges');
+assert(page.includes('capital-stock-breakdown.js?v=20261022wavescorelink1'),'Mobile cache must load new stock score cards');
+// Integration with actual date-frozen model, if available in build workspace.
+const manifest=JSON.parse(fs.readFileSync('docs/v2/data/current_manifest.json','utf8'));
+const scoreMeta=manifest.datasets?.decision_close_index;
+if(scoreMeta?.url){
+ const locate=meta=>require('node:path').join('docs/v2',String(meta.url).replace(/^\.\//,''));
+ const index=JSON.parse(fs.readFileSync(locate(scoreMeta),'utf8'));
+ assert(Array.isArray(index)&&index.length>0,'Missing model index');
+ const known=index.find(r=>r?.scores?.swing_quality_score!=null);
+ assert(known,'No canonical swing quality scores to display');
+ assert.equal(known.build_id,manifest.active_build_id,'Wave index build mismatch');
+ const shardFile=require('node:path').join('docs/v2/data/builds',manifest.active_build_id,
+                                  'stock-shards/close',String(known.code)+'.json');
+ assert(fs.existsSync(shardFile),'Score-bearing stock must have full close research card');
+ const shard=JSON.parse(fs.readFileSync(shardFile,'utf8'));
+ assert.equal(shard.decision?.scores?.swing_quality_score,known.scores.swing_quality_score,
+  'Wave badge and detail card MUST show the exact same original value');
+ console.log('LIVE stock swing detail matched:',known.code,known.scores.swing_quality_score,manifest.active_build_id);
+}
+console.log('PASS: original wave score displayed on sector stocks and full swing card opens without score recomputation');
