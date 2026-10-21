@@ -45,6 +45,7 @@ assert.equal(info.rankAmount,28.8,'Use current individual-stock net, not conflic
 assert(!check(stock,conflict,'2026-10-22').rankEligible,'Never rank stale row tomorrow');
 const partialConflict={...conflict,groups:{AI伺服器ODM:{...conflict.groups.AI伺服器ODM,verified_count:5}}};
 assert(!check(stock,partialConflict,day).rankEligible,'Do not let incomplete current stocks become ranked via discrepancy fallback');
+assert(source.includes('recalculated')&&source.includes('同日逐檔重算・舊彙總差異'),'Disagreeing aggregate must carry a distinct audit label on rank card');
 assert(source.includes('資金流入排行')&&source.includes('資金流出排行'),'Both complete-sector rankings required');
 assert(source.includes('eligible.filter(t=>t.info.rankAmount>0)'),'Rank only verified full groups');
 assert(source.includes('未具排名資格')&&source.includes('不依金額排序'),'Incomplete sectors must remain outside the ranking');
@@ -55,5 +56,5 @@ assert(source.includes('法人來源日')&&source.includes('歷史估算涵蓋�
 assert(source.includes('犬子雷達追蹤池'),'Sector rank must disclose tracked-universe denominator');
 assert(source.includes('intervalSection(')&&source.includes('非官方保證界限'),'Uncertainty must not be sold as certified ordering');
 assert(source.includes('data-turnover-heat')&&source.includes('非法人買賣')&&source.includes('heatDate===day'),'Turnover heat must remain a separately labeled and date-matched noninstitutional indicator');
-assert(page.includes('market-capital-renderer.js?v=20261021sectorengine1'),'Mobile cache must load complete-sector-first renderer');
+assert(page.includes('market-capital-renderer.js?v=20261022allcurrent2'),'Mobile cache must load complete-sector-first renderer');
 console.log('PASS: all-current same-day stock sectors rank even if legacy total conflicts; partials, stale data and uncited sums stay excluded');
