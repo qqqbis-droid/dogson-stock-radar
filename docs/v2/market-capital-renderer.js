@@ -44,6 +44,15 @@ function style(){if(document.getElementById('marketCapitalRendererStyle'))return
 #sectorList .capital-rank-line strong{font-size:.97rem;white-space:nowrap;font-variant-numeric:tabular-nums}
 #sectorList .capital-rank-number{display:inline-block;min-width:1.7rem;text-align:center;border:1px solid var(--line);border-radius:8px;padding:3px;background:var(--soft)}
 #sectorList .capital-unranked-item{min-width:0;max-width:100%}
+
+#sectorList .capital-rank-overflow{width:100%;min-width:0;border:1px solid var(--line);border-radius:11px;padding:0;overflow:hidden}
+#sectorList .capital-rank-overflow>summary{padding:12px;font-size:.84rem;font-weight:850;line-height:1.4;cursor:pointer;list-style-position:inside;color:var(--fg);background:var(--soft);overflow-wrap:anywhere}
+#sectorList .capital-rank-overflow>summary:focus-visible{outline:2px solid #7aa996;outline-offset:-3px}
+#sectorList .capital-rank-overflow .capital-rank-close-text{display:none}
+#sectorList .capital-rank-overflow[open] .capital-rank-close-text{display:inline}
+#sectorList .capital-rank-overflow[open] .capital-rank-open-text{display:none}
+#sectorList .capital-rank-overflow-list{display:grid;gap:8px;padding:9px}
+#sectorList .capital-rank-overflow-list>.capital-rank-item{width:100%;max-width:100%;min-width:0;padding:10px 12px}
 @media(max-width:560px){.market-pulse{grid-template-columns:1fr 1fr 1fr;font-size:.68rem}.market-pulse .pulse-time{display:none}}
 `;document.head.appendChild(st)}
 function mcomponentName(k){return k==='taiex'?'加權':k==='otc'?'櫃買':k==='breadth'?'市場廣度':k==='funds'?'資金動能':k==='sector'?'族群擴散':'官方外資'}
@@ -138,7 +147,14 @@ function renderCapital(view,c,context={}){const box=document.getElementById('sec
  const recalculated=eligible.filter(t=>t.info.recalculated).length;
  const rankMore=(view,x,a)=>`<div class="capital-more" hidden><div class="mc-row"><span>同日完整法人淨額估算</span><b>${mmoney(a.rankAmount)}</b></div><div class="mc-row"><span>同日淨張數</span><b>${mlots(a.rankLots)}</b></div><div class="mc-row"><span>核對涵蓋</span><b>${a.verified}/${a.members} 檔 · 100%</b></div><div class="mc-row"><span>原族群彙總來源日</span><b>${mesc(a.sourceDay||'待確認')}</b></div><div class="capital-hint">${a.confirmed?'原族群彙總日期、金額與淨張數亦與同日逐檔重算相符。':a.recalculated?'全部成分股均有當日有效資料；原族群彙總與逐檔重算金額／張數尚不一致，排名只採同日逐檔淨額，保留差異供核對。':'原彙總仍為舊交易日；已採全部成分股當日外資、投信與收盤價重算，不拿舊彙總金額排今天的名次。'}未含自營商。</div>${memberButtons(view,x.primary_group)}</div>`;
  const rankCard=(t,i,dir)=>{const x=t.x,a=t.info;return `<div class="chip capital-chip capital-rank-item" tabindex="0" role="button" aria-expanded="false" data-capital-expand="rank-${dir}-${i}" data-capital-group="${mesc(x.primary_group)}"><div class="capital-rank-line"><b><span class="capital-rank-number">${i+1}</span> ${mesc(x.primary_group)}</b><strong>${mmoney(a.rankAmount)}</strong></div><div class="capital-hint">${a.confirmed?'跨來源對帳':a.recalculated?'同日逐檔重算・舊彙總差異':'全部成分股重算'} · ${a.verified}/${a.members} 檔 · ${mesc(day)}</div>${rankMore(view,x,a)}</div>`};
- const rankBoard=(heading,list,dir)=>`<section class="capital-rank-board"><div class="capital-rank-title">${heading} · ${list.length} 個族群</div>${list.length?list.map((t,i)=>rankCard(t,i,dir)).join(''):'<div class="capital-hint">當日沒有符合入榜資格的這個方向族群。</div>'}</section>`;
+ const rankBoard=(heading,list,dir)=>{
+   // Presentation only: keep the entire verified, ordered list and original
+   // index numbering; no limits on the underlying sector calculations.
+   const first=list.slice(0,3);
+   const rest=list.slice(3);
+   const folded=rest.length?`<details class="capital-rank-overflow" data-capital-overflow="${dir}"><summary><span class="capital-rank-open-text">展開其餘 ${rest.length} 個族群（第 4～${list.length} 名）</span><span class="capital-rank-close-text">收合其餘 ${rest.length} 個族群</span></summary><div class="capital-rank-overflow-list">${rest.map((t,i)=>rankCard(t,i+3,dir)).join('')}</div></details>`:'';
+   return `<section class="capital-rank-board" data-capital-rank-board="${dir}"><div class="capital-rank-title">${heading} · ${list.length} 個族群</div>${first.length?first.map((t,i)=>rankCard(t,i,dir)).join(''):'<div class="capital-hint">當日沒有符合入榜資格的這個方向族群。</div>'}${folded}</section>`;
+ };
  const intervalCard=(t,i,side)=>{const x=t.x,a=t.info;return `<div class="chip capital-chip capital-unranked-item" tabindex="0" role="button" aria-expanded="false" data-capital-expand="interval-${side}-${i}" data-capital-group="${mesc(x.primary_group)}"><b>${mesc(x.primary_group)}</b><div class="capital-hint">當日估算影響區間 ${mmoney(a.intervalLower)} ～ ${mmoney(a.intervalUpper)}；缺 ${a.missingCount}/${a.members} 檔</div><div class="capital-hint">成交量與收盤價 × 1.3 倍估算缺漏可能影響，非官方保證界限；名次未定。</div>${a.sampleReady?sampleMore(view,x,a):closeMore(view,x)}</div>`};
  const intervalSection=(heading,list,side)=>`<details class="capital-estimates"><summary>${heading} · ${list.length} 個（非正式排名）</summary><div class="capital-hint">近似量價區間只供判斷可能方向，依族群名稱列示，不給精確名次。</div><div class="capital-estimate-list">${list.map((t,i)=>intervalCard(t,i,side)).join('')}</div></details>`;
  const heat=context?.turnoverHeat;

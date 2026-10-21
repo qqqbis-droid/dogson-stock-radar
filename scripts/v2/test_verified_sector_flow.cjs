@@ -51,7 +51,7 @@ assert(source.includes('法人來源日')&&source.includes('歷史估算涵蓋�
 assert(source.includes('犬子雷達追蹤池'),'Sector rank must disclose tracked-universe denominator');
 assert(source.includes('intervalSection(')&&source.includes('非官方保證界限'),'Uncertainty must not be sold as certified ordering');
 assert(source.includes('data-turnover-heat')&&source.includes('非法人買賣')&&source.includes('heatDate===day'),'Turnover heat must remain a separately labeled and date-matched noninstitutional indicator');
-assert(page.includes('market-capital-renderer.js?v=20261022rankfix4'),'Mobile cache must load complete-sector-first renderer');
+assert(page.includes('market-capital-renderer.js?v=20261022top3fold1'),'Mobile cache must load complete-sector-first renderer');
 assert(source.includes('data-capital-build')&&source.includes('data-capital-ranked'),'Live capital ranking must show the actual active build and ranked count');
 assert(source.includes("window.setInterval(capitalRecheckOnReturn,45000)")&&source.includes("window.addEventListener('pageshow',capitalRecheckOnReturn)"),'iPhone web views must retry version checks on wake and periodically');
 assert(source.includes("close?mset(m,'capital_close_members'):Promise.resolve(null)"),'Missing ledger must not silently become 0 ranks');
@@ -89,5 +89,36 @@ if(fs.existsSync(manifestPath)){
               +' complete '+complete.length+' outdated legacy summaries '+older+' build '+m.active_build_id);
  }
 }
+
+
+// UI-only regression: keep the whole sorted list intact, preserve ranks 4+,
+// and fold each direction independently with a native keyboard-friendly details.
+const rankStart=source.indexOf(' const rankBoard='),rankEnd=source.indexOf(' const intervalCard=',rankStart);
+assert(rankStart>=0&&rankEnd>rankStart,'Missing ranked sector board');
+const rankRenderer=new Function('rankCard',source.slice(rankStart,rankEnd)+'\nreturn rankBoard;')(
+ (entry,i,dir)=>'<article data-test-rank="'+dir+'-'+(i+1)+'">'+entry.label+'</article>'
+);
+const seven=Array.from({length:7},(_,i)=>({label:'G'+(i+1)}));
+for(const dir of ['in','out']){
+ const html=rankRenderer(dir==='in'?'資金流入排行':'資金流出排行',seven,dir);
+ const gate='data-capital-overflow="'+dir+'"';
+ assert(html.includes(gate),'Missing independent '+dir+' fold');
+ assert(html.includes('展開其餘 4 個族群（第 4～7 名）'),'Hidden rank count must be exact');
+ const cutoff=html.indexOf('<details class="capital-rank-overflow"');
+ assert(cutoff>0,'Expected native details for ranks 4+');
+ assert.equal((html.slice(0,cutoff).match(/<article /g)||[]).length,3,'Only top three visible by default');
+ assert.deepEqual([...html.matchAll(/data-test-rank="(in|out)-(\d+)"/g)].map(x=>Number(x[2])),
+  [1,2,3,4,5,6,7],'Every rank must keep its original ordered index');
+ assert(html.slice(cutoff).includes('data-test-rank="'+dir+'-4"'),'Rank four belongs inside fold');
+ assert(!/<details class="capital-rank-overflow"[^>]*\bopen\b/.test(html),'Ranks 4+ must be initially collapsed');
+}
+for(const n of [0,1,2,3]){
+ const html=rankRenderer('資金流入排行',seven.slice(0,n),'in');
+ assert(!html.includes('data-capital-overflow'),'No pointless expander for '+n+' ranks');
+ assert.equal((html.match(/<article /g)||[]).length,n,'Show all when no more than three');
+}
+assert(source.includes('capital-rank-overflow[open] .capital-rank-close-text'),
+ 'Expanded summary must offer a clear collapse label');
+console.log('PASS: inflow/outflow Top 3 visible; all other original positions collapsible without changing scores');
 
 console.log('PASS: version-visible, self-healing iPhone capital ranking plus strict same-build ledger validation');
