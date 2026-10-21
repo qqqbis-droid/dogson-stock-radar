@@ -41,7 +41,9 @@ assert(!check(stock,conflict,day).rankEligible,'Same-day contradictory group agg
 assert(source.includes('資金流入排行')&&source.includes('資金流出排行'),'Both complete-sector rankings required');
 assert(source.includes('eligible.filter(t=>t.info.rankAmount>0)'),'Rank only verified full groups');
 assert(source.includes('未具排名資格')&&source.includes('不依金額排序'),'Incomplete sectors must remain outside the ranking');
-assert(source.includes('不使用不完整樣本')&&!source.includes('sampleCards.join('),'Never rank partial samples');
+assert(source.includes('eligible.filter(t=>t.info.rankAmount>0)') && source.includes('eligible.filter(t=>t.info.rankAmount<0)'), 'Only full same-date sectors may be ranked in either direction');
+assert(!source.includes('sampleCards.join('), 'Partial per-stock sample cards must never enter ranked lists');
+assert(source.includes('缺值不能當零') && source.includes('不拿部分樣本'), 'No hidden promotion of missing or partial evidence');
 assert(source.includes('法人來源日')&&source.includes('歷史估算涵蓋（非逐檔有效）'),'Preserve actual legacy source disclosure');
 assert(source.includes('犬子雷達追蹤池'),'Sector rank must disclose tracked-universe denominator');
 assert(source.includes('intervalSection(')&&source.includes('非官方保證界限'),'Uncertainty must not be sold as certified ordering');
