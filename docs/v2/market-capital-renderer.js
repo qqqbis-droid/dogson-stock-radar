@@ -66,21 +66,33 @@ function closeRankInfo(x,ledger,day){
  const ratio=members>0?verified/members*100:null;
  const amount=mn(row?.rank_amount_100m),lots=mn(row?.rank_lots);
  const status=String(row?.rank_status||'INCOMPLETE');
- const confirmed=Boolean(day&&ledgerDay===day&&sourceDay===day
-   &&row?.reconciled===true&&status==='RECONCILED'
-   &&members>0&&verified===members&&amount!=null&&lots!=null);
- const rebuilt=Boolean(day&&ledgerDay===day&&sourceDay&&sourceDay<day
-   &&row?.rank_full_member_coverage===true
-   &&status==='REBUILT_ALL_MEMBERS'
-   &&members>0&&verified===members&&amount!=null&&lots!=null);
- const recalculated=Boolean(day&&ledgerDay===day&&sourceDay===day
-   &&row?.rank_full_member_coverage===true
-   &&status==='RECALCULATED_SOURCE_DISAGREEMENT'
+ const stocks=Array.isArray(row?.stocks)?row.stocks:[];
+ // Today's independently dated stock evidence, NOT the legacy group summary
+ // date, is authoritative for eligibility. The legacy summary remains an
+ // informational cross-check, never a veto on complete same-session stocks.
+ const allStockEvidence=Boolean(day&&ledgerDay===day
+   &&row?.rank_trade_date===day&&row?.sample_trade_date===day
+   &&row?.rank_eligible===true
    &&row?.rank_evidence_source==='COMPLETE_SAME_DAY_STOCK_ROWS'
-   &&members>0&&verified===members&&amount!=null&&lots!=null);
- const rankEligible=Boolean(day&&row?.rank_eligible===true
-   &&row?.rank_trade_date===day&&(confirmed||rebuilt||recalculated));
- // 60%-covered individual-stock samples NEVER qualify for a sector rank.
+   &&row?.rank_full_member_coverage===true
+   &&['RECONCILED','REBUILT_ALL_MEMBERS','RECALCULATED_SOURCE_DISAGREEMENT'].includes(status)
+   &&members>0&&verified===members&&amount!=null&&lots!=null
+   &&stocks.length===members
+   &&stocks.every(z=>z?.valid===true&&z.foreign_date===day&&z.trust_date===day
+     &&mn(z.estimated_amount_100m)!=null&&mn(z.net_lots)!=null&&mn(z.close_price)!=null));
+ const sumAmount=allStockEvidence?stocks.reduce((sum,z)=>sum+Number(z.estimated_amount_100m),0):null;
+ const sumLots=allStockEvidence?stocks.reduce((sum,z)=>sum+Number(z.net_lots),0):null;
+ const current=Boolean(allStockEvidence&&Math.abs(sumAmount-amount)<=.0002&&Math.abs(sumLots-lots)<=.2);
+ // An actually independent cross-source reconciliation needs comparable
+ // aggregate amounts, lots and dates; a ledger's own RECONCILED flag alone
+ // can merely mean that its internal reconstructed inputs agree.
+ const priorAmount=mn(x?.today_amount_100m),priorLots=mn(x?.today_lots);
+ const confirmed=Boolean(current&&sourceDay===day
+   &&priorAmount!=null&&priorLots!=null
+   &&Math.abs(priorAmount-amount)<=.012&&Math.abs(priorLots-lots)<=.2);
+ const rebuilt=Boolean(current&&sourceDay&&sourceDay<day);
+ const recalculated=Boolean(current&&sourceDay===day&&!confirmed);
+ const rankEligible=Boolean(current&&(!sourceDay||sourceDay<=day));
  const sampleAmount=mn(row?.sample_amount_100m);
  const intervalLower=mn(row?.interval_lower_100m),intervalUpper=mn(row?.interval_upper_100m);
  const intervalReady=Boolean(!rankEligible&&row?.interval_available===true
@@ -124,8 +136,8 @@ function renderCapital(view,c,context={}){const box=document.getElementById('sec
  const matched=eligible.filter(t=>t.info.confirmed).length;
  const rebuilt=eligible.filter(t=>t.info.rebuilt).length;
  const recalculated=eligible.filter(t=>t.info.recalculated).length;
- const rankMore=(view,x,a)=>`<div class="capital-more" hidden><div class="mc-row"><span>同日完整法人淨額估算</span><b>${mmoney(a.rankAmount)}</b></div><div class="mc-row"><span>同日淨張數</span><b>${mlots(a.rankLots)}</b></div><div class="mc-row"><span>核對涵蓋</span><b>${a.verified}/${a.members} 檔 · 100%</b></div><div class="mc-row"><span>原族群彙總來源日</span><b>${mesc(a.sourceDay||'待確認')}</b></div><div class="capital-hint">${a.confirmed?'已通過同日族群彙總與逐檔金額、張數對帳。':a.recalculated?'全部成分股均有當日有效資料；舊族群彙總金額與逐檔重算不同，榜單僅採同日逐檔重算，保留差異待查。':'原彙總尚停在舊交易日，已改以所有成分股當日外資、投信與收盤價重算，不使用舊日總額。'}未含自營商。</div>${memberButtons(view,x.primary_group)}</div>`;
- const rankCard=(t,i,dir)=>{const x=t.x,a=t.info;return `<div class="chip capital-chip capital-rank-item" tabindex="0" role="button" aria-expanded="false" data-capital-expand="rank-${dir}-${i}" data-capital-group="${mesc(x.primary_group)}"><div class="capital-rank-line"><b><span class="capital-rank-number">${i+1}</span> ${mesc(x.primary_group)}</b><strong>${mmoney(a.rankAmount)}</strong></div><div class="capital-hint">${a.confirmed?'完整對帳':a.recalculated?'同日逐檔重算・舊彙總差異':'全部成分股重算'} · ${a.verified}/${a.members} 檔 · ${mesc(day)}</div>${rankMore(view,x,a)}</div>`};
+ const rankMore=(view,x,a)=>`<div class="capital-more" hidden><div class="mc-row"><span>同日完整法人淨額估算</span><b>${mmoney(a.rankAmount)}</b></div><div class="mc-row"><span>同日淨張數</span><b>${mlots(a.rankLots)}</b></div><div class="mc-row"><span>核對涵蓋</span><b>${a.verified}/${a.members} 檔 · 100%</b></div><div class="mc-row"><span>原族群彙總來源日</span><b>${mesc(a.sourceDay||'待確認')}</b></div><div class="capital-hint">${a.confirmed?'原族群彙總日期、金額與淨張數亦與同日逐檔重算相符。':a.recalculated?'全部成分股均有當日有效資料；原族群彙總與逐檔重算金額／張數尚不一致，排名只採同日逐檔淨額，保留差異供核對。':'原彙總仍為舊交易日；已採全部成分股當日外資、投信與收盤價重算，不拿舊彙總金額排今天的名次。'}未含自營商。</div>${memberButtons(view,x.primary_group)}</div>`;
+ const rankCard=(t,i,dir)=>{const x=t.x,a=t.info;return `<div class="chip capital-chip capital-rank-item" tabindex="0" role="button" aria-expanded="false" data-capital-expand="rank-${dir}-${i}" data-capital-group="${mesc(x.primary_group)}"><div class="capital-rank-line"><b><span class="capital-rank-number">${i+1}</span> ${mesc(x.primary_group)}</b><strong>${mmoney(a.rankAmount)}</strong></div><div class="capital-hint">${a.confirmed?'跨來源對帳':a.recalculated?'同日逐檔重算・舊彙總差異':'全部成分股重算'} · ${a.verified}/${a.members} 檔 · ${mesc(day)}</div>${rankMore(view,x,a)}</div>`};
  const rankBoard=(heading,list,dir)=>`<section class="capital-rank-board"><div class="capital-rank-title">${heading} · ${list.length} 個族群</div>${list.length?list.map((t,i)=>rankCard(t,i,dir)).join(''):'<div class="capital-hint">當日沒有符合入榜資格的這個方向族群。</div>'}</section>`;
  const intervalCard=(t,i,side)=>{const x=t.x,a=t.info;return `<div class="chip capital-chip capital-unranked-item" tabindex="0" role="button" aria-expanded="false" data-capital-expand="interval-${side}-${i}" data-capital-group="${mesc(x.primary_group)}"><b>${mesc(x.primary_group)}</b><div class="capital-hint">當日估算影響區間 ${mmoney(a.intervalLower)} ～ ${mmoney(a.intervalUpper)}；缺 ${a.missingCount}/${a.members} 檔</div><div class="capital-hint">成交量與收盤價 × 1.3 倍估算缺漏可能影響，非官方保證界限；名次未定。</div>${a.sampleReady?sampleMore(view,x,a):closeMore(view,x)}</div>`};
  const intervalSection=(heading,list,side)=>`<details class="capital-estimates"><summary>${heading} · ${list.length} 個（非正式排名）</summary><div class="capital-hint">近似量價區間只供判斷可能方向，依族群名稱列示，不給精確名次。</div><div class="capital-estimate-list">${list.map((t,i)=>intervalCard(t,i,side)).join('')}</div></details>`;
@@ -137,7 +149,7 @@ function renderCapital(view,c,context={}){const box=document.getElementById('sec
   const excludedCard=(t,i)=>{const x=t.x,a=t.info;const reason=a.rankStatus==='CONFLICT'?'當日逐檔與同日族群彙總數值衝突':a.verified<a.members?'同日逐檔資料缺漏':'來源日期或成分清單待核對';return `<div class="chip capital-chip capital-unranked-item" tabindex="0" role="button" aria-expanded="false" data-capital-expand="excluded-${i}" data-capital-group="${mesc(x.primary_group)}"><b>${mesc(x.primary_group)}</b><div class="capital-hint">不參與排名 · ${mesc(reason)} · 同日有效 ${a.verified}/${a.members} 檔</div><div class="capital-hint">舊族群彙總日 ${mesc(a.sourceDay||'待確認')}，不得作為 ${mesc(day)} 排名。</div>${a.sampleReady?sampleMore(view,x,a):closeMore(view,x)}</div>`};
  const build=String(context?.build||'未取得');
  const buildStamp=`<div class="capital-version-stamp" data-capital-build="${mesc(build)}" data-capital-ranked="${eligible.length}"><span>載入資料版本：<b>${mesc(day)} · ${mesc(build.split('-').slice(-1)[0])}</b>｜本版本可排名 ${eligible.length}/${infos.length} 族群</span><button type="button" data-capital-recheck>立即核對新版</button></div>`;
- box.innerHTML=buildStamp+`<div class="capital-verification-note" data-capital-rank-scope><b>${mesc(day||'未知日期')} 犬子雷達追蹤池｜族群法人資金流向 ${eligible.length}/${infos.length} 個族群可排名</b><div>只在雷達追蹤的當日成分股中比較：完整對帳 ${matched} 個、舊日彙總重算 ${rebuilt} 個、同日彙總不一致但逐檔全數有效 ${recalculated} 個。後者依當日逐檔淨額排名並標記差異；其餘 ${excluded.length} 個才是資料缺漏。這不是全台股所有股票的名次。</div><div>外資＋投信淨買賣股數 × 同日收盤價估算金額；缺值不能當零，不拿部分樣本或前日金額硬湊名次。</div></div>`
+ box.innerHTML=buildStamp+`<div class="capital-verification-note" data-capital-rank-scope><b>${mesc(day||'未知日期')} 犬子雷達追蹤池｜族群法人資金流向 ${eligible.length}/${infos.length} 個族群可排名</b><div>只在雷達追蹤的當日成分股中比較：跨來源對帳 ${matched} 個、舊日彙總重算 ${rebuilt} 個、同日彙總不一致但逐檔全數有效 ${recalculated} 個。全部按當日逐檔淨額排名；其餘 ${excluded.length} 個未通過同日核對。這不是全台股所有股票的名次。</div><div>外資＋投信淨買賣股數 × 同日收盤價估算金額；缺值不能當零，不拿部分樣本或前日金額硬湊名次。</div></div>`
  +(eligible.length?rankBoard('資金流入排行',inflow,'in')+rankBoard('資金流出排行',outflow,'out'):`<div class="capital-verification-note">目前沒有足夠同日完整資料可核實法人族群名次，暫時不提供可能錯誤的淨金額排行。以下可展開缺漏影響及「非法人」的同日成交額動能觀察。</div>`)
  +(neutral.length?rankBoard('淨額持平',neutral,'flat'):'')
  +intervalSection('估算區間方向仍偏流入',intervalPositive,'in')
