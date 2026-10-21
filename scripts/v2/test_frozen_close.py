@@ -44,6 +44,13 @@ class FrozenCloseTest(unittest.TestCase):
             self.assertTrue(all(s["freshness"] in ("FRESH","FROZEN") for s in summary))
             self.assertEqual(hydrate(root,PIN)["action"],"restored")
 
+    def test_manifest_accepts_frozen_source_provenance(self):
+        schema=json.loads((Path(__file__).resolve().parents[2]/
+          "contracts/schemas/bundle-manifest.schema.json").read_text(encoding="utf-8"))
+        for key in ("close_frozen_trade_date","close_frozen_source_build_id","close_frozen_reason"):
+            self.assertIn(key,schema["properties"])
+        self.assertFalse(schema["additionalProperties"])
+
     def test_next_complete_close_is_not_rolled_back(self):
         fm,_=frozen_snapshot(PIN)
         with tempfile.TemporaryDirectory() as d:

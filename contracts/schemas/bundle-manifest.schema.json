@@ -20,57 +20,176 @@
     "health"
   ],
   "properties": {
-    "version_registry_version": {"const": "2.1.0"},
-    "version_set_id": {"const": "cb2-vset-2.1.0-alpha.2"},
-    "schema_version": {"const": "2.0.0"},
-    "app_contract_version": {"const": "2.0.0"},
-    "engine_version": {"const": "2.0.0-alpha.2"},
-    "enum_registry_version": {"const": "2.0.0"},
-    "threshold_registry_version": {"const": "2.0.0"},
-    "taxonomy_version": {"const": "2.1.0"},
-    "active_build_id": {"type": "string"},
-    "previous_good_build_id": {"type": ["string", "null"]},
-    "trade_date": {"type": ["string", "null"], "format": "date"},
-    "session_phase": {"enum": ["PRE_OPEN", "LIVE", "CLOSE_FREEZE", "POST_CLOSE", "NEXT_DAY"]},
-    "generated_at": {"type": "string", "format": "date-time"},
+    "version_registry_version": {
+      "const": "2.1.0"
+    },
+    "version_set_id": {
+      "const": "cb2-vset-2.1.0-alpha.2"
+    },
+    "schema_version": {
+      "const": "2.0.0"
+    },
+    "app_contract_version": {
+      "const": "2.0.0"
+    },
+    "engine_version": {
+      "const": "2.0.0-alpha.2"
+    },
+    "enum_registry_version": {
+      "const": "2.0.0"
+    },
+    "threshold_registry_version": {
+      "const": "2.0.0"
+    },
+    "taxonomy_version": {
+      "const": "2.1.0"
+    },
+    "active_build_id": {
+      "type": "string"
+    },
+    "previous_good_build_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "trade_date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "session_phase": {
+      "enum": [
+        "PRE_OPEN",
+        "LIVE",
+        "CLOSE_FREEZE",
+        "POST_CLOSE",
+        "NEXT_DAY"
+      ]
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
     "datasets": {
       "type": "object",
       "minProperties": 1,
       "additionalProperties": {
         "type": "object",
-        "required": ["url", "hash", "bytes", "complete", "as_of", "known_at", "build_id"],
+        "required": [
+          "url",
+          "hash",
+          "bytes",
+          "complete",
+          "as_of",
+          "known_at",
+          "build_id"
+        ],
         "properties": {
-          "url": {"type": "string"},
-          "hash": {"type": "string", "minLength": 8},
-          "bytes": {"type": "integer", "minimum": 0},
-          "complete": {"type": "boolean"},
-          "as_of": {"type": ["string", "null"], "format": "date-time"},
-          "known_at": {"type": ["string", "null"], "format": "date-time"},
-          "build_id": {"type": "string"}
+          "url": {
+            "type": "string"
+          },
+          "hash": {
+            "type": "string",
+            "minLength": 8
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "as_of": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "known_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "build_id": {
+            "type": "string"
+          }
         },
         "additionalProperties": false
       }
     },
     "health": {
       "type": "object",
-      "required": ["validation_passed", "warnings", "errors", "fallback_reason"],
+      "required": [
+        "validation_passed",
+        "warnings",
+        "errors",
+        "fallback_reason"
+      ],
       "properties": {
-        "validation_passed": {"type": "boolean"},
-        "warnings": {"type": "array", "items": {"type": "string"}},
-        "errors": {"type": "array", "items": {"type": "string"}},
-        "fallback_reason": {"type": ["string", "null"]},
+        "validation_passed": {
+          "type": "boolean"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fallback_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "build_identity": {
           "type": "object",
-          "required": ["source_fingerprint", "implementation_fingerprint", "identity_rule"],
+          "required": [
+            "source_fingerprint",
+            "implementation_fingerprint",
+            "identity_rule"
+          ],
           "properties": {
-            "source_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{10}$"},
-            "implementation_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{10}$"},
-            "identity_rule": {"const": "source-content + production-v2-implementation-contract"}
+            "source_fingerprint": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{10}$"
+            },
+            "implementation_fingerprint": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{10}$"
+            },
+            "identity_rule": {
+              "const": "source-content + production-v2-implementation-contract"
+            }
           },
           "additionalProperties": false
         }
       },
       "additionalProperties": false
+    },
+    "close_frozen_trade_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Last independently validated close carried across live sessions"
+    },
+    "close_frozen_source_build_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "close_frozen_reason": {
+      "type": "string",
+      "minLength": 1
     }
   },
   "additionalProperties": false
