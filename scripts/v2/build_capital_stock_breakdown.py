@@ -178,13 +178,19 @@ def build(root, registry):
             # shares and same-day closes. Rebuild today's total from all stocks;
             # the older group aggregate is not used or called reconciled.
             rank_status = "REBUILT_ALL_MEMBERS"
-        elif full_members and source_day == close_date:
-            # A same-day aggregate conflicting with fully dated members is a
-            # real integrity failure: never silently choose a side.
-            rank_status = "CONFLICT"
+        elif full_members:
+            # A legacy same-day group total can be produced from a DIFFERENT
+            # member set or an earlier snapshot. Do not substitute that total.
+            # Independently observed same-day foreign/trust SHARES and prices
+            # for every tracked member form a comparable tracked-universe sum.
+            # It is explicitly NOT called aggregate reconciled; preserve the
+            # discrepancy and the conflicting legacy date for investigation.
+            rank_status = "RECALCULATED_SOURCE_DISAGREEMENT"
         else:
             rank_status = "INCOMPLETE"
-        rank_eligible = rank_status in {"RECONCILED", "REBUILT_ALL_MEMBERS"}
+        rank_eligible = rank_status in {"RECONCILED", "REBUILT_ALL_MEMBERS", "RECALCULATED_SOURCE_DISAGREEMENT"}
+        if full_members and not rank_eligible:
+            raise AssertionError(f"all-current stock evidence was incorrectly excluded: {group}")
         if not matched:
             mismatch_count += 1
         valid_count += len(good)
@@ -241,6 +247,9 @@ def build(root, registry):
             "rank_amount_100m": round(sum_amount, 8) if rank_eligible else None,
             "rank_lots": round(sum_lots, 4) if rank_eligible else None,
             "aggregate_source_date": source_day or None,
+            "legacy_aggregate_differs": bool(full_members and not matched),
+            "rank_evidence_source": "COMPLETE_SAME_DAY_STOCK_ROWS" if rank_eligible else "INCOMPLETE_STOCK_ROWS",
+            "rank_scope": "ATOMIC_TRACKED_STOCKS_ONLY",
             "rank_full_member_coverage": full_members,
             "delta_amount_100m": round(delta_amount, 5) if delta_amount is not None else None,
             "delta_lots": round(delta_lots, 3) if delta_lots is not None else None,
@@ -256,9 +265,11 @@ def build(root, registry):
         "tracked_stock_count": len(tracked),
         "sample_rule": "at least 3 same-day stocks with at least 60% of tracked members; sample net is not full-sector net",
         "interval_rule": "missing impact = 130% of validated daily share volume * close; date-matched turnover sanity check; approximate range only, NOT an official upper/lower bound",
-        "rank_rule": "ALL listed constituents require same-date foreign, trust and closing price. Full group aggregate must reconcile when its own source date matches; older aggregate is never used for today's rank.",
+        "rank_rule": "All tracked constituents must have same-date foreign, trust and close; rank uses their independent signed sum. Legacy same-day aggregate discrepancies are flagged but never substituted into rank.",
         "groups": out, "group_count": len(out), "verified_stock_count": valid_count,
         "unreconciled_group_count": mismatch_count,
+        "rank_eligible_group_count": sum(g["rank_eligible"] for g in out.values()),
+        "source_disagreement_group_count": sum(g["rank_status"]=="RECALCULATED_SOURCE_DISAGREEMENT" for g in out.values()),
     }
     data = json.dumps(result, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
     dest = root / "builds" / build_id / "capital-close-members.json"
@@ -267,7 +278,7 @@ def build(root, registry):
     datasets["capital_close_members"] = {
         "url": f"./data/builds/{build_id}/capital-close-members.json",
         "hash": "sha256:" + hashlib.sha256(data).hexdigest(),
-        "bytes": len(data), "complete": mismatch_count == 0,
+        "bytes": len(data), "complete": all(g["rank_eligible"] for g in out.values()),
         "as_of": result["as_of"], "known_at": datasets["capital_close_context"].get("known_at"),
         "build_id": build_id,
     }
@@ -275,7 +286,7 @@ def build(root, registry):
     print("capital close constituents", {"build": build_id, "date": close_date, "groups": len(out),
                                        "verified": valid_count, "unreconciled": mismatch_count,
                                        "rank_status": {kind: sum(g["rank_status"]==kind for g in out.values())
-                                                       for kind in ("RECONCILED","REBUILT_ALL_MEMBERS","CONFLICT","INCOMPLETE")},
+                                                       for kind in ("RECONCILED","REBUILT_ALL_MEMBERS","RECALCULATED_SOURCE_DISAGREEMENT","INCOMPLETE")},
                                        "interval_available": sum(g["interval_available"] for g in out.values()),
                                        "memory": {field: out["記憶體IC"][field] for field in ["buy_count", "sell_count", "delta_amount_100m", "delta_lots", "verdict"]}
                                        if "記憶體IC" in out else None})
