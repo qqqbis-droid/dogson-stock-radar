@@ -42,16 +42,26 @@ function closeRankInfo(x,ledger,day){
  const members=Number(row?.member_count)||0;
  const verified=Number(row?.verified_count)||0;
  const ratio=members>0?verified/members*100:null;
- const confirmed=Boolean(day&&sourceDay===day&&ledgerDay===day
-   &&row?.reconciled===true&&members>0&&verified===members
-   &&mn(x?.today_amount_100m)!=null);
- // This tier reconciles ONLY the valid same-day constituent subset, never
- // the whole-sector aggregate or its potentially older source date.
+ const amount=mn(row?.rank_amount_100m),lots=mn(row?.rank_lots);
+ const status=String(row?.rank_status||'INCOMPLETE');
+ const confirmed=Boolean(day&&ledgerDay===day&&sourceDay===day
+   &&row?.reconciled===true&&status==='RECONCILED'
+   &&members>0&&verified===members&&amount!=null&&lots!=null);
+ const rebuilt=Boolean(day&&ledgerDay===day&&sourceDay&&sourceDay<day
+   &&row?.rank_full_member_coverage===true
+   &&status==='REBUILT_ALL_MEMBERS'
+   &&members>0&&verified===members&&amount!=null&&lots!=null);
+ const rankEligible=Boolean(day&&row?.rank_eligible===true
+   &&row?.rank_trade_date===day&&(confirmed||rebuilt));
+ // 60%-covered individual-stock samples NEVER qualify for a sector rank.
  const sampleAmount=mn(row?.sample_amount_100m);
- const sampleReady=Boolean(!confirmed&&ledgerDay===day&&row?.sample_trade_date===day
-   &&row?.sample_scope==='SAME_DAY_MATCHED_STOCKS_ONLY'&&row?.sample_eligible===true
-   &&members>=3&&verified>=3&&ratio>=60&&sampleAmount!=null&&mn(row?.sample_lots)!=null);
- return {confirmed,sampleReady,sampleAmount,sampleLots:mn(row?.sample_lots),sourceDay:sourceDay||'',members,verified,ratio};
+ const sampleReady=Boolean(!rankEligible&&ledgerDay===day&&row?.sample_trade_date===day
+   &&row?.sample_scope==='SAME_DAY_MATCHED_STOCKS_ONLY'
+   &&row?.sample_eligible===true&&members>=3&&verified>=3&&ratio>=60
+   &&sampleAmount!=null&&mn(row?.sample_lots)!=null);
+ return {confirmed,rebuilt,rankEligible,rankAmount:amount,rankLots:lots,
+   rankStatus:status,sourceDay:sourceDay||'',members,verified,ratio,
+   sampleReady,sampleAmount,sampleLots:mn(row?.sample_lots)};
 }
 function flowAuditText(x,info){
  const date=info.sourceDay||'無日期';
