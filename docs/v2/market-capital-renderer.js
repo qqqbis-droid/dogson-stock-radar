@@ -45,7 +45,13 @@ function closeRankInfo(x,ledger,day){
  const confirmed=Boolean(day&&sourceDay===day&&ledgerDay===day
    &&row?.reconciled===true&&members>0&&verified===members
    &&mn(x?.today_amount_100m)!=null);
- return {confirmed,sourceDay:sourceDay||'',members,verified,ratio};
+ // This tier reconciles ONLY the valid same-day constituent subset, never
+ // the whole-sector aggregate or its potentially older source date.
+ const sampleAmount=mn(row?.sample_amount_100m);
+ const sampleReady=Boolean(!confirmed&&ledgerDay===day&&row?.sample_trade_date===day
+   &&row?.sample_scope==='SAME_DAY_MATCHED_STOCKS_ONLY'&&row?.sample_eligible===true
+   &&members>=3&&verified>=3&&ratio>=60&&sampleAmount!=null&&mn(row?.sample_lots)!=null);
+ return {confirmed,sampleReady,sampleAmount,sampleLots:mn(row?.sample_lots),sourceDay:sourceDay||'',members,verified,ratio};
 }
 function flowAuditText(x,info){
  const date=info.sourceDay||'無日期';
