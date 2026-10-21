@@ -89,7 +89,14 @@ def build(root, registry):
         if not isinstance(e, dict):
             continue
         code = str(code)
-        group = members.get(code) or str(e.get("sector_group") or "").strip()
+        # The upstream group aggregates were built from the SAME stock row's
+        # sector_group (fallback to industry_name). Never override that with
+        # a different taxonomy registry: that made two valid sums disagree.
+        sector = str(e.get("sector_group") or "").strip()
+        industry = str(e.get("industry_name") or "").strip()
+        group = sector or (industry if industry and industry != "未分類" else "")
+        if not group and members.get(code) in groups:
+            group = members[code]
         if group not in groups:
             continue
         membership[group].add(code)
@@ -245,6 +252,7 @@ def build(root, registry):
         "as_of": datasets["capital_close_context"].get("as_of"),
         "method": "foreign/trust official net shares per stock multiplied by same-day closing price; amount is an estimate",
         "universe_scope": "ATOMIC_TRACKED_STOCKS_ONLY",
+        "group_source": "stock_detail_close.sector_group_or_official_industry; registry must not override upstream group aggregates",
         "tracked_stock_count": len(tracked),
         "sample_rule": "at least 3 same-day stocks with at least 60% of tracked members; sample net is not full-sector net",
         "interval_rule": "missing impact = 130% of validated daily share volume * close; date-matched turnover sanity check; approximate range only, NOT an official upper/lower bound",
