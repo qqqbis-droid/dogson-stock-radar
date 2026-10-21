@@ -67,7 +67,7 @@ def restore(root: Path):
     m=load(mp)
     build=str(m.get("active_build_id") or "")
     prior=str(m.get("previous_good_build_id") or "")
-    day=date(m.get("trade_date"))
+    day=date(((m.get("datasets") or {}).get("decision_close_summary") or {}).get("as_of") or m.get("trade_date"))
     if not build or not day or not prior or prior==build:
         return {"restored":0,"reason":"no previous distinct build"}
     ds=m.get("datasets") or {}

@@ -116,7 +116,10 @@ def patch_row(row, raw):
 def run(root: Path, legacy: Path):
     manifest_path = root / "current_manifest.json"
     m = read(manifest_path)
-    date = str(m.get("trade_date") or "")[:10]
+    # On the next trading morning, live bundle date is already today while
+    # the completed CLOSE mission still belongs to yesterday.
+    close_meta = (m.get("datasets") or {}).get("decision_close_summary") or {}
+    date = str(close_meta.get("as_of") or m.get("trade_date") or "")[:10]
     active = str(m.get("active_build_id") or "")
     source = read(legacy)
     rows = source.get("rows") or []

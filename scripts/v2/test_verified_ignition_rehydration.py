@@ -48,7 +48,8 @@ class TestRepair(unittest.TestCase):
             for k,v in sources.items():
                 path=b/(k+".json");path.write_text(json.dumps(v))
                 ds[k]={"url":"./data/builds/"+BID+"/"+k+".json","build_id":BID}
-            manifest={"active_build_id":BID,"trade_date":DAY,"datasets":ds}
+            manifest={"active_build_id":BID,"trade_date":"2026-10-17","datasets":ds}
+            for key in ds: ds[key]["as_of"]=DAY+"T13:30:00+08:00"
             (root/"current_manifest.json").write_text(json.dumps(manifest))
             n=run(root,raw)
             self.assertEqual(n,16)
@@ -62,7 +63,10 @@ class TestRepair(unittest.TestCase):
             self.assertEqual(index[0]["ignition_execution_state"],"READY")
             m=json.loads((root/"current_manifest.json").read_text())
             self.assertEqual(m["datasets"]["decision_close_index"]["bytes"],(b/"decision_close_index.json").stat().st_size)
-            # Cross-day source must be refused, NEVER reuse yesterday's model.
+            # The live bundle clock may be tomorrow; CLOSE must still use
+            # its exact completed-session date. An older source is forbidden.
+            self.assertEqual(m["trade_date"],"2026-10-17")
+            # Cross-day source must be refused, NEVER reuse another close session.
             old=json.loads(raw.read_text())
             for r in old["rows"]:r["date"]="2026-10-15"
             raw.write_text(json.dumps(old))
