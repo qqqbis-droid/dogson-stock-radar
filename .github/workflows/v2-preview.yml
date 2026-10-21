@@ -31,6 +31,10 @@ jobs:
       - run: pip install -r requirements-contract.txt
       - name: Contract tests
         run: python -m unittest discover -s contracts/contract-tests -p 'test_*.py' -v
+      - name: Completed-session freeze regression
+        run: |
+          python -m py_compile scripts/v2/preserve_frozen_close.py
+          python -m unittest scripts.v2.test_frozen_close -v
       - name: Engine structural tests
         run: python -m unittest scripts.v2.test_engine -v
       - name: TradeCase structural tests
