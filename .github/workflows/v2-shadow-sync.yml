@@ -94,6 +94,11 @@ jobs:
               print(name, obj.get('trade_date') or obj.get('source_trade_date') or obj.get('date'))
           PY
 
+      - name: Verify original Wave Score 2.0 in downloaded source
+        run: |
+          python scripts/v2/validate_full_swing_source.py --source .shadow-main-data/close.json
+          echo "Source-side scoring must include original tech6/chip7/sector6/liquidity5. No substitute legacy score allowed."
+
       - name: Build 2.0 canonical atomic bundle
         run: python scripts/v2/build_legacy_bundle.py --legacy-root .shadow-main-data --output docs/v2/data
 
@@ -106,10 +111,14 @@ jobs:
       - name: Enrich mission-specific stock detail evidence
         run: python scripts/v2/enrich_stock_detail_context.py --legacy-root .shadow-main-data --root docs/v2/data
 
+      - name: Confirm full original score ledger survived detail import
+        run: |
+          python scripts/v2/validate_full_swing_source.py --source .shadow-main-data/close.json --atomic-root docs/v2/data
+
       - name: Restore market/capital and latest-close semantics
         run: |
           python scripts/v2/restore_market_capital_context.py --legacy-root .shadow-main-data --root docs/v2/data
-          python scripts/v2/normalize_close_snapshot_by_close_date.py --root docs/v2/data
+          python scripts/v2/normalize_close_snapshot_by_close_date.py --root docs/v2/data --legacy-root .shadow-main-data
           python scripts/v2/preserve_frozen_close.py --root docs/v2/data --frozen-root docs/v2/frozen-close/latest
           python scripts/v2/stamp_version_contract.py --root docs/v2/data
 
