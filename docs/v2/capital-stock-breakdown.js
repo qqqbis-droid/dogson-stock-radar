@@ -10,12 +10,58 @@ const amt=v=>{const n=num(v);if(n==null)return'—';return (n>0?'+':'')+(Math.ab
 const lots=v=>num(v)==null?'—':(Number(v)>0?'+':'')+fmt(v,1)+'張';
 const verdict={BROAD_INFLOW:'多數個股同步流入',CONCENTRATED_INFLOW:'少數個股主導流入',DIVERGENT_INFLOW:'金額流入、家數分歧',BROAD_OUTFLOW:'多數個股同步流出',SMALL_SAMPLE:'族群成分股樣本較少',MIXED:'多空分歧',UNVERIFIED:'明細尚未完全對帳'};
 let cache=null,build='',loading=false,seq=0;
+let scoresByCode=null,scoreBuild='',scoreMeta=null,scorePromise=null,scoreEpoch=0,scoreError=false;
+function officialSwing(row,bid){
+  if(!row||String(row.build_id||'')!==String(bid||''))return null;
+  const v=num(row.scores?.swing_quality_score);
+  return v!=null&&v>=0&&v<=100?v:null;
+}
+function paintScores(){
+  if(!active())return;
+  document.querySelectorAll('#sectorList [data-cms-wave-score]').forEach(el=>{
+    const row=scoresByCode?.get(String(el.dataset.cmsWaveScore||''));
+    const value=officialSwing(row,scoreBuild);
+    el.textContent=value!=null?'波段分數 '+fmt(value,1)+'/100'
+      :scoreError?'波段分數：來源待核'
+      :scoresByCode?'波段分數：尚未提供':'波段分數：待載入';
+    el.dataset.scoreAvailable=value!=null?'true':'false';
+  });
+}
+async function loadScores(){
+  if(!active()||!cache||!build)return;
+  if(scoresByCode&&scoreBuild===build){paintScores();return}
+  if(scorePromise)return scorePromise;
+  const requestedBuild=build,requestedDay=String(cache.trade_date||'').slice(0,10);
+  const source=scoreMeta,epoch=scoreEpoch;
+  if(!source?.url||String(source.as_of||'').slice(0,10)!==requestedDay){
+    scoresByCode=new Map();scoreBuild=requestedBuild;scoreError=true;paintScores();return;
+  }
+  scorePromise=(async()=>{
+    try{
+      const response=await fetch(source.url,{cache:'no-store'});
+      if(!response.ok)throw new Error('wave index HTTP '+response.status);
+      const rows=await response.json();
+      if(!Array.isArray(rows))throw new Error('wave index shape');
+      if(rows.some(r=>r&&r.build_id!==requestedBuild))throw new Error('wave index build mismatch');
+      if(epoch!==scoreEpoch||requestedBuild!==build)return;
+      scoresByCode=new Map(rows.filter(r=>r&&r.code!=null).map(r=>[String(r.code),r]));
+      scoreBuild=requestedBuild;scoreError=false;
+    }catch(err){
+      if(epoch!==scoreEpoch||requestedBuild!==build)return;
+      console.warn('capital stock swing score',err);
+      scoresByCode=new Map();scoreBuild=requestedBuild;scoreError=true;
+    }finally{
+      if(epoch===scoreEpoch){scorePromise=null;paintScores()}
+    }
+  })();
+  return scorePromise;
+}
 const view=()=>$('.tab.active')?.dataset.view||'intraday';
 const active=()=>['close','portfolio'].includes(view());
 function style(){
  if($('#dogsonCapitalStocksStyle'))return;
  const s=document.createElement('style');s.id='dogsonCapitalStocksStyle';
- s.textContent="\n#sectorList .capital-chip>.cms-glance {grid-column:1/-1;width:100%;min-width:0;max-width:100%}\n#sectorList .capital-chip>.capital-more>.cms-detail {grid-column:1/-1;width:100%;min-width:0;max-width:100%}\n#sectorList .capital-chip>.capital-more>.capital-member-fallback[hidden] {display:none!important}\n#sectorList .capital-chip>.capital-more>.capital-section-label[hidden],\n#sectorList .capital-chip>.capital-more>.member-list[hidden] {display:none!important}\n#sectorList .capital-chip .cms-glance {margin:8px 0 2px;padding:9px 10px;background:var(--soft);border:1px solid var(--line);border-radius:10px;line-height:1.5;font-size:.72rem;overflow-wrap:anywhere}\n#sectorList .capital-chip .cms-glance.good {border-left:3px solid var(--green)}\n#sectorList .capital-chip .cms-glance.warn {border-left:3px solid #b89636}\n#sectorList .capital-chip .cms-glance.bad {border-left:3px solid var(--red)}\n.cms-detail {margin-top:10px;padding:12px 0 0;border-top:1px solid var(--line)}\n#sectorList .capital-chip .cms-title {font-weight:900;font-size:.85rem;line-height:1.4;color:var(--ink,var(--text))}\n#sectorList .capital-chip .cms-warning {padding:9px 10px;margin:8px 0;border-radius:9px;border:1px solid var(--line);background:var(--soft);font-size:.73rem;line-height:1.55;overflow-wrap:anywhere}\n.cms-stocks {display:grid;grid-template-columns:minmax(0,1fr);gap:9px;max-height:min(650px,76vh);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;margin-top:11px;width:100%}\n#sectorList .capital-chip .cms-stock {min-width:0;max-width:100%;padding:11px;border:1px solid var(--line);background:var(--card);border-radius:11px}\n.cms-main {display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}\n.cms-main button {display:flex;align-items:center;gap:6px;min-width:0;max-width:100%;border:0;background:transparent;color:var(--ink,var(--text));font-weight:850;font-size:.86rem;line-height:1.4;text-align:left;padding:1px 0;cursor:pointer}\n.cms-main .cms-name {min-width:0;overflow-wrap:anywhere}\n.cms-main .cms-arrow {font-size:.75rem;opacity:.75}\n#sectorList .capital-chip .cms-money {flex:none;font-size:.93rem;font-weight:900;white-space:nowrap;font-variant-numeric:tabular-nums}\n#sectorList .capital-chip .cms-money.plus {color:var(--red)}\n#sectorList .capital-chip .cms-money.minus {color:var(--green)}\n#sectorList .capital-chip .cms-sub {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:8px;color:var(--ink,var(--text))}\n#sectorList .capital-chip .cms-stat {min-width:0;background:var(--soft);border-radius:8px;padding:7px 8px}\n.cms-stat small {display:block;font-size:.66rem;line-height:1.3;color:var(--muted);font-weight:500}\n.cms-stat b {display:block;font-size:.75rem;line-height:1.35;margin-top:3px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}\n#sectorList .capital-chip .cms-unverified {font-size:.7rem;line-height:1.5;color:var(--muted);margin-top:7px}\n#sectorList .capital-chip .cms-method {font-size:.68rem;line-height:1.6;color:var(--muted);margin:10px 0 2px;overflow-wrap:anywhere}\n@media(min-width:760px) {\n  .cms-stocks {grid-template-columns:repeat(2,minmax(0,1fr))}\n}\n@media(max-width:390px) {\n  .cms-main button {font-size:.78rem}\n  .cms-money {font-size:.83rem}\n  .cms-stat b {font-size:.7rem}\n}\n";
+ s.textContent="\n#sectorList .capital-chip>.cms-glance {grid-column:1/-1;width:100%;min-width:0;max-width:100%}\n#sectorList .capital-chip>.capital-more>.cms-detail {grid-column:1/-1;width:100%;min-width:0;max-width:100%}\n#sectorList .capital-chip>.capital-more>.capital-member-fallback[hidden] {display:none!important}\n#sectorList .capital-chip>.capital-more>.capital-section-label[hidden],\n#sectorList .capital-chip>.capital-more>.member-list[hidden] {display:none!important}\n#sectorList .capital-chip .cms-glance {margin:8px 0 2px;padding:9px 10px;background:var(--soft);border:1px solid var(--line);border-radius:10px;line-height:1.5;font-size:.72rem;overflow-wrap:anywhere}\n#sectorList .capital-chip .cms-glance.good {border-left:3px solid var(--green)}\n#sectorList .capital-chip .cms-glance.warn {border-left:3px solid #b89636}\n#sectorList .capital-chip .cms-glance.bad {border-left:3px solid var(--red)}\n.cms-detail {margin-top:10px;padding:12px 0 0;border-top:1px solid var(--line)}\n#sectorList .capital-chip .cms-title {font-weight:900;font-size:.85rem;line-height:1.4;color:var(--ink,var(--text))}\n#sectorList .capital-chip .cms-warning {padding:9px 10px;margin:8px 0;border-radius:9px;border:1px solid var(--line);background:var(--soft);font-size:.73rem;line-height:1.55;overflow-wrap:anywhere}\n.cms-stocks {display:grid;grid-template-columns:minmax(0,1fr);gap:9px;max-height:min(650px,76vh);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;margin-top:11px;width:100%}\n#sectorList .capital-chip .cms-stock {min-width:0;max-width:100%;padding:11px;border:1px solid var(--line);background:var(--card);border-radius:11px}\n.cms-main {display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}\n.cms-main button {display:flex;align-items:center;gap:6px;min-width:0;max-width:100%;border:0;background:transparent;color:var(--ink,var(--text));font-weight:850;font-size:.86rem;line-height:1.4;text-align:left;padding:1px 0;cursor:pointer}\n.cms-main .cms-name {min-width:0;overflow-wrap:anywhere}\n.cms-stock-ident{display:grid;gap:3px;min-width:0}\n.cms-wave-score{font-size:.68rem;font-weight:750;line-height:1.35;color:var(--muted);font-variant-numeric:tabular-nums}\n.cms-wave-score[data-score-available="true"]{color:var(--green)}\n#sectorList .capital-chip .cms-stock[data-cms-stock-card]{cursor:pointer}\n#sectorList .capital-chip .cms-stock[data-cms-stock-card]:hover{border-color:var(--green)}\n.cms-main .cms-arrow {font-size:.75rem;opacity:.75}\n#sectorList .capital-chip .cms-money {flex:none;font-size:.93rem;font-weight:900;white-space:nowrap;font-variant-numeric:tabular-nums}\n#sectorList .capital-chip .cms-money.plus {color:var(--red)}\n#sectorList .capital-chip .cms-money.minus {color:var(--green)}\n#sectorList .capital-chip .cms-sub {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:8px;color:var(--ink,var(--text))}\n#sectorList .capital-chip .cms-stat {min-width:0;background:var(--soft);border-radius:8px;padding:7px 8px}\n.cms-stat small {display:block;font-size:.66rem;line-height:1.3;color:var(--muted);font-weight:500}\n.cms-stat b {display:block;font-size:.75rem;line-height:1.35;margin-top:3px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}\n#sectorList .capital-chip .cms-unverified {font-size:.7rem;line-height:1.5;color:var(--muted);margin-top:7px}\n#sectorList .capital-chip .cms-method {font-size:.68rem;line-height:1.6;color:var(--muted);margin:10px 0 2px;overflow-wrap:anywhere}\n@media(min-width:760px) {\n  .cms-stocks {grid-template-columns:repeat(2,minmax(0,1fr))}\n}\n@media(max-width:390px) {\n  .cms-main button {font-size:.78rem}\n  .cms-money {font-size:.83rem}\n  .cms-stat b {font-size:.7rem}\n}\n";
  document.head.appendChild(s);
 }
 function status(g){if(g.rank_eligible&&g.rank_status==='REBUILT_ALL_MEMBERS')return ['warn','同日完整逐檔重算（原族群彙總尚未更新）'];if(g.rank_eligible&&g.rank_status==='RECALCULATED_SOURCE_DISAGREEMENT')return ['warn','同日逐檔完整・舊族群總額差異待查'];if(!g.reconciled)return ['bad',verdict.UNVERIFIED];return[g.verdict==='BROAD_INFLOW'?'good':g.verdict==='BROAD_OUTFLOW'?'bad':'warn',verdict[g.verdict]||verdict.MIXED]}
@@ -28,7 +74,7 @@ function glance(g){
 }
 function stock(s){
  const n=num(s.estimated_amount_100m);
- const top='<div class="cms-stock"><div class="cms-main"><button type="button" data-stock-code="'+esc(s.code)+'" aria-label="查看 '+esc(s.name)+' 個股詳情"><span class="cms-code">'+esc(s.code)+'</span><span class="cms-name">'+esc(s.name)+'</span><span class="cms-arrow" aria-hidden="true">↗</span></button><strong class="cms-money '+(n>0?'plus':n<0?'minus':'')+'">'+esc(s.valid?amt(n):'待核對')+'</strong></div>';
+ const top='<div class="cms-stock" data-cms-stock-card="'+esc(s.code)+'"><div class="cms-main"><button type="button" data-stock-code="'+esc(s.code)+'" aria-label="開啟 '+esc(s.code)+' '+esc(s.name)+' 完整波段個股小卡"><span class="cms-stock-ident"><span><span class="cms-code">'+esc(s.code)+'</span> <span class="cms-name">'+esc(s.name)+'</span></span><span class="cms-wave-score" data-cms-wave-score="'+esc(s.code)+'" data-score-available="false">波段分數：待載入</span></span><span class="cms-arrow" aria-hidden="true">↗</span></button><strong class="cms-money '+(n>0?'plus':n<0?'minus':'')+'">'+esc(s.valid?amt(n):'待核對')+'</strong></div>';
  if(!s.valid)return top+'<div class="cms-unverified">法人或收盤資料缺漏，日期：外資 '+esc(s.foreign_date||'—')+'／投信 '+esc(s.trust_date||'—')+'</div></div>';
  const items=[['淨買賣',lots(s.net_lots)],['外資',lots(s.foreign_lots)],['投信',lots(s.trust_lots)],['當日收盤',fmt(s.close_price,2)]];
  return top+'<div class="cms-sub">'+items.map(([k,v])=>'<div class="cms-stat"><small>'+esc(k)+'</small><b>'+esc(v)+'</b></div>').join('')+'</div></div>';
@@ -58,6 +104,7 @@ function paint(){
    more.querySelector('.capital-member-fallback')?.setAttribute('hidden','');
    more.insertAdjacentHTML('beforeend',detail(g));
  });
+ paintScores();
 }
 function warning(message){
  const host=$('#sectorList');if(!host||!active())return;
@@ -76,16 +123,43 @@ async function load(){
   if(build===m.active_build_id&&cache){paint();return}
   const d=await fetch(meta.url,{cache:'no-store'}).then(x=>{if(!x.ok)throw Error('members '+x.status);return x.json()});
   if(d.build_id!==m.active_build_id||d.trade_date!==day)throw Error('資金明細與族群資料日期不一致');
-  if(my!==seq)return;cache=d;build=d.build_id;paint();
+  if(my!==seq)return;
+  if(build!==d.build_id){scoreEpoch++;scoresByCode=null;scoreBuild='';scorePromise=null;scoreError=false}
+  scoreMeta=m.datasets?.decision_close_index||null;
+  cache=d;build=d.build_id;paint();
  }catch(e){console.warn('sector stocks detail',e);warning('逐檔資料尚未取得或資料日不一致，不據此判定族群共振。')}
  finally{loading=false}
 }
 function sync(){if(!active())return;if(cache)paint();else load()}
 function boot(){
  style();const host=$('#sectorList');
- if(host)new MutationObserver(()=>{if(active()){if(cache)paint();else load()}}).observe(host,{childList:true});
+ if(host){
+   new MutationObserver(()=>{if(active()){if(cache)paint();else load()}}).observe(host,{childList:true});
+   // Capture before the enclosing sector toggles on document bubble.
+   host.addEventListener('click',e=>{
+     const stockCard=e.target.closest?.('.cms-stock[data-cms-stock-card]');
+     if(stockCard&&host.contains(stockCard)){
+       const code=String(stockCard.dataset.cmsStockCard||'');
+       if(!code)return;
+       e.preventDefault();e.stopPropagation();
+       document.dispatchEvent(new CustomEvent('radar:open-stock',{
+         detail:{code,view:'close',closeMode:'swing'}
+       }));
+       return;
+     }
+     const group=e.target.closest?.('.capital-chip[data-capital-group]');
+     if(group&&host.contains(group)){
+       setTimeout(()=>{
+         if(active()&&group.isConnected&&group.querySelector('.capital-more:not([hidden])'))void loadScores();
+       },0);
+     }
+   },true);
+ }
  document.addEventListener('radar:view-rendered',()=>setTimeout(sync,150));
- document.addEventListener('radar:data-reloaded',()=>{cache=null;build='';load()});
+ document.addEventListener('radar:data-reloaded',()=>{
+   cache=null;build='';scoreEpoch++;scoresByCode=null;scoreBuild='';scoreMeta=null;scorePromise=null;scoreError=false;
+   load();
+ });
  document.addEventListener('click',e=>{if(e.target.closest('.tab'))setTimeout(sync,250)});
  sync();
 }
