@@ -79,9 +79,13 @@ def build(root, registry):
     if not groups:
         raise SystemExit("capital_close_context has no groups")
 
+    # Scope must be the SAME source universe as the close-sector aggregates.
+    # A registry may contain many symbols outside the tracked Atomic bundle;
+    # counting those as missing per-stock evidence makes every group fail forever.
+    tracked = keyed(source)
     membership = {key: set() for key in groups}
     records = {}
-    for code, e in keyed(source).items():
+    for code, e in tracked.items():
         if not isinstance(e, dict):
             continue
         code = str(code)
@@ -95,6 +99,14 @@ def build(root, registry):
         valid = f is not None and t is not None and close is not None and close > 0 and date_foreign == close_date and date_trust == close_date
         lots = (f + t) / 1000 if valid else None
         amt = (f + t) * close / 1e8 if valid else None
+        volume = number(e.get("volume"))
+        turnover = number(e.get("current_turnover"))
+        # volume is daily traded SHARES in the V1 market engine; validate its
+        # magnitude against observed turnover before estimating missing impact.
+        # This remains an approximation, NOT a guaranteed official bound.
+        volume_usable = bool(volume is not None and volume > 0 and
+            turnover is not None and turnover > 0 and close is not None and close > 0
+            and 0.60 <= (turnover / (volume * close)) <= 1.70)
         records[code] = {
             "code": code,
             "name": str(e.get("name") or code),
@@ -106,21 +118,14 @@ def build(root, registry):
             "foreign_date": date_foreign or None,
             "trust_date": date_trust or None,
             "valid": valid,
+            "volume_shares": volume if volume_usable else None,
+            "missing_flow_impact_100m": round(volume * close * 1.30 / 1e8, 8)
+                if (not valid and volume_usable) else None,
+            "volume_proxy_validated": volume_usable,
         }
 
-    # Show all registry constituents even when stock-detail coverage is missing.
-    for code, group in members.items():
-        if group not in groups:
-            continue
-        membership[group].add(code)
-        if code not in records:
-            records[code] = {
-                "code": code, "name": code, "foreign_lots": None,
-                "trust_lots": None, "net_lots": None, "close_price": None,
-                "estimated_amount_100m": None, "foreign_date": None,
-                "trust_date": None, "valid": False
-            }
-
+    # Unlisted/untracked registry symbols are NOT included in the 756-stock
+    # denominator; the UI explicitly discloses this tracking-universe scope.
     out = {}
     mismatch_count = 0
     valid_count = 0
@@ -130,11 +135,24 @@ def build(root, registry):
         good = [r for r in rows if r["valid"]]
         count, bought, sold = len(rows), sum(r["net_lots"] > 0 for r in good), sum(r["net_lots"] < 0 for r in good)
         neutral = len(good) - bought - sold
+        missing = [r for r in rows if not r["valid"]]
         sum_amount = sum(r["estimated_amount_100m"] for r in good)
         sum_lots = sum(r["net_lots"] for r in good)
         # Same-day audited subset: never claim it is the full sector net.
         sample_ratio = len(good) / count * 100 if count else None
         sample_eligible = bool(len(good) >= 3 and sample_ratio is not None and sample_ratio >= 60)
+        # A nonverified sector is never assigned a precise rank. When EVERY
+        # missing stock has valid daily volume+turnover, expose a deliberately
+        # wide +/-130% turnover-value impact interval, for direction analysis.
+        # No volume or unit plausibility: no numeric interval, never fake 0.
+        missing_bound_ok = bool(missing and all(
+            r.get("missing_flow_impact_100m") is not None for r in missing))
+        missing_impact = sum(r["missing_flow_impact_100m"] for r in missing) if missing_bound_ok else None
+        lower = sum_amount - missing_impact if missing_impact is not None else None
+        upper = sum_amount + missing_impact if missing_impact is not None else None
+        interval_direction = ("POSITIVE" if lower is not None and lower > 0 else
+                              "NEGATIVE" if upper is not None and upper < 0 else
+                              "INDETERMINATE") if missing_bound_ok else "UNKNOWN"
         source_day = str(x.get("latest_date") or "")[:10]
         source_amount, source_lots = number(x.get("today_amount_100m")), number(x.get("today_lots"))
         # Existing cards round lots to tenths, monetary units to four decimals.
@@ -196,6 +214,14 @@ def build(root, registry):
             "sample_coverage_pct": round(sample_ratio, 2) if sample_ratio is not None else None,
             "sample_eligible": sample_eligible,
             "sample_scope": "SAME_DAY_MATCHED_STOCKS_ONLY",
+            "missing_count": len(missing),
+            "interval_available": missing_bound_ok,
+            "interval_lower_100m": round(lower, 6) if lower is not None else None,
+            "interval_upper_100m": round(upper, 6) if upper is not None else None,
+            "interval_impact_100m": round(missing_impact, 6) if missing_impact is not None else None,
+            "interval_direction": interval_direction,
+            "interval_method": "volume_shares * close * 1.30 impact per missing symbol; volume- and turnover-consistency-gated PROXY, not a guaranteed official bound",
+
             "buy_ratio_pct": round(bought / len(good) * 100, 2) if good else None,
             "largest_positive_code": leader["code"] if leader else None,
             "largest_positive_name": leader["name"] if leader else None,
@@ -218,7 +244,10 @@ def build(root, registry):
         "build_id": build_id, "trade_date": close_date,
         "as_of": datasets["capital_close_context"].get("as_of"),
         "method": "foreign/trust official net shares per stock multiplied by same-day closing price; amount is an estimate",
-        "sample_rule": "at least 3 same-day stocks with at least 60% of listed members; sample net is not full-sector net",
+        "universe_scope": "ATOMIC_TRACKED_STOCKS_ONLY",
+        "tracked_stock_count": len(tracked),
+        "sample_rule": "at least 3 same-day stocks with at least 60% of tracked members; sample net is not full-sector net",
+        "interval_rule": "missing impact = 130% of validated daily share volume * close; date-matched turnover sanity check; approximate range only, NOT an official upper/lower bound",
         "rank_rule": "ALL listed constituents require same-date foreign, trust and closing price. Full group aggregate must reconcile when its own source date matches; older aggregate is never used for today's rank.",
         "groups": out, "group_count": len(out), "verified_stock_count": valid_count,
         "unreconciled_group_count": mismatch_count,
