@@ -208,10 +208,10 @@ console.log('PASS: original wave score displayed on sector stocks and full swing
 // reason to deny independently verified 10/21 stock rankings.
 const auditSource=fs.readFileSync('docs/v2/capital-stock-breakdown.js','utf8');
 const marketSource=fs.readFileSync('docs/v2/market-capital-renderer.js','utf8');
-const auditRankStart=marketSource.indexOf(' const auditRankMore=(view,x,a)=>'),auditRankEnd=marketSource.indexOf(' const rankCard=',auditRankStart);
+const auditRankStart=marketSource.indexOf(' const rankMore=(view,x,a)=>'),auditRankEnd=marketSource.indexOf(' const rankCard=',auditRankStart);
 assert(auditRankStart>=0&&auditRankEnd>auditRankStart,'Cannot find ranked sector summary');
 const auditRankMore=new Function('mmoney','mlots','mesc','memberButtons','day',
- marketSource.slice(auditRankStart,auditRankEnd)+'\nreturn auditRankMore;')(
+ marketSource.slice(auditRankStart,auditRankEnd)+'\nreturn rankMore;')(
  v=>String(v),v=>String(v),v=>String(v),()=>'<div class="members"></div>','2026-10-21');
 const rankHtml=auditRankMore('close',{primary_group:'AI伺服器ODM'},{rankAmount:133.1,rankLots:61083.1,verified:6,members:6,sourceDay:'2026-10-20'});
 assert(rankHtml.includes('當日資料日期</span><b>2026-10-21</b>'),'Current day stays prominent');
