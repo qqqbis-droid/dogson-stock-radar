@@ -94,6 +94,53 @@ jobs:
               print(name, obj.get('trade_date') or obj.get('source_trade_date') or obj.get('date'))
           PY
 
+      - name: Locate last successful official Close Update
+        id: verified_close
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/close.yml/runs?status=success&per_page=10" --jq '.workflow_runs[0].id // empty')"
+          test -n "$run_id"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "Verified EOD source: Radar Close Update run $run_id"
+
+      - name: Download exact verified EOD artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: .verified-close-artifact
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.verified_close.outputs.run_id }}
+
+      - name: Restore original full-scored EOD from verified artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .verified-close-pages
+          test -s .verified-close-artifact/artifact.tar
+          tar -xf .verified-close-artifact/artifact.tar -C .verified-close-pages
+          python - <<'PY'
+          import json, shutil
+          from pathlib import Path
+          live=Path(".shadow-main-data")
+          verified=Path(".verified-close-pages/data")
+          current=json.loads((live/"close.json").read_text(encoding="utf-8"))
+          official=json.loads((verified/"close.json").read_text(encoding="utf-8"))
+          official_market=json.loads((verified/"market.json").read_text(encoding="utf-8"))
+          vday=str(official.get("trade_date") or "")[:10]
+          lday=str(current.get("trade_date") or "")[:10]
+          if not vday or (lday and vday < lday):
+              raise SystemExit(f"Verified close snapshot {vday} older than visible close {lday}: refuse downgrade")
+          if str(official_market.get("trade_date") or "")[:10]!=vday:
+              raise SystemExit(f"Verified market context does not match verified close {vday}")
+          shutil.copyfile(verified/"close.json",live/"close.json")
+          shutil.copyfile(verified/"market.json",live/"market.json")
+          print("Full scoring EOD source:",{"date":vday,"stocks":len(official.get("rows") or []),
+                "source":"verified successful Radar - Close Update Pages artifact"})
+          PY
+
       - name: Verify original Wave Score 2.0 in downloaded source
         run: |
           python scripts/v2/validate_full_swing_source.py --source .shadow-main-data/close.json
