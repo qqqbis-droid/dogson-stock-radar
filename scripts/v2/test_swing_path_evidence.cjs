@@ -148,6 +148,8 @@ assert.equal(verified.mode,'complete');
 assert.equal(researchVerification({...partialSource,foreign_date:'2026-10-15',chip_check_health:'HEALTHY'},date).mode,'unverified');
 assert.equal(researchVerification(null,date).mode,'unverified');
 assert(bridge.includes('researchAuditHtml(shard)'),'Close research must expose audit rows from the actual shard');
+assert(bridge.includes('歷史參考')&&bridge.includes('來源交易日'),'Mobile research audit must display explicit historical vs current provenance');
+assert(html.includes('audit=20261021sources2'),'Updated mobile research audit must bypass iPhone cache');
 assert(bridge.includes('原始波段評分 2.0｜24 項引擎明細'),'Full-scoring source must show the original 24 scoring items');
 assert(bridge.includes('data-original-swing-v2'),'Original 2.0 24-item panel must be accessible');
 assert(bridge.includes('籌碼七項以原始 100 點計算'),'Chip item weights must explain 100 to 25 conversion');
@@ -200,6 +202,26 @@ assert rows['foreign']['status']=='observed'
 assert rows['trust']['status']=='observed'
 assert research_checks(d,None,None)['observed_count']==0
 assert research_checks({'trade_date':day,'risk_overlays':['TRADING_RESTRICTION']},e,day)['warning_count']==1
+older={**e,'chip_check_health':'PARTIAL','foreign_date':'2026-10-20',
+       'trust_date':'2026-10-20','sbl_date':'2026-10-20',
+       'margin_date':'2026-10-20',
+       'hourly60':{'trade_date':'2026-10-20','data_status':'OK',
+                   'entry_light_label':'觀察','ma20_60':91.2,'ma60_60':86.5}}
+r2=research_checks(d,older,day)
+by={x['key']:x for x in r2['checks']}
+assert r2['historical_count']==5, r2
+assert r2['pending_count']==7, r2
+assert by['foreign']['reason']=='PRIOR_SESSION'
+assert by['trust']['reason']=='PRIOR_SESSION'
+assert by['sbl']['reason']=='PRIOR_SESSION'
+assert by['margin']['reason']=='PRIOR_SESSION'
+assert by['hourly60']['reason']=='PRIOR_SESSION'
+assert '91.20' in by['hourly60']['detail']
+assert by['chip_sources']['reason']=='PARTIAL_CHECK'
+assert by['restriction']['reason']=='NOTICE_UNVERIFIED'
+today_check={**e,'chip_check_health':'CHECKED'}
+assert research_checks(d,today_check,day)['observed_count']==6
+
 print('research audit passed')
 `;
 const auditTest=spawnSync('python',['-c',auditProbe],{encoding:'utf8'});
