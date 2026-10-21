@@ -26,12 +26,13 @@ with tempfile.TemporaryDirectory() as tmp:
     root = Path(tmp) / "data"
     bdir = root / "builds" / ID
     registry = Path(tmp) / "registry.json"
-    put(registry, {"groups": [{"group": "記憶體IC", "members": [r[0] for r in STOCKS]}]})
+    put(registry, {"groups": [{"group": "記憶體IC", "members": [r[0] for r in STOCKS] + ["9999"]}]})
     put(bdir / "stock.json", {
         "build_id": ID, "items": {
             code: {"code": code, "name": name, "sector_group": "記憶體IC", "close": price,
                    "foreign_date": DATE, "trust_date": DATE,
-                   "foreign_net_latest": foreign, "trust_net_latest": trust}
+                   "foreign_net_latest": foreign, "trust_net_latest": trust,
+                   "volume": 120000000, "current_turnover": 120000000 * price}
             for code, name, price, foreign, trust in STOCKS
         },
     })
@@ -52,6 +53,7 @@ with tempfile.TemporaryDirectory() as tmp:
     build(root, registry)
     result = json.loads((bdir / "capital-close-members.json").read_text(encoding="utf-8"))
     memory = result["groups"]["記憶體IC"]
+    assert memory["member_count"] == 6, "registry symbols outside Atomic universe must not inflate denominator"
     assert memory["reconciled"], memory
     assert memory["rank_eligible"] and memory["rank_status"] == "RECONCILED"
     assert memory["rank_trade_date"] == DATE
@@ -85,7 +87,19 @@ with tempfile.TemporaryDirectory() as tmp:
     assert stale["sample_coverage_pct"] > 60 and stale["sample_trade_date"] == DATE
     assert stale["sample_amount_100m"] is not None
     assert stale["verified_count"] == 5
+    assert stale["missing_count"] == 1 and stale["interval_available"] is True
+    assert stale["interval_lower_100m"] is not None
+    assert stale["interval_upper_100m"] is not None
+    assert stale["interval_lower_100m"] < stale["sample_amount_100m"] < stale["interval_upper_100m"]
     assert stale["rank_eligible"] is False and stale["rank_status"] == "INCOMPLETE"
+
+    # Unknown/mismatched daily volume must suppress numeric intervals.
+    stock["items"]["5351"]["volume"] = None
+    put(bdir / "stock.json", stock)
+    build(root, registry)
+    unchecked = json.loads((bdir / "capital-close-members.json").read_text(encoding="utf-8"))["groups"]["記憶體IC"]
+    assert unchecked["interval_available"] is False and unchecked["interval_lower_100m"] is None
+    stock["items"]["5351"]["volume"] = 120000000
 
     # An older aggregate does not veto a complete SAME-DAY set of stock flows.
     stock["items"]["5351"]["foreign_date"] = DATE
