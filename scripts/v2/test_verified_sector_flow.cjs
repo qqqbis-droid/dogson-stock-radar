@@ -51,7 +51,7 @@ assert(source.includes('法人來源日')&&source.includes('歷史估算涵蓋�
 assert(source.includes('犬子雷達追蹤池'),'Sector rank must disclose tracked-universe denominator');
 assert(source.includes('intervalSection(')&&source.includes('非官方保證界限'),'Uncertainty must not be sold as certified ordering');
 assert(source.includes('data-turnover-heat')&&source.includes('非法人買賣')&&source.includes('heatDate===day'),'Turnover heat must remain a separately labeled and date-matched noninstitutional indicator');
-assert(page.includes('market-capital-renderer.js?v=20261022auditfold1'),'Mobile cache must load complete-sector-first renderer');
+assert(page.includes('market-capital-renderer.js?v=20261022legacyfold2'),'Mobile cache must load complete-sector-first renderer');
 assert(source.includes('data-capital-build')&&source.includes('data-capital-ranked'),'Live capital ranking must show the actual active build and ranked count');
 assert(source.includes("window.setInterval(capitalRecheckOnReturn,45000)")&&source.includes("window.addEventListener('pageshow',capitalRecheckOnReturn)"),'iPhone web views must retry version checks on wake and periodically');
 assert(source.includes("close?mset(m,'capital_close_members'):Promise.resolve(null)"),'Missing ledger must not silently become 0 ranks');
@@ -182,7 +182,7 @@ assert(detailSource.includes("host.addEventListener('click',e=>")&&detailSource.
  'Capture stock taps before parent sector collapses');
 assert(detailSource.includes("scoreEpoch++")&&detailSource.includes('scoresByCode=null'),
  'New data builds must invalidate old score badges');
-assert(page.includes('capital-stock-breakdown.js?v=20261022wavescorelink1'),'Mobile cache must load new stock score cards');
+assert(page.includes('capital-stock-breakdown.js?v=20261022sourceaudit2'),'Mobile cache must load new stock score cards');
 // Integration with actual date-frozen model, if available in build workspace.
 const manifest=JSON.parse(fs.readFileSync('docs/v2/data/current_manifest.json','utf8'));
 const scoreMeta=manifest.datasets?.decision_close_index;
@@ -202,3 +202,43 @@ if(scoreMeta?.url){
  console.log('LIVE stock swing detail matched:',known.code,known.scores.swing_quality_score,manifest.active_build_id);
 }
 console.log('PASS: original wave score displayed on sector stocks and full swing card opens without score recomputation');
+
+
+// Provenance UX: old 10/20 aggregate is audit-only, never a headline nor a
+// reason to deny independently verified 10/21 stock rankings.
+const auditSource=fs.readFileSync('docs/v2/capital-stock-breakdown.js','utf8');
+const marketSource=fs.readFileSync('docs/v2/market-capital-renderer.js','utf8');
+const rankStart=marketSource.indexOf(' const rankMore=(view,x,a)=>'),rankEnd=marketSource.indexOf(' const rankCard=',rankStart);
+assert(rankStart>=0&&rankEnd>rankStart,'Cannot find ranked sector summary');
+const rankMore=new Function('mmoney','mlots','mesc','memberButtons','day',
+ marketSource.slice(rankStart,rankEnd)+'\nreturn rankMore;')(
+ v=>String(v),v=>String(v),v=>String(v),()=>'<div class="members"></div>','2026-10-21');
+const rankHtml=rankMore('close',{primary_group:'AI伺服器ODM'},{rankAmount:133.1,rankLots:61083.1,verified:6,members:6,sourceDay:'2026-10-20'});
+assert(rankHtml.includes('當日資料日期</span><b>2026-10-21</b>'),'Current day stays prominent');
+assert(rankHtml.includes('6/6 檔 · 100%'),'Coverage must remain shown');
+assert(!rankHtml.includes('原族群彙總來源日</span>'),'Old date should not be an upfront metric');
+assert(!rankHtml.includes('2026-10-20'),'Old date belongs only in provenance accordion');
+const detailStart=auditSource.indexOf('function detail(g){'),detailEnd=auditSource.indexOf('function paint(',detailStart);
+assert(detailStart>=0&&detailEnd>detailStart,'Cannot locate per-sector audit renderer');
+const detailRender=new Function('status','esc','amt','fmt','stock',
+ auditSource.slice(detailStart,detailEnd)+'\nreturn detail;')(
+ ()=>['warn','同日完整逐檔重算'],v=>String(v),v=>String(v),v=>String(v),
+ x=>'<div class="test-stock">'+x.code+'</div>');
+const group={trade_date:'2026-10-21',aggregate_source_date:'2026-10-20',
+ rank_eligible:true,rank_status:'REBUILT_ALL_MEMBERS',rank_amount_100m:133.1,
+ verified_count:6,member_count:6,buy_count:5,sell_count:1,flat_count:0,
+ stocks:[{code:'2317'}],reconciled:false};
+const detailHtml=detailRender(group);
+const foldPoint=detailHtml.indexOf('<details class="cms-source-audit" data-cms-source-audit>');
+assert(foldPoint>0,'Native collapsed audit details must exist');
+assert(detailHtml.indexOf('逐檔資金明細')<detailHtml.indexOf('class="cms-stocks"'),'Stock details remain prominent');
+assert(detailHtml.indexOf('class="cms-stocks"')<foldPoint,'Audit is below stock details');
+assert(!detailHtml.slice(0,foldPoint).includes('2026-10-20'),'Legacy source date must be hidden until audit expands');
+assert(detailHtml.slice(foldPoint).includes('原族群彙總來源日</span><b>2026-10-20</b>'),
+ 'Source date remains verifiable inside fold');
+assert(!/<details class="cms-source-audit"[^>]*\bopen\b/.test(detailHtml),'Audit fold must start closed');
+assert(auditSource.includes("e.target.closest?.('.cms-source-audit')")&&auditSource.includes('e.stopPropagation();return;'),
+ 'Opening audit fold must not accidentally close enclosing group');
+assert(auditSource.includes('data-cms-wave-score')&&auditSource.includes("detail:{code,view:'close',closeMode:'swing'}"),
+ 'Preserve full stock card and Wave Score 2.0 links');
+console.log('PASS: old aggregate source date hidden inside collapsible audit; fresh date, coverage, score link and ranking preserved');
