@@ -202,10 +202,10 @@ assert rows['foreign']['status']=='observed'
 assert rows['trust']['status']=='observed'
 assert research_checks(d,None,None)['observed_count']==0
 assert research_checks({'trade_date':day,'risk_overlays':['TRADING_RESTRICTION']},e,day)['warning_count']==1
-older={**e,'chip_check_health':'PARTIAL','foreign_date':'2026-10-20',
-       'trust_date':'2026-10-20','sbl_date':'2026-10-20',
-       'margin_date':'2026-10-20',
-       'hourly60':{'trade_date':'2026-10-20','data_status':'OK',
+older={**e,'chip_check_health':'PARTIAL','foreign_date':'2026-10-19',
+       'trust_date':'2026-10-19','sbl_date':'2026-10-19',
+       'margin_date':'2026-10-19',
+       'hourly60':{'trade_date':'2026-10-19','data_status':'OK',
                    'entry_light_label':'觀察','ma20_60':91.2,'ma60_60':86.5}}
 r2=research_checks(d,older,day)
 by={x['key']:x for x in r2['checks']}

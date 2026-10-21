@@ -53,6 +53,9 @@ with tempfile.TemporaryDirectory() as tmp:
     result = json.loads((bdir / "capital-close-members.json").read_text(encoding="utf-8"))
     memory = result["groups"]["記憶體IC"]
     assert memory["reconciled"], memory
+    assert memory["sample_eligible"] and memory["sample_trade_date"] == DATE
+    assert memory["sample_coverage_pct"] == 100
+    assert abs(memory["sample_amount_100m"] - 53.0877) < .012
     assert (memory["buy_count"], memory["sell_count"], memory["verified_count"]) == (1, 5, 6)
     assert memory["amount_lots_diverge"] is True
     assert memory["verdict"] == "CONCENTRATED_INFLOW"
@@ -74,5 +77,8 @@ with tempfile.TemporaryDirectory() as tmp:
     build(root, registry)
     stale = json.loads((bdir / "capital-close-members.json").read_text(encoding="utf-8"))["groups"]["記憶體IC"]
     assert not stale["reconciled"] and stale["verdict"] == "UNVERIFIED"
+    assert stale["sample_eligible"], "Partial dated stock subset should remain useful"
+    assert stale["sample_coverage_pct"] > 60 and stale["sample_trade_date"] == DATE
+    assert stale["sample_amount_100m"] is not None
     assert stale["verified_count"] == 5
 print("PASS per-stock capital breadth, signed monetary weighting and fail-closed reconciliation")

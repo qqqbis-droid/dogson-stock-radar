@@ -23,7 +23,8 @@ function glance(g){
  const [cls,t]=status(g),count=g.verified_count||0;
  const lead=g.largest_positive_code?' · 最大買超 '+(g.largest_positive_name||g.largest_positive_code)+' '+amt(g.largest_positive_100m):'';
  const div=g.amount_lots_diverge?' · ⚠ 金額／張數背離':'';
- return '<div class="cms-glance '+cls+'" data-cms-glance><b>'+esc(t)+'</b>｜買 '+(g.buy_count||0)+'／'+count+'、賣 '+(g.sell_count||0)+' 檔'+div+'<div>'+esc(lead.replace(/^ · /,''))+' · 有效資料 '+count+'/'+(g.member_count||0)+' 檔</div>'+(g.reconciled?'':'<div>⚠ 族群金額仍是未完全對帳的估算，不能當作族群一致流入／流出；上方覆蓋率不等於逐檔有效比例。</div>')+'</div>';
+ const sample=g.sample_eligible&&!g.reconciled?'當日已核對個股樣本 '+(g.verified_count||0)+'／'+(g.member_count||0)+' 檔、'+fmt(g.sample_coverage_pct,0)+'%，樣本淨額 '+amt(g.sample_amount_100m)+'；非整個族群。':'';
+ return '<div class="cms-glance '+cls+'" data-cms-glance><b>'+esc(t)+'</b>｜買 '+(g.buy_count||0)+'／'+count+'、賣 '+(g.sell_count||0)+' 檔'+div+'<div>'+esc(lead.replace(/^ · /,''))+' · 有效資料 '+count+'/'+(g.member_count||0)+' 檔</div>'+(sample?'<div>'+esc(sample)+'</div>':'')+(g.reconciled?'':'<div>⚠ 族群金額仍是未完全對帳的估算，不能當作族群一致流入／流出；上方覆蓋率不等於逐檔有效比例。</div>')+'</div>';
 }
 function stock(s){
  const n=num(s.estimated_amount_100m);
@@ -35,10 +36,11 @@ function stock(s){
 function detail(g){
  const [,state]=status(g),reconciled=g.reconciled;
  const warn=!reconciled?'<div class="cms-warning">⚠ 明細與族群總額未完全對帳，暫不判斷整個族群強弱。金額差 '+esc(amt(g.delta_amount_100m))+'、張數差 '+esc(lots(g.delta_lots))+'。</div>':'';
+ const sampleNote=g.sample_eligible?'<div class="cms-warning">同日核對個股樣本 '+esc(amt(g.sample_amount_100m))+'（'+(g.verified_count||0)+'/'+(g.member_count||0)+' 檔）；並非全族群法人淨額。</div>':'';
  const lead=g.largest_positive_code&&g.largest_positive_share_pct!=null?'<div class="cms-warning">最大買超：'+esc(g.largest_positive_name||g.largest_positive_code)+'，占所有買超個股正向金額 '+esc(fmt(g.largest_positive_share_pct,1))+'%（不是占淨流入）。</div>':'';
  return '<div class="cms-detail" data-cms-detail><div class="cms-title">逐檔資金明細｜'+esc(g.trade_date)+' · '+(g.member_count||0)+' 檔</div>'
  +'<div class="cms-warning">'+esc(state)+'｜買超 '+(g.buy_count||0)+'、賣超 '+(g.sell_count||0)+'、持平 '+(g.flat_count||0)+'；有效驗證 '+(g.verified_count||0)+'／'+(g.member_count||0)+' 檔。</div>'
- +warn+lead+'<div class="cms-stocks">'+((g.stocks||[]).map(stock).join('')||'<div class="cms-warning">沒有可用逐檔資料。</div>')+'</div>'
+ +warn+sampleNote+lead+'<div class="cms-stocks">'+((g.stocks||[]).map(stock).join('')||'<div class="cms-warning">沒有可用逐檔資料。</div>')+'</div>'
  +'<p class="cms-method">外資＋投信各股當日淨買賣股數 × 當日收盤價估算；未含自營商。已依估算金額絕對值排序，全部成分股可捲動查看。金額正負不等於族群全體同步買賣。</p></div>';
 }
 function paint(){

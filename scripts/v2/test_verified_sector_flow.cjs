@@ -17,8 +17,16 @@ assert.equal(check({...row,latest_date:'2026-10-15'},{trade_date:'2026-10-15',gr
 let x=check({...row,latest_date:'2026-10-15'},{trade_date:'2026-10-15',groups:{塑膠工業:{reconciled:false,verified_count:0,member_count:0}}},'2026-10-15');
 assert.equal(x.confirmed,false);assert.equal(x.ratio,null,'No denominator must never mean 100% coverage');
 assert.equal(check({...row,latest_date:'2026-10-15'},null,'2026-10-15').confirmed,false,'Missing reconciliation dataset fails closed');
+const partial={trade_date:'2026-10-15',groups:{塑膠工業:{reconciled:false,member_count:12,verified_count:9,sample_eligible:true,sample_trade_date:'2026-10-15',sample_scope:'SAME_DAY_MATCHED_STOCKS_ONLY',sample_amount_100m:18.125,sample_lots:142}}};
+const sample=check({...row,latest_date:'2026-10-14'},partial,'2026-10-15');
+assert.equal(sample.confirmed,false);
+assert.equal(sample.sampleReady,true);
+assert.equal(sample.sampleAmount,18.125,'Never use old broad aggregate for a same-day sample');
+assert.equal(check(row,partial,'2026-10-16').sampleReady,false,'Stale sample must not appear today');
+assert.equal(check(row,{...partial,groups:{塑膠工業:{...partial.groups.塑膠工業,verified_count:2}}},'2026-10-15').sampleReady,false,'2 stocks are not an eligible sample');
+assert(source.includes('當日逐檔核對樣本')&&source.includes('sampleMore('),'Show same-day sample as a separate tier');
 assert(source.includes('歷史估算資料涵蓋')&&source.includes('非逐檔覆蓋率'),'Historical coverage must be separately labeled');
 assert(source.includes('目前沒有通過完整對帳的族群，暫停已驗證流入／流出排行榜'),'Empty verified leaderboard must be shown truthfully');
 assert(source.includes('法人來源日')&&source.includes('未對帳估算參考（非已驗證排行）'),'Every unverified sector must have its actual source date');
-assert(page.includes('market-capital-renderer.js?v=20261015verifiedflow2'),'iPhone must fetch current corrected capital renderer');
+assert(page.includes('market-capital-renderer.js?v=20261021samples1'),'iPhone must fetch current corrected capital renderer');
 console.log('PASS: daily source date, per-stock coverage, full reconciliation, and separate estimated flows');
