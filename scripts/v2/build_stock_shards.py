@@ -211,7 +211,7 @@ def research_checks(decision: dict[str, Any], evidence: Any, evidence_date: Any)
             reason, detail = "PRIOR_SESSION", f"當日四類籌碼尚未全部到齊；最近來源：{dates_text}。只能作歷史參考"
         else:
             reason, detail = "SOURCE_UNVERIFIED", f"來源未完成查核或日期異常；{dates_text}"
-        add("chip_sources", "籌碼來源查核", "pending", detail, trade_date, reason)
+        add("chip_sources", "籌碼來源查核", "pending", detail, max((v for v in dates.values() if v), default=""), reason)
 
     for key, title, datekey, netkey in (
         ("foreign", "外資買賣方向", "foreign_date", "foreign_net_latest"),
@@ -296,7 +296,7 @@ def research_checks(decision: dict[str, Any], evidence: Any, evidence_date: Any)
     else:
         add("restriction", "交易限制", "pending",
             "交易所處置／注意股公告尚未獨立核對；不是『確認無限制』",
-            trade_date, "NOTICE_UNVERIFIED")
+            "", "NOTICE_UNVERIFIED")
 
     pending_reasons = {}
     for row in rows:
