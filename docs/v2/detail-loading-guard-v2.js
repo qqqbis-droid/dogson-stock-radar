@@ -153,7 +153,7 @@
       const parts=e[kind+'_components_v2'];
       const model=e[kind+'_model_version'];
       const displayed=num(e[kind+'_score_v2']);
-      if(model!=='inuko-'+kind+'-v2.0')problems.push(label+'版本缺失');
+      if(model!==(kind==='technical'?'inuko-tech-v2.0':'inuko-'+kind+'-v2.0'))problems.push(label+'版本缺失');
       if(!parts||typeof parts!=='object'){problems.push(label+'細項缺失');continue;}
       const actual=required.map(k=>parts[k]),missing=required.filter(k=>!parts[k]);
       if(missing.length)problems.push(label+'缺少 '+missing.join('、'));
