@@ -208,12 +208,12 @@ console.log('PASS: original wave score displayed on sector stocks and full swing
 // reason to deny independently verified 10/21 stock rankings.
 const auditSource=fs.readFileSync('docs/v2/capital-stock-breakdown.js','utf8');
 const marketSource=fs.readFileSync('docs/v2/market-capital-renderer.js','utf8');
-const rankStart=marketSource.indexOf(' const rankMore=(view,x,a)=>'),rankEnd=marketSource.indexOf(' const rankCard=',rankStart);
-assert(rankStart>=0&&rankEnd>rankStart,'Cannot find ranked sector summary');
-const rankMore=new Function('mmoney','mlots','mesc','memberButtons','day',
- marketSource.slice(rankStart,rankEnd)+'\nreturn rankMore;')(
+const auditRankStart=marketSource.indexOf(' const auditRankMore=(view,x,a)=>'),auditRankEnd=marketSource.indexOf(' const rankCard=',auditRankStart);
+assert(auditRankStart>=0&&auditRankEnd>auditRankStart,'Cannot find ranked sector summary');
+const auditRankMore=new Function('mmoney','mlots','mesc','memberButtons','day',
+ marketSource.slice(auditRankStart,auditRankEnd)+'\nreturn auditRankMore;')(
  v=>String(v),v=>String(v),v=>String(v),()=>'<div class="members"></div>','2026-10-21');
-const rankHtml=rankMore('close',{primary_group:'AI伺服器ODM'},{rankAmount:133.1,rankLots:61083.1,verified:6,members:6,sourceDay:'2026-10-20'});
+const rankHtml=auditRankMore('close',{primary_group:'AI伺服器ODM'},{rankAmount:133.1,rankLots:61083.1,verified:6,members:6,sourceDay:'2026-10-20'});
 assert(rankHtml.includes('當日資料日期</span><b>2026-10-21</b>'),'Current day stays prominent');
 assert(rankHtml.includes('6/6 檔 · 100%'),'Coverage must remain shown');
 assert(!rankHtml.includes('原族群彙總來源日</span>'),'Old date should not be an upfront metric');
