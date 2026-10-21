@@ -33,6 +33,8 @@ python scripts/v2/enrich_zones.py --legacy-root docs/data --output docs/v2/data
 python scripts/v2/enrich_stock_detail_context.py --legacy-root docs/data --root docs/v2/data
 python scripts/v2/restore_market_capital_context.py --legacy-root docs/data --root docs/v2/data
 python scripts/v2/normalize_close_snapshot_by_close_date.py --root docs/v2/data
+# Pre-close data must keep the previous completed session immutable.
+python scripts/v2/preserve_frozen_close.py --root docs/v2/data --frozen-root docs/v2/frozen-close/latest
 python scripts/v2/stamp_version_contract.py --root docs/v2/data
 python scripts/v2/validate_bundle.py --root docs/v2/data
 python scripts/v2/validate_market_capital_context.py --root docs/v2/data
@@ -50,6 +52,7 @@ python -m py_compile scripts/v2/enrich_stock_detail_context.py
 python -m py_compile scripts/v2/restore_market_capital_context.py
 python -m py_compile scripts/v2/validate_mission_evidence.py
 python -m py_compile scripts/v2/rebuild_close_rank_views.py
+python -m py_compile scripts/v2/preserve_frozen_close.py
 
 python - <<'PY'
 import json

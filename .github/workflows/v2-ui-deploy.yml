@@ -207,6 +207,9 @@ jobs:
           python /tmp/v2-source/scripts/v2/enrich_stock_detail_context.py --legacy-root docs/data --root /tmp/v2-source/docs/v2/data
           python /tmp/v2-source/scripts/v2/test_capital_stock_breakdown.py
           python /tmp/v2-source/scripts/v2/build_capital_stock_breakdown.py --root /tmp/v2-source/docs/v2/data --registry /tmp/v2-source/contracts/registries/sector_registry.json
+          # Never allow a new live-session rebuild to rewrite yesterday's
+          # independently verified close prices, scores, zones or verdicts.
+          python /tmp/v2-source/scripts/v2/preserve_frozen_close.py --root /tmp/v2-source/docs/v2/data --frozen-root /tmp/v2-source/docs/v2/frozen-close/latest
           python /tmp/v2-source/scripts/v2/validate_bundle.py --root /tmp/v2-source/docs/v2/data
           python /tmp/v2-source/scripts/v2/validate_market_capital_context.py --root /tmp/v2-source/docs/v2/data
           python - <<'PY'
@@ -361,7 +364,7 @@ jobs:
           python scripts/v2/validate_single_writer_ui.py
           python scripts/v2/validate_product_surface.py
           node scripts/v2/test_portfolio_ledger.js
-          python -m py_compile scripts/v2/build_stock_shards.py scripts/v2/enrich_zones.py
+          python -m py_compile scripts/v2/build_stock_shards.py scripts/v2/enrich_zones.py /tmp/v2-source/scripts/v2/preserve_frozen_close.py
           node --check docs/v2/app.js
           node --check docs/v2/intraday-quote-recovery-v2.js
           grep -q 'intraday-quote-recovery-v2.js?v=20261013recovery1' docs/v2/index.html

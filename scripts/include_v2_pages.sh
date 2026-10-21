@@ -110,6 +110,7 @@ case "$mode" in
   PRESERVE_SAME_DAY|PRESERVE_CLOSE_ADVANCE|PRESERVE_NEWER_CANONICAL)
     echo "Preserving verified canonical V2 data; deploying UI without rebuilding from stale after-hours MIS."
     python scripts/v2/normalize_close_snapshot_by_close_date.py --root docs/v2/data
+    python scripts/v2/preserve_frozen_close.py --root docs/v2/data --frozen-root docs/v2/frozen-close/latest
     python scripts/v2/stamp_version_contract.py --root docs/v2/data
     python scripts/v2/validate_bundle.py --root docs/v2/data
     python scripts/v2/validate_market_capital_context.py --root docs/v2/data
@@ -144,6 +145,7 @@ node --check docs/v2/ui-coherence-v5.js
 python -m py_compile scripts/v2/normalize_close_snapshot.py
 python -m py_compile scripts/v2/normalize_close_snapshot_by_close_date.py
 python -m py_compile scripts/v2/close_semantics_v5.py
+python -m py_compile scripts/v2/preserve_frozen_close.py
 python -m py_compile scripts/v2/enrich_stock_detail_context.py
 
 test -f docs/v2/data/current_manifest.json
