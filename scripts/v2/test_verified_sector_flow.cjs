@@ -56,5 +56,10 @@ assert(source.includes('法人來源日')&&source.includes('歷史估算涵蓋�
 assert(source.includes('犬子雷達追蹤池'),'Sector rank must disclose tracked-universe denominator');
 assert(source.includes('intervalSection(')&&source.includes('非官方保證界限'),'Uncertainty must not be sold as certified ordering');
 assert(source.includes('data-turnover-heat')&&source.includes('非法人買賣')&&source.includes('heatDate===day'),'Turnover heat must remain a separately labeled and date-matched noninstitutional indicator');
-assert(page.includes('market-capital-renderer.js?v=20261022allcurrent2'),'Mobile cache must load complete-sector-first renderer');
-console.log('PASS: all-current same-day stock sectors rank even if legacy total conflicts; partials, stale data and uncited sums stay excluded');
+assert(page.includes('market-capital-renderer.js?v=20261022autosync3'),'Mobile cache must load complete-sector-first renderer');
+assert(source.includes('data-capital-build')&&source.includes('data-capital-ranked'),'Live capital ranking must show the actual active build and ranked count');
+assert(source.includes("window.setInterval(capitalRecheckOnReturn,45000)")&&source.includes("window.addEventListener('pageshow',capitalRecheckOnReturn)"),'iPhone web views must retry version checks on wake and periodically');
+assert(source.includes("close?mset(m,'capital_close_members'):Promise.resolve(null)"),'Missing ledger must not silently become 0 ranks');
+assert(source.includes("ledger?.build_id!==m.active_build_id")&&source.includes("Object.keys(groups).length!==(capital?.rows?.length||0)"),'Group version/count mismatch must fail rather than render stale cards');
+assert(source.includes('if(seq!==MCR.renderSeq)return'),'Old async responses must not overwrite a new render');
+console.log('PASS: version-visible, self-healing iPhone capital ranking plus strict same-build ledger validation');
