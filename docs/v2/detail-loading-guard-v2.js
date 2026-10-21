@@ -183,6 +183,10 @@
       const hasSector2=e.sector_model_version==='inuko-sector-v2.0'&&e.sector_components_v2;
       const hasLiquidity2=e.liquidity_model_version==='inuko-liquidity-v2.0'&&e.liquidity_components_v2;
       if(hasTech2||hasChip2||hasSector2||hasLiquidity2){
+        const v2Full=Boolean(hasTech2&&hasChip2&&hasSector2&&hasLiquidity2);
+        const modelStatus=v2Full
+          ?'<div class="isd-model-provenance complete"><b>原始波段評分 2.0｜24 項引擎明細</b><span>技術 6＋籌碼 7＋族群 6＋流動性 5。保留原始指標、權重、分項分數與資料來源；畫面不另外配分。</span></div>'
+          :'<div class="isd-model-provenance partial"><b>部分 2.0 評分資料尚未齊全</b><span>僅顯示有原始版本標記的子模型；其他項目不得當成完整 2.0 計分。</span></div>';
         const tech=hasTech2?v2BreakdownCard('技術 2.0',e.technical_score_v2,50,e.technical_components_v2,['trend','breakout','volume_price','momentum','relative','risk_quality'],'technical'):'';
         const chip=hasChip2?v2BreakdownCard('籌碼 2.0',e.chip_score_v2,25,e.chip_components_v2,['foreign','trust','sbl','margin','consensus','price_chip','sector_inst'],'chip'):'';
         const sector=hasSector2?v2BreakdownCard(`族群 2.0 · ${e.sector_verdict_v2||''}`,e.sector_score_v2,15,e.sector_components_v2,['breadth','leaders','persistence','capital_resonance','structure','taxonomy'],'technical'):'';
@@ -195,7 +199,7 @@
           const p=x[k]; if(!p)return'';
           return `<div class="isd-exp-card"><div class="isd-exp-head"><b>${esc({sector:'族群',liquidity:'流動性',entry_position:'進場位置'}[k]||k)}</b><strong>${fmt(p.score)}/${fmt(p.max,0)}</strong></div>${(p.items||[]).map(i=>`<div class="isd-exp-item"><b>${num(i.points)>0?'+':''}${fmt(i.points)}</b><span>${esc(i.label||'')}</span>${i.detail?`<span class="isd-exp-detail">${esc(i.detail)}</span>`:''}</div>`).join('')}</div>`;
         }).join(''):'';
-        return `<details class="isd-explain"><summary>評分依據｜為什麼是這個分數</summary><div class="isd-exp"><div class="isd-muted">波段品質＝技術50＋籌碼25＋族群15＋流動性10；進場位置另計100。技術6分項、籌碼7分項、族群6分項、流動性5分項各自計分，不重複灌分。</div>${tech}${chip}${sector}${liquidity}${rest}<div class="isd-muted">族群只評估整體共振；個股相對族群強弱留在技術2.0。法人族群共振留在籌碼2.0。流動性採飽和式評分，不因單日爆量或超大型成交額無限加分。</div></div></details>`;
+        return `<details class="isd-explain"><summary>評分依據｜為什麼是這個分數</summary><div class="isd-exp"><div class="isd-muted">波段品質＝技術50＋籌碼25＋族群15＋流動性10；進場位置另計100。技術6分項、籌碼7分項、族群6分項、流動性5分項各自計分，不重複灌分。</div>${modelStatus}${tech}${chip}${sector}${liquidity}${rest}<div class="isd-muted">族群只評估整體共振；個股相對族群強弱留在技術2.0。法人族群共振留在籌碼2.0。流動性採飽和式評分，不因單日爆量或超大型成交額無限加分。</div></div></details>`;
       }
     }
 
@@ -204,9 +208,12 @@
         const p=x[k]; if(!p)return'';
         return `<div class="isd-exp-card"><div class="isd-exp-head"><b>${esc({technical:'技術',chip:'籌碼',sector:'族群',liquidity:'流動性',entry_position:'進場位置'}[k]||k)}</b><strong>${fmt(p.score)}/${fmt(p.max,0)}</strong></div>${(p.items||[]).map(i=>`<div class="isd-exp-item"><b>${num(i.points)>0?'+':''}${fmt(i.points)}</b><span>${esc(i.label||'')}</span>${i.detail?`<span class="isd-exp-detail">${esc(i.detail)}</span>`:''}</div>`).join('')}</div>`;
       }).join('');
-      return `<details class="isd-explain"><summary>評分依據｜為什麼是這個分數</summary><div class="isd-exp"><div class="isd-muted">${esc(x.formula||'分數代表條件同步程度，不代表上漲機率。')}</div>${parts}</div></details>`;
+      return `<details class="isd-explain"><summary>評分依據｜歷史分數與解釋（非完整 2.0）</summary><div class="isd-exp">
+        <div class="isd-model-provenance partial"><b>尚未取得原始 2.0 明細</b>
+        <span>這一交易日沿用舊版評分紀錄及重建解釋，不是 24 項原始引擎加扣分。為保護收盤定格，不能由畫面事後重算或虛構缺少的細項。</span></div>
+        <div class="isd-muted">${esc(x.formula||'分數代表條件同步程度，不代表上漲機率。')}</div>${parts}</div></details>`;
     }
-    return'';
+    return '<div class="isd-model-provenance partial"><b>原始評分明細待補</b><span>資料來源未提供可驗證的分項流水，不能反推或自動補算分數。</span></div>';
   }
 
   function freshnessHtml(shard,d,e,m){
@@ -331,6 +338,9 @@
         </div>
         ${swingThreeQ}
         <div class="isd-score inuko-research-metrics">${scoreTile(ms,mv)}${scoreTile('進場位置',fmt(d.scores?.entry_position_score))}${scoreTile('資料信心',`${fmt(d.data_confidence,0)}%`)}</div>
+        <div class="inuko-score-source-status" aria-label="評分來源版本">${e?.technical_model_version==='inuko-tech-v2.0'&&e?.chip_model_version==='inuko-chip-v2.0'&&e?.sector_model_version==='inuko-sector-v2.0'&&e?.liquidity_model_version==='inuko-liquidity-v2.0'
+          ?'波段評分 2.0｜原始 24 項可核對'
+          :'歷史基準分數｜原始 2.0 子項未齊；請展開評分依據'}</div>
         ${pathHtml}
         <div class="inuko-research-index"><span>深入研究</span><small>點選分類展開</small></div>
         <details class="inuko-dossier" data-inuko-research><summary><span class="inuko-accordion-num">01</span><span>交易理由與風險<small>入選、卡點與失效條件</small></span></summary><div>

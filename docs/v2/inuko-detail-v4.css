@@ -259,3 +259,10 @@
 #detailBody .inuko-detail-v4 .inuko-audit-unavailable{padding:10px 12px;background:var(--soft);border-left:3px solid var(--amber);border-radius:7px}
 #detailBody .inuko-detail-v4 .inuko-audit-unavailable>b{font-size:12px}
 #detailBody .inuko-detail-v4 .inuko-audit-unavailable>p{font-size:11px;line-height:1.45;margin:5px 0 0}
+
+/* Unambiguous 2.0 provenance; no synthetic component or historical score rewrites. */
+#detailBody .inuko-detail-v4 .inuko-score-source-status{font-size:10px;color:var(--muted);line-height:1.45;padding:4px 0 11px;border-bottom:1px solid var(--line)}
+#detailBody .inuko-detail-v4 .isd-model-provenance{margin:10px 0 12px;padding:10px 12px;border-radius:9px;border-left:3px solid var(--amber);background:var(--soft)}
+#detailBody .inuko-detail-v4 .isd-model-provenance.complete{border-left-color:var(--green)}
+#detailBody .inuko-detail-v4 .isd-model-provenance>b{display:block;font-size:12px;font-weight:850;margin-bottom:5px}
+#detailBody .inuko-detail-v4 .isd-model-provenance>span{display:block;font-size:11px;line-height:1.5;color:var(--muted)}
