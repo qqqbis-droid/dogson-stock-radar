@@ -77,12 +77,39 @@ def validate(payload):
             "weights":{"technical":50,"chip":25,"sector":15,"liquidity":10},
             "entry_position_independent":True}
 
+def validate_atomic(payload, root):
+    """Verify full original 2.0 components survived adapter + enrichment verbatim."""
+    root=Path(root)
+    manifest=json.loads((root/"current_manifest.json").read_text(encoding="utf-8"))
+    meta=(manifest.get("datasets") or {}).get("stock_detail_close") or {}
+    url=str(meta.get("url") or "")
+    if not url.startswith("./data/"):
+        raise ValueError("atomic stock detail location invalid")
+    detail=json.loads((root/url[len("./data/"):]).read_text(encoding="utf-8"))
+    items=detail.get("items") or {}
+    originals={str(row["code"]):row for row in payload["rows"]}
+    if len(items)!=len(originals):
+        raise ValueError(f"stock detail count changed: {len(items)} != {len(originals)}")
+    for code,raw in originals.items():
+        target=items.get(code)
+        if not isinstance(target,dict):
+            raise ValueError("atomic detail missing stock "+code)
+        for kind,(version,field,keys,cap) in MODELS.items():
+            if target.get(kind+"_model_version")!=version or target.get(field)!=raw.get(field):
+                raise ValueError(code+" "+kind+" model source changed/dropped by adapter")
+    return {"atomic_original_model_2_0":True,"stocks":len(items),
+            "source_build_id":manifest.get("active_build_id")}
+
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--source",required=True)
+    ap.add_argument("--atomic-root",help="After enrich: verify original 24 components survived unchanged")
     args=ap.parse_args()
     payload=json.loads(Path(args.source).read_text(encoding="utf-8"))
-    print(json.dumps(validate(payload),ensure_ascii=False))
+    check=validate(payload)
+    if args.atomic_root:
+        check["atomic"]=validate_atomic(payload,args.atomic_root)
+    print(json.dumps(check,ensure_ascii=False))
 
 if __name__=="__main__":
     main()
