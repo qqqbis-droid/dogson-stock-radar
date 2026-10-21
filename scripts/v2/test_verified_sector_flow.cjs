@@ -34,10 +34,17 @@ const incomplete={trade_date:day,groups:{AI伺服器ODM:{
 info=check(stock,incomplete,day);
 assert(!info.rankEligible&&info.sampleReady,'Partial stock subset may be shown ONLY outside ranked list');
 const conflict={trade_date:day,groups:{AI伺服器ODM:{
- rank_eligible:false,rank_status:'CONFLICT',reconciled:false,member_count:6,verified_count:6,
- rank_amount_100m:null,rank_lots:null
+ rank_eligible:true,rank_status:'RECALCULATED_SOURCE_DISAGREEMENT',
+ rank_trade_date:day,rank_evidence_source:'COMPLETE_SAME_DAY_STOCK_ROWS',
+ rank_full_member_coverage:true,reconciled:false,member_count:6,verified_count:6,
+ rank_amount_100m:28.8,rank_lots:1110
 }}};
-assert(!check(stock,conflict,day).rankEligible,'Same-day contradictory group aggregate must be excluded');
+info=check(stock,conflict,day);
+assert(info.rankEligible&&info.recalculated&&!info.confirmed,'Six of six dated constituent flows may rank independently of disputed legacy aggregate');
+assert.equal(info.rankAmount,28.8,'Use current individual-stock net, not conflicting source group total');
+assert(!check(stock,conflict,'2026-10-22').rankEligible,'Never rank stale row tomorrow');
+const partialConflict={...conflict,groups:{AI伺服器ODM:{...conflict.groups.AI伺服器ODM,verified_count:5}}};
+assert(!check(stock,partialConflict,day).rankEligible,'Do not let incomplete current stocks become ranked via discrepancy fallback');
 assert(source.includes('資金流入排行')&&source.includes('資金流出排行'),'Both complete-sector rankings required');
 assert(source.includes('eligible.filter(t=>t.info.rankAmount>0)'),'Rank only verified full groups');
 assert(source.includes('未具排名資格')&&source.includes('不依金額排序'),'Incomplete sectors must remain outside the ranking');
@@ -49,4 +56,4 @@ assert(source.includes('犬子雷達追蹤池'),'Sector rank must disclose track
 assert(source.includes('intervalSection(')&&source.includes('非官方保證界限'),'Uncertainty must not be sold as certified ordering');
 assert(source.includes('data-turnover-heat')&&source.includes('非法人買賣')&&source.includes('heatDate===day'),'Turnover heat must remain a separately labeled and date-matched noninstitutional indicator');
 assert(page.includes('market-capital-renderer.js?v=20261021sectorengine1'),'Mobile cache must load complete-sector-first renderer');
-console.log('PASS: same-date full-sector inflow/outflow ranking, full-member rebuild, no partial ranks or stale totals');
+console.log('PASS: all-current same-day stock sectors rank even if legacy total conflicts; partials, stale data and uncited sums stay excluded');
