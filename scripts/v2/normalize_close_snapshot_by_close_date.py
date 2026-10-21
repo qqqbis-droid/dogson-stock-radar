@@ -44,7 +44,7 @@ def run_script(name: str, root: Path, *extra: str):
     subprocess.run([sys.executable, str(Path(__file__).with_name(name)), "--root", str(root), *extra], check=True)
 
 
-def finalize_common(root: Path):
+def finalize_common(root: Path, legacy_root: Path):
     run_script("close_semantics_v5.py", root)
     run_script("build_radar_stats.py", root)
     overlay_mode = os.environ.get("V2_OVERLAY_MODE", "")
@@ -57,22 +57,24 @@ def finalize_common(root: Path):
     if overlay_mode in {"PRESERVE_SAME_DAY", "PRESERVE_CLOSE_ADVANCE", "PRESERVE_NEWER_CANONICAL"}:
         print("close evidence legacy-root cross-check skipped for preserve overlay", overlay_mode)
     else:
-        run_script("validate_mission_evidence.py", root, "--legacy-root", "docs/data", "--mission", "close")
+        run_script("validate_mission_evidence.py", root, "--legacy-root", str(legacy_root), "--mission", "close")
 
 
-def finalize_close(root: Path):
+def finalize_close(root: Path, legacy_root: Path):
     # The normalizer can change entry-position and ranks. Rebuild the physical
     # summary/index arrays after rank assignment so card order and displayed #rank
     # are guaranteed to be the same thing.
     run_script("rebuild_close_rank_views.py", root)
-    finalize_common(root)
+    finalize_common(root, legacy_root)
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default="docs/v2/data")
+    ap.add_argument("--legacy-root", default="docs/data", help="Actual source of this atomic build, not a stale checked-out docs/data")
     args = ap.parse_args()
     root = Path(args.root)
+    legacy_root = Path(args.legacy_root)
     manifest_path = root / "current_manifest.json"
     manifest = load(manifest_path)
     bundle_date = str(manifest.get("trade_date") or "")[:10]
@@ -82,7 +84,7 @@ def main():
 
     if close_date == bundle_date:
         run_script("normalize_close_snapshot.py", root)
-        finalize_close(root)
+        finalize_close(root, legacy_root)
         print("close-date wrapper", {"bundle_date": bundle_date, "close_date": close_date, "mode": "same-date"})
         return
 
@@ -99,7 +101,7 @@ def main():
         latest = load(manifest_path)
         latest["trade_date"] = bundle_date
         write(manifest_path, latest)
-    finalize_common(root)
+    finalize_common(root, legacy_root)
     print("close-date wrapper", {"bundle_date": bundle_date, "close_date": close_date, "mode": "temporary-close-bind"})
 
 

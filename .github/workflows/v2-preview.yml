@@ -37,8 +37,8 @@ jobs:
           python -m unittest scripts.v2.test_frozen_close -v
       - name: Original Wave Score 2.0 source integrity
         run: |
-          python -m py_compile scripts/build_data.py
-          python -m unittest scripts.v2.test_score_model_source_v2 -v
+          python -m py_compile scripts/build_data.py scripts/v2/validate_full_swing_source.py
+          python -m unittest scripts.v2.test_score_model_source_v2 scripts.v2.test_full_swing_source -v
 
       - name: Engine structural tests
         run: python -m unittest scripts.v2.test_engine -v
