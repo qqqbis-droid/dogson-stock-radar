@@ -26,7 +26,7 @@ with tempfile.TemporaryDirectory() as tmp:
     root = Path(tmp) / "data"
     bdir = root / "builds" / ID
     registry = Path(tmp) / "registry.json"
-    put(registry, {"groups": [{"group": "記憶體IC", "members": [r[0] for r in STOCKS] + ["9999"]}]})
+    put(registry, {"groups": [{"group": "記憶體IC", "members": [r[0] for r in STOCKS] + ["9999"]}], "stock_overrides": {"2344": {"primary_group":"OTHER_AUDIT"}}})
     put(bdir / "stock.json", {
         "build_id": ID, "items": {
             code: {"code": code, "name": name, "sector_group": "記憶體IC", "close": price,
@@ -54,6 +54,7 @@ with tempfile.TemporaryDirectory() as tmp:
     result = json.loads((bdir / "capital-close-members.json").read_text(encoding="utf-8"))
     memory = result["groups"]["記憶體IC"]
     assert memory["member_count"] == 6, "registry symbols outside Atomic universe must not inflate denominator"
+    assert "2344" in [x["code"] for x in memory["stocks"]], "Audit registry override cannot move source stock to another flow group"
     assert memory["reconciled"], memory
     assert memory["rank_eligible"] and memory["rank_status"] == "RECONCILED"
     assert memory["rank_trade_date"] == DATE
