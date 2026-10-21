@@ -8,43 +8,38 @@ assert(a>=0&&b>a,'No canonical sector rank validation');
 const check=new Function('mn',source.slice(a,b)+'\nreturn closeRankInfo;')(
  v=>v==null||v===''||!Number.isFinite(Number(v))?null:Number(v));
 const day='2026-10-21',old='2026-10-20';
-const stock={primary_group:'AI伺服器ODM',latest_date:day,today_amount_100m:17.6};
-const reconciled={trade_date:day,groups:{AI伺服器ODM:{
- rank_eligible:true,rank_status:'RECONCILED',rank_trade_date:day,rank_amount_100m:17.61,rank_lots:862,
- reconciled:true,member_count:6,verified_count:6
-}}};
-let info=check(stock,reconciled,day);
-assert(info.confirmed&&info.rankEligible&&info.rankAmount===17.61);
-let rebuilt={trade_date:day,groups:{AI伺服器ODM:{
- rank_eligible:true,rank_status:'REBUILT_ALL_MEMBERS',rank_trade_date:day,
- rank_amount_100m:22.5,rank_lots:900,rank_full_member_coverage:true,
- reconciled:false,member_count:6,verified_count:6
-}}};
-info=check({...stock,latest_date:old},rebuilt,day);
-assert(info.rankEligible&&info.rebuilt&&!info.confirmed,'Full valid same-day stocks may be rebuilt even if aggregate is old');
-assert.equal(info.rankAmount,22.5,'New rank must use fully recalculated same-day shares, NOT yesterday amount');
-assert.equal(check(stock,rebuilt,day).rankEligible,false,'Mismatched status/source date must not rank');
-assert.equal(check({...stock,latest_date:old},rebuilt,'2026-10-22').rankEligible,false,'Never promote old data to next session');
-assert.equal(check(stock,null,day).rankEligible,false,'Absent detail ledger cannot rank');
-const incomplete={trade_date:day,groups:{AI伺服器ODM:{
- rank_eligible:false,rank_status:'INCOMPLETE',member_count:6,verified_count:5,
+const rows=[
+ {code:'1111',valid:true,foreign_date:day,trust_date:day,estimated_amount_100m:10,net_lots:200,close_price:120},
+ {code:'2222',valid:true,foreign_date:day,trust_date:day,estimated_amount_100m:7.61,net_lots:662,close_price:230}
+];
+const baseline={
+ rank_eligible:true,rank_status:'RECONCILED',rank_trade_date:day,rank_amount_100m:17.61,
+ rank_lots:862,reconciled:true,rank_evidence_source:'COMPLETE_SAME_DAY_STOCK_ROWS',
+ rank_full_member_coverage:true,sample_trade_date:day,member_count:2,verified_count:2,stocks:rows
+};
+const stock={primary_group:'AI伺服器ODM',latest_date:day,today_amount_100m:17.61,today_lots:862};
+const ledger=(row=baseline,date=day)=>({trade_date:date,groups:{AI伺服器ODM:row}});
+let info=check(stock,ledger(),day);
+assert(info.confirmed&&info.rankEligible&&info.rankAmount===17.61,'Independently matched same-session aggregate must rank');
+info=check({...stock,latest_date:old,today_amount_100m:-88},ledger(),day);
+assert(info.rankEligible&&info.rebuilt&&!info.confirmed,'OLD aggregate date must not remove complete current per-stock evidence');
+assert.equal(info.rankAmount,17.61,'Do not replace current per-stock net with previous-day aggregate');
+info=check({...stock,today_amount_100m:999},ledger(),day);
+assert(info.rankEligible&&info.recalculated&&!info.confirmed,'Conflicting same-day group aggregate is only an audit note');
+assert(!check(stock,ledger(baseline,old),day).rankEligible,'Previous-session ledger must not rank');
+assert(!check(stock,ledger(), '2026-10-22').rankEligible,'Old ledger must not enter a future session');
+assert(!check(stock,null,day).rankEligible,'Missing ledger must not rank');
+assert(!check(stock,ledger({...baseline,verified_count:1}),day).rankEligible,'Partial coverage does not qualify');
+assert(!check(stock,ledger({...baseline,stocks:rows.slice(0,1)}),day).rankEligible,'Missing constituent cannot qualify');
+assert(!check(stock,ledger({...baseline,stocks:[{...rows[0],foreign_date:old},rows[1]]}),day).rankEligible,'Stale source constituent cannot qualify');
+assert(!check(stock,ledger({...baseline,rank_amount_100m:19}),day).rankEligible,'Mismatched per-stock sum must not qualify');
+assert(!check(stock,ledger({...baseline,rank_evidence_source:'INCOMPLETE_STOCK_ROWS'}),day).rankEligible,'Unverified evidence source cannot qualify');
+assert(!check(stock,ledger({...baseline,rank_full_member_coverage:false}),day).rankEligible,'Incomplete-member flag cannot qualify');
+assert(!check(stock,ledger({...baseline,rank_eligible:false}),day).rankEligible,'Backend veto must be respected');
+const incomplete={...baseline,rank_eligible:false,rank_status:'INCOMPLETE',verified_count:1,
  sample_eligible:true,sample_trade_date:day,sample_scope:'SAME_DAY_MATCHED_STOCKS_ONLY',
- sample_amount_100m:1000,sample_lots:2200
-}}};
-info=check(stock,incomplete,day);
-assert(!info.rankEligible&&info.sampleReady,'Partial stock subset may be shown ONLY outside ranked list');
-const conflict={trade_date:day,groups:{AI伺服器ODM:{
- rank_eligible:true,rank_status:'RECALCULATED_SOURCE_DISAGREEMENT',
- rank_trade_date:day,rank_evidence_source:'COMPLETE_SAME_DAY_STOCK_ROWS',
- rank_full_member_coverage:true,reconciled:false,member_count:6,verified_count:6,
- rank_amount_100m:28.8,rank_lots:1110
-}}};
-info=check(stock,conflict,day);
-assert(info.rankEligible&&info.recalculated&&!info.confirmed,'Six of six dated constituent flows may rank independently of disputed legacy aggregate');
-assert.equal(info.rankAmount,28.8,'Use current individual-stock net, not conflicting source group total');
-assert(!check(stock,conflict,'2026-10-22').rankEligible,'Never rank stale row tomorrow');
-const partialConflict={...conflict,groups:{AI伺服器ODM:{...conflict.groups.AI伺服器ODM,verified_count:5}}};
-assert(!check(stock,partialConflict,day).rankEligible,'Do not let incomplete current stocks become ranked via discrepancy fallback');
+ sample_amount_100m:1000,sample_lots:2200};
+assert(!check(stock,ledger(incomplete),day).rankEligible,'Partial samples must remain unranked');
 assert(source.includes('recalculated')&&source.includes('同日逐檔重算・舊彙總差異'),'Disagreeing aggregate must carry a distinct audit label on rank card');
 assert(source.includes('資金流入排行')&&source.includes('資金流出排行'),'Both complete-sector rankings required');
 assert(source.includes('eligible.filter(t=>t.info.rankAmount>0)'),'Rank only verified full groups');
@@ -56,10 +51,43 @@ assert(source.includes('法人來源日')&&source.includes('歷史估算涵蓋�
 assert(source.includes('犬子雷達追蹤池'),'Sector rank must disclose tracked-universe denominator');
 assert(source.includes('intervalSection(')&&source.includes('非官方保證界限'),'Uncertainty must not be sold as certified ordering');
 assert(source.includes('data-turnover-heat')&&source.includes('非法人買賣')&&source.includes('heatDate===day'),'Turnover heat must remain a separately labeled and date-matched noninstitutional indicator');
-assert(page.includes('market-capital-renderer.js?v=20261022autosync3'),'Mobile cache must load complete-sector-first renderer');
+assert(page.includes('market-capital-renderer.js?v=20261022rankfix4'),'Mobile cache must load complete-sector-first renderer');
 assert(source.includes('data-capital-build')&&source.includes('data-capital-ranked'),'Live capital ranking must show the actual active build and ranked count');
 assert(source.includes("window.setInterval(capitalRecheckOnReturn,45000)")&&source.includes("window.addEventListener('pageshow',capitalRecheckOnReturn)"),'iPhone web views must retry version checks on wake and periodically');
 assert(source.includes("close?mset(m,'capital_close_members'):Promise.resolve(null)"),'Missing ledger must not silently become 0 ranks');
 assert(source.includes("ledger?.build_id!==m.active_build_id")&&source.includes("Object.keys(groups).length!==(capital?.rows?.length||0)"),'Group version/count mismatch must fail rather than render stale cards');
 assert(source.includes('if(seq!==MCR.renderSeq)return'),'Old async responses must not overwrite a new render');
+
+// Production artifact integration: verify actual capital rows against same-build
+// constituent ledger, not just flags or previous-day summary dates.
+const path=require('node:path');
+const root=path.resolve('docs/v2');
+const manifestPath=path.join(root,'data/current_manifest.json');
+if(fs.existsSync(manifestPath)){
+ const m=JSON.parse(fs.readFileSync(manifestPath,'utf8'));
+ const cmeta=m.datasets?.capital_close_context,lmeta=m.datasets?.capital_close_members;
+ if(cmeta&&lmeta){
+  const load=meta=>{
+   const rel=String(meta.url||'').replace(/^\.\//,'');
+   assert(rel.startsWith('data/builds/'),'Unexpected capital dataset location');
+   return JSON.parse(fs.readFileSync(path.join(root,rel),'utf8'));
+  };
+  const capital=load(cmeta),led=load(lmeta),tradingDay=String(cmeta.as_of||m.trade_date||'').slice(0,10);
+  assert.equal(led.build_id,m.active_build_id,'Ledger is not the current atomic build');
+  assert.equal(led.trade_date,tradingDay,'Ledger trade date differs from capital context');
+  const evaluations=capital.rows.map(x=>({name:x.primary_group,source:x.latest_date,info:check(x,led,tradingDay)}));
+  assert.equal(evaluations.length,Object.keys(led.groups).length,'Capital universe size mismatch');
+  const complete=evaluations.filter(e=>{
+   const g=led.groups[e.name];
+   return g&&g.rank_eligible===true&&g.member_count>0
+     &&g.verified_count===g.member_count&&g.rank_trade_date===tradingDay
+     &&g.rank_evidence_source==='COMPLETE_SAME_DAY_STOCK_ROWS';
+  });
+  for(const e of complete)assert(e.info.rankEligible,'Complete stock evidence incorrectly omitted: '+e.name);
+  const older=complete.filter(e=>String(e.source||'').slice(0,10)<tradingDay).length;
+  console.log('LIVE capital eligible '+evaluations.filter(e=>e.info.rankEligible).length+'/'+evaluations.length
+              +' complete '+complete.length+' outdated legacy summaries '+older+' build '+m.active_build_id);
+ }
+}
+
 console.log('PASS: version-visible, self-healing iPhone capital ranking plus strict same-build ledger validation');
