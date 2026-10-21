@@ -279,7 +279,7 @@
     const newest=validDates.reduce((max,x)=>x.date>max?x.date:max,'');
     const fullyCurrent=sources.every(x=>x.date===actualDay);
     const health=String(e?.chip_check_health||'UNKNOWN').toUpperCase();
-    const complete=health==='HEALTHY'||health==='OK'||health==='PASS'||health==='COMPLETE';
+    const complete=['HEALTHY','OK','PASS','COMPLETE','CHECKED'].includes(health);
     const flagged=!fullyCurrent||!complete;
     const chipDays=sources.map(x=>x.name+' '+(x.date?md(x.date):'無資料')).join(' · ');
     const checked=String(e?.chip_checked_at||'');
@@ -306,7 +306,7 @@
     const health=String(e?.chip_check_health||'UNKNOWN').toUpperCase();
     const dates=['foreign_date','trust_date','sbl_date','margin_date'].map(k=>String(e?.[k]||'').slice(0,10));
     const aligned=Boolean(/^\d{4}-\d{2}-\d{2}$/.test(String(tradeDate||''))&&dates.every(x=>x===tradeDate));
-    const complete=['HEALTHY','OK','PASS','COMPLETE'].includes(health);
+    const complete=['HEALTHY','OK','PASS','COMPLETE','CHECKED'].includes(health);
     const mode=aligned&&complete?'complete':health==='PARTIAL'?'partial':'unverified';
     const label=mode==='complete'?'籌碼來源：已完成查核'
       :mode==='partial'?'籌碼來源：部分完成':'籌碼來源：待核對';
@@ -320,18 +320,25 @@
     const checks=Array.isArray(audit?.checks)?audit.checks:[];
     if(!checks.length)return '<div class="inuko-audit-unavailable"><b>逐項研究尚未產生</b><p>此批次未附上各項證據的查核結果；不以空清單推論沒有卡點或風險。</p></div>';
     const observed=checks.filter(c=>c?.status==='observed').length;
-    const pending=checks.filter(c=>c?.status==='pending').length;
+    const historic=checks.filter(c=>c?.status==='pending'&&c.reason==='PRIOR_SESSION').length;
+    const pending=checks.filter(c=>c?.status==='pending'&&c.reason!=='PRIOR_SESSION').length;
     const warning=checks.filter(c=>c?.status==='warning').length;
-    const statusName=x=>x==='observed'?'已觀測':x==='warning'?'警示':'待補查';
+    const pendingName={MISSING:'資料缺漏',PARTIAL_CHECK:'來源部分完成',
+      SOURCE_UNVERIFIED:'來源待核對',DATE_MISMATCH:'日期待核對',
+      NOTICE_UNVERIFIED:'公告待核對'};
+    const statusName=c=>c?.status==='observed'?'當日已觀測':
+      c?.status==='warning'?'風險警示':
+      c?.reason==='PRIOR_SESSION'?'歷史參考':(pendingName[c?.reason]||'待補查');
     return '<section class="inuko-research-audit" data-inuko-research-audit>'
-      +'<header><b>模型逐項查核</b><small>已觀測 '+observed+'｜待補 '+pending+'｜警示 '+warning+'</small></header>'
-      +'<p class="inuko-audit-explain">已觀測只表示取得證據，不等於通過或零風險。</p>'
+      +'<header><b>模型逐項查核</b><small>當日已觀測 '+observed+'｜歷史參考 '+historic+'｜待核對 '+pending+'｜警示 '+warning+'</small></header>'
+      +'<p class="inuko-audit-explain">歷史參考僅顯示最後有效資料及來源日期，不是同日信號；來源尚未公布、漏值、驗證不過均不視為已通過。</p>'
       +'<div class="inuko-audit-rows">'+checks.map(c=>{
         const status=['observed','pending','warning'].includes(c.status)?c.status:'pending';
-        return '<div class="inuko-audit-row '+status+'"><div class="inuko-audit-row-head"><b>'+esc(c.label)+'</b><span>'+statusName(status)+'</span></div>'
-          +'<p>'+esc(c.detail)+'</p>'+(c.source_date?'<small>證據日期 '+esc(c.source_date)+'</small>':'')+'</div>';
+        const historical=status==='pending'&&c.reason==='PRIOR_SESSION';
+        return '<div class="inuko-audit-row '+status+(historical?' historical':'')+'"><div class="inuko-audit-row-head"><b>'+esc(c.label)+'</b><span>'+statusName(c)+'</span></div>'
+          +'<p>'+esc(c.detail)+'</p>'+(c.source_date?'<small>來源交易日 '+esc(c.source_date)+'</small>':'<small>來源交易日待確認</small>')+'</div>';
       }).join('')+'</div>'
-      +'<footer>'+esc(audit.semantics||'待補與已觀測為不同狀態，不能互相替代')+'</footer></section>';
+      +'<footer>'+esc(audit.semantics||'待補、歷史參考與已觀測為不同狀態，不得互相替代')+'</footer></section>';
   }
   function sectorDisplayFromDetail(d,e){return d.primary_group||e?.primary_group||d.industry||e?.industry||'產業待補';}
   function render(shard,view,box,m){
