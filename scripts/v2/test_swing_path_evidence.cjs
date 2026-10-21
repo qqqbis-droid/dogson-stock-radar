@@ -151,6 +151,32 @@ assert(bridge.includes('researchAuditHtml(shard)'),'Close research must expose a
 assert(bridge.includes('原始波段評分 2.0｜24 項引擎明細'),'Full-scoring source must show the original 24 scoring items');
 assert(bridge.includes('data-original-swing-v2'),'Original 2.0 24-item panel must be accessible');
 assert(bridge.includes('籌碼七項以原始 100 點計算'),'Chip item weights must explain 100 to 25 conversion');
+
+const scoreAuditSource=bridge.slice(bridge.indexOf('  const SWING_SUBMODELS='),bridge.indexOf('  function v2BreakdownCard('));
+assert(scoreAuditSource.includes('function auditOriginalSwingV2'),'Authentic 2.0 score integrity code missing');
+const auditV2=new Function('num',scoreAuditSource+';return auditOriginalSwingV2;')(v=>v==null||v===''||!Number.isFinite(Number(v))?null:Number(v));
+const specs=[
+ ['technical',50,['trend','breakout','volume_price','momentum','relative','risk_quality'],[10,5,6,7,6,3.5],[14,10,8,7,6,5]],
+ ['chip',25,['foreign','trust','sbl','margin','consensus','price_chip','sector_inst'],[20,13.5,10.5,7.8,9.4,15.6,5],[25,15,15,10,10,20,5]],
+ ['sector',15,['breadth','leaders','persistence','capital_resonance','structure','taxonomy'],[3.4,1.8,2.4,2,0,1],[4,3,3,2,2,1]],
+ ['liquidity',10,['avg_turnover','stability','price_impact','continuity','crowding'],[3,1.6,2,1.5,1.1],[3,2,2,1.5,1.5]]
+];
+const scoreEvidence={};
+for(const [kind,max,keys,pts,caps] of specs){
+ scoreEvidence[kind+'_model_version']=kind==='technical'?'inuko-tech-v2.0':'inuko-'+kind+'-v2.0';
+ scoreEvidence[kind+'_score_v2']=kind==='technical'?37.5:kind==='chip'?20.4:kind==='sector'?10.6:9.2;
+ scoreEvidence[kind+'_components_v2']=Object.fromEntries(keys.map((k,i)=>[k,{label:k,...(kind==='chip'?{points:pts[i],weight:caps[i]}:{score:pts[i],max:caps[i]})}]));
+}
+const auditDecision={scores:{swing_quality_score:77.7},components:{swing:{items:specs.map(([kind])=>({key:kind,raw_score:scoreEvidence[kind+'_score_v2'],contribution:scoreEvidence[kind+'_score_v2']}))}}};
+const goodAudit=auditV2(auditDecision,scoreEvidence);
+assert(goodAudit.complete, '24 actual engine scores must reconcile: '+goodAudit.problems.join(';'));
+assert.equal(goodAudit.segments.reduce((s,x)=>s+x.items,0),24,'All 24 original children preserved');
+assert.equal(goodAudit.score,77.7,'Published raw engine swing score stays unchanged');
+assert(Math.abs(goodAudit.segments.find(x=>x.kind==='chip').rawTotal-81.8)<0.001,'Chip source raw sum must be 81.8 on the 100-point scale');
+assert(!auditV2(auditDecision,{...scoreEvidence,technical_components_v2:undefined}).complete,'Missing six technical items is not full 2.0');
+assert(!auditV2(auditDecision,{...scoreEvidence,chip_score_v2:25}).complete,'Incorrect chip conversion cannot pass as original total');
+assert(!auditV2({...auditDecision,scores:{swing_quality_score:89}},scoreEvidence).complete,'Score mismatch must not be disguised');
+
 assert(bridge.includes('auditOriginalSwingV2(d,e)'),'Do not declare model complete based solely on the four version labels');
 assert(bridge.includes('歷史分數與解釋（非完整 2.0）'),'Legacy frozen scores must not be relabeled as complete 2.0');
 assert(bridge.includes('原始 2.0 子項未齊'),'Headline must expose incomplete submodel coverage');
