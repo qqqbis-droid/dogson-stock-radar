@@ -1,4 +1,4 @@
-const MCR={build:null,manifest:null,cache:new Map(),members:null,marketDetail:null,openMarket:false};
+const MCR={build:null,manifest:null,cache:new Map(),members:null,marketDetail:null,openMarket:false,renderSeq:0,lastRenderedBuild:null,lastRankCount:null};
 const MCFG={
   intraday:{market:'market_intraday_context',capital:'capital_intraday_context',capitalTitle:'即時族群動能',memberKey:'intraday'},
   daytrade:{market:'market_intraday_context',capital:'capital_intraday_context',capitalTitle:'即時族群動能',memberKey:'intraday'},
@@ -17,11 +17,25 @@ const mmoney=v=>mn(v)==null?'—':`${Number(v)>0?'+':''}${mfmt(v,1)}億`;
 const mlots=v=>mn(v)==null?'—':`${Number(v)>0?'+':''}${mfmt(v,1)}張`;
 const mtime=v=>{const s=String(v||'');if(!s)return'—';return s.includes('T')?s.replace('T',' ').slice(0,16):s};
 async function mjson(url){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error(`${url} HTTP ${r.status}`);return r.json()}
-async function mmanifest(){const m=await mjson(`./data/current_manifest.json?t=${Date.now()}`);if(MCR.build!==m.active_build_id){MCR.build=m.active_build_id;MCR.cache.clear();MCR.members=null;MCR.marketDetail=null}MCR.manifest=m;return m}
+async function mmanifest(){
+ const fetched=await mjson(`./data/current_manifest.json?t=${Date.now()}`);
+ if(!fetched?.active_build_id||fetched?.health?.validation_passed!==true)throw new Error('盤後版本驗證尚未完成');
+ const current=MCR.manifest;
+ // Do not regress to an older manifest during brief CDN deployment overlap.
+ const older=current?.generated_at&&fetched?.generated_at
+   &&Date.parse(fetched.generated_at)<Date.parse(current.generated_at);
+ const m=older?current:fetched;
+ if(MCR.build!==m.active_build_id){
+  MCR.build=m.active_build_id;MCR.cache.clear();MCR.members=null;MCR.marketDetail=null;
+ }
+ MCR.manifest=m;return m;
+}
 async function mset(m,key){const meta=m.datasets?.[key];if(!meta)throw new Error(`manifest 缺少 ${key}`);const ck=`${m.active_build_id}:${key}`;if(MCR.cache.has(ck))return MCR.cache.get(ck);const obj=await mjson(meta.url);if(obj?.build_id&&obj.build_id!==m.active_build_id)throw new Error(`${key} build_id 不一致`);MCR.cache.set(ck,obj);return obj}
 async function companion(name){try{const obj=await mjson(`./data/${name}?t=${Date.now()}`);if(obj?.build_id&&MCR.build&&obj.build_id!==MCR.build)return null;return obj}catch{return null}}
 function style(){if(document.getElementById('marketCapitalRendererStyle'))return;const st=document.createElement('style');st.id='marketCapitalRendererStyle';st.textContent=`
 .market-pulse{display:grid;grid-template-columns:1.2fr .7fr 1fr 1fr;gap:6px;padding:7px 10px;margin:0;background:#253c33;color:#fff;font-size:.72rem;align-items:center}.market-pulse b{font-size:.8rem}.market-pulse span{opacity:.82}.market-pulse .rise{color:#ffb5ad}.market-pulse .fall{color:#9fddbd}.mc-score-card{padding:8px 9px;border:1px solid #e2e7e3;border-radius:10px;background:#fff}.mc-score-card b{display:flex;justify-content:space-between;gap:8px;font-size:.84rem}.mc-score-card small{display:block;margin-top:4px;color:#718078;line-height:1.35;font-size:.75rem}.mc-clock{margin-top:7px;padding:7px 9px;background:#f5f7f4;border-radius:9px;font-size:.76rem;color:#65746d;line-height:1.45}.capital-chip{cursor:pointer}.capital-chip:focus{outline:2px solid #7aa996;outline-offset:2px}.capital-more{margin-top:7px;padding-top:7px;border-top:1px dashed #dfe5df;font-size:.78rem;line-height:1.5;color:#61716a}.capital-more[hidden]{display:none}.capital-more .mc-row{display:flex;justify-content:space-between;gap:10px}.capital-hint{font-size:.72rem;color:#809089;margin-top:4px}.member-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.member-btn{border:1px solid #d9e2dc;background:#fff;border-radius:999px;padding:6px 9px;font-size:.74rem;color:#355247}.member-btn:active{transform:scale(.98)}.capital-verification-note{grid-column:1/-1;padding:11px 12px;border-radius:11px;background:var(--soft);border:1px solid var(--line);font-size:.75rem;line-height:1.55}.capital-verification-note b{font-size:.85rem}.capital-estimates{grid-column:1/-1;min-width:0;border:1px solid var(--line);padding:10px;border-radius:12px}.capital-estimates>summary{font-size:.8rem;font-weight:850;cursor:pointer}.capital-estimate-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:10px}.capital-estimate-list .capital-chip{min-width:0}.capital-estimate-list .capital-chip>.capital-hint{overflow-wrap:anywhere}@media(max-width:390px){.capital-estimate-list{grid-template-columns:1fr}}.capital-section-label{flex-basis:100%;font-size:.72rem;color:#75837c;margin:2px 0 0}
+.capital-version-stamp{grid-column:1/-1;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--line);padding:8px 10px;border-radius:9px;font-size:.73rem;color:var(--muted);line-height:1.5}
+.capital-version-stamp b{color:var(--fg)}.capital-version-stamp button{border:1px solid var(--line);background:var(--soft);border-radius:8px;padding:6px 9px;font-weight:750;color:inherit;cursor:pointer}
 #sectorList .capital-rank-board{grid-column:1/-1;display:grid;gap:7px;min-width:0;margin:5px 0}
 #sectorList .capital-rank-title{font-size:.87rem;font-weight:900;padding:5px;border-bottom:1px solid var(--line)}
 #sectorList .capital-rank-board>.capital-rank-item{width:100%;max-width:100%;min-width:0;padding:10px 12px}
@@ -121,7 +135,9 @@ function renderCapital(view,c,context={}){const box=document.getElementById('sec
  const heatTop=[...heatRows].filter(x=>mn(x.share_change_pp)!=null&&mn(x.turnover_share_pct)!=null).sort((a,b)=>b.share_change_pp-a.share_change_pp).slice(0,5);
  const heatSection=heatTop.length?`<details class="capital-estimates" data-turnover-heat ${eligible.length?'':'open'}><summary>當日成交額占比變化｜獨立量價參考（非法人買賣）</summary><div class="capital-hint">${mesc(day)} 當日成交額占比視窗變化；不是法人淨買賣，不能代替法人排行。</div><div class="capital-estimate-list">${heatTop.map(x=>`<div class="chip capital-chip"><b>${mesc(x.primary_group)}</b><strong>占比變化 ${msigned(x.share_change_pp,2,'pp')}</strong><div class="capital-hint">成交額占比 ${mfmt(x.turnover_share_pct,2)}% · 熱度 ${msigned(x.heat,1)}</div></div>`).join('')}</div></details>`:'';
   const excludedCard=(t,i)=>{const x=t.x,a=t.info;const reason=a.rankStatus==='CONFLICT'?'當日逐檔與同日族群彙總數值衝突':a.verified<a.members?'同日逐檔資料缺漏':'來源日期或成分清單待核對';return `<div class="chip capital-chip capital-unranked-item" tabindex="0" role="button" aria-expanded="false" data-capital-expand="excluded-${i}" data-capital-group="${mesc(x.primary_group)}"><b>${mesc(x.primary_group)}</b><div class="capital-hint">不參與排名 · ${mesc(reason)} · 同日有效 ${a.verified}/${a.members} 檔</div><div class="capital-hint">舊族群彙總日 ${mesc(a.sourceDay||'待確認')}，不得作為 ${mesc(day)} 排名。</div>${a.sampleReady?sampleMore(view,x,a):closeMore(view,x)}</div>`};
- box.innerHTML=`<div class="capital-verification-note" data-capital-rank-scope><b>${mesc(day||'未知日期')} 犬子雷達追蹤池｜族群法人資金流向 ${eligible.length}/${infos.length} 個族群可排名</b><div>只在雷達追蹤的當日成分股中比較：完整對帳 ${matched} 個、舊日彙總重算 ${rebuilt} 個、同日彙總不一致但逐檔全數有效 ${recalculated} 個。後者依當日逐檔淨額排名並標記差異；其餘 ${excluded.length} 個才是資料缺漏。這不是全台股所有股票的名次。</div><div>外資＋投信淨買賣股數 × 同日收盤價估算金額；缺值不能當零，不拿部分樣本或前日金額硬湊名次。</div></div>`
+ const build=String(context?.build||'未取得');
+ const buildStamp=`<div class="capital-version-stamp" data-capital-build="${mesc(build)}" data-capital-ranked="${eligible.length}"><span>載入資料版本：<b>${mesc(day)} · ${mesc(build.split('-').slice(-1)[0])}</b>｜本版本可排名 ${eligible.length}/${infos.length} 族群</span><button type="button" data-capital-recheck>立即核對新版</button></div>`;
+ box.innerHTML=buildStamp+`<div class="capital-verification-note" data-capital-rank-scope><b>${mesc(day||'未知日期')} 犬子雷達追蹤池｜族群法人資金流向 ${eligible.length}/${infos.length} 個族群可排名</b><div>只在雷達追蹤的當日成分股中比較：完整對帳 ${matched} 個、舊日彙總重算 ${rebuilt} 個、同日彙總不一致但逐檔全數有效 ${recalculated} 個。後者依當日逐檔淨額排名並標記差異；其餘 ${excluded.length} 個才是資料缺漏。這不是全台股所有股票的名次。</div><div>外資＋投信淨買賣股數 × 同日收盤價估算金額；缺值不能當零，不拿部分樣本或前日金額硬湊名次。</div></div>`
  +(eligible.length?rankBoard('資金流入排行',inflow,'in')+rankBoard('資金流出排行',outflow,'out'):`<div class="capital-verification-note">目前沒有足夠同日完整資料可核實法人族群名次，暫時不提供可能錯誤的淨金額排行。以下可展開缺漏影響及「非法人」的同日成交額動能觀察。</div>`)
  +(neutral.length?rankBoard('淨額持平',neutral,'flat'):'')
  +intervalSection('估算區間方向仍偏流入',intervalPositive,'in')
@@ -131,10 +147,54 @@ function renderCapital(view,c,context={}){const box=document.getElementById('sec
  +`<details class="capital-estimates"><summary>未具排名資格 · ${excluded.length} 個族群（不依金額排序）</summary><div class="capital-hint">其中 ${noBound.length} 個無法核對缺漏影響區間。全部依族群名稱列示，沒有任意金額排名。</div><div class="capital-estimate-list">${excluded.map(excludedCard).join('')}</div></details>`;
  }
 }
-async function render(){try{style();const view=mview(),cfg=MCFG[view]||MCFG.intraday,m=await mmanifest();const [market,capital,members,raw,ledger,turnoverHeat]=await Promise.all([mset(m,cfg.market),mset(m,cfg.capital),MCR.members?Promise.resolve(MCR.members):companion('sector-members.json'),MCR.marketDetail?Promise.resolve(MCR.marketDetail):companion('market-detail.json'),(view==='close'||view==='portfolio')?mset(m,'capital_close_members').catch(()=>null):Promise.resolve(null),(view==='close'||view==='portfolio')?mset(m,'capital_intraday_context').catch(()=>null):Promise.resolve(null)]);if(members)MCR.members=members;if(raw)MCR.marketDetail=raw;renderMarket(view,market,raw?.payload||null);renderCapital(view,capital,{closeLedger:ledger,turnoverHeat,tradeDate:String(m.datasets?.capital_close_context?.as_of||m.trade_date||'').slice(0,10)})}catch(err){console.error('market-capital-renderer',err);const b=document.getElementById('healthBanner');if(b){b.classList.remove('hidden');b.textContent='市場／資金資料載入失敗；個股資料仍可查看，但請先不要把市場區當成最新狀態。'}}}
+async function render(){
+ const seq=++MCR.renderSeq;
+ try{
+  style();
+  const view=mview(),cfg=MCFG[view]||MCFG.intraday,m=await mmanifest();
+  const close=view==='close'||view==='portfolio';
+  const [market,capital,members,raw,ledger,turnoverHeat]=await Promise.all([
+   mset(m,cfg.market),mset(m,cfg.capital),
+   MCR.members?Promise.resolve(MCR.members):companion('sector-members.json'),
+   MCR.marketDetail?Promise.resolve(MCR.marketDetail):companion('market-detail.json'),
+   close?mset(m,'capital_close_members'):Promise.resolve(null),
+   close?mset(m,'capital_intraday_context').catch(()=>null):Promise.resolve(null)
+  ]);
+  if(seq!==MCR.renderSeq)return;
+  const day=String(m.datasets?.capital_close_context?.as_of||m.trade_date||'').slice(0,10);
+  if(close){
+   const groups=ledger?.groups;
+   if(ledger?.build_id!==m.active_build_id||ledger?.trade_date!==day
+      ||!groups||Object.keys(groups).length!==(capital?.rows?.length||0)){
+    throw new Error('族群法人資料與目前版本不一致');
+   }
+  }
+  if(members)MCR.members=members;
+  if(raw)MCR.marketDetail=raw;
+  renderMarket(view,market,raw?.payload||null);
+  renderCapital(view,capital,{closeLedger:ledger,turnoverHeat,tradeDate:day,build:m.active_build_id});
+  MCR.lastRenderedBuild=m.active_build_id;
+  MCR.lastRankCount=close?Object.values(ledger.groups).filter(g=>g?.rank_eligible).length:null;
+ }catch(err){
+  if(seq!==MCR.renderSeq)return;
+  console.error('market-capital-renderer',err);
+  const banner=document.getElementById('healthBanner');
+  if(banner){banner.classList.remove('hidden');banner.textContent='族群資料版本尚未一致：'+String(err?.message||'請稍後核對');}
+  if(mview()==='close'||mview()==='portfolio'){
+   const target=document.getElementById('sectorList');
+   if(target)target.innerHTML='<div class="capital-verification-note" data-capital-version-error>族群資料正在更新，避免顯示舊版排行。<button type="button" data-capital-recheck>立即核對新版</button></div>';
+  }
+ }
+}
+
 function toggle(el){const more=el?.querySelector('.capital-more');if(!more)return;const open=more.hasAttribute('hidden');if(open)more.removeAttribute('hidden');else more.setAttribute('hidden','');el.setAttribute('aria-expanded',open?'true':'false')}
-document.addEventListener('click',e=>{const member=e.target.closest?.('[data-stock-code]');if(member){e.stopPropagation();document.dispatchEvent(new CustomEvent('radar:open-stock',{detail:{code:member.dataset.stockCode}}));return}const cap=e.target.closest?.('[data-capital-expand]');if(cap){toggle(cap);return}if(e.target.id==='marketToggle'){MCR.openMarket=!MCR.openMarket;document.getElementById('marketDetail')?.classList.toggle('open',MCR.openMarket);e.target.textContent=MCR.openMarket?'收合細節':'查看細節'}});
+document.addEventListener('click',e=>{if(e.target.closest?.('[data-capital-recheck]')){MCR.cache.clear();render();return}const member=e.target.closest?.('[data-stock-code]');if(member){e.stopPropagation();document.dispatchEvent(new CustomEvent('radar:open-stock',{detail:{code:member.dataset.stockCode}}));return}const cap=e.target.closest?.('[data-capital-expand]');if(cap){toggle(cap);return}if(e.target.id==='marketToggle'){MCR.openMarket=!MCR.openMarket;document.getElementById('marketDetail')?.classList.toggle('open',MCR.openMarket);e.target.textContent=MCR.openMarket?'收合細節':'查看細節'}});
 document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('[data-capital-expand]')){e.preventDefault();toggle(e.target)}});
 document.addEventListener('radar:view-rendered',render);
-document.addEventListener('radar:data-reloaded',()=>{MCR.build=null;MCR.manifest=null;MCR.cache.clear();MCR.members=null;MCR.marketDetail=null;render()});
+document.addEventListener('radar:data-reloaded',()=>{MCR.cache.clear();MCR.members=null;MCR.marketDetail=null;render()});
+// On iPhone, a tab can stay alive across GitHub Pages deployments.
+function capitalRecheckOnReturn(){if(!document.hidden&&(mview()==='close'||mview()==='portfolio'))render()}
+document.addEventListener('visibilitychange',capitalRecheckOnReturn);
+window.addEventListener('pageshow',capitalRecheckOnReturn);
+window.setInterval(capitalRecheckOnReturn,45000);
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',render);else setTimeout(render,0);
