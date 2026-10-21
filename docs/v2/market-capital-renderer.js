@@ -63,13 +63,20 @@ function closeRankInfo(x,ledger,day){
    &&row?.rank_trade_date===day&&(confirmed||rebuilt));
  // 60%-covered individual-stock samples NEVER qualify for a sector rank.
  const sampleAmount=mn(row?.sample_amount_100m);
+ const intervalLower=mn(row?.interval_lower_100m),intervalUpper=mn(row?.interval_upper_100m);
+ const intervalReady=Boolean(!rankEligible&&row?.interval_available===true
+   &&ledgerDay===day&&intervalLower!=null&&intervalUpper!=null
+   &&intervalLower<=intervalUpper&&verified>0);
+ const intervalDirection=intervalReady?String(row?.interval_direction||'UNKNOWN'):'UNKNOWN';
  const sampleReady=Boolean(!rankEligible&&ledgerDay===day&&row?.sample_trade_date===day
    &&row?.sample_scope==='SAME_DAY_MATCHED_STOCKS_ONLY'
    &&row?.sample_eligible===true&&members>=3&&verified>=3&&ratio>=60
    &&sampleAmount!=null&&mn(row?.sample_lots)!=null);
  return {confirmed,rebuilt,rankEligible,rankAmount:amount,rankLots:lots,
    rankStatus:status,sourceDay:sourceDay||'',members,verified,ratio,
-   sampleReady,sampleAmount,sampleLots:mn(row?.sample_lots)};
+   sampleReady,sampleAmount,sampleLots:mn(row?.sample_lots),
+   intervalReady,intervalLower,intervalUpper,intervalDirection,
+   missingCount:Math.max(0,Number(row?.missing_count)||0)};
 }
 function flowAuditText(x,info){
  const date=info.sourceDay||'無日期';
@@ -91,19 +98,34 @@ function renderCapital(view,c,context={}){const box=document.getElementById('sec
  const inflow=eligible.filter(t=>t.info.rankAmount>0).sort((a,b)=>b.info.rankAmount-a.info.rankAmount);
  const outflow=eligible.filter(t=>t.info.rankAmount<0).sort((a,b)=>a.info.rankAmount-b.info.rankAmount);
  const neutral=eligible.filter(t=>t.info.rankAmount===0).sort((a,b)=>String(a.x.primary_group).localeCompare(String(b.x.primary_group),'zh-Hant'));
+ const intervalPositive=excluded.filter(t=>t.info.intervalReady&&t.info.intervalDirection==='POSITIVE');
+ const intervalNegative=excluded.filter(t=>t.info.intervalReady&&t.info.intervalDirection==='NEGATIVE');
+ const intervalUncertain=excluded.filter(t=>t.info.intervalReady&&t.info.intervalDirection==='INDETERMINATE');
+ const noBound=excluded.filter(t=>!t.info.intervalReady);
  const matched=eligible.filter(t=>t.info.confirmed).length;
  const rebuilt=eligible.filter(t=>t.info.rebuilt).length;
  const rankMore=(view,x,a)=>`<div class="capital-more" hidden><div class="mc-row"><span>同日完整法人淨額估算</span><b>${mmoney(a.rankAmount)}</b></div><div class="mc-row"><span>同日淨張數</span><b>${mlots(a.rankLots)}</b></div><div class="mc-row"><span>核對涵蓋</span><b>${a.verified}/${a.members} 檔 · 100%</b></div><div class="mc-row"><span>原族群彙總來源日</span><b>${mesc(a.sourceDay||'待確認')}</b></div><div class="capital-hint">${a.confirmed?'已通過同日族群彙總與逐檔金額、張數對帳。':'原彙總尚停在舊交易日，已改以所有成分股當日外資、投信與收盤價重算，不使用舊日總額。'}未含自營商。</div>${memberButtons(view,x.primary_group)}</div>`;
  const rankCard=(t,i,dir)=>{const x=t.x,a=t.info;return `<div class="chip capital-chip capital-rank-item" tabindex="0" role="button" aria-expanded="false" data-capital-expand="rank-${dir}-${i}" data-capital-group="${mesc(x.primary_group)}"><div class="capital-rank-line"><b><span class="capital-rank-number">${i+1}</span> ${mesc(x.primary_group)}</b><strong>${mmoney(a.rankAmount)}</strong></div><div class="capital-hint">${a.confirmed?'完整對帳':'全部成分股重算'} · ${a.verified}/${a.members} 檔 · ${mesc(day)}</div>${rankMore(view,x,a)}</div>`};
  const rankBoard=(heading,list,dir)=>`<section class="capital-rank-board"><div class="capital-rank-title">${heading} · ${list.length} 個族群</div>${list.length?list.map((t,i)=>rankCard(t,i,dir)).join(''):'<div class="capital-hint">當日沒有符合入榜資格的這個方向族群。</div>'}</section>`;
- const excludedCard=(t,i)=>{const x=t.x,a=t.info;const reason=a.rankStatus==='CONFLICT'?'當日逐檔與同日族群彙總數值衝突':a.verified<a.members?'同日逐檔資料缺漏':'來源日期或成分清單待核對';return `<div class="chip capital-chip capital-unranked-item" tabindex="0" role="button" aria-expanded="false" data-capital-expand="excluded-${i}" data-capital-group="${mesc(x.primary_group)}"><b>${mesc(x.primary_group)}</b><div class="capital-hint">不參與排名 · ${mesc(reason)} · 同日有效 ${a.verified}/${a.members} 檔</div><div class="capital-hint">舊族群彙總日 ${mesc(a.sourceDay||'待確認')}，不得作為 ${mesc(day)} 排名。</div>${a.sampleReady?sampleMore(view,x,a):closeMore(view,x)}</div>`};
- box.innerHTML=`<div class="capital-verification-note" data-capital-rank-scope><b>${mesc(day||'未知日期')} 族群法人資金流向排序｜${eligible.length}/${infos.length} 個族群</b><div>只排名同日全部成分股資料齊全的族群：完整對帳 ${matched} 個、當日全股重算 ${rebuilt} 個。其餘 ${excluded.length} 個排除，不是全 ${infos.length} 個族群的市場名次。</div><div>外資＋投信淨買賣股數 × 同日收盤價估算金額；不使用不完整樣本或舊交易日估算填補名次。</div></div>`
+ const intervalCard=(t,i,side)=>{const x=t.x,a=t.info;return `<div class="chip capital-chip capital-unranked-item" tabindex="0" role="button" aria-expanded="false" data-capital-expand="interval-${side}-${i}" data-capital-group="${mesc(x.primary_group)}"><b>${mesc(x.primary_group)}</b><div class="capital-hint">當日估算影響區間 ${mmoney(a.intervalLower)} ～ ${mmoney(a.intervalUpper)}；缺 ${a.missingCount}/${a.members} 檔</div><div class="capital-hint">成交量與收盤價 × 1.3 倍估算缺漏可能影響，非官方保證界限；名次未定。</div>${a.sampleReady?sampleMore(view,x,a):closeMore(view,x)}</div>`};
+ const intervalSection=(heading,list,side)=>`<details class="capital-estimates"><summary>${heading} · ${list.length} 個（非正式排名）</summary><div class="capital-hint">近似量價區間只供判斷可能方向，依族群名稱列示，不給精確名次。</div><div class="capital-estimate-list">${list.map((t,i)=>intervalCard(t,i,side)).join('')}</div></details>`;
+ const heat=context?.turnoverHeat;
+ const heatDate=String(heat?.trade_date||'').slice(0,10);
+ const heatRows=heatDate===day&&Array.isArray(heat?.rows)?heat.rows:[];
+ const heatTop=[...heatRows].filter(x=>mn(x.share_change_pp)!=null&&mn(x.turnover_share_pct)!=null).sort((a,b)=>b.share_change_pp-a.share_change_pp).slice(0,5);
+ const heatSection=heatTop.length?`<details class="capital-estimates" data-turnover-heat><summary>當日成交額占比變化｜獨立量價參考（非法人買賣）</summary><div class="capital-hint">${mesc(day)} 當日成交額占比視窗變化；不是法人淨買賣，不能代替法人排行。</div><div class="capital-estimate-list">${heatTop.map(x=>`<div class="chip capital-chip"><b>${mesc(x.primary_group)}</b><strong>占比變化 ${msigned(x.share_change_pp,2,'pp')}</strong><div class="capital-hint">成交額占比 ${mfmt(x.turnover_share_pct,2)}% · 熱度 ${msigned(x.heat,1)}</div></div>`).join('')}</div></details>`:'';
+  const excludedCard=(t,i)=>{const x=t.x,a=t.info;const reason=a.rankStatus==='CONFLICT'?'當日逐檔與同日族群彙總數值衝突':a.verified<a.members?'同日逐檔資料缺漏':'來源日期或成分清單待核對';return `<div class="chip capital-chip capital-unranked-item" tabindex="0" role="button" aria-expanded="false" data-capital-expand="excluded-${i}" data-capital-group="${mesc(x.primary_group)}"><b>${mesc(x.primary_group)}</b><div class="capital-hint">不參與排名 · ${mesc(reason)} · 同日有效 ${a.verified}/${a.members} 檔</div><div class="capital-hint">舊族群彙總日 ${mesc(a.sourceDay||'待確認')}，不得作為 ${mesc(day)} 排名。</div>${a.sampleReady?sampleMore(view,x,a):closeMore(view,x)}</div>`};
+ box.innerHTML=`<div class="capital-verification-note" data-capital-rank-scope><b>${mesc(day||'未知日期')} 犬子雷達追蹤池｜族群法人資金流向 ${eligible.length}/${infos.length} 個族群可排名</b><div>只在雷達追蹤的當日成分股中比較：完整對帳 ${matched} 個、追蹤池全數成分股重算 ${rebuilt} 個。其餘 ${excluded.length} 個名次尚未能證實；不代表全台股所有股票。</div><div>外資＋投信淨買賣股數 × 同日收盤價估算金額；缺值不能當零，不拿部分樣本或前日金額硬湊名次。</div></div>`
  +rankBoard('資金流入排行',inflow,'in')+rankBoard('資金流出排行',outflow,'out')
  +(neutral.length?rankBoard('淨額持平',neutral,'flat'):'')
- +`<details class="capital-estimates"><summary>未具排名資格 · ${excluded.length} 個族群（不依金額排序）</summary><div class="capital-hint">以下依族群名稱列出，個股樣本與歷史資料僅供查核，不加入正式排名。</div><div class="capital-estimate-list">${excluded.map(excludedCard).join('')}</div></details>`;
+ +intervalSection('估算區間方向仍偏流入',intervalPositive,'in')
+ +intervalSection('估算區間方向仍偏流出',intervalNegative,'out')
+ +intervalSection('缺值可能改變流向',intervalUncertain,'mixed')
+ +heatSection
+ +`<details class="capital-estimates"><summary>未具排名資格 · ${excluded.length} 個族群（不依金額排序）</summary><div class="capital-hint">其中 ${noBound.length} 個無法核對缺漏影響區間。全部依族群名稱列示，沒有任意金額排名。</div><div class="capital-estimate-list">${excluded.map(excludedCard).join('')}</div></details>`;
  }
 }
-async function render(){try{style();const view=mview(),cfg=MCFG[view]||MCFG.intraday,m=await mmanifest();const [market,capital,members,raw,ledger]=await Promise.all([mset(m,cfg.market),mset(m,cfg.capital),MCR.members?Promise.resolve(MCR.members):companion('sector-members.json'),MCR.marketDetail?Promise.resolve(MCR.marketDetail):companion('market-detail.json'),(view==='close'||view==='portfolio')?mset(m,'capital_close_members').catch(()=>null):Promise.resolve(null)]);if(members)MCR.members=members;if(raw)MCR.marketDetail=raw;renderMarket(view,market,raw?.payload||null);renderCapital(view,capital,{closeLedger:ledger,tradeDate:String(m.datasets?.capital_close_context?.as_of||m.trade_date||'').slice(0,10)})}catch(err){console.error('market-capital-renderer',err);const b=document.getElementById('healthBanner');if(b){b.classList.remove('hidden');b.textContent='市場／資金資料載入失敗；個股資料仍可查看，但請先不要把市場區當成最新狀態。'}}}
+async function render(){try{style();const view=mview(),cfg=MCFG[view]||MCFG.intraday,m=await mmanifest();const [market,capital,members,raw,ledger,turnoverHeat]=await Promise.all([mset(m,cfg.market),mset(m,cfg.capital),MCR.members?Promise.resolve(MCR.members):companion('sector-members.json'),MCR.marketDetail?Promise.resolve(MCR.marketDetail):companion('market-detail.json'),(view==='close'||view==='portfolio')?mset(m,'capital_close_members').catch(()=>null):Promise.resolve(null),(view==='close'||view==='portfolio')?mset(m,'capital_intraday_context').catch(()=>null):Promise.resolve(null)]);if(members)MCR.members=members;if(raw)MCR.marketDetail=raw;renderMarket(view,market,raw?.payload||null);renderCapital(view,capital,{closeLedger:ledger,turnoverHeat,tradeDate:String(m.datasets?.capital_close_context?.as_of||m.trade_date||'').slice(0,10)})}catch(err){console.error('market-capital-renderer',err);const b=document.getElementById('healthBanner');if(b){b.classList.remove('hidden');b.textContent='市場／資金資料載入失敗；個股資料仍可查看，但請先不要把市場區當成最新狀態。'}}}
 function toggle(el){const more=el?.querySelector('.capital-more');if(!more)return;const open=more.hasAttribute('hidden');if(open)more.removeAttribute('hidden');else more.setAttribute('hidden','');el.setAttribute('aria-expanded',open?'true':'false')}
 document.addEventListener('click',e=>{const member=e.target.closest?.('[data-stock-code]');if(member){e.stopPropagation();document.dispatchEvent(new CustomEvent('radar:open-stock',{detail:{code:member.dataset.stockCode}}));return}const cap=e.target.closest?.('[data-capital-expand]');if(cap){toggle(cap);return}if(e.target.id==='marketToggle'){MCR.openMarket=!MCR.openMarket;document.getElementById('marketDetail')?.classList.toggle('open',MCR.openMarket);e.target.textContent=MCR.openMarket?'收合細節':'查看細節'}});
 document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('[data-capital-expand]')){e.preventDefault();toggle(e.target)}});
