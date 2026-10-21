@@ -109,7 +109,7 @@ const addon=fs.readFileSync('docs/v2/hourly60-addon.js','utf8');
 assert(addon.includes("body.querySelector('.inuko-detail-v4 [data-hourly60-slot]')"),'60K cards must not float outside the research layout');
 assert(fs.readFileSync('docs/v2/data-source.js','utf8').includes('hourly60-addon.js?v=20261020inside4'),'Updated addon cache bust is required');
 assert(!js.slice(js.indexOf('function detailHtml(')).includes('<div class="swing-path-steps">'),'4-card repeat must be removed');
-assert(html.includes('detail-loading-guard-v2.js?v=20261016route1&layout=20261020b&design=20261021score2audit'),'Mobile detail script must bypass old cache');
+assert(html.includes('detail-loading-guard-v2.js?v=20261016route1&layout=20261020b&design=20261021score2coverage1'),'Mobile detail script must bypass old cache');
 assert(path.lens&&path.lens.pct>0&&path.lens.pct<100);
 assert(lib.detailHtml(path).includes('價格結構與當日重點'));
 assert(lib.detailHtml(path).includes('S1｜防守')&&lib.detailHtml(path).includes('R1｜壓力'));

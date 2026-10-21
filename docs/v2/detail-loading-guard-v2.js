@@ -234,6 +234,7 @@
         const audit=auditOriginalSwingV2(d,e);
         const v2Full=audit.complete;
         const evidenceDate=esc(String(e.trade_date||e.source_trade_date||d.trade_date||'待核對').slice(0,10));
+        const summaryLabel=v2Full?'完整波段評分 2.0｜24 項細分':'原始 2.0 子項未齊｜分數來源待核對';
         const modelStatus=v2Full
           ?`<div class="isd-model-provenance complete" data-score-audit="complete"><b>原始波段評分 2.0｜24 項引擎明細</b><span>資料日 ${evidenceDate}｜技術 6＋籌碼 7＋族群 6＋流動性 5。四項加權分數及所有細項已與引擎總分核對；不另行配分。</span></div>`
           :`<div class="isd-model-provenance partial" data-score-audit="partial"><b>2.0 分項尚未完整核對</b><span>保留原始引擎總分，不用舊解釋補湊。待核對：${esc(audit.problems.slice(0,5).join('；')||'必要模型證據未齊')}。</span></div>`;
@@ -249,7 +250,7 @@
           const p=x[k]; if(!p)return'';
           return `<div class="isd-exp-card"><div class="isd-exp-head"><b>${esc({sector:'族群',liquidity:'流動性',entry_position:'進場位置'}[k]||k)}</b><strong>${fmt(p.score)}/${fmt(p.max,0)}</strong></div>${(p.items||[]).map(i=>`<div class="isd-exp-item"><b>${num(i.points)>0?'+':''}${fmt(i.points)}</b><span>${esc(i.label||'')}</span>${i.detail?`<span class="isd-exp-detail">${esc(i.detail)}</span>`:''}</div>`).join('')}</div>`;
         }).join(''):'';
-        return `<details class="isd-explain" data-original-swing-v2><summary>完整波段評分 2.0｜24 項細分</summary><div class="isd-exp"><div class="isd-muted">波段品質＝技術50＋籌碼25＋族群15＋流動性10；進場位置另計100。技術6分項、籌碼7分項、族群6分項、流動性5分項各自計分，不重複灌分。</div>${modelStatus}${tech}${chip}${sector}${liquidity}${rest}<div class="isd-muted">族群只評估整體共振；個股相對族群強弱留在技術2.0。法人族群共振留在籌碼2.0。流動性採飽和式評分，不因單日爆量或超大型成交額無限加分。</div></div></details>`;
+        return `<details class="isd-explain" data-original-swing-v2><summary>${summaryLabel}</summary><div class="isd-exp"><div class="isd-muted">波段品質＝技術50＋籌碼25＋族群15＋流動性10；進場位置另計100。技術6分項、籌碼7分項、族群6分項、流動性5分項各自計分，不重複灌分。</div>${modelStatus}${tech}${chip}${sector}${liquidity}${rest}<div class="isd-muted">族群只評估整體共振；個股相對族群強弱留在技術2.0。法人族群共振留在籌碼2.0。流動性採飽和式評分，不因單日爆量或超大型成交額無限加分。</div></div></details>`;
       }
     }
 
