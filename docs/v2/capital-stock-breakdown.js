@@ -127,6 +127,9 @@ async function load(){
   if(build!==d.build_id){scoreEpoch++;scoresByCode=null;scoreBuild='';scorePromise=null;scoreError=false}
   scoreMeta=m.datasets?.decision_close_index||null;
   cache=d;build=d.build_id;paint();
+  // Detail may already be open while membership data is first loading or
+  // after a fresh Atomic Build. Fill badges without a second user tap.
+  if(document.querySelector('#sectorList .capital-chip[data-capital-group] .capital-more:not([hidden])'))void loadScores();
  }catch(e){console.warn('sector stocks detail',e);warning('逐檔資料尚未取得或資料日不一致，不據此判定族群共振。')}
  finally{loading=false}
 }
