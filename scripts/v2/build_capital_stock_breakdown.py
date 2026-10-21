@@ -266,6 +266,9 @@ def build(root, registry):
     mf.write_text(json.dumps(m, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     print("capital close constituents", {"build": build_id, "date": close_date, "groups": len(out),
                                        "verified": valid_count, "unreconciled": mismatch_count,
+                                       "rank_status": {kind: sum(g["rank_status"]==kind for g in out.values())
+                                                       for kind in ("RECONCILED","REBUILT_ALL_MEMBERS","CONFLICT","INCOMPLETE")},
+                                       "interval_available": sum(g["interval_available"] for g in out.values()),
                                        "memory": {field: out["記憶體IC"][field] for field in ["buy_count", "sell_count", "delta_amount_100m", "delta_lots", "verdict"]}
                                        if "記憶體IC" in out else None})
     # Do not abort deployment for missing/partial provenance in some groups.
