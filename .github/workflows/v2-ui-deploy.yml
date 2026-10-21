@@ -207,6 +207,42 @@ jobs:
           python /tmp/v2-source/scripts/v2/enrich_stock_detail_context.py --legacy-root docs/data --root /tmp/v2-source/docs/v2/data
           python /tmp/v2-source/scripts/v2/test_capital_stock_breakdown.py
           python /tmp/v2-source/scripts/v2/build_capital_stock_breakdown.py --root /tmp/v2-source/docs/v2/data --registry /tmp/v2-source/contracts/registries/sector_registry.json
+          # Fail this release if all same-date per-stock source evidence exists
+          # but one or more sector rows are still omitted from the ranked list.
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('/tmp/v2-source/docs/v2/data')
+          mf=json.loads((root/'current_manifest.json').read_text(encoding='utf-8'))
+          meta=mf['datasets']['capital_close_members']
+          raw=str(meta['url'])
+          path=root/(raw[7:] if raw.startswith('./data/') else raw.lstrip('./'))
+          d=json.loads(path.read_text(encoding='utf-8'))
+          groups=d['groups']
+          complete=[(name,g) for name,g in groups.items()
+                    if g['member_count']>0 and g['verified_count']==g['member_count']]
+          ranked=[(name,g) for name,g in groups.items() if g['rank_eligible']]
+          defects=[]
+          for name,g in groups.items():
+              if g['rank_eligible']:
+                  values=[r['estimated_amount_100m'] for r in g['stocks']]
+                  if not values or any(v is None or not r['valid'] for v,r in zip(values,g['stocks'])):
+                      defects.append((name,'incomplete row marked rankable'))
+                  elif abs(sum(values)-g['rank_amount_100m'])>0.0002:
+                      defects.append((name,'rank not equal to independent current-stock sum'))
+                  elif g['rank_trade_date']!=d['trade_date']:
+                      defects.append((name,'rank date stale'))
+              if g['member_count']>0 and g['verified_count']==g['member_count'] and not g['rank_eligible']:
+                  defects.append((name,'complete current group hidden from ranking'))
+              if g['rank_status']=='RECALCULATED_SOURCE_DISAGREEMENT' and g['reconciled']:
+                  defects.append((name,'disputed aggregate mislabeled reconciled'))
+          print('Sector rank live coverage:',{'build':d['build_id'],'date':d['trade_date'],
+                'all_groups':len(groups),'all_current':len(complete),'ranked':len(ranked),
+                'legacy_source_disagreements':sum(g['rank_status']=='RECALCULATED_SOURCE_DISAGREEMENT' for g in groups.values()),
+                'bad':defects[:5]})
+          if defects or (complete and len(ranked)<len(complete)):
+              raise SystemExit('Same-date full-stock capital ranking contract violated')
+          PY
           # Never allow a new live-session rebuild to rewrite yesterday's
           # independently verified close prices, scores, zones or verdicts.
           python /tmp/v2-source/scripts/v2/preserve_frozen_close.py --root /tmp/v2-source/docs/v2/data --frozen-root /tmp/v2-source/docs/v2/frozen-close/latest
@@ -436,10 +472,10 @@ jobs:
           grep -q 'unified-score-freshness-v1.js?v=20261012singleverdict1' docs/v2/index.html
           grep -q 'universe-search.js?v=20261012singleverdict1' docs/v2/index.html
           node --check docs/v2/capital-stock-breakdown.js
-          grep -q 'market-capital-renderer.js?v=20261021sectorengine1' docs/v2/index.html
+          grep -q 'market-capital-renderer.js?v=20261022allcurrent2' docs/v2/index.html
           grep -q 'capital-member-fallback' docs/v2/market-capital-renderer.js
           grep -q 'cms-detail {grid-column:1/-1' docs/v2/capital-stock-breakdown.js
-          grep -q 'capital-stock-breakdown.js?v=20261021fullrank2' docs/v2/index.html
+          grep -q 'capital-stock-breakdown.js?v=20261022recalc2' docs/v2/index.html
           python -m py_compile scripts/v2/build_capital_stock_breakdown.py
           grep -q 'close-ops-v1.js?v=20261016route1' docs/v2/index.html
           grep -q 'hourly60-screener.js?v=20261012stabletyping1' docs/v2/index.html
