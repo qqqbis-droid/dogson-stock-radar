@@ -427,6 +427,62 @@ def macd_hist(s):
     return m - sig
 
 
+def stochastic_kd(df, n=9):
+    low_n = df["Low"].rolling(n).min()
+    high_n = df["High"].rolling(n).max()
+    denom = (high_n - low_n).replace(0, np.nan)
+    rsv = ((df["Close"] - low_n) / denom * 100).clip(0, 100).fillna(50)
+    k = rsv.ewm(alpha=1/3, adjust=False).mean()
+    d = k.ewm(alpha=1/3, adjust=False).mean()
+    return k, d
+
+
+def parabolic_sar(df, step=.02, max_step=.20):
+    """Return PSAR series plus bull/bear state without leaking future bars."""
+    if df is None or len(df) < 3:
+        return pd.Series(index=getattr(df, "index", None), dtype=float), []
+    high = pd.to_numeric(df["High"], errors="coerce").to_numpy(dtype=float)
+    low = pd.to_numeric(df["Low"], errors="coerce").to_numpy(dtype=float)
+    close = pd.to_numeric(df["Close"], errors="coerce").to_numpy(dtype=float)
+    psar = np.full(len(df), np.nan, dtype=float)
+    states = [True] * len(df)
+    bull = bool(close[1] >= close[0])
+    ep = high[0] if bull else low[0]
+    sar = low[0] if bull else high[0]
+    af = step
+    psar[0] = sar
+    states[0] = bull
+    for i in range(1, len(df)):
+        sar = sar + af * (ep - sar)
+        if bull:
+            sar = min(sar, low[i-1])
+            if i >= 2:
+                sar = min(sar, low[i-2])
+            if low[i] < sar:
+                bull = False
+                sar = ep
+                ep = low[i]
+                af = step
+            elif high[i] > ep:
+                ep = high[i]
+                af = min(max_step, af + step)
+        else:
+            sar = max(sar, high[i-1])
+            if i >= 2:
+                sar = max(sar, high[i-2])
+            if high[i] > sar:
+                bull = True
+                sar = ep
+                ep = high[i]
+                af = step
+            elif low[i] < ep:
+                ep = low[i]
+                af = min(max_step, af + step)
+        psar[i] = sar
+        states[i] = bull
+    return pd.Series(psar, index=df.index), states
+
+
 def true_range(df):
     pc = df["Close"].shift(1)
     return pd.concat([
@@ -624,21 +680,89 @@ def close_technical(x):
     if len(x) < 35:
         return None
     c, h, l, v = x["Close"], x["High"], x["Low"], x["Volume"]
-    ma5, ma10, ma20 = c.rolling(5).mean(), c.rolling(10).mean(), c.rolling(20).mean()
+    o = x["Open"]
+    ma5, ma10, ma20, ma60 = c.rolling(5).mean(), c.rolling(10).mean(), c.rolling(20).mean(), c.rolling(60).mean()
     vx = v / v.rolling(20).mean().shift(1).replace(0, np.nan)
     ret1 = (c/c.shift(1)-1)*100
+    ret3 = (c/c.shift(3)-1)*100
     ret5 = (c/c.shift(5)-1)*100
+    ret10 = (c/c.shift(10)-1)*100
     ret20 = (c/c.shift(20)-1)*100
     dist = (c/ma20-1)*100
     rr = rsi(c)
     mh = macd_hist(c)
+    kk, dd = stochastic_kd(x)
+    psar_series, psar_states = parabolic_sar(x)
     p3 = h.shift(1).rolling(3).max()
     p20 = h.shift(1).rolling(20).max()
     # v1.5.30: causal self baselines. Average volume excludes the current day;
     # breakout-event volume uses only prior completed 20-day breakout events.
     avgvol20 = v.shift(1).rolling(20).mean()
+    turnover = (c * v).replace([np.inf, -np.inf], np.nan)
+    turn20 = turnover.tail(20).dropna()
+    avg_turnover20 = float(turn20.mean()) if len(turn20) else None
+    median_turnover20 = float(turn20.median()) if len(turn20) else None
+    min_turnover20 = float(turn20.min()) if len(turn20) else None
+    turnover_cv20 = float(turn20.std(ddof=0) / turn20.mean()) if len(turn20) >= 5 and float(turn20.mean()) > 0 else None
+    turnover_days_ge30m20 = int((turn20 >= 30_000_000).sum()) if len(turn20) else 0
+    turnover_days_ge80m20 = int((turn20 >= 80_000_000).sum()) if len(turn20) else 0
+    turnover_today = float(turnover.iloc[-1]) if pd.notna(turnover.iloc[-1]) else None
+    turnover_vs_median20 = (turnover_today / median_turnover20) if turnover_today is not None and median_turnover20 and median_turnover20 > 0 else None
+    impact = pd.Series(index=x.index, dtype=float)
+    valid_turn = turnover > 0
+    impact.loc[valid_turn] = ret1.loc[valid_turn].abs() / (turnover.loc[valid_turn] / 100_000_000.0)
+    impact20 = impact.tail(20).replace([np.inf, -np.inf], np.nan).dropna()
+    price_impact_median20 = float(impact20.median()) if len(impact20) >= 5 else None
     breakout_mask = (c > p20) & p20.notna()
     hist_breakout_vol = v.iloc[:-1][breakout_mask.iloc[:-1]].dropna().tail(20)
+
+    def slope_pct(series, bars=5):
+        try:
+            if len(series) <= bars or pd.isna(series.iloc[-1]) or pd.isna(series.iloc[-1-bars]) or float(series.iloc[-1-bars]) == 0:
+                return None
+            return (float(series.iloc[-1]) / float(series.iloc[-1-bars]) - 1) * 100
+        except Exception:
+            return None
+
+    pre20 = x.iloc[-21:-1] if len(x) >= 21 else x.iloc[:-1]
+    platform_high = float(pre20["High"].max()) if len(pre20) else None
+    platform_low = float(pre20["Low"].min()) if len(pre20) else None
+    platform_width_pct = ((platform_high / platform_low - 1) * 100) if platform_high and platform_low else None
+    breakout_pct = ((float(c.iloc[-1]) / platform_high - 1) * 100) if platform_high else None
+    day_range = max(float(h.iloc[-1] - l.iloc[-1]), 1e-9)
+    close_position_pct = (float(c.iloc[-1] - l.iloc[-1]) / day_range) * 100
+    upper_wick_pct = (float(h.iloc[-1] - max(o.iloc[-1], c.iloc[-1])) / day_range) * 100
+    body_pct = (abs(float(c.iloc[-1] - o.iloc[-1])) / day_range) * 100
+    failed_breakout = bool(platform_high and float(h.iloc[-1]) > platform_high * 1.003 and float(c.iloc[-1]) < platform_high)
+
+    recent_breakout_age = None
+    recent_breakout_volume_x = None
+    recent_breakout_width_pct = None
+    for age in range(0, min(20, max(0, len(x) - 20))):
+        i = len(x) - 1 - age
+        if i < 20:
+            break
+        pre = x.iloc[i-20:i]
+        ph = float(pre["High"].max())
+        pl = float(pre["Low"].min())
+        av = float(pre["Volume"].mean()) if len(pre) else 0
+        cc = float(c.iloc[i])
+        vv = float(v.iloc[i])
+        if ph > 0 and pl > 0 and cc > ph * 1.003:
+            recent_breakout_age = age
+            recent_breakout_volume_x = vv / av if av > 0 else None
+            recent_breakout_width_pct = (ph / pl - 1) * 100
+            break
+
+    psar_value = float(psar_series.iloc[-1]) if len(psar_series) and pd.notna(psar_series.iloc[-1]) else None
+    psar_bull = bool(psar_states[-1]) if psar_states else None
+    psar_flip_age = None
+    if psar_states:
+        cur_state = psar_states[-1]
+        for age in range(1, min(30, len(psar_states))):
+            if psar_states[-1-age] != cur_state:
+                psar_flip_age = age - 1
+                break
 
     row = {
         "close": float(c.iloc[-1]),
@@ -647,23 +771,58 @@ def close_technical(x):
         "ma5": float(ma5.iloc[-1]),
         "ma10": float(ma10.iloc[-1]),
         "ma20": float(ma20.iloc[-1]),
+        "ma60": float(ma60.iloc[-1]) if pd.notna(ma60.iloc[-1]) else None,
+        "ma5_slope5_pct": round(slope_pct(ma5, 5), 3) if slope_pct(ma5, 5) is not None else None,
+        "ma10_slope5_pct": round(slope_pct(ma10, 5), 3) if slope_pct(ma10, 5) is not None else None,
+        "ma20_slope5_pct": round(slope_pct(ma20, 5), 3) if slope_pct(ma20, 5) is not None else None,
+        "ma60_slope5_pct": round(slope_pct(ma60, 5), 3) if slope_pct(ma60, 5) is not None else None,
         "vol_x": float(vx.iloc[-1]) if pd.notna(vx.iloc[-1]) else 0,
         "day_change": float(ret1.iloc[-1]) if pd.notna(ret1.iloc[-1]) else 0,
+        "ret3": float(ret3.iloc[-1]) if pd.notna(ret3.iloc[-1]) else 0,
         "ret5": float(ret5.iloc[-1]) if pd.notna(ret5.iloc[-1]) else 0,
+        "ret10": float(ret10.iloc[-1]) if pd.notna(ret10.iloc[-1]) else 0,
         "ret20": float(ret20.iloc[-1]) if pd.notna(ret20.iloc[-1]) else 0,
         "dist20": float(dist.iloc[-1]) if pd.notna(dist.iloc[-1]) else 0,
         "rsi": float(rr.iloc[-1]),
         "macd_h": float(mh.iloc[-1]),
         "macd_acc": float(mh.iloc[-1]-mh.iloc[-2]),
+        "kd_k": round(float(kk.iloc[-1]), 2) if pd.notna(kk.iloc[-1]) else None,
+        "kd_d": round(float(dd.iloc[-1]), 2) if pd.notna(dd.iloc[-1]) else None,
+        "kd_cross_up": bool(kk.iloc[-1] > dd.iloc[-1] and kk.iloc[-2] <= dd.iloc[-2]) if len(kk) >= 2 and pd.notna(kk.iloc[-2]) and pd.notna(dd.iloc[-2]) else False,
+        "sar": round(psar_value, 3) if psar_value is not None else None,
+        "sar_state": "BULL" if psar_bull is True else "BEAR" if psar_bull is False else None,
+        "sar_flip_age": psar_flip_age,
         "break3": bool(c.iloc[-1] > p3.iloc[-1]) if pd.notna(p3.iloc[-1]) else False,
         "break20": bool(c.iloc[-1] > p20.iloc[-1]) if pd.notna(p20.iloc[-1]) else False,
         "trend": bool(c.iloc[-1] > ma5.iloc[-1] > ma10.iloc[-1] > ma20.iloc[-1]),
+        "trend60": bool(pd.notna(ma60.iloc[-1]) and c.iloc[-1] > ma20.iloc[-1] > ma60.iloc[-1]),
+        "platform_high20": round(platform_high, 3) if platform_high is not None else None,
+        "platform_low20": round(platform_low, 3) if platform_low is not None else None,
+        "platform_width20_pct": round(platform_width_pct, 2) if platform_width_pct is not None else None,
+        "breakout_pct": round(breakout_pct, 2) if breakout_pct is not None else None,
+        "recent_breakout_age": recent_breakout_age,
+        "recent_breakout_volume_x": round(recent_breakout_volume_x, 2) if recent_breakout_volume_x is not None else None,
+        "recent_breakout_width_pct": round(recent_breakout_width_pct, 2) if recent_breakout_width_pct is not None else None,
+        "failed_breakout": failed_breakout,
+        "close_position_pct": round(close_position_pct, 1),
+        "upper_wick_pct": round(upper_wick_pct, 1),
+        "body_pct": round(body_pct, 1),
         "volume": float(v.iloc[-1]),
+        "volume_3d": float(v.tail(3).sum()) if len(v) >= 3 else None,
+        "volume_5d": float(v.tail(5).sum()) if len(v) >= 5 else None,
         "avg_volume20": float(avgvol20.iloc[-1]) if pd.notna(avgvol20.iloc[-1]) else None,
         "breakout_event_count": int(len(hist_breakout_vol)),
         "breakout_volume_median20": float(hist_breakout_vol.median()) if len(hist_breakout_vol) >= 3 else None,
         "breakout_volume_avg20": float(hist_breakout_vol.mean()) if len(hist_breakout_vol) >= 3 else None,
-        "avg_turnover20": float((c*v).rolling(20).mean().iloc[-1]),
+        "avg_turnover20": avg_turnover20,
+        "median_turnover20": median_turnover20,
+        "min_turnover20": min_turnover20,
+        "turnover_cv20": round(turnover_cv20, 4) if turnover_cv20 is not None else None,
+        "turnover_days_ge30m20": turnover_days_ge30m20,
+        "turnover_days_ge80m20": turnover_days_ge80m20,
+        "turnover_today": turnover_today,
+        "turnover_vs_median20": round(turnover_vs_median20, 3) if turnover_vs_median20 is not None else None,
+        "price_impact_median20": round(price_impact_median20, 4) if price_impact_median20 is not None else None,
         "date": str(x.index[-1].date()),
     }
 
@@ -728,6 +887,7 @@ def close_technical(x):
         "vol_x_p90": round(float(hist_vx.quantile(.90)), 3) if len(hist_vx) >= 10 else None,
     }
     row["technical_score"] = max(0, min(50, round(score, 1)))
+    row["technical_score_legacy"] = row["technical_score"]
     row["reasons"] = reasons
     row["overheat_reasons"] = over
     row.update(daily_sr(x))
@@ -789,6 +949,268 @@ def chip_score(chip):
         score += 2.5
 
     return int(math.floor(min(25, score) + 0.5)), round(coverage/25*100, 0)
+
+
+def _chip_num(v):
+    try:
+        x = float(v)
+        return x if math.isfinite(x) else None
+    except Exception:
+        return None
+
+
+def _chip_clip(v):
+    return max(0.0, min(100.0, float(v)))
+
+
+def _chip_source_factor(source_date, trade_date):
+    if not source_date:
+        return 0.0
+    sd = str(source_date)[:10]
+    td = str(trade_date or "")[:10]
+    if not td:
+        return 0.7
+    if sd == td:
+        return 1.0
+    try:
+        days = abs((datetime.strptime(td, "%Y-%m-%d") - datetime.strptime(sd, "%Y-%m-%d")).days)
+    except Exception:
+        return 0.6
+    if days <= 1:
+        return 0.8
+    if days <= 4:
+        return 0.65
+    return 0.35
+
+
+def _chip_component(label, score, weight, detail):
+    score = round(_chip_clip(score), 1)
+    return {
+        "label": label,
+        "score": score,
+        "weight": float(weight),
+        "points": round(score / 100.0 * float(weight), 1),
+        "detail": str(detail or ""),
+    }
+
+
+def _apply_chip_score_v2(r, group_rows, trade_date):
+    """犬子籌碼評分 2.0：先算0~100，再折成盤後總分中的0~25。
+
+    缺資料不直接判空，而是該分項維持中性，另由 chip_confidence_v2
+    表示可信程度。如此避免晚公布的融資/借券拖累已更新的外資/投信。
+    """
+    f1 = _chip_num(r.get("foreign_net_latest"))
+    f3 = _chip_num(r.get("foreign_3d_net"))
+    f5 = _chip_num(r.get("foreign_5d_net"))
+    f20 = _chip_num(r.get("foreign_20d_net"))
+    fdays = _chip_num(r.get("foreign_buy_days_10"))
+    fstreak = _chip_num(r.get("foreign_streak"))
+    t1 = _chip_num(r.get("trust_net_latest"))
+    t3 = _chip_num(r.get("trust_3d_net"))
+    t5 = _chip_num(r.get("trust_5d_net"))
+    tdays = _chip_num(r.get("trust_buy_days_10"))
+    tstreak = _chip_num(r.get("trust_streak"))
+    s1 = _chip_num(r.get("sbl_1d_pct"))
+    s3 = _chip_num(r.get("sbl_3change_pct"))
+    s5 = _chip_num(r.get("sbl_5d_pct"))
+    m1 = _chip_num(r.get("margin_1d_pct"))
+    m3 = _chip_num(r.get("margin_3d_pct"))
+    m5 = _chip_num(r.get("margin_5d_pct"))
+    ret5 = _chip_num(r.get("ret5"))
+    vol3 = _chip_num(r.get("volume_3d"))
+    foreign_3d_volume_pct = (f3 / vol3 * 100.0) if f3 is not None and vol3 not in (None, 0) else None
+    r["foreign_3d_volume_pct"] = round(foreign_3d_volume_pct, 2) if foreign_3d_volume_pct is not None else None
+
+    # 1) 外資結構 / 影響力 25%
+    foreign = 50.0
+    if f1 is not None: foreign += 8 if f1 > 0 else -8 if f1 < 0 else 0
+    if f3 is not None: foreign += 12 if f3 > 0 else -12 if f3 < 0 else 0
+    if f5 is not None: foreign += 10 if f5 > 0 else -10 if f5 < 0 else 0
+    if f20 is not None: foreign += 5 if f20 > 0 else -5 if f20 < 0 else 0
+    if fstreak is not None:
+        if fstreak >= 3: foreign += 10
+        elif fstreak <= -3: foreign -= 10
+    if fdays is not None:
+        if fdays >= 7: foreign += 8
+        elif fdays <= 3: foreign -= 8
+    if foreign_3d_volume_pct is not None:
+        a = abs(foreign_3d_volume_pct)
+        impact = 15 if a >= 12 else 10 if a >= 7 else 6 if a >= 3 else 0
+        foreign += impact if foreign_3d_volume_pct > 0 else -impact
+    foreign_detail = (
+        f"3日 {f3/1000:+.0f}張｜占3日成交量 {foreign_3d_volume_pct:+.1f}%"
+        if f3 is not None and foreign_3d_volume_pct is not None
+        else (f"3日 {f3/1000:+.0f}張" if f3 is not None else "外資資料待補")
+    )
+
+    # 2) 投信結構 15%
+    trust = 50.0
+    if t1 is not None: trust += 15 if t1 > 0 else -15 if t1 < 0 else 0
+    if t3 is not None: trust += 15 if t3 > 0 else -15 if t3 < 0 else 0
+    if t5 is not None: trust += 10 if t5 > 0 else -10 if t5 < 0 else 0
+    if tstreak is not None:
+        if tstreak >= 3: trust += 10
+        elif tstreak <= -3: trust -= 10
+    if tdays is not None:
+        if tdays >= 7: trust += 10
+        elif tdays <= 3: trust -= 10
+    trust_detail = f"5日 {t5/1000:+.0f}張｜連續 {int(tstreak):+d}日" if t5 is not None and tstreak is not None else "投信資料待補"
+
+    # 3) 借券 / 空方壓力 15%
+    sbl = 50.0
+    if r.get("sbl_3down") is True: sbl += 20
+    elif r.get("sbl_3down") is False and s3 is not None and s3 > 0: sbl -= 8
+    if s1 is not None:
+        if s1 <= -2: sbl += 8
+        elif s1 >= 2: sbl -= 8
+    if s3 is not None:
+        if s3 <= -5: sbl += 20
+        elif s3 <= -2: sbl += 10
+        elif s3 >= 5: sbl -= 20
+        elif s3 >= 2: sbl -= 10
+    if s5 is not None:
+        if s5 <= -8: sbl += 12
+        elif s5 >= 8: sbl -= 12
+    sbl_detail = f"1日 {s1:+.1f}%｜3日 {s3:+.1f}%｜5日 {s5:+.1f}%" if None not in (s1, s3, s5) else (f"3日 {s3:+.1f}%" if s3 is not None else "借券資料待補")
+
+    # 4) 融資健康度 10%
+    margin = 55.0
+    status = str(r.get("margin_status") or "")
+    if status == "下降": margin += 12
+    elif status == "正常": margin += 5
+    elif status == "偏熱": margin -= 25
+    if m3 is not None:
+        if m3 <= -5: margin += 12
+        elif m3 <= 0: margin += 5
+        elif m3 >= 8: margin -= 20
+        elif m3 >= 3: margin -= 8
+    if m5 is not None:
+        if m5 <= -8: margin += 8
+        elif m5 >= 12: margin -= 10
+    if m3 is not None and ret5 is not None:
+        leverage_gap = m3 - max(ret5, 0.0)
+        if ret5 >= 3 and m3 <= 2: margin += 8
+        if leverage_gap >= 5: margin -= 10
+        elif leverage_gap <= -3: margin += 5
+    # Missing 5-day margin history is a legitimate partial-source state.
+    # Keep available 3-day evidence without formatting None as a float.
+    margin_detail = (
+        f"3日 {m3:+.1f}%｜5日 {m5:+.1f}%｜{status or '狀態待補'}"
+        if m3 is not None and m5 is not None
+        else f"3日 {m3:+.1f}%｜5日待補｜{status or '狀態待補'}"
+        if m3 is not None
+        else "融資資料待補"
+    )
+
+    # 5) 法人共識 10%
+    consensus = 50.0
+    if f1 is not None: consensus += 15 if f1 > 0 else -15 if f1 < 0 else 0
+    if t1 is not None: consensus += 10 if t1 > 0 else -10 if t1 < 0 else 0
+    if f1 is not None and t1 is not None:
+        if f1 > 0 and t1 > 0: consensus += 15
+        elif f1 < 0 and t1 < 0: consensus -= 15
+    if r.get("sbl_3down") is True: consensus += 8
+    elif s3 is not None and s3 >= 5: consensus -= 8
+    if status == "偏熱": consensus -= 8
+    elif status in {"正常", "下降"}: consensus += 4
+    consensus_detail = f"外資 {'買' if (f1 or 0)>0 else '賣' if (f1 or 0)<0 else '平'}｜投信 {'買' if (t1 or 0)>0 else '賣' if (t1 or 0)<0 else '平'}"
+
+    # 6) 價籌配合 / 背離 20%
+    price_chip = 50.0
+    if f3 is not None and ret5 is not None:
+        if f3 > 0:
+            if -1 <= ret5 <= 2: price_chip += 28
+            elif ret5 > 2: price_chip += 20
+            elif ret5 <= -5: price_chip -= 12
+            else: price_chip += 5
+        elif f3 < 0:
+            if ret5 >= 3: price_chip += 20  # 外資賣但價格不跌，承接偏強
+            elif ret5 <= -3: price_chip -= 28
+            else: price_chip += 5
+    if t3 is not None and ret5 is not None:
+        if t3 > 0 and ret5 >= 0: price_chip += 8
+        elif t3 < 0 and ret5 < 0: price_chip -= 8
+    if foreign_3d_volume_pct is not None and ret5 is not None:
+        if foreign_3d_volume_pct >= 5 and -1 <= ret5 <= 3: price_chip += 10
+        elif foreign_3d_volume_pct <= -5 and ret5 >= 3: price_chip += 8
+    price_chip_detail = f"5日股價 {ret5:+.1f}%｜外資3日占量 {foreign_3d_volume_pct:+.1f}%" if ret5 is not None and foreign_3d_volume_pct is not None else "價籌配合資料待補"
+
+    # 7) 同族群法人共振 5%
+    peers = []
+    for peer in group_rows or []:
+        pf = _chip_num(peer.get("foreign_net_latest"))
+        pt = _chip_num(peer.get("trust_net_latest"))
+        if pf is None and pt is None:
+            continue
+        flow = (pf or 0.0) + (pt or 0.0)
+        peers.append(1 if flow > 0 else -1 if flow < 0 else 0)
+    if len(peers) >= 3:
+        sector_inst = 50.0 + 50.0 * (sum(peers) / len(peers))
+        sector_detail = f"{sum(x>0 for x in peers)}/{len(peers)} 檔法人淨流向偏多"
+    else:
+        sector_inst = 50.0
+        sector_detail = "同族群法人樣本不足3檔"
+
+    components = {
+        "foreign": _chip_component("外資影響力", foreign, 25, foreign_detail),
+        "trust": _chip_component("投信結構", trust, 15, trust_detail),
+        "sbl": _chip_component("借券／空方壓力", sbl, 15, sbl_detail),
+        "margin": _chip_component("融資健康度", margin, 10, margin_detail),
+        "consensus": _chip_component("法人共識", consensus, 10, consensus_detail),
+        "price_chip": _chip_component("價籌配合", price_chip, 20, price_chip_detail),
+        "sector_inst": _chip_component("族群法人共振", sector_inst, 5, sector_detail),
+    }
+    total100 = round(sum(x["points"] for x in components.values()), 1)
+    score25 = round(total100 / 4.0, 1)
+
+    # 各來源日期獨立計算信心；晚公布的融資/借券不拖累已更新外資/投信的方向分。
+    confidence = 0.0
+    confidence += 25 * _chip_source_factor(r.get("foreign_date"), trade_date) if f1 is not None else 0
+    confidence += 15 * _chip_source_factor(r.get("trust_date"), trade_date) if t1 is not None else 0
+    confidence += 15 * _chip_source_factor(r.get("sbl_date"), trade_date) if s3 is not None else 0
+    confidence += 10 * _chip_source_factor(r.get("margin_date"), trade_date) if m3 is not None else 0
+    if f3 is not None and ret5 is not None and vol3 not in (None, 0): confidence += 20
+    if f1 is not None and t1 is not None: confidence += 10
+    elif f1 is not None or t1 is not None: confidence += 5
+    if len(peers) >= 3: confidence += 5
+    confidence = round(min(100.0, confidence), 0)
+
+    if total100 >= 80:
+        verdict = "強勢偏多"
+    elif total100 >= 68:
+        verdict = "偏多"
+    elif total100 >= 45:
+        verdict = "中性"
+    elif total100 >= 32:
+        verdict = "偏弱"
+    else:
+        verdict = "偏空"
+
+    if components["foreign"]["score"] >= 70 and components["price_chip"]["score"] >= 70:
+        summary = "法人收籌，股價也有配合"
+    elif components["foreign"]["score"] >= 70 and components["price_chip"]["score"] < 45:
+        summary = "法人偏買，但股價反應偏弱"
+    elif components["foreign"]["score"] < 40 and components["price_chip"]["score"] >= 65:
+        summary = "外資偏賣，但價格有明顯承接"
+    elif total100 < 40:
+        summary = "籌碼偏空，先看承接是否出現"
+    else:
+        summary = "籌碼方向尚未形成強共識"
+
+    legacy = _chip_num(r.get("chip_score_legacy"))
+    r["chip_model_version"] = "inuko-chip-v2.0"
+    r["chip_score_v2_raw"] = total100
+    r["chip_score_v2"] = score25
+    r["chip_confidence_v2"] = confidence
+    r["chip_verdict_v2"] = verdict
+    r["chip_summary_v2"] = summary
+    r["chip_components_v2"] = components
+    r["chip_score_delta"] = round(score25 - legacy, 1) if legacy is not None else None
+    # Compatibility: existing consumers keep reading chip_score / chip_coverage_pct.
+    r["chip_score"] = score25
+    r["chip_coverage_pct"] = confidence
+    return score25, confidence
 
 
 def sector_score(n, ratio=None, fallback=False):
@@ -1012,9 +1434,11 @@ def index_state(symbol, label, snap=None):
         else:
             change = float((c.iloc[-1]/c.iloc[-2]-1)*100)
         ret5 = float((c.iloc[-1]/c.iloc[-6]-1)*100) if len(c) >= 6 else None
+        ret20 = float((c.iloc[-1]/c.iloc[-21]-1)*100) if len(c) >= 21 else None
         return {
             "label": label, "symbol": symbol, "close": round(close, 2),
             "change_pct": round(change, 2), "ret5": round(ret5, 2) if ret5 is not None else None,
+            "ret20": round(ret20, 2) if ret20 is not None else None,
             "ma5": round(ma5, 2), "ma10": round(ma10, 2), "ma20": round(ma20, 2),
             "trend": bool(close > ma5 > ma10 > ma20),
             "above20": bool(close > ma20),
@@ -1739,6 +2163,753 @@ def _intraday_score_parts(r, market, sector_score_10):
 
 
 
+
+def _tech_component(label, score, max_score, detail):
+    score = max(0.0, min(float(max_score), float(score)))
+    return {"label": label, "score": round(score, 1), "max": float(max_score), "detail": str(detail or "")}
+
+
+def _apply_technical_score_v2(r, group_rows, market):
+    """犬子技術評分2.0：技術品質50分，進場位置另計，不重複懲罰過熱。"""
+    close = _chip_num(r.get("close")) or 0.0
+    ma5 = _chip_num(r.get("ma5"))
+    ma10 = _chip_num(r.get("ma10"))
+    ma20 = _chip_num(r.get("ma20"))
+    ma60 = _chip_num(r.get("ma60"))
+    s5 = _chip_num(r.get("ma5_slope5_pct"))
+    s10 = _chip_num(r.get("ma10_slope5_pct"))
+    s20 = _chip_num(r.get("ma20_slope5_pct"))
+    s60 = _chip_num(r.get("ma60_slope5_pct"))
+    volx = _chip_num(r.get("vol_x")) or 0.0
+    ret1 = _chip_num(r.get("day_change")) or 0.0
+    ret5 = _chip_num(r.get("ret5"))
+    ret20 = _chip_num(r.get("ret20"))
+    rsi_v = _chip_num(r.get("rsi"))
+    macd_h = _chip_num(r.get("macd_h"))
+    macd_acc = _chip_num(r.get("macd_acc"))
+    k = _chip_num(r.get("kd_k"))
+    d = _chip_num(r.get("kd_d"))
+    width = _chip_num(r.get("platform_width20_pct"))
+    breakout_age = r.get("recent_breakout_age")
+    breakout_vx = _chip_num(r.get("recent_breakout_volume_x"))
+    breakout_width = _chip_num(r.get("recent_breakout_width_pct"))
+    close_pos = _chip_num(r.get("close_position_pct"))
+    upper_wick = _chip_num(r.get("upper_wick_pct"))
+    failed_breakout = bool(r.get("failed_breakout"))
+
+    # A. 趨勢結構 14：只看趨勢品質，不因離均線太遠扣分。
+    trend = 0.0
+    if ma20 is not None and close > ma20: trend += 2.0
+    if None not in (ma5, ma10, ma20) and ma5 > ma10 > ma20: trend += 3.0
+    if None not in (ma20, ma60) and ma20 > ma60: trend += 2.0
+    if s20 is not None:
+        trend += 3.0 if s20 > .20 else 2.0 if s20 > 0 else 0.0
+    if s60 is not None:
+        trend += 2.0 if s60 > .10 else 1.0 if s60 >= 0 else 0.0
+    if ma60 is not None and close > ma60: trend += 1.0
+    if str(r.get("sar_state") or "") == "BULL": trend += 1.0
+    trend = min(14.0, trend)
+
+    # B. 突破 / 型態 10：平台品質＋近期有效突破；不是只有今天創20日高才有分。
+    breakout = 0.0
+    if width is not None:
+        breakout += 3.0 if width <= 12 else 2.0 if width <= 18 else 1.0 if width <= 25 else 0.0
+    if bool(r.get("break20")):
+        breakout += 3.0
+    elif bool(r.get("break3")):
+        breakout += 1.5
+    if breakout_age is not None and int(breakout_age) <= 10:
+        breakout += 2.0 if int(breakout_age) <= 3 else 1.0
+        if breakout_vx is not None:
+            breakout += 1.5 if breakout_vx >= 1.5 else 1.0 if breakout_vx >= 1.2 else 0.0
+        if breakout_width is not None and breakout_width <= 18:
+            breakout += .5
+    breakout = min(10.0, breakout)
+
+    # C. 量價品質 8：量價方向、收盤位置、量縮回測。
+    vp = 0.0
+    if ret1 > 0:
+        if volx >= 1.3: vp += 3.0
+        elif volx >= .8: vp += 2.0
+        else: vp += 1.0
+        if close_pos is not None:
+            vp += 2.0 if close_pos >= 75 else 1.0 if close_pos >= 55 else 0.0
+        if bool(r.get("break20")) and volx >= 1.2: vp += 2.0
+    elif ret1 < 0:
+        if volx <= .8 and ma20 is not None and close >= ma20 * .985:
+            vp += 4.0  # 量縮回測
+        elif volx < 1.0:
+            vp += 2.0
+        if close_pos is not None and close_pos >= 55: vp += 1.0
+    else:
+        vp += 2.0 if volx <= 1.1 else 1.0
+    if str(r.get("sar_state") or "") == "BULL" and ret1 >= 0: vp += 1.0
+    vp = min(8.0, vp)
+
+    # D. 動能 7：RSI/MACD/KD 合併成一桶，避免三個相關指標重複灌分。
+    momentum = 0.0
+    if rsi_v is not None:
+        momentum += 2.5 if 55 <= rsi_v <= 72 else 1.5 if 50 <= rsi_v < 55 or 72 < rsi_v <= 78 else .5 if rsi_v >= 45 else 0.0
+    if macd_h is not None:
+        if macd_h > 0 and (macd_acc or 0) > 0: momentum += 2.5
+        elif macd_h > 0: momentum += 1.5
+        elif (macd_acc or 0) > 0: momentum += .5
+    if k is not None and d is not None:
+        if k > d and k < 85: momentum += 1.5
+        elif bool(r.get("kd_cross_up")): momentum += 1.0
+        elif k > d: momentum += .5
+    if str(r.get("sar_state") or "") == "BULL": momentum += .5
+    momentum = min(7.0, momentum)
+
+    # E. 相對強弱 6：1/5/20日對市場 + 5/20日對同族群。
+    side = "otc" if str(r.get("market") or "") == "上櫃" else "taiex"
+    bench = (market or {}).get(side) or {}
+    rel1 = ret1 - float(bench.get("change_pct") or 0.0) if bench.get("change_pct") is not None else None
+    rel5 = ret5 - float(bench.get("ret5") or 0.0) if ret5 is not None and bench.get("ret5") is not None else None
+    rel20 = ret20 - float(bench.get("ret20") or 0.0) if ret20 is not None and bench.get("ret20") is not None else None
+    peer5 = [_chip_num(x.get("ret5")) for x in (group_rows or []) if str(x.get("code")) != str(r.get("code"))]
+    peer20 = [_chip_num(x.get("ret20")) for x in (group_rows or []) if str(x.get("code")) != str(r.get("code"))]
+    peer5 = [x for x in peer5 if x is not None]
+    peer20 = [x for x in peer20 if x is not None]
+    med5 = float(np.median(peer5)) if len(peer5) >= 2 else None
+    med20 = float(np.median(peer20)) if len(peer20) >= 2 else None
+    sector_rel5 = ret5 - med5 if ret5 is not None and med5 is not None else None
+    sector_rel20 = ret20 - med20 if ret20 is not None and med20 is not None else None
+    relative = 0.0
+    for value, weight in ((rel1, 1.5), (rel5, 1.5), (rel20, 1.5)):
+        if value is None: continue
+        relative += weight if value >= 1.0 else weight*.7 if value >= .3 else weight*.35 if value >= 0 else 0.0
+    for value, weight in ((sector_rel5, .75), (sector_rel20, .75)):
+        if value is None: continue
+        relative += weight if value >= 1.0 else weight*.65 if value >= 0 else 0.0
+    relative = min(6.0, relative)
+    r["technical_relative_v2"] = {
+        "market_1d_pct": round(rel1, 2) if rel1 is not None else None,
+        "market_5d_pct": round(rel5, 2) if rel5 is not None else None,
+        "market_20d_pct": round(rel20, 2) if rel20 is not None else None,
+        "sector_5d_pct": round(sector_rel5, 2) if sector_rel5 is not None else None,
+        "sector_20d_pct": round(sector_rel20, 2) if sector_rel20 is not None else None,
+    }
+
+    # F. 結構風險品質 5：5代表乾淨。只看假突破/出貨型K，不把「漲太多」重複扣在技術分。
+    riskq = 5.0
+    risk_flags = []
+    if failed_breakout:
+        riskq -= 2.0; risk_flags.append("假突破")
+    if upper_wick is not None and upper_wick >= 45 and volx >= 1.4:
+        riskq -= 1.5; risk_flags.append("爆量長上影")
+    if close_pos is not None and close_pos <= 25 and volx >= 1.5:
+        riskq -= 1.0; risk_flags.append("爆量收低")
+    if ret1 <= -4 and volx >= 1.3:
+        riskq -= 1.0; risk_flags.append("帶量長黑")
+    if volx > 6 and (close_pos is None or close_pos < 60):
+        riskq -= .5; risk_flags.append("極端爆量")
+    riskq = max(0.0, riskq)
+
+    components = {
+        "trend": _tech_component("趨勢結構", trend, 14, f"20MA斜率 {s20:+.2f}%" if s20 is not None else "20MA斜率待補"),
+        "breakout": _tech_component("突破／型態", breakout, 10, f"20日平台寬 {width:.1f}%" if width is not None else "平台資料待補"),
+        "volume_price": _tech_component("量價品質", vp, 8, f"量比 {volx:.2f}x｜收盤位置 {close_pos:.0f}%" if close_pos is not None else f"量比 {volx:.2f}x"),
+        "momentum": _tech_component("動能狀態", momentum, 7, f"RSI {rsi_v:.0f}｜K/D {k:.0f}/{d:.0f}" if None not in (rsi_v,k,d) else "動能資料待補"),
+        "relative": _tech_component("相對強弱", relative, 6, f"對市場 5日 {rel5:+.1f}%" if rel5 is not None else "市場相對強弱待補"),
+        "risk_quality": _tech_component("結構風險品質", riskq, 5, "、".join(risk_flags) if risk_flags else "未見明顯假突破／出貨型K"),
+    }
+    total = round(sum(x["score"] for x in components.values()), 1)
+
+    dist20 = _chip_num(r.get("dist20"))
+    if failed_breakout and ma20 is not None and close < ma20:
+        lifecycle = "假突破／結構失效"
+    elif ma20 is not None and close < ma20 and (s20 or 0) <= 0:
+        lifecycle = "轉弱"
+    elif bool(r.get("break20")) or (breakout_age is not None and int(breakout_age) <= 3):
+        lifecycle = "剛啟動"
+    elif ret1 < 0 and volx <= .9 and ma20 is not None and close >= ma20*.985:
+        lifecycle = "回踩測試"
+    elif (dist20 is not None and dist20 >= 12) or (rsi_v is not None and rsi_v > 78):
+        lifecycle = "高檔鈍化"
+    elif trend >= 10 and breakout >= 4:
+        lifecycle = "趨勢延伸"
+    elif width is not None and width <= 18 and close >= (r.get("platform_high20") or close)*.94:
+        lifecycle = "蓄勢"
+    else:
+        lifecycle = "蓄勢"
+
+    if total >= 42:
+        verdict = "技術強"
+    elif total >= 35:
+        verdict = "偏強"
+    elif total >= 27:
+        verdict = "中性"
+    elif total >= 20:
+        verdict = "偏弱"
+    else:
+        verdict = "轉弱"
+
+    if lifecycle == "剛啟動" and components["volume_price"]["score"] >= 5:
+        summary = "平台／突破與量價同步，屬早期發動"
+    elif lifecycle == "回踩測試":
+        summary = "趨勢未壞，正在量縮回踩確認"
+    elif lifecycle == "高檔鈍化":
+        summary = "趨勢仍強，但位置已延伸；強不等於可追"
+    elif components["relative"]["score"] >= 4.5 and trend >= 10:
+        summary = "趨勢與相對強弱同步領先"
+    elif lifecycle in {"轉弱", "假突破／結構失效"}:
+        summary = "結構轉弱，先等重新站回關鍵均線／平台"
+    else:
+        summary = "技術結構仍需更多共振"
+
+    relative_inputs = sum(v is not None for v in (rel1, rel5, rel20, sector_rel5, sector_rel20))
+    confidence = 70.0
+    if ma60 is not None and s60 is not None: confidence += 10
+    if width is not None and breakout_age is not None: confidence += 5
+    if None not in (rsi_v, macd_h, k, d): confidence += 5
+    confidence += min(10, relative_inputs * 2)
+    confidence = min(100.0, confidence)
+
+    legacy = _chip_num(r.get("technical_score_legacy"))
+    r["technical_model_version"] = "inuko-tech-v2.0"
+    r["technical_score_v2"] = total
+    r["technical_score_delta"] = round(total - legacy, 1) if legacy is not None else None
+    r["technical_confidence_v2"] = round(confidence, 0)
+    r["technical_components_v2"] = components
+    r["technical_lifecycle_v2"] = lifecycle
+    r["technical_verdict_v2"] = verdict
+    r["technical_summary_v2"] = summary
+    r["technical_score"] = total
+    return total, confidence
+
+
+def _sector_v2_component(label, score, max_score, detail):
+    score = max(0.0, min(float(max_score), float(score)))
+    return {"label": label, "score": round(score, 1), "max": float(max_score), "detail": str(detail or "")}
+
+
+def _apply_sector_score_v2(r, group_rows, source, label):
+    """犬子族群評分2.0：只評估族群本身，不重複個股相對強弱或法人籌碼。"""
+    members = [x for x in (group_rows or []) if isinstance(x, dict)]
+    total = len(members)
+
+    def f(x, key):
+        return _chip_num(x.get(key))
+
+    def pct_count(fn):
+        if not members:
+            return 0.0
+        return sum(1 for x in members if fn(x)) / len(members) * 100.0
+
+    up_pct = pct_count(lambda x: (f(x, "day_change") or 0) > 0)
+    above20_pct = pct_count(lambda x: f(x, "close") is not None and f(x, "ma20") is not None and f(x, "close") > f(x, "ma20"))
+    break20_pct = pct_count(lambda x: bool(x.get("break20")))
+    ma20_up_pct = pct_count(lambda x: (f(x, "ma20_slope5_pct") or -999) > 0)
+    ret20_pos_pct = pct_count(lambda x: (f(x, "ret20") or 0) > 0)
+
+    # A. 族群廣度 4：今日上漲、站20MA、創20日高。
+    breadth = 0.0
+    breadth += 1.5 if up_pct >= 70 else 1.2 if up_pct >= 60 else .8 if up_pct >= 50 else .4 if up_pct >= 40 else 0.0
+    breadth += 1.5 if above20_pct >= 70 else 1.2 if above20_pct >= 60 else .8 if above20_pct >= 50 else .4 if above20_pct >= 40 else 0.0
+    breadth += 1.0 if break20_pct >= 25 else .7 if break20_pct >= 15 else .4 if break20_pct >= 8 else .2 if break20_pct > 0 else 0.0
+
+    # B. 領頭股強度 3：至少有真正突破/趨勢且流動性足夠的核心股。
+    leaders = []
+    for x in members:
+        ret5 = f(x, "ret5") or 0.0
+        close = f(x, "close")
+        ma20 = f(x, "ma20")
+        avg_turn = f(x, "avg_turnover20") or 0.0
+        age = x.get("recent_breakout_age")
+        recent_break = age is not None and int(age) <= 3
+        if ret5 >= 3 and close is not None and ma20 is not None and close > ma20 and avg_turn >= 80_000_000 and (bool(x.get("break20")) or recent_break or bool(x.get("trend"))):
+            leaders.append(x)
+    leader_count = len(leaders)
+    leader_pct = (leader_count / total * 100.0) if total else 0.0
+    if leader_count >= 3 and leader_pct >= 25:
+        leader_score = 3.0
+    elif leader_count >= 2:
+        leader_score = 2.6
+    elif leader_count == 1:
+        leader_score = 1.8
+    elif above20_pct >= 60:
+        leader_score = .8
+    else:
+        leader_score = 0.0
+
+    # C. 持續性 3：3/5/10日，不因單日全面反彈就直接滿分。
+    persistence = 0.0
+    persistence_detail = []
+    for key, tag in (("ret3", "3日"), ("ret5", "5日"), ("ret10", "10日")):
+        vals = [f(x, key) for x in members]
+        vals = [v for v in vals if v is not None]
+        if not vals:
+            persistence_detail.append(f"{tag}待補")
+            continue
+        med = float(np.median(vals))
+        pos = sum(v > 0 for v in vals) / len(vals) * 100.0
+        pts = 1.0 if med >= 1.0 and pos >= 60 else .75 if med > 0 and pos >= 55 else .4 if med > 0 or pos >= 50 else 0.0
+        persistence += pts
+        persistence_detail.append(f"{tag}中位 {med:+.1f}%／上漲 {pos:.0f}%")
+
+    # D. 族群量價資金共振 2：只看價格與量能，不重複外資/投信。
+    active = [x for x in members if (f(x, "day_change") or 0) > 0 and (f(x, "vol_x") or 0) >= 1.2]
+    active_pct = (len(active) / total * 100.0) if total else 0.0
+    vxs = [f(x, "vol_x") for x in members]
+    vxs = [v for v in vxs if v is not None]
+    median_vx = float(np.median(vxs)) if vxs else None
+    capital = 0.0
+    capital += 1.2 if active_pct >= 40 and len(active) >= 2 else .8 if active_pct >= 25 and len(active) >= 2 else .4 if len(active) >= 1 else 0.0
+    if median_vx is not None:
+        capital += .8 if median_vx >= 1.3 else .5 if median_vx >= 1.05 else .2 if median_vx >= .85 else 0.0
+    capital = min(2.0, capital)
+
+    # E. 中期結構一致性 2：20MA方向與20日報酬，避免只看今日紅盤。
+    structure = 0.0
+    structure += 1.0 if ma20_up_pct >= 70 else .7 if ma20_up_pct >= 55 else .35 if ma20_up_pct >= 40 else 0.0
+    structure += 1.0 if ret20_pos_pct >= 70 else .7 if ret20_pos_pct >= 55 else .35 if ret20_pos_pct >= 40 else 0.0
+
+    # F. 分類可信度 1：不偽造基本面/新聞資料。窄族群高於官方大產業 proxy。
+    narrow = str(source or "").startswith("次產業")
+    if narrow and total >= 3:
+        taxonomy = 1.0
+    elif narrow and total >= 2:
+        taxonomy = .8
+    elif "官方產業" in str(source or "") and total >= 5:
+        taxonomy = .5
+    elif total >= 2:
+        taxonomy = .3
+    else:
+        taxonomy = .1
+
+    components = {
+        "breadth": _sector_v2_component("族群廣度", breadth, 4, f"上漲 {up_pct:.0f}%｜站20MA {above20_pct:.0f}%｜20日突破 {break20_pct:.0f}%"),
+        "leaders": _sector_v2_component("領頭股強度", leader_score, 3, f"合格領頭股 {leader_count}/{total} 檔"),
+        "persistence": _sector_v2_component("趨勢持續性", persistence, 3, "｜".join(persistence_detail)),
+        "capital_resonance": _sector_v2_component("量價資金共振", capital, 2, f"放量上漲 {len(active)}/{total} 檔｜族群量比中位 {median_vx:.2f}x" if median_vx is not None else f"放量上漲 {len(active)}/{total} 檔"),
+        "structure": _sector_v2_component("中期結構一致性", structure, 2, f"20MA上彎 {ma20_up_pct:.0f}%｜20日正報酬 {ret20_pos_pct:.0f}%"),
+        "taxonomy": _sector_v2_component("族群定義可信度", taxonomy, 1, f"{source or '待分類'}｜{label or '—'}｜樣本 {total} 檔"),
+    }
+    score15 = round(sum(x["score"] for x in components.values()), 1)
+    cap = 15.0
+    cap_note = None
+    if "官方產業" in str(source or ""):
+        cap = 9.0
+        cap_note = "官方大產業代理最高9/15，避免過寬分類被誤判成精準族群共振"
+    elif str(source or "") == "待分類":
+        cap = 4.5
+        cap_note = "待分類族群最高4.5/15"
+    if score15 > cap and score15 > 0:
+        scale = cap / score15
+        for item in components.values():
+            item["score"] = round(float(item["score"]) * scale, 1)
+        # absorb one-decimal rounding drift into taxonomy so displayed parts sum exactly.
+        drift = round(cap - sum(float(x["score"]) for x in components.values()), 1)
+        if abs(drift) >= .1:
+            components["taxonomy"]["score"] = round(max(0.0, min(float(components["taxonomy"]["max"]), float(components["taxonomy"]["score"]) + drift)), 1)
+        score15 = round(sum(float(x["score"]) for x in components.values()), 1)
+        if cap_note:
+            components["taxonomy"]["detail"] = f'{components["taxonomy"]["detail"]}｜{cap_note}'
+
+    confidence = 100.0 if narrow and total >= 5 else 92.0 if narrow and total >= 3 else 78.0 if narrow and total >= 2 else 70.0 if total >= 8 else 58.0 if total >= 3 else 40.0
+    if "官方產業" in str(source or ""):
+        confidence = min(confidence, 72.0)
+
+    verdict = "主升共振" if score15 >= 12 else "偏強" if score15 >= 9 else "中性" if score15 >= 6 else "偏弱"
+    if score15 >= 12:
+        if breadth >= 3 and persistence >= 2.2 and leader_score >= 2.6:
+            summary = "族群廣度、領頭股與多日趨勢同步"
+        elif persistence >= 2.2 and leader_score >= 2.6:
+            summary = "主升條件成立；多日趨勢與領頭股強，今日廣度仍可再擴散"
+        elif breadth >= 3 and persistence >= 2.2:
+            summary = "主升條件成立；族群廣度與多日趨勢同步，領頭股強度仍可再提升"
+        else:
+            summary = "族群總分已達主升共振，仍有部分子項未同步滿足"
+    elif breadth >= 3 and persistence < 1.5:
+        summary = "今日族群偏強，但多日持續性仍待確認"
+    elif leader_score >= 2.6 and breadth < 2:
+        summary = "領頭股強，但族群擴散仍不足"
+    elif score15 < 6:
+        summary = "族群共振偏弱，個股需靠自身結構"
+    else:
+        summary = "族群條件中性，尚未形成完整主升共振"
+
+    r["sector_model_version"] = "inuko-sector-v2.0"
+    r["sector_score_v2"] = score15
+    r["sector_confidence_v2"] = round(confidence, 0)
+    r["sector_verdict_v2"] = verdict
+    r["sector_summary_v2"] = summary
+    r["sector_components_v2"] = components
+    r["sector_member_count_v2"] = total
+    return score15, confidence
+
+
+def _liquidity_v2_component(label, score, max_score, detail):
+    score = max(0.0, min(float(max_score), float(score)))
+    return {"label": label, "score": round(score, 1), "max": float(max_score), "detail": str(detail or "")}
+
+
+def _apply_liquidity_score_v2(r):
+    """犬子流動性評分2.0：評估可持續進出品質，不把單日爆量直接當成高流動性。"""
+    avg = _chip_num(r.get("avg_turnover20"))
+    med = _chip_num(r.get("median_turnover20"))
+    low = _chip_num(r.get("min_turnover20"))
+    cv = _chip_num(r.get("turnover_cv20"))
+    days30 = int(r.get("turnover_days_ge30m20") or 0)
+    days80 = int(r.get("turnover_days_ge80m20") or 0)
+    impact = _chip_num(r.get("price_impact_median20"))
+    volx = _chip_num(r.get("vol_x"))
+    today_vs_med = _chip_num(r.get("turnover_vs_median20"))
+    upper = _chip_num(r.get("upper_wick_pct"))
+    close_pos = _chip_num(r.get("close_position_pct"))
+
+    # A. 20日平均成交額 3：飽和式，不讓巨型股靠成交額無限加分。
+    if avg is None:
+        avg_score = 0.0
+    elif avg >= 500_000_000:
+        avg_score = 3.0
+    elif avg >= 300_000_000:
+        avg_score = 2.7
+    elif avg >= 200_000_000:
+        avg_score = 2.4
+    elif avg >= 100_000_000:
+        avg_score = 2.0
+    elif avg >= 80_000_000:
+        avg_score = 1.6
+    elif avg >= 50_000_000:
+        avg_score = 1.2
+    elif avg >= 30_000_000:
+        avg_score = .8
+    else:
+        avg_score = 0.0
+
+    # B. 成交額穩定度 2：CV + 中位數/平均數。
+    stability = 0.0
+    if cv is not None:
+        stability += 1.2 if cv <= .45 else 1.0 if cv <= .65 else .7 if cv <= .9 else .35 if cv <= 1.25 else 0.0
+    ratio = (med / avg) if med is not None and avg not in (None, 0) else None
+    if ratio is not None:
+        stability += .8 if ratio >= .80 else .6 if ratio >= .65 else .35 if ratio >= .50 else .1
+
+    # C. 價格衝擊 2：每1億元成交額對應的日波動越小，越容易正常進出。
+    if impact is None:
+        impact_score = 1.0
+    elif impact <= .45:
+        impact_score = 2.0
+    elif impact <= .8:
+        impact_score = 1.7
+    elif impact <= 1.3:
+        impact_score = 1.4
+    elif impact <= 2.0:
+        impact_score = 1.0
+    elif impact <= 3.0:
+        impact_score = .6
+    else:
+        impact_score = .2
+
+    # D. 成交連續性 1.5：20個交易日有多少天真的達可交易門檻。
+    continuity = 0.0
+    ratio30 = days30 / 20.0
+    continuity += 1.0 if ratio30 >= .90 else .75 if ratio30 >= .75 else .45 if ratio30 >= .55 else .2 if ratio30 >= .35 else 0.0
+    if med is not None and med >= 80_000_000:
+        continuity += .5
+    elif days80 >= 12:
+        continuity += .4
+    elif avg is not None and avg >= 80_000_000:
+        continuity += .25
+    continuity = min(1.5, continuity)
+
+    # E. 異常爆量/擁擠風險 1.5：滿分代表乾淨；爆量長上影等才扣。
+    crowd = 1.5
+    alerts = []
+    if volx is not None and volx > 6:
+        crowd -= .7; alerts.append("量比>6x")
+    elif volx is not None and volx > 4:
+        crowd -= .3; alerts.append("量比>4x")
+    if today_vs_med is not None and today_vs_med > 5:
+        crowd -= .4; alerts.append("成交額>20日中位5倍")
+    elif today_vs_med is not None and today_vs_med > 3:
+        crowd -= .2; alerts.append("成交額短暫放大")
+    if upper is not None and upper >= 45 and (volx or 0) >= 1.4:
+        crowd -= .4; alerts.append("放量長上影")
+    if close_pos is not None and close_pos <= 25 and (volx or 0) >= 1.5:
+        crowd -= .4; alerts.append("放量收低")
+    crowd = max(0.0, crowd)
+
+    components = {
+        "avg_turnover": _liquidity_v2_component("20日平均成交額", avg_score, 3, f"{avg/100_000_000:.2f}億" if avg is not None else "資料待補"),
+        "stability": _liquidity_v2_component("成交額穩定度", stability, 2, f"CV {cv:.2f}｜中位/平均 {ratio:.0%}" if cv is not None and ratio is not None else "穩定度資料待補"),
+        "price_impact": _liquidity_v2_component("價格衝擊", impact_score, 2, f"中位 {impact:.2f}%／每1億元" if impact is not None else "價格衝擊樣本不足"),
+        "continuity": _liquidity_v2_component("成交連續性", continuity, 1.5, f"20日中 {days30} 日≥3000萬｜{days80} 日≥8000萬"),
+        "crowding": _liquidity_v2_component("擁擠／異常量風險", crowd, 1.5, "、".join(alerts) if alerts else "未見明顯異常爆量／流動性扭曲"),
+    }
+    score10 = round(sum(x["score"] for x in components.values()), 1)
+    fields = [avg, med, cv, impact]
+    confidence = round(sum(v is not None for v in fields) / len(fields) * 100.0, 0)
+    verdict = "健康" if score10 >= 8.5 else "可交易" if score10 >= 7 else "普通" if score10 >= 5.5 else "偏薄／風險較高"
+    if alerts:
+        summary = f"流動性可用，但注意{'、'.join(alerts[:2])}"
+    elif score10 >= 8.5:
+        summary = "成交額充足且穩定，價格衝擊低"
+    elif score10 >= 7:
+        summary = "流動性足以波段操作，仍需控制追價"
+    else:
+        summary = "成交品質普通，建議降低單筆部位與追價"
+
+    r["liquidity_model_version"] = "inuko-liquidity-v2.0"
+    r["liquidity_score_v2"] = score10
+    r["liquidity_confidence_v2"] = confidence
+    r["liquidity_verdict_v2"] = verdict
+    r["liquidity_summary_v2"] = summary
+    r["liquidity_components_v2"] = components
+    r["liquidity_alerts_v2"] = alerts
+    return score10, confidence
+
+
+def _ignition_component(label, score, max_score, detail):
+    score = max(0.0, min(float(max_score), float(score)))
+    return {"label": label, "score": round(score, 1), "max": float(max_score), "detail": str(detail or "")}
+
+
+def _apply_ignition_score_v2(r):
+    """犬子點火雷達 2.0：找「壓縮→擴張／剛突破／突破回踩」而不是把慢牛直接排第一。
+
+    六大分項固定 25+20+15+15+15+10=100；Gate 只做風險封頂，
+    raw score 與 final score 分開保存，前端必須顯示封頂原因。
+    """
+    close = _chip_num(r.get("close")) or 0.0
+    width = _chip_num(r.get("platform_width20_pct"))
+    platform_high = _chip_num(r.get("platform_high20"))
+    breakout_pct = _chip_num(r.get("breakout_pct"))
+    breakout_age = r.get("recent_breakout_age")
+    breakout_vx = _chip_num(r.get("recent_breakout_volume_x"))
+    volx = _chip_num(r.get("vol_x")) or 0.0
+    turn_vs_med = _chip_num(r.get("turnover_vs_median20"))
+    close_pos = _chip_num(r.get("close_position_pct"))
+    upper_wick = _chip_num(r.get("upper_wick_pct"))
+    ret1 = _chip_num(r.get("day_change")) or 0.0
+    ret5 = _chip_num(r.get("ret5")) or 0.0
+    dist20 = _chip_num(r.get("dist20"))
+    failed_breakout = bool(r.get("failed_breakout"))
+    atr_pct = _chip_num((r.get("dynamic_profile") or {}).get("atr14_pct"))
+
+    # A. 壓縮／突破結構 25：平台越乾淨、突破越新、起漲量越健康越高。
+    structure = 0.0
+    if width is not None:
+        structure += 8 if width <= 10 else 7 if width <= 14 else 5 if width <= 18 else 3 if width <= 25 else 1 if width <= 35 else 0
+    if bool(r.get("break20")):
+        structure += 8
+    elif bool(r.get("break3")):
+        structure += 5
+    elif platform_high and close >= platform_high * .98:
+        structure += 3
+    if breakout_age is not None:
+        age = int(breakout_age)
+        structure += 5 if age == 0 else 4 if age <= 2 else 2 if age <= 5 else 1 if age <= 10 else 0
+        if breakout_vx is not None:
+            structure += 4 if 1.5 <= breakout_vx <= 3.5 else 3 if 1.2 <= breakout_vx < 1.5 else 2 if 3.5 < breakout_vx <= 5 else 0
+    elif platform_high and close >= platform_high * .95:
+        structure += 2
+    structure = min(25.0, structure)
+
+    # B. 量能加速 20：要「開始進錢」，但極端爆量不當成滿分。
+    volume = 0.0
+    volume += 8 if 1.5 <= volx <= 3.0 else 6 if 1.2 <= volx < 1.5 else 4 if 1.0 <= volx < 1.2 else 3 if 3.0 < volx <= 4.5 else 0
+    if turn_vs_med is not None:
+        volume += 6 if 1.8 <= turn_vs_med <= 3.5 else 5 if 1.4 <= turn_vs_med < 1.8 else 3 if 1.1 <= turn_vs_med < 1.4 else 2 if 3.5 < turn_vs_med <= 5 else 0
+    if close_pos is not None:
+        volume += 4 if close_pos >= 75 else 3 if close_pos >= 60 else 1 if close_pos >= 45 else 0
+    if ret1 > 0 and volx >= 1.2:
+        volume += 2
+    volume = min(20.0, volume)
+
+    # C. 族群共振 15：直接引用已去重複計分的 Sector 2.0。
+    sector = max(0.0, min(15.0, float(_chip_num(r.get("sector_score_v2")) or 0.0)))
+
+    # D. 相對強度加速 15：不只看「強」，而是看短期是否正在加速領先市場／同族群。
+    rel = r.get("technical_relative_v2") or {}
+    rel1 = _chip_num(rel.get("market_1d_pct"))
+    rel5 = _chip_num(rel.get("market_5d_pct"))
+    sector_rel5 = _chip_num(rel.get("sector_5d_pct"))
+    relative = 0.0
+    if rel1 is not None:
+        relative += 6 if rel1 >= 2 else 5 if rel1 >= 1 else 3 if rel1 >= .3 else 1 if rel1 >= 0 else 0
+    if rel5 is not None:
+        relative += 4 if rel5 >= 5 else 3 if rel5 >= 2 else 2 if rel5 >= .5 else 1 if rel5 >= 0 else 0
+    if sector_rel5 is not None:
+        relative += 3 if sector_rel5 >= 3 else 2 if sector_rel5 >= 1 else 1 if sector_rel5 >= 0 else 0
+    if rel1 is not None and rel5 is not None and rel1 > rel5 / 5.0 + .5:
+        relative += 2
+    relative = min(15.0, relative)
+
+    # E. 籌碼加速 15：看「最近一天是否比5日均速更積極」＋法人共識＋借券/融資壓力。
+    f1 = _chip_num(r.get("foreign_net_latest")); f3 = _chip_num(r.get("foreign_3d_net")); f5 = _chip_num(r.get("foreign_5d_net"))
+    t1 = _chip_num(r.get("trust_net_latest")); t3 = _chip_num(r.get("trust_3d_net")); t5 = _chip_num(r.get("trust_5d_net"))
+    fstreak = _chip_num(r.get("foreign_streak")); tstreak = _chip_num(r.get("trust_streak"))
+    sbl3 = _chip_num(r.get("sbl_3change_pct")); margin3 = _chip_num(r.get("margin_3d_pct"))
+    chip_acc = 0.0
+    if f1 is not None and f5 is not None:
+        chip_acc += 4 if f1 > 0 and f1 > (f5 / 5.0) * 1.3 else 3 if f1 > 0 else 0
+    elif f1 is not None and f1 > 0:
+        chip_acc += 2
+    if t1 is not None and t5 is not None:
+        chip_acc += 3 if t1 > 0 and t1 > max(0.0, t5 / 5.0) * 1.2 else 2 if t1 > 0 else 0
+    elif t1 is not None and t1 > 0:
+        chip_acc += 1.5
+    if f3 is not None and t3 is not None and f3 > 0 and t3 > 0:
+        chip_acc += 3
+    elif (f3 or 0) > 0 or (t3 or 0) > 0:
+        chip_acc += 1.5
+    if fstreak is not None and fstreak >= 3: chip_acc += 1.5
+    if tstreak is not None and tstreak >= 3: chip_acc += 1.5
+    if sbl3 is not None:
+        chip_acc += 1.5 if sbl3 <= -5 else 1.0 if sbl3 < 0 else 0
+    if margin3 is not None and margin3 <= 2:
+        chip_acc += .5
+    chip_acc = min(15.0, chip_acc)
+
+    # F. 可交易性／風險 10：以 Liquidity 2.0 為底，再扣假突破、爆量長上影、收低。
+    liquidity = _chip_num(r.get("liquidity_score_v2"))
+    tradability = float(liquidity if liquidity is not None else 5.0)
+    risk_notes = []
+    if failed_breakout:
+        tradability -= 5; risk_notes.append("假突破")
+    if upper_wick is not None and upper_wick >= 45 and volx >= 1.4:
+        tradability -= 2; risk_notes.append("放量長上影")
+    if close_pos is not None and close_pos <= 25 and volx >= 1.5:
+        tradability -= 2; risk_notes.append("放量收低")
+    if volx > 6:
+        tradability -= 2; risk_notes.append("極端爆量")
+    if ret1 <= -4 and volx >= 1.3:
+        tradability -= 2; risk_notes.append("帶量長黑")
+    tradability = max(0.0, min(10.0, tradability))
+
+    components = {
+        "structure": _ignition_component("壓縮／突破結構", structure, 25,
+            f"平台寬 {width:.1f}%｜突破 {breakout_pct:+.1f}%｜突破年齡 {int(breakout_age)}日" if width is not None and breakout_pct is not None and breakout_age is not None
+            else (f"平台寬 {width:.1f}%｜突破待確認" if width is not None else "平台／突破資料待補")),
+        "volume_acceleration": _ignition_component("量能加速", volume, 20,
+            f"量比 {volx:.2f}x｜成交額/20日中位 {turn_vs_med:.2f}x｜收盤位置 {close_pos:.0f}%" if turn_vs_med is not None and close_pos is not None
+            else f"量比 {volx:.2f}x"),
+        "sector_resonance": _ignition_component("族群共振", sector, 15,
+            f"{r.get('sector_verdict_v2') or '待確認'}｜{r.get('sector_summary_v2') or r.get('sector_score_label') or '族群資料待補'}"),
+        "relative_acceleration": _ignition_component("相對強度加速", relative, 15,
+            f"對市場 1日 {rel1:+.1f}%｜5日 {rel5:+.1f}%｜對族群5日 {sector_rel5:+.1f}%" if None not in (rel1, rel5, sector_rel5)
+            else "相對強弱資料部分待補"),
+        "chip_acceleration": _ignition_component("籌碼加速", chip_acc, 15,
+            f"外資1日 {f1/1000:+.0f}張｜5日 {f5/1000:+.0f}張｜投信1日 {t1/1000:+.0f}張" if None not in (f1, f5, t1)
+            else "法人加速度資料部分待補"),
+        "tradability_risk": _ignition_component("可交易性／風險", tradability, 10,
+            "、".join(risk_notes) if risk_notes else f"流動性 {liquidity:.1f}/10" if liquidity is not None else "流動性資料待補"),
+    }
+    raw_score = round(sum(float(x["score"]) for x in components.values()), 1)
+
+    # 距離突破點用 ATR 標準化：同樣3%對高波動／低波動股票意義不同。
+    breakout_distance_pct = None
+    breakout_distance_atr = None
+    if platform_high and close > 0:
+        breakout_distance_pct = (close / platform_high - 1.0) * 100.0
+        if atr_pct not in (None, 0):
+            breakout_distance_atr = breakout_distance_pct / atr_pct
+
+    # Gate：股票再強，只要位置／流動性已不適合追，就限制 final score。
+    gate_cap = 100.0
+    gate_flags = []
+    def cap_at(value, reason):
+        nonlocal gate_cap
+        gate_cap = min(gate_cap, float(value))
+        if reason not in gate_flags:
+            gate_flags.append(reason)
+
+    if failed_breakout:
+        cap_at(45, "假突破")
+    if liquidity is not None and liquidity < 5.5:
+        cap_at(60, "流動性偏薄")
+    elif liquidity is not None and liquidity < 7:
+        cap_at(75, "流動性普通")
+    if breakout_distance_atr is not None and breakout_distance_atr > 3:
+        cap_at(60, "距突破點>3ATR")
+    elif breakout_distance_atr is not None and breakout_distance_atr > 2.2:
+        cap_at(72, "距突破點偏遠")
+    if dist20 is not None and dist20 > 18:
+        cap_at(60, "距20MA過遠")
+    if ret5 > 30:
+        cap_at(55, "5日漲幅>30%")
+    elif ret5 > 22:
+        cap_at(68, "5日漲幅偏大")
+    if upper_wick is not None and upper_wick >= 45 and volx >= 1.4:
+        cap_at(55, "放量長上影")
+    if close_pos is not None and close_pos <= 20 and volx >= 1.5:
+        cap_at(55, "放量收低")
+    if volx > 6:
+        cap_at(65, "極端爆量")
+
+    score = round(min(raw_score, gate_cap), 1)
+    near_platform = bool(platform_high and close > 0 and abs(close / platform_high - 1) <= .025)
+    pre_break = bool(platform_high and close < platform_high and close >= platform_high * .94)
+    recent = breakout_age is not None and int(breakout_age) <= 5
+
+    if failed_breakout or "放量長上影" in gate_flags or "放量收低" in gate_flags or "5日漲幅>30%" in gate_flags:
+        stage, action = "末端過熱／不追", "不追"
+    elif recent and near_platform and int(breakout_age) >= 1 and volx <= 1.8 and ret1 <= 2.5:
+        stage, action = "突破回踩", "等承接／小量試單"
+    elif score >= 75 and (bool(r.get("break20")) or (breakout_age is not None and int(breakout_age) <= 2)) and volx >= 1.2 and (breakout_distance_atr is None or breakout_distance_atr <= 1.8):
+        stage, action = "剛點火", "小量試單候選"
+    elif score >= 65 and pre_break and width is not None and width <= 20 and volx <= 1.8:
+        stage, action = "蓄勢", "等突破"
+    elif score >= 68 and recent:
+        stage, action = "已發動等回踩", "等回踩"
+    else:
+        stage, action = "觀察", "觀察"
+
+    verdict = "高點火" if score >= 82 else "點火候選" if score >= 72 else "蓄勢觀察" if score >= 62 else "一般"
+    if stage == "末端過熱／不追":
+        verdict = "過熱不追"
+    reasons = []
+    if structure >= 18: reasons.append("突破／壓縮結構集中")
+    if volume >= 15: reasons.append("量能加速")
+    if sector >= 12: reasons.append("族群主升共振")
+    if relative >= 11: reasons.append("相對強度加速")
+    if chip_acc >= 10: reasons.append("籌碼加速")
+    if stage == "突破回踩": reasons.insert(0, "突破後回踩確認區")
+    if gate_flags: reasons.append("Gate：" + "、".join(gate_flags[:2]))
+    summary = (
+        "突破、量能、族群與相對強度同步，且仍在可追蹤的早期發動區"
+        if stage == "剛點火" else
+        "尚未正式突破，但平台、量價與資金條件正在集中"
+        if stage == "蓄勢" else
+        "近期已突破，現正回測突破帶；重點看承接是否守住"
+        if stage == "突破回踩" else
+        "條件仍強，但已離起漲點較遠；等回踩比追價重要"
+        if stage == "已發動等回踩" else
+        "已有末端／流動性風險訊號，強勢不等於可以追"
+        if stage == "末端過熱／不追" else
+        "點火條件尚未集中，先列研究觀察"
+    )
+
+    confidence_parts = [
+        100.0 if (r.get("dynamic_profile") or {}).get("ready") else 65.0,
+        float(_chip_num(r.get("sector_confidence_v2")) or 50.0),
+        float(_chip_num(r.get("chip_confidence_v2")) or 50.0),
+        float(_chip_num(r.get("liquidity_confidence_v2")) or 50.0),
+        100.0 if isinstance(r.get("technical_relative_v2"), dict) and any(v is not None for v in (r.get("technical_relative_v2") or {}).values()) else 60.0,
+    ]
+    confidence = round(sum(confidence_parts) / len(confidence_parts), 0)
+
+    r["ignition_model_version"] = "inuko-ignition-v2.0"
+    r["ignition_score_v2"] = score
+    r["ignition_raw_score_v2"] = raw_score
+    r["ignition_confidence_v2"] = confidence
+    r["ignition_components_v2"] = components
+    r["ignition_gate_cap_v2"] = round(gate_cap, 1)
+    r["ignition_gate_flags_v2"] = gate_flags
+    r["ignition_stage_v2"] = stage
+    r["ignition_action_v2"] = action
+    r["ignition_verdict_v2"] = verdict
+    r["ignition_summary_v2"] = summary
+    r["ignition_reasons_v2"] = reasons[:5]
+    r["ignition_breakout_distance_pct_v2"] = round(breakout_distance_pct, 2) if breakout_distance_pct is not None else None
+    r["ignition_breakout_distance_atr_v2"] = round(breakout_distance_atr, 2) if breakout_distance_atr is not None else None
+    r["ignition_candidate_v2"] = bool(score >= 62 and stage != "末端過熱／不追")
+    return score, confidence
+
+
 def _swing_liquidity_score(r):
     """盤後波段延續的流動性 0~10；不和進場位置混在一起。"""
     level = str(r.get("liquidity_level") or "未知")
@@ -1812,6 +2983,51 @@ def _close_entry_position_score(r):
 
     score -= min(25.0, 10.0 * len(r.get("overheat_reasons") or []))
     return round(max(0.0, min(100.0, score)), 1)
+
+
+def _finalize_ignition_execution_v2(r):
+    """Separate 'is it igniting?' from 'is this price actionable now?'."""
+    stage = str(r.get("ignition_stage_v2") or "")
+    signal_action = str(r.get("ignition_action_v2") or "觀察")
+    score = _chip_num(r.get("ignition_score_v2"))
+    entry = _chip_num(r.get("entry_position_score"))
+    cap = _chip_num(r.get("ignition_gate_cap_v2"))
+    r["ignition_signal_action_v2"] = signal_action
+
+    def set_exec(state, ready, action, note):
+        r["ignition_execution_state_v2"] = state
+        r["ignition_execution_ready_v2"] = bool(ready)
+        r["ignition_action_v2"] = action
+        r["ignition_execution_note_v2"] = note
+
+    if stage == "末端過熱／不追":
+        set_exec("NO_CHASE", False, "不追", "點火訊號可能仍強，但末端／追價 Gate 已禁止追價。")
+        return
+    if stage == "蓄勢":
+        set_exec("WAIT_BREAKOUT", False, "等突破", "尚未完成點火，等待正式突破與量價確認。")
+        return
+    if stage == "已發動等回踩":
+        set_exec("WAIT_PULLBACK", False, "等回踩", "已發動但離起漲點偏遠，等回踩再評估。")
+        return
+    if stage in {"剛點火", "突破回踩"}:
+        if entry is None:
+            set_exec("WAIT_POSITION", False, "位置待補", "點火條件成立，但進場位置資料不足，不直接給試單訊號。")
+            return
+        if entry < 55:
+            set_exec("WAIT_PULLBACK", False, "點火成立・位置差，等回踩", f"點火成立，但進場位置僅 {entry:.0f}/100，先等回踩，不把強勢當買點。")
+            return
+        if entry < 65:
+            set_exec("WAIT_CONFIRM", False, "點火成立・等確認", f"點火成立，進場位置 {entry:.0f}/100；等支撐／突破回測確認後再升級。")
+            return
+        if (score or 0) >= 75 and (cap is None or cap >= 75):
+            if stage == "突破回踩":
+                set_exec("RETEST_READY", True, "等承接／小量試單", f"突破回踩且進場位置 {entry:.0f}/100，可等承接確認後小量試單。")
+            else:
+                set_exec("READY", True, "小量試單候選", f"剛點火且進場位置 {entry:.0f}/100，具備小量試單資格；仍不可追高。")
+            return
+        set_exec("WAIT_CONFIRM", False, "等確認", "點火尚未同時滿足分數／Gate／位置三項執行條件。")
+        return
+    set_exec("WATCH", False, signal_action if signal_action else "觀察", "點火條件尚未集中，維持觀察。")
 
 
 def _assign_stage_v2(r, preliminary_intraday, sector_score_10):
@@ -2190,14 +3406,9 @@ def add_component_scores(rows, market, preliminary_intraday=False):
     _calibration = (_validation.get("calibration") or {}) if isinstance(_validation, dict) else {}
     _calibration_active = bool(_calibration.get("active"))
     _candidate_weights = _calibration.get("active_weights") or {}
-    _swing_weights = {}
-    for _k, _base in _baseline_swing_weights.items():
-        try:
-            _swing_weights[_k] = float(_candidate_weights.get(_k, _base)) if _calibration_active else _base
-        except Exception:
-            _swing_weights[_k] = _base
-    _wsum = sum(_swing_weights.values()) or 100.0
-    _swing_weights = {k: v / _wsum * 100.0 for k, v in _swing_weights.items()}
+    # v2 scoring contracts: top-level module weights are fixed and comparable
+    # across dates. Historical calibration may evolve sub-models, not 50/25/15/10.
+    _swing_weights = dict(_baseline_swing_weights)
 
     for r in rows:
         key = str(r.get("sector_group") or "").strip()
@@ -2248,8 +3459,14 @@ def add_component_scores(rows, market, preliminary_intraday=False):
         r["market_data_complete"] = bool(market.get("data_complete", True))
         r["market_trade_date"] = market.get("trade_date")
 
+        if not preliminary_intraday:
+            _apply_chip_score_v2(r, group_rows, market.get("trade_date"))
+            _apply_technical_score_v2(r, group_rows, market)
+            _apply_sector_score_v2(r, group_rows, source, label)
+            _apply_liquidity_score_v2(r)
+            _apply_ignition_score_v2(r)
         cs = float(r.get("chip_score", 12.5))
-        chip_cov = float(r.get("chip_coverage_pct") or 0)
+        chip_cov = float(r.get("chip_confidence_v2", r.get("chip_coverage_pct") or 0))
         liq_adjust = float(r.get("liquidity_adjust", 0))
         r["market_in_quality_score"] = False
         r["chip_background"] = _chip_background_label(cs, chip_cov)
@@ -2279,8 +3496,8 @@ def add_component_scores(rows, market, preliminary_intraday=False):
             # 技術50＋籌碼25＋族群15＋流動性10＝100；進場位置另外獨立100。
             tech_component = max(0.0, min(50.0, float(r.get("technical_score") or 0)))
             chip_component = max(0.0, min(25.0, cs))
-            sector_component = max(0.0, min(15.0, float(sec or 0) * 1.5))
-            liquidity_component = _swing_liquidity_score(r)
+            sector_component = max(0.0, min(15.0, float(r.get("sector_score_v2") or 0)))
+            liquidity_component = max(0.0, min(10.0, float(r.get("liquidity_score_v2") or _swing_liquidity_score(r))))
             # 原始 component 尺度仍是 50/25/15/10；校準只調整它們在100分內的相對權重。
             _component_caps = {"technical": 50.0, "chip": 25.0, "sector": 15.0, "liquidity": 10.0}
             _raw_components = {
@@ -2308,6 +3525,7 @@ def add_component_scores(rows, market, preliminary_intraday=False):
             r["swing_quality_score"] = swing
             r["swing_continuation_score"] = swing
             r["entry_position_score"] = _close_entry_position_score(r)
+            _finalize_ignition_execution_v2(r)
             r["score_type"] = "swing_continuation_direct_100"
             r["score_reliable"] = bool(chip_cov >= 60)
             if not r["score_reliable"]:
@@ -2323,6 +3541,18 @@ def add_component_scores(rows, market, preliminary_intraday=False):
 
         _assign_stage_v2(r, preliminary_intraday, sec)
 
+    if not preliminary_intraday:
+        ignition_sorted = sorted(
+            rows,
+            key=lambda x: (
+                -float(x.get("ignition_score_v2") or 0),
+                -float(x.get("ignition_confidence_v2") or 0),
+                str(x.get("code") or ""),
+            ),
+        )
+        for rank, item in enumerate(ignition_sorted, 1):
+            item["ignition_rank_v2"] = rank
+
     order = {
         "剛啟動": 0, "蓄勢待發": 1, "回踩承接": 2, "趨勢持有": 3,
         "觀察": 4, "轉弱警戒": 5, "結構失效": 6, "過熱不追": 7,
@@ -2336,6 +3566,9 @@ def add_component_scores(rows, market, preliminary_intraday=False):
     return rows
 
 
+# Inuko sector + liquidity 2.0 official deployment trigger
+# Inuko sector/liquidity score 2.0 official deployment trigger
+# Inuko chip score 2.0 deployment trigger: official close rebuild
 def build_close():
     uni = get_universe()
     uni["industry_name"] = uni["industry"].map(industry_name_for)
@@ -2345,6 +3578,22 @@ def build_close():
     meta = uni.set_index("symbol").to_dict("index")
     official_today = official_mis_snapshot(uni)
     official_trade_date = max((v.get("date") for v in official_today.values() if v.get("date")), default=None)
+    # Owned holdings need independent close coverage, even when the swing radar
+    # rejects a thin or nonrankable stock. Never assign fake swing scores.
+    universe_by_code = {str(x["code"]): x for x in universe_public}
+    portfolio_ref = {}
+    for code, snap in official_today.items():
+        meta_row = universe_by_code.get(str(code), {})
+        if snap.get("Close") is None or not snap.get("date"):
+            continue
+        portfolio_ref[str(code)] = {
+            "code": str(code), "name": meta_row.get("name", ""),
+            "market": meta_row.get("market", ""), "industry_name": meta_row.get("industry_name", ""),
+            "trade_date": snap["date"].isoformat(), "close": snap["Close"],
+            "high": snap.get("High"), "low": snap.get("Low"),
+            "volume": snap.get("Volume"), "source": "TWSE MIS verified close",
+            "coverage": "OFFICIAL_CLOSE_ONLY", "rank_eligible": False,
+        }
 
     rows = []
     # v1.5.12：沿用這一輪本來就下載的6個月日K，保存各股近期每日收盤價，
@@ -2379,7 +3628,26 @@ def build_close():
                 if not t:
                     continue
                 breadth_changes.append(t["day_change"])
+                # Preserve the non-ranked stock's real daily K metrics for its
+                # owner. These are raw evidence, never the ranking 2.0 score.
+                meta_row = universe_by_code.get(code, {})
+                reference = portfolio_ref.get(code, {
+                    "code": code, "name": meta_row.get("name", ""),
+                    "market": meta_row.get("market", ""),
+                    "industry_name": meta_row.get("industry_name", ""),
+                    "source": "Yahoo daily close", "rank_eligible": False,
+                })
+                reference.update({
+                    "trade_date": str(t.get("date") or ""), "coverage": "DAILY_TECHNICAL",
+                    **{key: t.get(key) for key in
+                       ("close", "high", "low", "day_change", "ma5", "ma10",
+                        "ma20", "ma60", "rsi", "macd_h", "kd_k", "kd_d",
+                        "sar", "support", "resistance", "vol_x",
+                        "avg_turnover20", "liquidity_level")},
+                })
+                portfolio_ref[code] = reference
                 liq_level, liq_adjust = liquidity_profile(t["avg_turnover20"])
+                reference["liquidity_level"] = liq_level
                 if liq_level == "不足":
                     continue
                 t["liquidity_level"] = liq_level
@@ -2412,6 +3680,18 @@ def build_close():
         rows = [r for r in rows if str(r.get("date")) == td]
         print("close trade-date lock", td, "kept", len(rows), "of", before)
 
+    # Only publish evidence from this exact verified completed session.
+    td_ref = trade_date.isoformat() if hasattr(trade_date, "isoformat") else str(trade_date or "")
+    if td_ref:
+        portfolio_ref = {code: row for code, row in portfolio_ref.items()
+                         if row.get("trade_date") == td_ref}
+    dump("portfolio_reference.json", {
+        "schema_version": "1.0.0", "trade_date": td_ref,
+        "generated_at": now_tw().isoformat(timespec="seconds"),
+        "note": "All owned stocks: official close and available unscored daily K evidence; separate from swing ranking liquidity gate.",
+        "quotes": portfolio_ref,
+    })
+
     market_map = dict(zip(uni["code"].astype(str), uni["market"].astype(str)))
 
     # All-market chip fetch is table-based, not 1000 individual HTTP calls.
@@ -2433,6 +3713,8 @@ def build_close():
         chip = chips.get(r["code"], {})
         cs, coverage = chip_score(chip)
         r.update(chip)
+        r["chip_score_legacy"] = cs
+        r["chip_coverage_legacy_pct"] = coverage
         r["chip_score"] = cs
         r["chip_coverage_pct"] = coverage
 
@@ -2446,7 +3728,7 @@ def build_close():
         "market": market,
         "sector_funds": sector_funds,
         "sector_funds_note": "外資＋投信官方淨買賣股數 × 各交易日收盤價估算金額；張數保留；未含自營商；估算金額僅供力度比較，不額外計入個股100分",
-        "score_formula": {"mode": "swing_direct_100", "technical": 50, "chip": 25, "sector": 15, "liquidity": 10, "total": 100, "normalized": False, "entry_position": 100, "market_separate": 15},
+        "score_formula": {"mode": "swing_direct_100", "technical": 50, "technical_model": "inuko-tech-v2.0", "chip": 25, "chip_model": "inuko-chip-v2.0", "chip_raw_max": 100, "sector": 15, "sector_model": "inuko-sector-v2.0", "liquidity": 10, "liquidity_model": "inuko-liquidity-v2.0", "total": 100, "normalized": False, "entry_position": 100, "market_separate": 15, "ignition": {"model": "inuko-ignition-v2.0", "structure": 25, "volume_acceleration": 20, "sector_resonance": 15, "relative_acceleration": 15, "chip_acceleration": 15, "tradability_risk": 10, "raw_total": 100, "gate_capped": True}},
         "rows": rows,
     })
     dump("market.json", market)
@@ -2456,7 +3738,7 @@ def build_close():
         "updated_at": now_tw().isoformat(timespec="seconds"),
         "close_updated_at": now_tw().isoformat(timespec="seconds"),
         "daily_count": len(rows),
-        "version": "1.5.17-free",
+        "version": "1.6.1-free",
     })
     dump("status.json", status)
 
