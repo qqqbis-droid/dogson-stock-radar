@@ -75,7 +75,17 @@ with tempfile.TemporaryDirectory() as tmp:
     build(root, registry)
     bad = json.loads((bdir / "capital-close-members.json").read_text(encoding="utf-8"))["groups"]["記憶體IC"]
     assert not bad["reconciled"] and bad["verdict"] == "UNVERIFIED"
-    assert bad["rank_eligible"] is False and bad["rank_status"] == "CONFLICT"
+    # Legacy same-day aggregate may be from a mismatched snapshot. The full
+    # set of official same-day per-stock rows remains independently usable,
+    # but never mark it as a reconciled aggregate.
+    assert bad["verified_count"] == bad["member_count"] == 6
+    assert bad["rank_eligible"] is True
+    assert bad["rank_status"] == "RECALCULATED_SOURCE_DISAGREEMENT"
+    assert bad["reconciled"] is False and bad["legacy_aggregate_differs"]
+    assert bad["rank_evidence_source"] == "COMPLETE_SAME_DAY_STOCK_ROWS"
+    assert abs(bad["rank_amount_100m"] - 53.0877) < .012
+    assert abs(bad["delta_amount_100m"]) > .01
+    assert bad["rank_amount_100m"] != source["rows"][0]["today_amount_100m"]
     source["rows"][0]["today_amount_100m"] = 53.0877
     put(bdir / "capital.json", source)
     stock = json.loads((bdir / "stock.json").read_text(encoding="utf-8"))
@@ -93,6 +103,7 @@ with tempfile.TemporaryDirectory() as tmp:
     assert stale["interval_upper_100m"] is not None
     assert stale["interval_lower_100m"] < stale["sample_amount_100m"] < stale["interval_upper_100m"]
     assert stale["rank_eligible"] is False and stale["rank_status"] == "INCOMPLETE"
+    assert stale["rank_amount_100m"] is None
 
     # Unknown/mismatched daily volume must suppress numeric intervals.
     stock["items"]["5351"]["volume"] = None
