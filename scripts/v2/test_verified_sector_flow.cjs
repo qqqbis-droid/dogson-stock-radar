@@ -51,7 +51,7 @@ assert(source.includes('法人來源日')&&source.includes('歷史估算涵蓋�
 assert(source.includes('犬子雷達追蹤池'),'Sector rank must disclose tracked-universe denominator');
 assert(source.includes('intervalSection(')&&source.includes('非官方保證界限'),'Uncertainty must not be sold as certified ordering');
 assert(source.includes('data-turnover-heat')&&source.includes('非法人買賣')&&source.includes('heatDate===day'),'Turnover heat must remain a separately labeled and date-matched noninstitutional indicator');
-assert(page.includes('market-capital-renderer.js?v=20261022top3fold1'),'Mobile cache must load complete-sector-first renderer');
+assert(page.includes('market-capital-renderer.js?v=20261022auditfold1'),'Mobile cache must load complete-sector-first renderer');
 assert(source.includes('data-capital-build')&&source.includes('data-capital-ranked'),'Live capital ranking must show the actual active build and ranked count');
 assert(source.includes("window.setInterval(capitalRecheckOnReturn,45000)")&&source.includes("window.addEventListener('pageshow',capitalRecheckOnReturn)"),'iPhone web views must retry version checks on wake and periodically');
 assert(source.includes("close?mset(m,'capital_close_members'):Promise.resolve(null)"),'Missing ledger must not silently become 0 ranks');
@@ -119,6 +119,25 @@ for(const n of [0,1,2,3]){
 }
 assert(source.includes('capital-rank-overflow[open] .capital-rank-close-text'),
  'Expanded summary must offer a clear collapse label');
+// Explanatory copy is preserved but moved BELOW ranked inflow and outflow,
+ // behind a closed native fold, to keep the first screen actionable on iPhone.
+const compactIndex=source.indexOf('box.innerHTML=shortInfo');
+const inflowIndex=source.indexOf("rankBoard('資金流入排行',inflow,'in')",compactIndex);
+const outflowIndex=source.indexOf("rankBoard('資金流出排行',outflow,'out')",compactIndex);
+const foldIndex=source.indexOf(' +auditFold',compactIndex);
+assert(compactIndex>=0&&inflowIndex>compactIndex&&outflowIndex>inflowIndex&&foldIndex>outflowIndex,
+ 'Compact date/count must appear first, full audit fold must follow both ranked boards');
+assert(source.includes('data-capital-rank-mini'),'Small inline date and eligible-sector count required');
+assert(source.includes('<details class="capital-estimates capital-method-fold" data-capital-method-fold>'),
+ 'Provenance requires an initially CLOSED native expandable detail');
+assert(!/<details class="capital-estimates capital-method-fold"[^>]*\\bopen\\b/.test(source),
+ 'Audit notes should not start expanded');
+assert(source.includes('資料來源與排名說明（含版本核對）'),
+ 'Explain where detailed provenance and version controls moved');
+assert(source.includes('${buildStamp}${rankingScope}'),
+ 'Version recheck button and evidence methodology must remain accessible');
+assert(source.includes('data-capital-recheck')&&source.includes('data-capital-rank-scope'),
+ 'No loss of provenance or version recheck function');
 console.log('PASS: inflow/outflow Top 3 visible; all other original positions collapsible without changing scores');
 
 console.log('PASS: version-visible, self-healing iPhone capital ranking plus strict same-build ledger validation');
