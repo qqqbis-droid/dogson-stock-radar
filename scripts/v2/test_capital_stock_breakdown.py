@@ -36,7 +36,7 @@ with tempfile.TemporaryDirectory() as tmp:
         },
     })
     source = {"build_id": ID, "trade_date": DATE, "rows": [
-        {"primary_group": "記憶體IC", "today_amount_100m": 53.0877, "today_lots": -13299.2}
+        {"primary_group": "記憶體IC", "latest_date": DATE, "today_amount_100m": 53.0877, "today_lots": -13299.2}
     ]}
     put(bdir / "capital.json", source)
     put(root / "current_manifest.json", {
@@ -53,6 +53,9 @@ with tempfile.TemporaryDirectory() as tmp:
     result = json.loads((bdir / "capital-close-members.json").read_text(encoding="utf-8"))
     memory = result["groups"]["記憶體IC"]
     assert memory["reconciled"], memory
+    assert memory["rank_eligible"] and memory["rank_status"] == "RECONCILED"
+    assert memory["rank_trade_date"] == DATE
+    assert abs(memory["rank_amount_100m"] - 53.0877) < .012
     assert memory["sample_eligible"] and memory["sample_trade_date"] == DATE
     assert memory["sample_coverage_pct"] == 100
     assert abs(memory["sample_amount_100m"] - 53.0877) < .012
@@ -69,6 +72,7 @@ with tempfile.TemporaryDirectory() as tmp:
     build(root, registry)
     bad = json.loads((bdir / "capital-close-members.json").read_text(encoding="utf-8"))["groups"]["記憶體IC"]
     assert not bad["reconciled"] and bad["verdict"] == "UNVERIFIED"
+    assert bad["rank_eligible"] is False and bad["rank_status"] == "CONFLICT"
     source["rows"][0]["today_amount_100m"] = 53.0877
     put(bdir / "capital.json", source)
     stock = json.loads((bdir / "stock.json").read_text(encoding="utf-8"))
@@ -81,4 +85,21 @@ with tempfile.TemporaryDirectory() as tmp:
     assert stale["sample_coverage_pct"] > 60 and stale["sample_trade_date"] == DATE
     assert stale["sample_amount_100m"] is not None
     assert stale["verified_count"] == 5
+    assert stale["rank_eligible"] is False and stale["rank_status"] == "INCOMPLETE"
+
+    # An older aggregate does not veto a complete SAME-DAY set of stock flows.
+    stock["items"]["5351"]["foreign_date"] = DATE
+    put(bdir / "stock.json", stock)
+    source["rows"][0]["latest_date"] = "2026-10-07"
+    source["rows"][0]["today_amount_100m"] = 999.0
+    put(bdir / "capital.json", source)
+    build(root, registry)
+    rebuilt = json.loads((bdir / "capital-close-members.json").read_text(encoding="utf-8"))["groups"]["記憶體IC"]
+    assert not rebuilt["reconciled"]
+    assert rebuilt["rank_eligible"] and rebuilt["rank_status"] == "REBUILT_ALL_MEMBERS"
+    assert rebuilt["rank_full_member_coverage"]
+    assert abs(rebuilt["rank_amount_100m"] - 53.0877) < .012
+    assert rebuilt["aggregate_source_date"] == "2026-10-07"
+    # Old 999億 must never enter a new ranked result.
+    assert rebuilt["rank_amount_100m"] != source["rows"][0]["today_amount_100m"]
 print("PASS per-stock capital breadth, signed monetary weighting and fail-closed reconciliation")

@@ -3,30 +3,45 @@
 const assert=require('node:assert/strict'),fs=require('node:fs');
 const source=fs.readFileSync('docs/v2/market-capital-renderer.js','utf8');
 const page=fs.readFileSync('docs/v2/index.html','utf8');
-const start=source.indexOf('function closeRankInfo(');
-const end=source.indexOf('function flowAuditText(',start);
-assert(start>=0&&end>start,'Missing canonical close-ranking verification function');
-const check=new Function('mn',source.slice(start,end)+'\nreturn closeRankInfo;')(
+const a=source.indexOf('function closeRankInfo('),b=source.indexOf('function flowAuditText(',a);
+assert(a>=0&&b>a,'No canonical sector rank validation');
+const check=new Function('mn',source.slice(a,b)+'\nreturn closeRankInfo;')(
  v=>v==null||v===''||!Number.isFinite(Number(v))?null:Number(v));
-const row={primary_group:'塑膠工業',latest_date:'2026-10-14',today_amount_100m:150.6403};
-const complete={trade_date:'2026-10-15',groups:{塑膠工業:{reconciled:true,verified_count:12,member_count:12}}};
-assert.equal(check(row,complete,'2026-10-15').confirmed,false,'Oct 14 estimate must not enter Oct 15 confirmed flow');
-assert.equal(check({...row,latest_date:'2026-10-15'},complete,'2026-10-15').confirmed,true,'Same-day fully reconciled row can enter confirmed flow');
-assert.equal(check({...row,latest_date:'2026-10-15'},{trade_date:'2026-10-15',groups:{塑膠工業:{reconciled:false,verified_count:12,member_count:12}}},'2026-10-15').confirmed,false,'Unreconciled sectors cannot rank');
-assert.equal(check({...row,latest_date:'2026-10-15'},{trade_date:'2026-10-15',groups:{塑膠工業:{reconciled:true,verified_count:9,member_count:12}}},'2026-10-15').confirmed,false,'Partial member coverage cannot rank');
-let x=check({...row,latest_date:'2026-10-15'},{trade_date:'2026-10-15',groups:{塑膠工業:{reconciled:false,verified_count:0,member_count:0}}},'2026-10-15');
-assert.equal(x.confirmed,false);assert.equal(x.ratio,null,'No denominator must never mean 100% coverage');
-assert.equal(check({...row,latest_date:'2026-10-15'},null,'2026-10-15').confirmed,false,'Missing reconciliation dataset fails closed');
-const partial={trade_date:'2026-10-15',groups:{塑膠工業:{reconciled:false,member_count:12,verified_count:9,sample_eligible:true,sample_trade_date:'2026-10-15',sample_scope:'SAME_DAY_MATCHED_STOCKS_ONLY',sample_amount_100m:18.125,sample_lots:142}}};
-const sample=check({...row,latest_date:'2026-10-14'},partial,'2026-10-15');
-assert.equal(sample.confirmed,false);
-assert.equal(sample.sampleReady,true);
-assert.equal(sample.sampleAmount,18.125,'Never use old broad aggregate for a same-day sample');
-assert.equal(check(row,partial,'2026-10-16').sampleReady,false,'Stale sample must not appear today');
-assert.equal(check(row,{...partial,groups:{塑膠工業:{...partial.groups.塑膠工業,verified_count:2}}},'2026-10-15').sampleReady,false,'2 stocks are not an eligible sample');
-assert(source.includes('當日逐檔核對樣本')&&source.includes('sampleMore('),'Show same-day sample as a separate tier');
-assert(source.includes('歷史估算資料涵蓋')&&source.includes('非逐檔覆蓋率'),'Historical coverage must be separately labeled');
-assert(source.includes('目前沒有通過完整對帳的族群，暫停已驗證流入／流出排行榜'),'Empty verified leaderboard must be shown truthfully');
-assert(source.includes('法人來源日')&&source.includes('未對帳估算參考（非已驗證排行）'),'Every unverified sector must have its actual source date');
-assert(page.includes('market-capital-renderer.js?v=20261021samples1'),'iPhone must fetch current corrected capital renderer');
-console.log('PASS: daily source date, per-stock coverage, full reconciliation, and separate estimated flows');
+const day='2026-10-21',old='2026-10-20';
+const stock={primary_group:'AI伺服器ODM',latest_date:day,today_amount_100m:17.6};
+const reconciled={trade_date:day,groups:{AI伺服器ODM:{
+ rank_eligible:true,rank_status:'RECONCILED',rank_trade_date:day,rank_amount_100m:17.61,rank_lots:862,
+ reconciled:true,member_count:6,verified_count:6
+}}};
+let info=check(stock,reconciled,day);
+assert(info.confirmed&&info.rankEligible&&info.rankAmount===17.61);
+let rebuilt={trade_date:day,groups:{AI伺服器ODM:{
+ rank_eligible:true,rank_status:'REBUILT_ALL_MEMBERS',rank_trade_date:day,
+ rank_amount_100m:22.5,rank_lots:900,rank_full_member_coverage:true,
+ reconciled:false,member_count:6,verified_count:6
+}}};
+info=check({...stock,latest_date:old},rebuilt,day);
+assert(info.rankEligible&&info.rebuilt&&!info.confirmed,'Full valid same-day stocks may be rebuilt even if aggregate is old');
+assert.equal(info.rankAmount,22.5,'New rank must use fully recalculated same-day shares, NOT yesterday amount');
+assert.equal(check(stock,rebuilt,day).rankEligible,false,'Mismatched status/source date must not rank');
+assert.equal(check({...stock,latest_date:old},rebuilt,'2026-10-22').rankEligible,false,'Never promote old data to next session');
+assert.equal(check(stock,null,day).rankEligible,false,'Absent detail ledger cannot rank');
+const incomplete={trade_date:day,groups:{AI伺服器ODM:{
+ rank_eligible:false,rank_status:'INCOMPLETE',member_count:6,verified_count:5,
+ sample_eligible:true,sample_trade_date:day,sample_scope:'SAME_DAY_MATCHED_STOCKS_ONLY',
+ sample_amount_100m:1000,sample_lots:2200
+}}};
+info=check(stock,incomplete,day);
+assert(!info.rankEligible&&info.sampleReady,'Partial stock subset may be shown ONLY outside ranked list');
+const conflict={trade_date:day,groups:{AI伺服器ODM:{
+ rank_eligible:false,rank_status:'CONFLICT',reconciled:false,member_count:6,verified_count:6,
+ rank_amount_100m:null,rank_lots:null
+}}};
+assert(!check(stock,conflict,day).rankEligible,'Same-day contradictory group aggregate must be excluded');
+assert(source.includes('資金流入排行')&&source.includes('資金流出排行'),'Both complete-sector rankings required');
+assert(source.includes('eligible.filter(t=>t.info.rankAmount>0)'),'Rank only verified full groups');
+assert(source.includes('未具排名資格')&&source.includes('不依金額排序'),'Incomplete sectors must remain outside the ranking');
+assert(source.includes('不使用不完整樣本')&&!source.includes('sampleCards.join('),'Never rank partial samples');
+assert(source.includes('法人來源日')&&source.includes('歷史估算涵蓋（非逐檔有效）'),'Preserve actual legacy source disclosure');
+assert(page.includes('market-capital-renderer.js?v=20261021fullrank2'),'Mobile cache must load complete-sector-first renderer');
+console.log('PASS: same-date full-sector inflow/outflow ranking, full-member rebuild, no partial ranks or stale totals');
