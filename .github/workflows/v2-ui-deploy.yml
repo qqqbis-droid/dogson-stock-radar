@@ -472,7 +472,7 @@ jobs:
           node --check docs/v2/chip-freshness-provenance.js
           node --check docs/v2/unified-score-freshness-v1.js
           node --check docs/v2/universe-search.js
-          grep -q 'unified-score-freshness-v1.js?v=20261012singleverdict1' docs/v2/index.html
+          grep -q 'unified-score-freshness-v1.js?v=20261027sessionclock1' docs/v2/index.html
           grep -q 'universe-search.js?v=20261012singleverdict1' docs/v2/index.html
           node --check docs/v2/capital-stock-breakdown.js
           grep -q 'market-capital-renderer.js?v=20261022legacyfold2' docs/v2/index.html
