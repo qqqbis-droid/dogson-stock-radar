@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 from scripts.v2.preserve_frozen_close import CLOSE_KEYS, frozen_snapshot, hydrate, capture, load
 
@@ -56,8 +57,9 @@ class FrozenCloseTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)
             root.mkdir(exist_ok=True)
-            m={"active_build_id":"next-build","trade_date":"2026-10-22",
-               "datasets":{"decision_close_summary":{"as_of":"2026-10-22T13:30:00+08:00"}}}
+            next_session=(date.fromisoformat(fm["trade_date"])+timedelta(days=1)).isoformat()
+            m={"active_build_id":"next-build","trade_date":next_session,
+               "datasets":{"decision_close_summary":{"as_of":next_session+"T13:30:00+08:00"}}}
             (root/"current_manifest.json").write_text(json.dumps(m))
             self.assertEqual(hydrate(root,PIN)["action"],"new_completed_close")
 
