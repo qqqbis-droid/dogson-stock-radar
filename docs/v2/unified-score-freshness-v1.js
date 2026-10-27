@@ -65,9 +65,12 @@
   function missionBadge(meta){
     if(!meta.asOf)return {cls:'unknown',text:'時間未知'};
     if(meta.key==='close')return {cls:'same',text:`盤後定格｜${meta.date||'—'}`};
-    const base=manifest?.trade_date||ymd(manifest?.generated_at);
+    const today=taipeiToday(),base=manifest?.trade_date||ymd(manifest?.generated_at);
+    // The Atomic Build trade_date is NOT the current Taipei date after a break.
+    if(meta.date&&today&&meta.date<today)return {cls:'stale',text:'歷史快照｜'+meta.date+'（非今日盤中）'};
+    if(meta.date&&today&&meta.date>today)return {cls:'unknown',text:'快照日期異常'};
     if(meta.date&&base&&meta.date<base)return {cls:'stale',text:'舊資料／凍結'};
-    if(meta.date===base)return {cls:'same',text:'本交易日快照'};
+    if(meta.date===today)return {cls:'same',text:'今日同日快照（仍須查核即時性）'};
     return {cls:'unknown',text:'日期待核對'};
   }
   function datasetRows(key){
@@ -80,9 +83,9 @@
         let st='時間未知';
         if(m?.as_of){
           if(key==='close')st=d===base?'盤後定格':d&&base&&d<base?'更舊快照':'日期異常';
-          else st=d&&base&&d<base?'舊／凍結':'本交易日';
+          else st=d&&taipeiToday()&&d<taipeiToday()?'歷史快照／非今日':d&&base&&d<base?'舊／凍結':d===taipeiToday()?'今日資料':'日期待核對';
         }
-        const bad=['舊／凍結','更舊快照','日期異常'].includes(st);
+        const bad=['歷史快照／非今日','舊／凍結','更舊快照','日期異常','日期待核對'].includes(st);
         return `<div class="uf-ds"><code>${esc(name)}</code><span>${esc(shortTime(m?.as_of))}</span><b class="${bad?'stale':''}">${esc(st)}</b></div>`;
       }).join('');
   }
@@ -97,6 +100,14 @@
     return `<div class="uf-warning">⚠ 混合資料日：${Object.entries(metas).map(([k,m])=>`${m.cfg.label} ${m.date||'未知'}`).join('；')}。不同任務不可互相視為同一時間的新資料。</div>`;
   }
 
+  function sessionWarning(){
+    const key=activeView();
+    if(!['intraday','daytrade'].includes(key))return '';
+    const date=missionMeta(key).date,today=taipeiToday();
+    if(!date||!today||date>=today)return '';
+    const label=key==='intraday'?'盤中':'當沖';
+    return `<div class="uf-warning hard" data-uf-live-stale="true"><b>⛔ ${label}目前不是今日行情</b>：畫面仍是 ${esc(date)} 的歷史快照，今天（${esc(today)}）尚未載入同日驗證資料。不能用這份快照判斷今日買賣；若今天休市，保留上個交易日屬正常。</div>`;
+  }
   function closeGuard(){
     const reasons=[];
     const warnings=[];
@@ -198,7 +209,7 @@
     const g=view==='close'?closeGuard():null;
     const hard=g&&!g.allowed?`<div class="uf-warning hard">⛔ 盤後不可執行：${esc(g.reasons.join('；'))}</div>`:'';
     const caution=g?.caution?`<div class="uf-warning">⚠ ${esc(g.warnings.join('；'))}</div>`:'';
-    host.innerHTML=`<div class="uf-head"><div><b>資料新鮮度</b><small>每個任務看自己的 as_of；盤後另外檢查整包日期、build 與可執行性。</small></div><button type="button" class="uf-refresh">重查時間</button></div>${mixedWarning()}${hard}${caution}<div class="uf-cards">${cards}</div><details class="uf-detail"><summary>${current.label}｜逐資料集時間</summary><div class="uf-datasets">${datasetRows(view)}</div></details><div class="uf-bundle">資料包產生：${esc(shortTime(manifest.generated_at))}。這只代表重新打包時間，<b>不代表包內每一個數據都在這個時間更新。</b></div>${view==='close'?'<div class="uf-schedule">盤後資料以最後完成收盤日為基準；市場、法人、決策與 Zone 必須同一 Close 日期且通過驗證。隔日收盤前維持前一完成交易日快照。</div>':''}`;
+    host.innerHTML=`<div class="uf-head"><div><b>資料新鮮度</b><small>每個任務看自己的 as_of；盤後另外檢查整包日期、build 與可執行性。</small></div><button type="button" class="uf-refresh">重查時間</button></div>${mixedWarning()}${sessionWarning()}${hard}${caution}<div class="uf-cards">${cards}</div><details class="uf-detail"><summary>${current.label}｜逐資料集時間</summary><div class="uf-datasets">${datasetRows(view)}</div></details><div class="uf-bundle">資料包產生：${esc(shortTime(manifest.generated_at))}。這只代表重新打包時間，<b>不代表包內每一個數據都在這個時間更新。</b></div>${view==='close'?'<div class="uf-schedule">盤後資料以最後完成收盤日為基準；市場、法人、決策與 Zone 必須同一 Close 日期且通過驗證。隔日收盤前維持前一完成交易日快照。</div>':''}`;
     host.querySelectorAll('[data-uf-view]').forEach(btn=>btn.addEventListener('click',()=>document.querySelector(`.tab[data-view="${btn.dataset.ufView}"]`)?.click()));
     host.querySelector('.uf-refresh')?.addEventListener('click',()=>load(true));
   }
