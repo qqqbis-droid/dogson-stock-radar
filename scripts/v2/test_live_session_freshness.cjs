@@ -1,0 +1,25 @@
+#!/usr/bin/env node
+'use strict';
+const fs=require('fs'),assert=require('assert');
+const source=fs.readFileSync('docs/v2/unified-score-freshness-v1.js','utf8');
+const html=fs.readFileSync('docs/v2/index.html','utf8');
+new Function(source);
+assert(html.includes('unified-score-freshness-v1.js?v=20261027sessionclock1'),'Mobile cache must be bust');
+assert(source.includes('data-uf-live-stale="true"'),'Old-session screen needs explicit historical warning');
+const b=source.slice(source.indexOf('function missionBadge('),source.indexOf('function datasetRows('));
+const getBadge=new Function('manifest','taipeiToday','ymd','dateKey',b+';return missionBadge');
+const ymd=v=>String(v||'').slice(0,10);
+const make=(date,today,core='intraday')=>getBadge({trade_date:'2026-10-22'},()=>today,ymd,ymd)({asOf:date+'T13:30:00+08:00',date,key:core});
+let x=make('2026-10-22','2026-10-27');
+assert.equal(x.cls,'stale');assert(x.text.includes('歷史快照'));assert(!x.text.includes('本交易日快照'));
+x=make('2026-10-27','2026-10-27');assert.equal(x.cls,'same');
+x=make('2026-10-22','2026-10-27','close');assert.equal(x.cls,'same');assert(x.text.includes('盤後定格'));
+const a=source.slice(source.indexOf('function sessionWarning('),source.indexOf('function closeGuard('));
+const mkWarning=new Function('activeView','missionMeta','taipeiToday','esc',a+';return sessionWarning');
+const warn=(view,date,today)=>mkWarning(()=>view,()=>({date}),()=>today,x=>String(x))();
+assert(warn('intraday','2026-10-22','2026-10-27').includes('不能用這份快照判斷今日買賣'));
+assert(warn('daytrade','2026-10-22','2026-10-27').includes('當沖'));
+assert.equal(warn('close','2026-10-22','2026-10-27'),'');
+assert.equal(warn('intraday','2026-10-27','2026-10-27'),'');
+assert(source.includes("else st=d&&taipeiToday()&&d<taipeiToday()?'歷史快照／非今日'"),'Per-dataset stale label');
+console.log('PASS: session badge uses Taipei today, close snapshot preserved, stale live warning explicit');
