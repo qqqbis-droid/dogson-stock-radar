@@ -249,7 +249,21 @@ for ctx in ('intraday','close','daytrade'):
     zones=load(zp)
     zone_counts[ctx]=len(zones) if isinstance(zones,list) else 0
     if zone_counts[ctx] <= 0:
-        raise SystemExit(f'V2 zone_{ctx} is empty after overlay')
+        # Live/Daytrade missions marked entirely DATA_STALE cannot honestly
+        # expose tradable support/resistance. Their empty zone lists are the
+        # correct non-actionable state, not a reason to block a valid CLOSE.
+        if ctx in ('intraday','daytrade'):
+            detail_key=f'decision_{ctx}_detail'
+            detail=load(resolve(root,m['datasets'][detail_key]['url']))
+            decisions=list((detail.get('items') or {}).values())
+            risk_only=bool(decisions) and all(
+                row.get('action_state')=='DATA_STALE' or
+                'DATA_QUALITY_RISK' in (row.get('risk_overlays') or [])
+                for row in decisions if isinstance(row,dict))
+            if risk_only:
+                print(f'V2 {ctx}: zero zones because all decisions are non-actionable (DATA_STALE / DATA_QUALITY_RISK)')
+                continue
+        raise SystemExit(f'V2 zone_{ctx} is empty despite actionable evidence')
 
 close_summary=load(resolve(root,m['datasets']['decision_close_summary']['url']))
 # The close mission is valid when it represents the newest preserved completed
