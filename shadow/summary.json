@@ -1,14 +1,14 @@
 {
   "shadow_summary_schema_version": "1.0.0",
-  "generated_at": "2026-10-26T22:23:46+08:00",
-  "total_report_files": 30,
-  "distinct_trading_days": 19,
+  "generated_at": "2026-10-27T21:19:27+08:00",
+  "total_report_files": 31,
+  "distinct_trading_days": 20,
   "first_trade_date": "2026-09-23",
-  "latest_trade_date": "2026-10-22",
-  "latest_build_id": "cb2-legacy-20261022-77e2af6768",
+  "latest_trade_date": "2026-10-27",
+  "latest_build_id": "cb2-legacy-20261027-863de8b63e",
   "latest_status": "PASS",
   "daily_status_counts": {
-    "PASS": 14,
+    "PASS": 15,
     "WARN": 5
   },
   "unresolved_safety_violations": 0,
@@ -19,14 +19,14 @@
   },
   "payload": {
     "latest_initial_bytes": {
-      "intraday": 117549,
-      "close": 18741,
-      "portfolio": 7836,
-      "daytrade": 131489
+      "intraday": 117526,
+      "close": 128170,
+      "portfolio": 74692,
+      "daytrade": 131476
     },
     "max_initial_bytes": {
       "intraday": 117794,
-      "close": 125999,
+      "close": 128170,
       "portfolio": 74839,
       "daytrade": 131663
     },
@@ -35,10 +35,9 @@
   "promotion": {
     "minimum_review_days": 20,
     "target_window_days": 40,
-    "ready_for_review": false,
+    "ready_for_review": true,
     "eligible_for_cutover": false,
     "blockers": [
-      "Need 1 more distinct trading-day Shadow samples to reach the minimum review window.",
       "Predictive threshold validation evidence and rollback verification remain separate Phase 5/6 gates."
     ]
   }
