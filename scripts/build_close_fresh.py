@@ -35,6 +35,11 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "docs" / "data"
 TAIPEI_TZ = timezone(timedelta(hours=8))
 
+# A broad official MIS close is the session anchor for all stock daily frames.
+# Some Yahoo bars may be later than the latest exchange-completed session
+# (especially over exchange holidays). Never mix those dates in one close.
+_VERIFIED_MIS_CLOSE_DATE: date | None = None
+
 
 def _frame_latest_date(frame) -> date | None:
     if frame is None or len(frame) == 0:
@@ -53,6 +58,8 @@ def completed_daily(syms, period="6mo"):
     """Return Yahoo daily data with any not-yet-completed session removed."""
     data = _ORIGINAL_DOWNLOAD_DAILY(syms, period)
     cutoff = bd._latest_completed_cutoff()
+    if _VERIFIED_MIS_CLOSE_DATE is not None:
+        cutoff = min(cutoff, _VERIFIED_MIS_CLOSE_DATE)
     out = {}
     for sym, frame in (data or {}).items():
         try:
@@ -95,6 +102,8 @@ def _latest_reference_date() -> date | None:
 
 
 def guarded_mis_snapshot(uni):
+    global _VERIFIED_MIS_CLOSE_DATE
+    _VERIFIED_MIS_CLOSE_DATE = None
     snap = _ORIGINAL_MIS(uni)
     if not snap:
         return snap
@@ -115,6 +124,23 @@ def guarded_mis_snapshot(uni):
             reference_latest,
         )
         return {}
+    # Anchor the daily-history cutoff only when the official session snapshot
+    # covers a meaningful share of the entire listed/OTC universe. An isolated
+    # stale or partial MIS response must not govern the full-market build.
+    universe_count = len(uni)
+    required = max(200, int(universe_count * 0.55))
+    if mis_latest is not None and len(snap) >= required:
+        _VERIFIED_MIS_CLOSE_DATE = mis_latest
+        print(
+            "daily close official-session anchor:",
+            mis_latest, "MIS coverage", len(snap), "/", universe_count,
+            "daily bars newer than this session will be excluded",
+        )
+    else:
+        print(
+            "daily close official-session anchor unavailable:",
+            "MIS coverage", len(snap), "/", universe_count, "required", required,
+        )
     return snap
 
 
