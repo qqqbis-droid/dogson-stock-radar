@@ -77,70 +77,77 @@ def completed_daily(syms, period="6mo"):
 
 
 def _latest_reference_date() -> date | None:
-    dates: list[date] = []
-    cutoff = bd._latest_completed_cutoff()
+    """Latest verified exchange session, never a Yahoo-only daily-bar date.
 
-    # TPEx history already applies the completed-session cutoff internally.
+    The official TPEx daily index history and TWSE MIS index are independent
+    exchange clocks. Yahoo may emit a bar on an unscheduled market holiday
+    (e.g. the 2026-10-23 typhoon closure), so its bar dates cannot establish
+    a new cash trading session.
+    """
+    cutoff = bd._latest_completed_cutoff()
+    evidence: list[date] = []
     try:
         d = _frame_latest_date(bd.tpex_index_history())
         if d and d <= cutoff:
-            dates.append(d)
+            evidence.append(d)
     except Exception as exc:
-        print("freshness reference TPEx failed:", exc)
+        print("official TPEx trading-session reference failed:", exc)
 
-    # Independent listed-market cross-check. completed_daily removes today's
-    # partial bar while the cash session is still open.
     try:
-        twii = bd.download_daily(["^TWII"], "1mo").get("^TWII")
-        d = _frame_latest_date(twii)
-        if d and d <= cutoff:
-            dates.append(d)
+        index = bd.official_index_snapshot()
+        for item in index.values():
+            raw = str(item.get("date") or "")[:10]
+            if not raw:
+                continue
+            d = date.fromisoformat(raw)
+            if d <= cutoff:
+                evidence.append(d)
     except Exception as exc:
-        print("freshness reference TWII failed:", exc)
+        print("official TWSE index trading-session reference failed:", exc)
 
-    return max(dates) if dates else None
+    verified = max(evidence) if evidence else None
+    print("official exchange-session reference:", verified, "evidence", evidence)
+    return verified
 
 
 def guarded_mis_snapshot(uni):
     global _VERIFIED_MIS_CLOSE_DATE
     _VERIFIED_MIS_CLOSE_DATE = None
     snap = _ORIGINAL_MIS(uni)
-    if not snap:
-        return snap
-
     cutoff = bd._latest_completed_cutoff()
-    snap = {k: v for k, v in snap.items() if v.get("date") and v.get("date") <= cutoff}
-    if not snap:
-        return {}
-
-    mis_dates = [v.get("date") for v in snap.values() if v.get("date")]
-    mis_latest = max(mis_dates) if mis_dates else None
+    snap = {k: v for k, v in (snap or {}).items()
+            if v.get("date") and v.get("date") <= cutoff}
+    mis_latest = max((v["date"] for v in snap.values()), default=None)
     reference_latest = _latest_reference_date()
 
-    print("freshness guard: cutoff", cutoff, "MIS", mis_latest, "reference", reference_latest)
+    if not reference_latest and not mis_latest:
+        raise RuntimeError("No official exchange session evidence: refuse Yahoo-only close date")
     if mis_latest and reference_latest and reference_latest > mis_latest:
-        print(
-            "freshness guard: ignoring stale MIS overlay so close build can use",
-            reference_latest,
-        )
-        return {}
-    # Anchor the daily-history cutoff only when the official session snapshot
-    # covers a meaningful share of the entire listed/OTC universe. An isolated
-    # stale or partial MIS response must not govern the full-market build.
-    universe_count = len(uni)
-    required = max(200, int(universe_count * 0.55))
+        print("freshness guard: stale MIS", mis_latest,
+              "newer official index", reference_latest)
+        snap = {}
+        mis_latest = None
+
+    required = max(200, int(len(uni) * 0.55))
     if mis_latest is not None and len(snap) >= required:
         _VERIFIED_MIS_CLOSE_DATE = mis_latest
-        print(
-            "daily close official-session anchor:",
-            mis_latest, "MIS coverage", len(snap), "/", universe_count,
-            "daily bars newer than this session will be excluded",
-        )
+        print("official full-market MIS session anchor:", mis_latest,
+              "coverage", len(snap), "/", len(uni))
+    elif reference_latest:
+        _VERIFIED_MIS_CLOSE_DATE = reference_latest
+        # An inconsistent or partial MIS response must not inject a different
+        # day's prices into the official-index-anchored daily history.
+        if mis_latest != reference_latest:
+            snap = {}
+        print("official index session anchor:", reference_latest,
+              "MIS coverage", len(snap), "/", len(uni))
     else:
-        print(
-            "daily close official-session anchor unavailable:",
-            "MIS coverage", len(snap), "/", universe_count, "required", required,
-        )
+        # In the rare case the official indices are both unreachable but MIS
+        # has broad, dated exchange coverage, the MIS full-market date is safe.
+        raise RuntimeError("Official indices unavailable and MIS coverage insufficient")
+
+    if snap and mis_latest != _VERIFIED_MIS_CLOSE_DATE:
+        snap = {}
     return snap
 
 
