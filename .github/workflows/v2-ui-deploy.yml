@@ -352,6 +352,7 @@ jobs:
           cp /tmp/v2-source/scripts/v2/test_portfolio_ledger.js scripts/v2/test_portfolio_ledger.js
           cp /tmp/v2-source/scripts/v2/test_search_focus_stability.cjs scripts/v2/test_search_focus_stability.cjs
           cp /tmp/v2-source/scripts/v2/test_intraday_quote_recovery.cjs scripts/v2/test_intraday_quote_recovery.cjs
+          cp /tmp/v2-source/scripts/v2/test_live_session_freshness.cjs scripts/v2/test_live_session_freshness.cjs
           cp /tmp/v2-source/scripts/v2/test_close_plan_progressive.cjs scripts/v2/test_close_plan_progressive.cjs
           cp /tmp/v2-source/scripts/v2/test_swing_path_evidence.cjs scripts/v2/test_swing_path_evidence.cjs
           cp /tmp/v2-source/scripts/v2/restore_ignition_from_previous.py scripts/v2/restore_ignition_from_previous.py
@@ -402,6 +403,8 @@ jobs:
           node scripts/v2/test_portfolio_ledger.js
           python -m py_compile scripts/v2/build_stock_shards.py scripts/v2/enrich_zones.py /tmp/v2-source/scripts/v2/preserve_frozen_close.py
           node --check docs/v2/app.js
+          node --check docs/v2/unified-score-freshness-v1.js
+          node scripts/v2/test_live_session_freshness.cjs
           node --check docs/v2/intraday-quote-recovery-v2.js
           grep -q 'intraday-quote-recovery-v2.js?v=20261013recovery1' docs/v2/index.html
           node --check docs/v2/market-pulse-v2.js
