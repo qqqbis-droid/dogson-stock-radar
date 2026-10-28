@@ -147,6 +147,16 @@ def capture(root, folder):
         return {"action":"unchanged","latest":latest}
     active=str(m.get("active_build_id") or "")
     source={key:load(resolve(root,ds[key])) for key in CLOSE_KEYS}
+    # Some official institutional/market fields are published after the cash
+    # close. An early same-day CLOSE can exist without being independently
+    # complete. Keep the previous verified freeze, publish the candid
+    # incomplete-state warning, and retry capture at the next scheduled EOD
+    # update; never pin or label this partial snapshot as complete.
+    incomplete=[key for key in ("market_close_context","capital_close_context")
+                if source[key].get("complete") is not True]
+    if incomplete:
+        return {"action":"deferred_incomplete_close","latest":latest,
+                "incomplete":incomplete,"preserved_frozen":bool(saved)}
     verify(source,latest,active)
     folder=Path(folder)
     hashes={key:write(folder/(key+".json"),source[key])["hash"] for key in CLOSE_KEYS}
