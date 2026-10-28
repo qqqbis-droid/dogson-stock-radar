@@ -136,6 +136,14 @@ case "$mode" in
     ;;
 esac
 
+# Every Pages publisher replaces the complete site artifact. Build the
+# SAME-DATE stock-member evidence on close and intraday updates, not only in
+# the UI-only workflow, or the manifest loses capital_close_members on refresh.
+# Incomplete official chips remain flagged as unverified by this builder.
+test -f contracts/registries/sector_registry.json
+python scripts/v2/test_capital_stock_breakdown.py
+python scripts/v2/build_capital_stock_breakdown.py --root docs/v2/data --registry contracts/registries/sector_registry.json
+
 node --check docs/v2/stock-detail-bridge.js
 node --check docs/v2/detail-context-v2.js
 node --check docs/v2/detail-context-v3.js
