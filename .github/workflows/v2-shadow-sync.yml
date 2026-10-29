@@ -298,7 +298,11 @@ jobs:
           exit 1
 
       - name: Publish newly synchronized V2 bundle to GitHub Pages
-        if: steps.publish_shadow.outputs.changed == 'true'
+        # Intraday publishers have ALREADY deployed their verified Atomic
+        # bundle. A second UI-only publish from the shadow branch races with
+        # the next 5m/10m snapshot and can roll back LIVE 5m structure.
+        # Only EOD close needs a post-shadow UI publication.
+        if: ${{ steps.publish_shadow.outputs.changed == 'true' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Radar - Close Update' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
