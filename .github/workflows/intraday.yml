@@ -49,6 +49,8 @@ permissions:
 # All Pages publishers share the same single-writer group. Intraday ticks may
 # replace an older *pending* tick, but must never cancel a running close/audit
 # publisher; otherwise the latest-completed-session background can never finish.
+# The validated intraday Pages artifact is authoritative; Shadow Sync must not
+# dispatch a second UI-only deploy that rolls back this newer session snapshot.
 # Recovery note: a [deep] workflow-file push intentionally runs the audit lane.
 concurrency:
   group: dogson-pages
