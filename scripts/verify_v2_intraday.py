@@ -133,8 +133,13 @@ def _reference_only(rows, mission):
             or "fresh_5m_structure" in missing
             or action == "DATA_STALE"
         )
-        expected = "RESEARCH_ONLY" if mission == "intraday" else "STALE"
-        if bucket != expected or not structure_blocked:
+        # The current quote-only LIVE adapter deliberately uses STALE for
+        # unverified structure across all 724 symbols; an earlier adapter
+        # used RESEARCH_ONLY. Both are non-actionable, but neither may
+        # reference executable zones. _verify_reference_only_zones below
+        # proves the zone list is empty/disabled before allowing publication.
+        allowed = {"RESEARCH_ONLY", "STALE"} if mission == "intraday" else {"STALE"}
+        if bucket not in allowed or not structure_blocked:
             return False
     return True
 
