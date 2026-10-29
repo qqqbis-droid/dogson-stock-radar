@@ -94,6 +94,10 @@ jobs:
             mode=structure
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             mode=audit
+          elif [[ "${{ github.event_name }}" == "push" && "${{ contains(github.event.head_commit.message, '[structure]') }}" == "true" ]]; then
+            # Manual current-session 5m bridge recovery without rewriting
+            # the slower 60K or audited historical close artifacts.
+            mode=structure
           elif [[ "${{ github.event_name }}" == "push" && "${{ contains(github.event.head_commit.message, '[deep]') }}" == "true" ]]; then
             mode=audit
           else
