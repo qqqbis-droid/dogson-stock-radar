@@ -54,7 +54,11 @@ assert(source.includes('data-turnover-heat')&&source.includes('非法人買賣')
 assert(page.includes('market-capital-renderer.js?v=20261022legacyfold2'),'Mobile cache must load complete-sector-first renderer');
 assert(source.includes('data-capital-build')&&source.includes('data-capital-ranked'),'Live capital ranking must show the actual active build and ranked count');
 assert(source.includes("window.setInterval(capitalRecheckOnReturn,45000)")&&source.includes("window.addEventListener('pageshow',capitalRecheckOnReturn)"),'iPhone web views must retry version checks on wake and periodically');
-assert(source.includes("close?mset(m,'capital_close_members'):Promise.resolve(null)"),'Missing ledger must not silently become 0 ranks');
+assert(
+  source.includes("close?mset(m,'capital_close_members').catch(()=>null):Promise.resolve(null)")
+  && source.includes("throw new Error('族群法人資料與目前版本不一致')"),
+  'Missing ledger may defer display but must fail closed, not silently become 0 ranks'
+);
 assert(source.includes("ledger?.build_id!==m.active_build_id")&&source.includes("Object.keys(groups).length!==(capital?.rows?.length||0)"),'Group version/count mismatch must fail rather than render stale cards');
 assert(source.includes('if(seq!==MCR.renderSeq)return'),'Old async responses must not overwrite a new render');
 
