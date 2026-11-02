@@ -430,6 +430,8 @@ jobs:
           grep -q 'Promise.allSettled' docs/v2/portfolio-renderer.js
           grep -q 'window.scrollY+p.getBoundingClientRect().top-sticky' docs/v2/app.js
           node --check docs/v2/portfolio-ledger-ui.js
+          node --check docs/v2/broker-trade-import.js
+          node scripts/v2/test_broker_trade_import.cjs
           node --check docs/v2/portfolio-quick-add.js
           node --check docs/v2/inuko-portfolio-intel-v2.js
           grep -q 'inuko-portfolio-intel-v2.js?v=20261013l-edge1' docs/v2/index.html
