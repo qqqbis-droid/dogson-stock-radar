@@ -115,7 +115,7 @@ def market_close(close, fallback, build_id, generated_at):
         "schema_version":"2.0.0","build_id":build_id,"dataset":"market_context","context":"CLOSE","trade_date":td,"session_phase":"CLOSE_FREEZE",
         "as_of":f"{td}T13:30:00+08:00" if td else None,"known_at":known,"generated_at":generated_at,"freshness":fresh,
         "complete":bool(m.get("data_complete", close.get("data_complete", False) if isinstance(close, dict) else False)),"source_status":source_status("docs/data/close.json",known),
-        "market_regime":regime(m.get("market_mode")),"market_score":num(m.get("market_score")),"market_confidence":90 if m.get("market_score") is not None else 55,
+        "market_regime":regime(m.get("market_mode")),"market_score":num(m.get("market_score")),"market_confidence":90 if (m.get("data_complete") is True and m.get("market_score") is not None) else None,
         "score_model":"close_5_4_3_3","components":close_components(m),
         "metrics":{"breadth_up_pct":num(m.get("breadth_up_pct")),"foreign_net_billion":num(m.get("foreign_net_billion")),"foreign_twse_billion":num(m.get("foreign_twse_billion")),"foreign_tpex_billion":num(m.get("foreign_tpex_billion")),"foreign_5d_billion":num(m.get("foreign_5d_billion"))},
         "notes":["盤後15分＝加權5＋櫃買4＋市場廣度3＋官方外資3。"]
