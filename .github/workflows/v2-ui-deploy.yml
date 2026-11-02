@@ -432,7 +432,7 @@ jobs:
           node --check docs/v2/portfolio-ledger-ui.js
           node --check docs/v2/broker-trade-import.js
           grep -q 'broker-trade-import.js?v=20261102broker-csv1' docs/v2/index.html
-          node scripts/v2/test_broker_trade_import.cjs
+          node /tmp/v2-source/scripts/v2/test_broker_trade_import.cjs
           node --check docs/v2/portfolio-quick-add.js
           node --check docs/v2/inuko-portfolio-intel-v2.js
           grep -q 'inuko-portfolio-intel-v2.js?v=20261013l-edge1' docs/v2/index.html
