@@ -35,9 +35,9 @@ var aliases={
  code:['股票代號','證券代號','證券代碼','股票代碼','股號','代號','symbol','stockcode','code'],
  name:['股票名稱','證券名稱','名稱','stockname','name'],
  side:['買賣別','買賣方向','買賣','交易別','交易方向','成交別','買賣區分','side','buyorsell'],
- shares:['成交股數','成交數量','股數','成交量','交易股數','數量','shares','quantity','qty'],
+ shares:['成交股數','成交數量','成交股數股','股數','股數股','成交量','交易股數','數量','shares','quantity','qty'],
  lots:['成交張數','張數','數量張','交易張數','lots'],
- price:['成交均價','成交單價','成交價格','成交價','成交平均價','成交價位','價格','price','avgprice'],
+ price:['成交均價','成交單價','成交價格','成交價','成交平均價','成交價位','成交價格元','成交單價元','成交價元','價格','price','avgprice'],
  time:['成交時間','成交時刻','時間','tradetime','time'],
  daytrade:['當沖','當沖別','當沖註記','現股當沖','交易型態','交易類別','daytrade'],
  account:['證券帳號','交易帳號','分戶帳號','帳戶號碼','子帳號','account'],
@@ -49,7 +49,7 @@ function columns(head){
 }
 function cell(row,col){return col==null?'':String(row[col]||'').trim()}
 function dateOf(s){
-  var x=String(s||'').trim().replace(/[年月]/g,'/').replace(/日/g,'').replace(/[.]/g,'/');
+  var x=String(s||'').trim().replace(/[年月]/g,'/').replace(/日/g,'').replace(/[.\-]/g,'/');
   if(/^\d{7,8}$/.test(x)){if(x.length===7)x=x.slice(0,3)+'/'+x.slice(3,5)+'/'+x.slice(5);else x=x.slice(0,4)+'/'+x.slice(4,6)+'/'+x.slice(6)}
   var m=x.match(/^(\d{3,4})\/(\d{1,2})\/(\d{1,2})$/);
   if(!m)return null;var year=Number(m[1]);if(m[1].length===3)year+=1911;
@@ -84,7 +84,7 @@ function timeOf(s){
 function fingerprint(t){return [t.trade_date,t.code,t.side,t.shares,Number(t.price).toFixed(4),t.daytrade_pair_id?'DAYTRADE':'STANDARD'].join('|')}
 function hash(x){var h=2166136261;for(var i=0;i<x.length;i++){h^=x.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0).toString(36)}
 function prepare(text){
-  var data=csvRecords(text),col=columns(data[0]),required=['date','code','side','price'];
+  var all=csvRecords(text),headAt=all.findIndex(function(row){var x=columns(row);return x.date!=null&&x.code!=null&&x.side!=null&&x.price!=null&&(x.shares!=null||x.lots!=null)});if(headAt<0)headAt=0;var data=all.slice(headAt),col=columns(data[0]),required=['date','code','side','price'];
   var missing=required.filter(function(k){return col[k]==null});
   if(col.shares==null&&col.lots==null)missing.push('shares');
   if(missing.length)throw new Error('券商檔案欄位無法辨識：'+missing.join('、')+'。可先匯出具有「成交日期／股票代號／買賣別／成交股數／成交價」欄名的 CSV');
@@ -131,20 +131,14 @@ function prepare(text){
     var id='broker_'+hash(key+'|'+(t.order||'')+'|'+n);
     newOnes.push({id:id,code:t.code,name:t.name,side:t.side,shares:t.shares,price:t.price,trade_date:t.trade_date,created_at:born,action:t.side==='BUY'?'ENTRY':'REDUCE',source:t.pair_id?'BROKER_CSV:DAYTRADE':'BROKER_CSV',daytrade_pair_id:t.pair_id||'',reason:'',discipline:'UNREVIEWED'});
   });
-  return {rows:newOnes,duplicates:duplicates.length,rejected:rejected,fileRows:data.length-1,accounts:accounts.size,valid:valid.length};
+  return {rows:newOnes,duplicates:duplicates.length,rejected:rejected,fileRows:data.length-1,accounts:accounts.size,valid:valid.length,ledgerRevision:JSON.stringify((store?.exportData?.()?.transactions||[]).map(function(t){return [t.id,fingerprint(t)]}))};
 }
 function merge(prepared){
   var store=window.RadarPortfolioStore;if(!store?.importData||!store?.exportData)throw new Error('私人交易帳本尚未載入');
   // Recompute duplicates against the latest ledger: avoid double taps and any
   // manual additions between preview and confirmation.
-  var current=store.exportData(),already=new Map(),seen=new Map(),toAdd=[];
-  current.transactions.forEach(function(t){var k=fingerprint(t);already.set(k,(already.get(k)||0)+1)});
-  prepared.rows.forEach(function(t){var key=fingerprint(t),n=(seen.get(key)||0)+1;seen.set(key,n);if(current.transactions.some(function(x){return x.id===t.id}))return;
-    // Preview has already reserved occurrences identical to existing entries.
-    // A fresh exact-id collision is always skipped; otherwise ledger validation
-    // catches insufficient historical holdings before any data is written.
-    toAdd.push(t);
-  });
+  var current=store.exportData(),toAdd=[];var revision=JSON.stringify((current.transactions||[]).map(function(t){return [t.id,fingerprint(t)]}));if(revision!==prepared.ledgerRevision)throw new Error('預覽後交易帳本已有變更，請重新選檔預覽，避免重複匯入');
+  prepared.rows.forEach(function(t){if(!current.transactions.some(function(x){return x.id===t.id}))toAdd.push(t)});
   if(!toAdd.length)return 0;
   var snapshot={transactions:current.transactions.concat(toAdd),meta:{...current.meta}};
   toAdd.forEach(function(t){if(!snapshot.meta[t.code]&&t.name)snapshot.meta[t.code]={name:t.name}});
