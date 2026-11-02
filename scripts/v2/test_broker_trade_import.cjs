@@ -49,4 +49,54 @@ assert.equal(parse(csv).rows.length,0,'rerun must not duplicate identical fills'
 const duplicated='交易日期,股票代號,買賣別,成交股數,成交價\n2026-11-02,2330,買進,100,1000\n2026-11-02,2330,買進,100,1000\n';
 current={transactions:[],meta:{}};
 assert.equal(parse(duplicated).rows.length,2,'two identical legitimate fills in one file are preserved');
-console.log('Broker CSV/TSV import regression PASS: ROC/ISO, multiline header, daytrade, accounts, dedup, preview-only');
+// Unmarked same-day BUY/SELL MUST be classified explicitly before touching
+// an existing swing position. Do not silently decide "daytrade" for the user.
+current={transactions:[],meta:{}};writes=0;
+const sameDay='成交日期,證券代號,買賣別,成交股數,成交價\n2026-11-02,1234,買進,1000,25\n2026-11-02,1234,賣出,1000,26\n';
+let pending=parse(sameDay);
+assert.equal(pending.possiblePairs.length,1,'one same-day candidate');
+assert.equal(window.InukoBrokerTradeImport.assess(pending).safeRows.length,0,'unknown trade type blocked');
+const pairKey=pending.possiblePairs[0].key;
+const classified=parse(sameDay,{[pairKey]:'DAYTRADE'});
+assert.equal(window.InukoBrokerTradeImport.assess(classified).safeRows.length,2);
+assert.ok(classified.rows.every(t=>t.daytrade_pair_id));
+assert.equal(window.InukoBrokerTradeImport.merge(classified),2);
+assert.equal(writes,1);
+assert.equal(store.exportData().transactions.length,2);
+assert.equal(parse(sameDay,{[pairKey]:'DAYTRADE'}).rows.length,0,'daytrade dedup does not depend on chosen bucket');
+const swing=parse(sameDay,{[pairKey]:'SWING'});
+assert.equal(swing.rows.length,0,'cannot re-add existing daytrade as a new swing trade');
+// Time-less regular fills must sort BUY before SELL, not by the hashed id.
+current={transactions:[],meta:{}};writes=0;
+let ordinary=parse(sameDay,{[pairKey]:'SWING'});
+assert.equal(window.InukoBrokerTradeImport.assess(ordinary).safeRows.length,2);
+assert.notEqual(ordinary.rows[0].created_at,ordinary.rows[1].created_at);
+assert.equal(window.InukoBrokerTradeImport.merge(ordinary),2);
+assert.equal(writes,1);
+assert.equal(store.exportData().transactions.length,2);
+// Partial history: isolate unsupported earlier sells, keep independent buys and
+// never invent an opening transaction or discard valid independently funded rows.
+current={transactions:[],meta:{}};writes=0;
+const partial='成交日期,證券代號,買賣別,成交股數,成交價\n2026-10-20,9876,賣出,20,121\n2026-10-20,1234,買進,1000,25\n2026-10-20,1234,賣出,1000,26\n2026-11-02,1234,買進,10,30\n';
+const all=parse(partial);
+const key=all.possiblePairs[0].key;
+const review=parse(partial,{[key]:'DAYTRADE'});
+const assessed=window.InukoBrokerTradeImport.assess(review);
+assert.equal(assessed.blocked.length,1,'unfunded prior sale should be flagged before confirmation');
+assert.equal(assessed.blocked[0].code,'9876');
+assert.equal(assessed.safeRows.length,3,'funded same-day pair plus separate lot');
+assert.equal(window.InukoBrokerTradeImport.merge(review),3);
+assert.equal(store.exportData().transactions.length,3);
+assert.ok(store.exportData().transactions.every(t=>t.code!=='9876'));
+assert.equal(window.InukoBrokerTradeImport.assess(parse(partial,{[key]:'DAYTRADE'})).safeRows.length,0,'safe subset is deduplicated');
+// A 1,000 share daytrade must not pollute a later 30+15 swing lot.
+current={transactions:[],meta:{}};writes=0;
+const mixed='成交日期,證券代號,買賣別,成交股數,成交價\n2026-10-21,4567,買進,1000,94.6\n2026-10-21,4567,賣出,1000,96.5\n2026-10-21,4567,買進,30,98.1\n2026-10-22,4567,買進,15,106\n2026-10-29,4567,賣出,45,104.5\n';
+const mixedKey=parse(mixed).possiblePairs[0].key;
+const mixedReport=parse(mixed,{[mixedKey]:'DAYTRADE'});
+assert.equal(window.InukoBrokerTradeImport.assess(mixedReport).safeRows.length,5);
+assert.equal(window.InukoBrokerTradeImport.merge(mixedReport),5);
+const ordinaryPositions=store.exportData().transactions.filter(t=>!t.daytrade_pair_id);
+assert.equal(ordinaryPositions.filter(t=>t.side==='BUY').reduce((n,t)=>n+t.shares,0),45);
+assert.equal(ordinaryPositions.filter(t=>t.side==='SELL').reduce((n,t)=>n+t.shares,0),45);
+console.log('Broker CSV/TSV import regression PASS: ROC/ISO, daytrade explicit, chronological same-day fills, safe partial import, dedup, preview-only');
