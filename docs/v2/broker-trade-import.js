@@ -127,18 +127,55 @@ function prepare(text){
     var key=fingerprint({trade_date:t.trade_date,code:t.code,side:t.side,shares:t.shares,price:t.price,daytrade_pair_id:t.pair_id||''});
     var n=(ordinal.get(key)||0)+1;ordinal.set(key,n);
     if(n<=(used.get(key)||0)){duplicates.push(t);return}
-    var born=t.trade_date+'T'+(t.time||'12:00:00')+'+08:00';
+    var born=t.trade_date+'T'+(t.time||'12:00:00')+'.'+String(newOnes.length+1).padStart(6,'0')+'+08:00';
     var id='broker_'+hash(key+'|'+(t.order||'')+'|'+n);
     newOnes.push({id:id,code:t.code,name:t.name,side:t.side,shares:t.shares,price:t.price,trade_date:t.trade_date,created_at:born,action:t.side==='BUY'?'ENTRY':'REDUCE',source:t.pair_id?'BROKER_CSV:DAYTRADE':'BROKER_CSV',daytrade_pair_id:t.pair_id||'',reason:'',discipline:'UNREVIEWED'});
   });
   return {rows:newOnes,duplicates:duplicates.length,rejected:rejected,fileRows:data.length-1,accounts:accounts.size,valid:valid.length,ledgerRevision:JSON.stringify((store?.exportData?.()?.transactions||[]).map(function(t){return [t.id,fingerprint(t)]}))};
+}
+function assess(prepared){
+  var store=window.RadarPortfolioStore;
+  if(!store?.exportData)throw new Error('私人交易帳本尚未載入');
+  var old=store.exportData().transactions||[],rows=prepared.rows||[],newIds=new Set(rows.map(function(t){return t.id}));
+  var paired=new Map(),blocked=new Map(),balance={};
+  rows.filter(function(t){return !!t.daytrade_pair_id}).forEach(function(t){
+    var id=t.daytrade_pair_id;if(!paired.has(id))paired.set(id,[]);
+    paired.get(id).push(t);
+  });
+  for(var [id,group] of paired){
+    if(group.length!==2||group.filter(function(t){return t.side==='BUY'}).length!==1
+      ||group.filter(function(t){return t.side==='SELL'}).length!==1
+      ||group[0].shares!==group[1].shares){
+      group.forEach(function(t){blocked.set(t.id,'當沖買賣不完整或已存在部分重複交易')});
+    }
+  }
+  var entries=old.concat(rows).slice().sort(function(a,b){
+    return String(a.trade_date||'').localeCompare(String(b.trade_date||''))
+      ||String(a.created_at||'').localeCompare(String(b.created_at||''))
+      ||String(a.id||'').localeCompare(String(b.id||''));
+  });
+  entries.forEach(function(t){
+    if(t.daytrade_pair_id)return;
+    var code=String(t.code||''),qty=Number(t.shares)||0;
+    if(t.side==='BUY'){balance[code]=(balance[code]||0)+qty;return}
+    if(qty>(balance[code]||0)){
+      if(newIds.has(t.id)){blocked.set(t.id,'缺少更早的買進紀錄／期初持股');return}
+      throw new Error('既有帳本 '+code+' 的持股明細不一致，為避免改寫原有紀錄已停止預覽');
+    }
+    balance[code]-=qty;
+  });
+  var safe=rows.filter(function(t){return !blocked.has(t.id)});
+  return{safeRows:safe,blocked:rows.filter(function(t){return blocked.has(t.id)}).map(function(t){
+    return{code:t.code,side:t.side,trade_date:t.trade_date,shares:t.shares,reason:blocked.get(t.id)}
+  })};
 }
 function merge(prepared){
   var store=window.RadarPortfolioStore;if(!store?.importData||!store?.exportData)throw new Error('私人交易帳本尚未載入');
   // Recompute duplicates against the latest ledger: avoid double taps and any
   // manual additions between preview and confirmation.
   var current=store.exportData(),toAdd=[];var revision=JSON.stringify((current.transactions||[]).map(function(t){return [t.id,fingerprint(t)]}));if(revision!==prepared.ledgerRevision)throw new Error('預覽後交易帳本已有變更，請重新選檔預覽，避免重複匯入');
-  prepared.rows.forEach(function(t){if(!current.transactions.some(function(x){return x.id===t.id}))toAdd.push(t)});
+  var eligibility=assess(prepared);
+  eligibility.safeRows.forEach(function(t){if(!current.transactions.some(function(x){return x.id===t.id}))toAdd.push(t)});
   if(!toAdd.length)return 0;
   var snapshot={transactions:current.transactions.concat(toAdd),meta:{...current.meta}};
   toAdd.forEach(function(t){if(!snapshot.meta[t.code]&&t.name)snapshot.meta[t.code]={name:t.name}});
@@ -181,21 +218,25 @@ async function onFile(event){
     try{decoded=new TextDecoder('utf-8',{fatal:true}).decode(buf)}
     catch{decoded=new TextDecoder('big5').decode(buf)}
     PREVIEW=prepare(decoded);
-    status.textContent='檔案 '+f.name+'｜可新增 '+PREVIEW.rows.length+' 筆｜與現有紀錄相同 '+PREVIEW.duplicates+' 筆｜無法辨識 '+PREVIEW.rejected.length+' 筆';
+    var eligibility=assess(PREVIEW);
+    PREVIEW.safeRows=eligibility.safeRows;PREVIEW.blocked=eligibility.blocked;
+    status.textContent='檔案 '+f.name+'｜可安全匯入 '+PREVIEW.safeRows.length+' 筆｜缺歷史持股 '+PREVIEW.blocked.length+' 筆｜重複 '+PREVIEW.duplicates+' 筆｜無法辨識 '+PREVIEW.rejected.length+' 筆';
     var html='<div class="broker-preview"><table><thead><tr><th>日期</th><th>代號</th><th>買賣</th><th>股數</th><th>成交價</th></tr></thead><tbody>';
-    PREVIEW.rows.slice(0,25).forEach(function(x){html+='<tr><td>'+esc(x.trade_date)+'</td><td>'+esc(x.code)+'</td><td>'+esc(x.side==='BUY'?'買':'賣')+'</td><td>'+x.shares+'</td><td>'+esc(x.price)+'</td></tr>'});
+    PREVIEW.safeRows.slice(0,25).forEach(function(x){html+='<tr><td>'+esc(x.trade_date)+'</td><td>'+esc(x.code)+'</td><td>'+esc(x.side==='BUY'?'買':'賣')+'</td><td>'+x.shares+'</td><td>'+esc(x.price)+'</td></tr>'});
     html+='</tbody></table></div>';
-    if(PREVIEW.rows.length>25)html+='<div class="broker-note">僅預覽前 25 筆；確認後會一次匯入全部 '+PREVIEW.rows.length+' 筆。</div>';
+    if(PREVIEW.safeRows.length>25)html+='<div class="broker-note">僅預覽前 25 筆；確認後會一次匯入通過檢查的 '+PREVIEW.safeRows.length+' 筆。</div>';
+    if(PREVIEW.blocked.length)html+='<p class="broker-error">⚠️ 以下 '+PREVIEW.blocked.length+' 筆暫不匯入（不會建立假的買入成本）：'+PREVIEW.blocked.slice(0,12).map(function(x){return esc(x.trade_date+' '+x.code+' '+(x.side==='SELL'?'賣':'買')+' '+x.shares+'股：'+x.reason)}).join('；')+'。如要完整匯入，需補原始買進歷史或真實期初庫存。</p>';
     if(PREVIEW.rejected.length)html+='<p class="broker-error">⚠️ 有 '+PREVIEW.rejected.length+' 筆無法辨識，將不匯入：'+PREVIEW.rejected.slice(0,5).map(function(x){return '第'+x.line+'列 '+esc(x.reason)}).join('；')+'。請確認不是融資融券或未配對當沖。</p>';
     html+='<p class="broker-note">本帳本不分帳戶；若既有庫存是其他證券帳號，請不要按確認。手續費與證交稅仍按網站的費率設定估算，未讀取券商實收費稅。</p>';
-    box.innerHTML=html;confirm.disabled=!PREVIEW.rows.length;confirm.textContent='確認匯入 '+PREVIEW.rows.length+' 筆';
+    if(PREVIEW.rows.some(function(t){return !t.daytrade_pair_id})&&PREVIEW.rows.some(function(t){return t.side==='SELL'}))html+='<p class="broker-note">注意：未標註當沖的同日買賣會先按普通買賣入帳，缺少成交時間時僅使用匯入順序核對庫存；請先確認這些交易不會誤改原本波段成本。</p>';
+    box.innerHTML=html;confirm.disabled=!PREVIEW.safeRows.length;confirm.textContent='確認匯入 '+PREVIEW.safeRows.length+' 筆';
   }catch(err){status.textContent='無法讀取：'+(err?.message||'不支援的檔案格式')}
 }
 function commit(){
   if(!PREVIEW||!PREVIEW.rows.length)return;
   try{
     var count=merge(PREVIEW);
-    DIALOG.querySelector('#brokerImportStatus').textContent='✅ 已匯入 '+count+' 筆；原有紀錄保留，重複項目不重複加入。';
+    DIALOG.querySelector('#brokerImportStatus').textContent='✅ 已匯入 '+count+' 筆；另有 '+(PREVIEW.blocked?.length||0)+' 筆因缺歷史持股未匯入。原有紀錄保留，重複項目不重複加入。';
     DIALOG.querySelector('#brokerImportConfirm').disabled=true;
     DIALOG.querySelector('#brokerImportPreview').innerHTML='<div class="broker-note">匯入完成，請到「全部交易紀錄」確認持股與已實現損益。</div>';
     PREVIEW=null;
@@ -205,6 +246,6 @@ function boot(){
   ensure();document.addEventListener('radar:view-rendered',ensure);
   document.addEventListener('click',function(e){if(e.target.closest?.('#portfolioBrokerImportBtn')){e.preventDefault();show()}},true);
 }
-window.InukoBrokerTradeImport={parse:prepare,records:csvRecords};
+window.InukoBrokerTradeImport={parse:prepare,assess:assess,merge:merge,records:csvRecords};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
