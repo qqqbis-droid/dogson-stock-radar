@@ -1474,7 +1474,7 @@ def _twse_foreign_value(d):
     try:
         rr = requests.get(
             "https://www.twse.com.tw/rwd/zh/fund/BFI82U",
-            params={"dayDate": d.strftime("%Y%m%d"), "response": "json", "type": "day"},
+            params={"date": d.strftime("%Y%m%d"), "response": "json"},
             headers={"User-Agent": "Mozilla/5.0 DogsonRadar/1.3.3", "Accept": "application/json,text/plain,*/*"},
             timeout=20,
         )
@@ -1503,45 +1503,88 @@ def _twse_foreign_value(d):
 
 
 def _tpex_foreign_value(d):
-    """TPEx 3-institution summary: foreign-investor net buy/sell amount in TWD."""
+    """Official TPEx daily institutional NET AMOUNT, TWD; never use another date.
+
+    Keep the historical endpoint as primary because its date parameter is
+    queryable; support both its HTML table and JSON aaData responses. Some
+    GitHub runners are blocked from the modern OpenAPI endpoint, so failure
+    is a missing-value status, not a synthetic zero.
+    """
     import io
+    import re
 
     roc = f"{d.year - 1911}/{d.month:02d}/{d.day:02d}"
-    try:
-        rr = requests.get(
-            "https://www.tpex.org.tw/web/stock/3insti/3insti_summary/3itrdsum_result.php",
-            params={"d": roc, "l": "zh-tw", "o": "htm", "p": "1", "t": "D"},
-            headers={"User-Agent": "Mozilla/5.0 DogsonRadar/1.3.3", "Accept-Language": "zh-TW,zh;q=0.9"},
-            timeout=20,
-        )
-        rr.raise_for_status()
-        text = rr.text
-        date_markers = [
-            roc,
-            f"{d.year - 1911}年{d.month:02d}月{d.day:02d}日",
-            f"{d.year - 1911}年{d.month}月{d.day}日",
-        ]
-        if not any(m in text for m in date_markers):
+    url = "https://www.tpex.org.tw/web/stock/3insti/3insti_summary/3itrdsum_result.php"
+    head = {"User-Agent": "Mozilla/5.0 DogsonRadar/1.3.8",
+            "Accept-Language": "zh-TW,zh;q=0.9",
+            "Referer": "https://www.tpex.org.tw/zh-tw/mainboard/trading/major-institutional/summary/day.html"}
+
+    def amount(value):
+        s = re.sub(r"<[^>]*>", "", str(value or "")).replace("&nbsp;", "").strip()
+        return _market_num(s)
+
+    def foreign_row(label, buy, sell, net):
+        name = re.sub(r"\s+", "", str(label))
+        if not (("外資" in name or "陸資" in name) and ("不含" in name or "合計" in name)):
             return None
-        tables = pd.read_html(io.StringIO(text))
-        for raw in tables:
-            if raw.empty or raw.shape[1] < 3:
-                continue
-            df = _flatten_market_table(raw)
-            name_col = next((c for c in df.columns if "單位名稱" in str(c)), df.columns[0])
-            net_col = next((c for c in df.columns if "買賣超" in str(c)), None)
-            if net_col is None:
-                continue
-            names = df[name_col].astype(str).str.replace(" ", "", regex=False)
-            hit = df[names.str.contains("外資及陸資", na=False) & names.str.contains("不含", na=False)]
-            if hit.empty:
-                hit = df[names.str.contains("外資及陸資合計", na=False)]
-            if not hit.empty:
-                return _market_num(hit.iloc[0][net_col])
-        return None
-    except Exception as e:
-        print("TPEx official foreign flow", d, e)
-        return None
+        b, s, n = amount(buy), amount(sell), amount(net)
+        if b is None or s is None or n is None:
+            return None
+        # Official net buys must agree with gross buys minus sells. Reject
+        # column reorders and malformed content instead of publishing a guess.
+        if abs((b - s) - n) > max(1.0, abs(n) * 0.00001):
+            return None
+        return n
+
+    for fmt in ("json", "htm"):
+        try:
+            rr = requests.get(
+                url, params={"d": roc, "l": "zh-tw", "o": fmt, "p": "1", "t": "D"},
+                headers=head, timeout=20)
+            rr.raise_for_status()
+            if fmt == "json":
+                obj = rr.json()
+                if not isinstance(obj, dict):
+                    continue
+                response_date = str(obj.get("date") or obj.get("d") or "").strip()
+                if response_date:
+                    normalized = re.sub(r"[^0-9]", "", response_date)
+                    if normalized not in {d.strftime("%Y%m%d"), f"{d.year-1911:03d}{d:%m%d}"}:
+                        print("TPEx institutional summary date mismatch:", response_date, d)
+                        continue
+                rows = obj.get("aaData") or obj.get("data") or []
+                for row in rows:
+                    if not isinstance(row, (list, tuple)) or len(row) < 4:
+                        continue
+                    result = foreign_row(row[0], row[1], row[2], row[3])
+                    if result is not None:
+                        print("TPEx official foreign summary", d, "json")
+                        return result
+            else:
+                body = rr.text
+                date_markers = [roc,
+                    f"{d.year - 1911}年{d.month:02d}月{d.day:02d}日",
+                    f"{d.year - 1911}年{d.month}月{d.day}日"]
+                if not any(marker in body for marker in date_markers):
+                    print("TPEx institutional HTML date missing:", d)
+                    continue
+                for raw in pd.read_html(io.StringIO(body)):
+                    if raw.empty or raw.shape[1] < 4:
+                        continue
+                    df = _flatten_market_table(raw)
+                    for _, row in df.iterrows():
+                        vals = list(row)
+                        if len(vals) < 4:
+                            continue
+                        result = foreign_row(vals[0], vals[1], vals[2], vals[3])
+                        if result is not None:
+                            print("TPEx official foreign summary", d, "html")
+                            return result
+        except Exception as exc:
+            print("TPEx official foreign summary", d, fmt,
+                  type(exc).__name__, exc)
+
+    return None
 
 
 def fetch_market_foreign_flow(need=5, lookback=18):
