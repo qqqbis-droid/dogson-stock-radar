@@ -1,0 +1,168 @@
+{
+  "shadow_schema_version": "1.1.0",
+  "captured_at": "2026-11-03T01:10:48+08:00",
+  "trade_date": "2026-11-02",
+  "build_id": "cb2-legacy-20261102-4b82fd4286",
+  "previous_build_id": "cb2-legacy-20261102-0706bfe89a",
+  "status": "PASS",
+  "source_dates": [
+    "2026-11-02"
+  ],
+  "source_counts": {
+    "close": 756,
+    "intraday": 724,
+    "daytrade": 724
+  },
+  "canonical_counts": {
+    "close": 756,
+    "intraday": 724,
+    "daytrade": 724
+  },
+  "coverage_ratio": {
+    "close": 1.0,
+    "intraday": 1.0,
+    "daytrade": 1.0
+  },
+  "safety_violations": [],
+  "warnings": [],
+  "payload_profile": {
+    "manifest_bytes": 5146,
+    "views": {
+      "intraday": {
+        "startup_dataset_keys": [
+          "market_summary",
+          "sector_intraday",
+          "decision_intraday_summary"
+        ],
+        "startup_dataset_bytes": 112696,
+        "initial_bytes": 117842,
+        "lazy_dataset_keys": [
+          "decision_intraday_index",
+          "decision_intraday_detail",
+          "zone_intraday",
+          "tradeplan_intraday",
+          "tradecase_swing"
+        ],
+        "lazy_dataset_bytes": 3566607
+      },
+      "close": {
+        "startup_dataset_keys": [
+          "market_summary",
+          "sector_close",
+          "decision_close_summary"
+        ],
+        "startup_dataset_bytes": 124198,
+        "initial_bytes": 129344,
+        "lazy_dataset_keys": [
+          "decision_close_index",
+          "decision_close_detail",
+          "zone_close",
+          "tradeplan_close",
+          "tradecase_swing"
+        ],
+        "lazy_dataset_bytes": 3790645
+      },
+      "portfolio": {
+        "startup_dataset_keys": [
+          "market_summary",
+          "sector_close"
+        ],
+        "startup_dataset_bytes": 69613,
+        "initial_bytes": 74759,
+        "lazy_dataset_keys": [
+          "portfolio_summary"
+        ],
+        "lazy_dataset_bytes": 3
+      },
+      "daytrade": {
+        "startup_dataset_keys": [
+          "market_summary",
+          "sector_intraday",
+          "decision_daytrade_summary"
+        ],
+        "startup_dataset_bytes": 126259,
+        "initial_bytes": 131405,
+        "lazy_dataset_keys": [
+          "decision_daytrade_index",
+          "decision_daytrade_detail",
+          "zone_daytrade",
+          "tradeplan_daytrade",
+          "tradecase_daytrade"
+        ],
+        "lazy_dataset_bytes": 4281964
+      }
+    },
+    "policy": "Summary/sector/market are startup payload; index/detail/zone/plan/case remain lazy and are excluded from initial bytes."
+  },
+  "distributions": {
+    "close": {
+      "lifecycle_stage": {
+        "FAILED": 267,
+        "LAUNCH": 6,
+        "OBSERVE": 67,
+        "PULLBACK_CONFIRMED": 45,
+        "SETUP": 74,
+        "TREND": 17,
+        "WEAKENING": 280
+      },
+      "action_state": {
+        "DATA_STALE": 756
+      },
+      "opportunity_bucket": {
+        "RESEARCH": 209,
+        "RISK": 547
+      },
+      "freshness": {
+        "STALE": 756
+      }
+    },
+    "intraday": {
+      "lifecycle_stage": {
+        "FAILED": 20,
+        "LAUNCH": 1,
+        "OBSERVE": 306,
+        "PULLBACK_CONFIRMED": 12,
+        "SETUP": 2,
+        "WEAKENING": 383
+      },
+      "action_state": {
+        "DATA_STALE": 1,
+        "DO_NOT_CHASE": 211,
+        "WAIT_TRIGGER": 15,
+        "WATCH": 497
+      },
+      "opportunity_bucket": {
+        "RESEARCH_ONLY": 108,
+        "RISK": 403,
+        "WAIT_PULLBACK": 211,
+        "WAIT_TRIGGER": 2
+      },
+      "freshness": {
+        "FROZEN": 724
+      }
+    },
+    "daytrade": {
+      "lifecycle_stage": {
+        "FAILED": 20,
+        "LAUNCH": 1,
+        "OBSERVE": 306,
+        "PULLBACK_CONFIRMED": 12,
+        "SETUP": 2,
+        "WEAKENING": 383
+      },
+      "action_state": {
+        "DATA_STALE": 724
+      },
+      "opportunity_bucket": {
+        "STALE": 724
+      },
+      "freshness": {
+        "FROZEN": 724
+      }
+    }
+  },
+  "promotion": {
+    "eligible": false,
+    "reason": "Phase 5 requires 20–40 distinct trading-day Shadow reports and no unresolved P0/P1 divergence."
+  }
+}
