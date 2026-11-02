@@ -6,7 +6,7 @@
 if(window.__INUKO_BROKER_CSV_V1__)return;
 window.__INUKO_BROKER_CSV_V1__=true;
 
-var PREVIEW=null, DIALOG=null;
+var PREVIEW=null, DIALOG=null,FILE_TEXT='',FILE_NAME='',PAIR_CHOICES={};
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function field(s){return String(s||'').replace(/^\uFEFF/,'').replace(/[\s\u3000_（）()【】「」\-\/]/g,'').toLowerCase()}
 function detectDelimiter(first){var t=(first.match(/\t/g)||[]).length,c=(first.match(/,/g)||[]).length;return t>c?'\t':','}
@@ -81,9 +81,9 @@ function timeOf(s){
   if(h>23||m>59||sec>59)return '';
   return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
 }
-function fingerprint(t){return [t.trade_date,t.code,t.side,t.shares,Number(t.price).toFixed(4),t.daytrade_pair_id?'DAYTRADE':'STANDARD'].join('|')}
+function fingerprint(t){return [t.trade_date,t.code,t.side,t.shares,Number(t.price).toFixed(4)].join('|')}
 function hash(x){var h=2166136261;for(var i=0;i<x.length;i++){h^=x.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0).toString(36)}
-function prepare(text){
+function prepare(text,choices={}){
   var all=csvRecords(text),headAt=all.findIndex(function(row){var x=columns(row);return x.date!=null&&x.code!=null&&x.side!=null&&x.price!=null&&(x.shares!=null||x.lots!=null)});if(headAt<0)headAt=0;var data=all.slice(headAt),col=columns(data[0]),required=['date','code','side','price'];
   var missing=required.filter(function(k){return col[k]==null});
   if(col.shares==null&&col.lots==null)missing.push('shares');
@@ -119,6 +119,30 @@ function prepare(text){
     }
   }
   valid=valid.filter(function(x){if(!x.rejected)return true;rejected.push({line:x.line,reason:x.rejected});return false});
+  // A same-day buy/sell is NOT necessarily a daytrade. In particular, if the
+  // account already holds a swing lot, importing it as ordinary BUY/SELL may
+  // silently rewrite the swing cost. Require a specific user decision.
+  var possiblePairs=[], grouped=new Map();
+  valid.filter(function(x){return !x.pair_id}).forEach(function(x){
+    var k=x.trade_date+'|'+x.code+'|'+x.shares;
+    if(!grouped.has(k))grouped.set(k,[]);
+    grouped.get(k).push(x);
+  });
+  for(var [groupKey,group] of grouped){
+    var buys=group.filter(function(x){return x.side==='BUY'});
+    var sells=group.filter(function(x){return x.side==='SELL'});
+    if(group.length!==2||buys.length!==1||sells.length!==1)continue;
+    var buy=buys[0],sell=sells[0];
+    var key=groupKey+'|'+Number(buy.price).toFixed(4)+'|'+Number(sell.price).toFixed(4);
+    possiblePairs.push({key:key,date:buy.trade_date,code:buy.code,shares:buy.shares,buy:buy.price,sell:sell.price});
+    var choice=choices[key]||'';
+    if(choice==='DAYTRADE'){
+      var pairid='broker_pair_'+hash(key);
+      buy.pair_id=pairid;sell.pair_id=pairid;
+    }else if(choice!=='SWING'){
+      buy.pending_pair_key=key;sell.pending_pair_key=key;
+    }
+  }
   var existing=store?.exportData?.()?.transactions||[];
   var used=new Map();existing.forEach(function(t){var key=fingerprint(t);used.set(key,(used.get(key)||0)+1)});
   valid.sort(function(a,b){return a.trade_date.localeCompare(b.trade_date)||a.time.localeCompare(b.time)||((a.side==='BUY'?0:1)-(b.side==='BUY'?0:1))||a.line-b.line});
@@ -129,15 +153,16 @@ function prepare(text){
     if(n<=(used.get(key)||0)){duplicates.push(t);return}
     var born=t.trade_date+'T'+(t.time||'12:00:00')+'.'+String(newOnes.length+1).padStart(6,'0')+'+08:00';
     var id='broker_'+hash(key+'|'+(t.order||'')+'|'+n);
-    newOnes.push({id:id,code:t.code,name:t.name,side:t.side,shares:t.shares,price:t.price,trade_date:t.trade_date,created_at:born,action:t.side==='BUY'?'ENTRY':'REDUCE',source:t.pair_id?'BROKER_CSV:DAYTRADE':'BROKER_CSV',daytrade_pair_id:t.pair_id||'',reason:'',discipline:'UNREVIEWED'});
+    newOnes.push({id:id,code:t.code,name:t.name,side:t.side,shares:t.shares,price:t.price,trade_date:t.trade_date,created_at:born,action:t.side==='BUY'?'ENTRY':'REDUCE',source:t.pair_id?'BROKER_CSV:DAYTRADE':'BROKER_CSV',daytrade_pair_id:t.pair_id||'',pending_pair_key:t.pending_pair_key||'',reason:'',discipline:'UNREVIEWED'});
   });
-  return {rows:newOnes,duplicates:duplicates.length,rejected:rejected,fileRows:data.length-1,accounts:accounts.size,valid:valid.length,ledgerRevision:JSON.stringify((store?.exportData?.()?.transactions||[]).map(function(t){return [t.id,fingerprint(t)]}))};
+  return {rows:newOnes,duplicates:duplicates.length,rejected:rejected,fileRows:data.length-1,accounts:accounts.size,valid:valid.length,possiblePairs:possiblePairs,ledgerRevision:JSON.stringify((store?.exportData?.()?.transactions||[]).map(function(t){return [t.id,fingerprint(t)]}))};
 }
 function assess(prepared){
   var store=window.RadarPortfolioStore;
   if(!store?.exportData)throw new Error('私人交易帳本尚未載入');
   var old=store.exportData().transactions||[],rows=prepared.rows||[],newIds=new Set(rows.map(function(t){return t.id}));
   var paired=new Map(),blocked=new Map(),balance={};
+  rows.forEach(function(t){if(t.pending_pair_key)blocked.set(t.id,'同日買賣尚未選擇「當沖」或「一般交易」')});
   rows.filter(function(t){return !!t.daytrade_pair_id}).forEach(function(t){
     var id=t.daytrade_pair_id;if(!paired.has(id))paired.set(id,[]);
     paired.get(id).push(t);
@@ -155,7 +180,7 @@ function assess(prepared){
       ||String(a.id||'').localeCompare(String(b.id||''));
   });
   entries.forEach(function(t){
-    if(t.daytrade_pair_id)return;
+    if(t.daytrade_pair_id||blocked.has(t.id))return;
     var code=String(t.code||''),qty=Number(t.shares)||0;
     if(t.side==='BUY'){balance[code]=(balance[code]||0)+qty;return}
     if(qty>(balance[code]||0)){
@@ -204,32 +229,55 @@ function ensure(){
     DIALOG.querySelector('#brokerImportClose').addEventListener('click',function(){DIALOG.close()});
     DIALOG.querySelector('#brokerImportCancel').addEventListener('click',function(){DIALOG.close()});
     DIALOG.querySelector('#brokerCsvFile').addEventListener('change',onFile);
+    DIALOG.querySelector('#brokerImportPreview').addEventListener('change',function(e){
+      var selector=e.target.closest?.('[data-broker-pair]');
+      if(!selector||!PREVIEW)return;
+      var index=Number(selector.dataset.brokerPair),match=PREVIEW.possiblePairs?.[index];
+      if(!match)return;
+      PAIR_CHOICES[match.key]=selector.value;
+      paintPreview();
+    });
     DIALOG.querySelector('#brokerImportConfirm').addEventListener('click',commit);
   }
 }
-function show(){ensure();PREVIEW=null;DIALOG.querySelector('#brokerCsvFile').value='';DIALOG.querySelector('#brokerImportStatus').textContent='尚未選擇檔案。';DIALOG.querySelector('#brokerImportPreview').innerHTML='';DIALOG.querySelector('#brokerImportConfirm').disabled=true;DIALOG.showModal()}
-async function onFile(event){
-  PREVIEW=null;var status=DIALOG.querySelector('#brokerImportStatus'),box=DIALOG.querySelector('#brokerImportPreview'),confirm=DIALOG.querySelector('#brokerImportConfirm');
+function show(){ensure();PREVIEW=null;FILE_TEXT='';FILE_NAME='';PAIR_CHOICES={};DIALOG.querySelector('#brokerCsvFile').value='';DIALOG.querySelector('#brokerImportStatus').textContent='尚未選擇檔案。';DIALOG.querySelector('#brokerImportPreview').innerHTML='';DIALOG.querySelector('#brokerImportConfirm').disabled=true;DIALOG.showModal()}
+function paintPreview(){
+  var status=DIALOG.querySelector('#brokerImportStatus'),box=DIALOG.querySelector('#brokerImportPreview'),confirm=DIALOG.querySelector('#brokerImportConfirm');
   confirm.disabled=true;box.innerHTML='';
+  PREVIEW=prepare(FILE_TEXT,PAIR_CHOICES);
+  var eligibility=assess(PREVIEW);
+  PREVIEW.safeRows=eligibility.safeRows;PREVIEW.blocked=eligibility.blocked;
+  var waiting=PREVIEW.possiblePairs.filter(function(p){return !PAIR_CHOICES[p.key]});
+  var missing=PREVIEW.blocked.filter(function(t){return /缺少更早/.test(t.reason)});
+  status.textContent='檔案 '+FILE_NAME+'｜可安全匯入 '+PREVIEW.safeRows.length+' 筆｜待分類同日買賣 '+waiting.length+' 組｜缺歷史持股 '+missing.length+' 筆｜已重複 '+PREVIEW.duplicates+' 筆';
+  var html='';
+  if(PREVIEW.possiblePairs.length){
+    html+='<div class="broker-note"><b>請先確認同日買賣</b>：同一天買賣未必是當沖。選「當沖」會獨立計算損益，不更動原有波段庫存成本；選「一般交易」則依波段買賣入帳。未確認的兩筆都不匯入。</div>';
+    PREVIEW.possiblePairs.forEach(function(p,i){
+      var choice=PAIR_CHOICES[p.key]||'';
+      html+='<div class="broker-note"><b>'+esc(p.date+' '+p.code)+'｜'+p.shares+' 股</b><div>買 '+esc(p.buy)+' → 賣 '+esc(p.sell)+'</div><label>交易性質 <select data-broker-pair="'+i+'" style="max-width:100%;min-height:36px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px"><option value=""'+(!choice?' selected':'')+'>請確認</option><option value="DAYTRADE"'+(choice==='DAYTRADE'?' selected':'')+'>當沖（不影響波段持股）</option><option value="SWING"'+(choice==='SWING'?' selected':'')+'>一般買賣（會影響波段成本）</option></select></label></div>';
+    });
+  }
+  html+='<div class="broker-preview"><table><thead><tr><th>日期</th><th>代號</th><th>買賣</th><th>股數</th><th>成交價</th></tr></thead><tbody>';
+  PREVIEW.safeRows.slice(0,25).forEach(function(x){html+='<tr><td>'+esc(x.trade_date)+'</td><td>'+esc(x.code)+'</td><td>'+esc(x.side==='BUY'?'買':'賣')+'</td><td>'+x.shares+'</td><td>'+esc(x.price)+'</td></tr>'});
+  html+='</tbody></table></div>';
+  if(PREVIEW.safeRows.length>25)html+='<div class="broker-note">僅預覽前 25 筆；確認後會一次匯入通過檢查的 '+PREVIEW.safeRows.length+' 筆。</div>';
+  if(PREVIEW.blocked.length)html+='<p class="broker-error">⚠️ 以下 '+PREVIEW.blocked.length+' 筆暫不匯入（不會建立假的買入成本）：'+PREVIEW.blocked.slice(0,12).map(function(x){return esc(x.trade_date+' '+x.code+' '+(x.side==='SELL'?'賣':'買')+' '+x.shares+'股：'+x.reason)}).join('；')+'。缺歷史持股者請補真實的更早買進或期初庫存。</p>';
+  if(PREVIEW.rejected.length)html+='<p class="broker-error">⚠️ 無法辨識 '+PREVIEW.rejected.length+' 筆：'+PREVIEW.rejected.slice(0,5).map(function(x){return '第'+x.line+'列 '+esc(x.reason)}).join('；')+'</p>';
+  html+='<p class="broker-note">缺少實際成交時間時只依同日買／賣順序進行持股驗證，這不是推算的真實時間；有同日先賣再買的交易，請改用有時間的券商成交明細。不同券商帳號仍不能混在一起。</p>';
+  box.innerHTML=html;confirm.disabled=!PREVIEW.safeRows.length;confirm.textContent='確認匯入 '+PREVIEW.safeRows.length+' 筆';
+}
+async function onFile(event){
+  var status=DIALOG.querySelector('#brokerImportStatus'),box=DIALOG.querySelector('#brokerImportPreview'),confirm=DIALOG.querySelector('#brokerImportConfirm');
+  PREVIEW=null;FILE_TEXT='';PAIR_CHOICES={};confirm.disabled=true;box.innerHTML='';
   var f=event.target.files?.[0];if(!f)return;
   if(f.size>4000000){status.textContent='檔案超過 4MB，請先分批匯出';return}
   try{
     var buf=await f.arrayBuffer(),decoded;
     try{decoded=new TextDecoder('utf-8',{fatal:true}).decode(buf)}
     catch{decoded=new TextDecoder('big5').decode(buf)}
-    PREVIEW=prepare(decoded);
-    var eligibility=assess(PREVIEW);
-    PREVIEW.safeRows=eligibility.safeRows;PREVIEW.blocked=eligibility.blocked;
-    status.textContent='檔案 '+f.name+'｜可安全匯入 '+PREVIEW.safeRows.length+' 筆｜缺歷史持股 '+PREVIEW.blocked.length+' 筆｜重複 '+PREVIEW.duplicates+' 筆｜無法辨識 '+PREVIEW.rejected.length+' 筆';
-    var html='<div class="broker-preview"><table><thead><tr><th>日期</th><th>代號</th><th>買賣</th><th>股數</th><th>成交價</th></tr></thead><tbody>';
-    PREVIEW.safeRows.slice(0,25).forEach(function(x){html+='<tr><td>'+esc(x.trade_date)+'</td><td>'+esc(x.code)+'</td><td>'+esc(x.side==='BUY'?'買':'賣')+'</td><td>'+x.shares+'</td><td>'+esc(x.price)+'</td></tr>'});
-    html+='</tbody></table></div>';
-    if(PREVIEW.safeRows.length>25)html+='<div class="broker-note">僅預覽前 25 筆；確認後會一次匯入通過檢查的 '+PREVIEW.safeRows.length+' 筆。</div>';
-    if(PREVIEW.blocked.length)html+='<p class="broker-error">⚠️ 以下 '+PREVIEW.blocked.length+' 筆暫不匯入（不會建立假的買入成本）：'+PREVIEW.blocked.slice(0,12).map(function(x){return esc(x.trade_date+' '+x.code+' '+(x.side==='SELL'?'賣':'買')+' '+x.shares+'股：'+x.reason)}).join('；')+'。如要完整匯入，需補原始買進歷史或真實期初庫存。</p>';
-    if(PREVIEW.rejected.length)html+='<p class="broker-error">⚠️ 有 '+PREVIEW.rejected.length+' 筆無法辨識，將不匯入：'+PREVIEW.rejected.slice(0,5).map(function(x){return '第'+x.line+'列 '+esc(x.reason)}).join('；')+'。請確認不是融資融券或未配對當沖。</p>';
-    html+='<p class="broker-note">本帳本不分帳戶；若既有庫存是其他證券帳號，請不要按確認。手續費與證交稅仍按網站的費率設定估算，未讀取券商實收費稅。</p>';
-    if(PREVIEW.rows.some(function(t){return !t.daytrade_pair_id})&&PREVIEW.rows.some(function(t){return t.side==='SELL'}))html+='<p class="broker-note">注意：未標註當沖的同日買賣會先按普通買賣入帳，缺少成交時間時僅使用匯入順序核對庫存；請先確認這些交易不會誤改原本波段成本。</p>';
-    box.innerHTML=html;confirm.disabled=!PREVIEW.safeRows.length;confirm.textContent='確認匯入 '+PREVIEW.safeRows.length+' 筆';
+    FILE_TEXT=decoded;FILE_NAME=f.name;
+    paintPreview();
   }catch(err){status.textContent='無法讀取：'+(err?.message||'不支援的檔案格式')}
 }
 function commit(){
