@@ -33,6 +33,10 @@ python scripts/v2/enrich_zones.py --legacy-root docs/data --output docs/v2/data
 python scripts/v2/enrich_stock_detail_context.py --legacy-root docs/data --root docs/v2/data
 python scripts/v2/restore_market_capital_context.py --legacy-root docs/data --root docs/v2/data
 python scripts/v2/normalize_close_snapshot_by_close_date.py --root docs/v2/data
+# The fast quote publisher also replaces the entire Pages artifact. It must
+# retain a SAME-CLOSE-DATE per-stock capital ledger; otherwise every 5m tick
+# erases sector rank verification added by the last EOD publisher.
+python scripts/v2/build_capital_stock_breakdown.py --root docs/v2/data --registry contracts/registries/sector_registry.json
 # Pre-close data must keep the previous completed session immutable.
 python scripts/v2/preserve_frozen_close.py --root docs/v2/data --frozen-root docs/v2/frozen-close/latest
 python scripts/v2/stamp_version_contract.py --root docs/v2/data
