@@ -431,7 +431,7 @@ jobs:
           grep -q 'window.scrollY+p.getBoundingClientRect().top-sticky' docs/v2/app.js
           node --check docs/v2/portfolio-ledger-ui.js
           node --check docs/v2/broker-trade-import.js
-          grep -q 'broker-trade-import.js?v=20261102broker-csv1' docs/v2/index.html
+          grep -q 'broker-trade-import.js?v=20261103broker-safepreview2' docs/v2/index.html
           node /tmp/v2-source/scripts/v2/test_broker_trade_import.cjs
           node --check docs/v2/portfolio-quick-add.js
           node --check docs/v2/inuko-portfolio-intel-v2.js
