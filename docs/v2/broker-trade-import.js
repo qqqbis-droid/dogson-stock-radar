@@ -12,7 +12,7 @@ function field(s){return String(s||'').replace(/^\uFEFF/,'').replace(/[\s\u3000_
 function detectDelimiter(first){var t=(first.match(/\t/g)||[]).length,c=(first.match(/,/g)||[]).length;return t>c?'\t':','}
 function csvRecords(input){
   var text=String(input||'').replace(/^\uFEFF/,'');
-  var delimiter=detectDelimiter(text.split(/\r?\n/,1)[0]||'');
+  var delimiter=detectDelimiter(text.split(/\r?\n/).slice(0,15).find(function(x){return /\t|,/.test(x)})||'');
   var result=[], row=[], cell='', quoted=false;
   for(var i=0;i<text.length;i++){
     var ch=text[i];
