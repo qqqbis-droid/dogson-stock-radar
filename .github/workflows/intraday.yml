@@ -52,6 +52,8 @@ permissions:
 # The validated intraday Pages artifact is authoritative; Shadow Sync must not
 # dispatch a second UI-only deploy that rolls back this newer session snapshot.
 # Recovery note: a [deep] workflow-file push intentionally runs the audit lane.
+# 2026-11-03 opening recovery: trigger a same-session [structure] MIS + 5m rebuild.
+# Keep the date/coverage publish gates enabled: never promote 11/02 quotes as 11/03.
 concurrency:
   group: dogson-pages
   cancel-in-progress: false
