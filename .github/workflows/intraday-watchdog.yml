@@ -63,14 +63,27 @@ jobs:
           # and its own source date must confirm that the market is in session.
           try:
               url=("https://mis.twse.com.tw/stock/api/getStockInfo.jsp"
-                   "?ex_ch=tse_t00.tw&json=1&delay=0&watchdog="+str(int(now.timestamp())))
-              index=fetch_json(url).get("msgArray") or []
-              quote=index[0] if index else {}
-              actual=str(quote.get("d") or "").replace("-","").replace("/","")
-              volume=float(str(quote.get("v") or "0").replace(",",""))
-              if actual!=today.replace("-","") or volume<=0:
-                  print("Official MIS has no active same-day index trade; no dispatch", actual, volume)
+                   "?ex_ch=tse_t00.tw%7Ctse_2330.tw&json=1&delay=0&watchdog="+str(int(now.timestamp())))
+              snapshots=fetch_json(url).get("msgArray") or []
+              def positive(value):
+                  try: return float(str(value or "").replace(",",""))>0
+                  except (TypeError,ValueError): return False
+              trading=[]
+              for quote in snapshots:
+                  actual=str(quote.get("d") or "").replace("-","").replace("/","")
+                  clock=str(quote.get("t") or "")
+                  # The index feed may report cumulative volume as 0 even
+                  # during active trading; a real dated stock volume or
+                  # positive index trade price is acceptable evidence.
+                  has_evidence=positive(quote.get("v")) or positive(quote.get("z"))
+                  if (actual==today.replace("-","") and
+                      "09:00" <= clock[:5] <= "13:35" and has_evidence):
+                      trading.append(str(quote.get("c") or quote.get("n") or "index"))
+              if not trading:
+                  print("No verified same-day cash trading from MIS index/2330; no dispatch",
+                        [(q.get("c"),q.get("d"),q.get("t"),q.get("z"),q.get("v")) for q in snapshots])
                   sys.exit(0)
+              print("Official trading-day evidence",trading)
           except Exception as exc:
               print("Official trading-day validation unavailable; fail closed:", str(exc)[:240])
               sys.exit(0)
