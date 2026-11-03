@@ -2,6 +2,13 @@ name: Radar - Intraday Update
 
 on:
   workflow_dispatch:
+    inputs:
+      lane:
+        description: "Recovery lane: fast MIS quotes, structure 5m, or full audit"
+        required: false
+        type: choice
+        options: [fast, structure, audit]
+        default: audit
   push:
     paths:
       - "scripts/sector_groups.py"
@@ -98,7 +105,12 @@ jobs:
           elif [[ "${{ github.event_name }}" == "schedule" && ( "$sched" == "3,13,23,33,43,53 1-4 * * 1-5" || "$sched" == "3,13,23 5 * * 1-5" ) ]]; then
             mode=structure
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            mode=audit
+            mode="${{ inputs.lane || 'audit' }}"
+            # The watchdog selects structure to recover both quotes and real 5-minute evidence.
+            if [[ "$mode" != "fast" && "$mode" != "structure" && "$mode" != "audit" ]]; then
+              echo "Unsupported workflow_dispatch lane: $mode" >&2
+              exit 1
+            fi
           elif [[ "${{ github.event_name }}" == "push" && "${{ contains(github.event.head_commit.message, '[structure]') }}" == "true" ]]; then
             # Manual current-session 5m bridge recovery without rewriting
             # the slower 60K or audited historical close artifacts.
