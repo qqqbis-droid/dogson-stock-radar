@@ -53,6 +53,7 @@ permissions:
 # dispatch a second UI-only deploy that rolls back this newer session snapshot.
 # Recovery note: a [deep] workflow-file push intentionally runs the audit lane.
 # 2026-11-03 opening recovery: trigger a same-session [structure] MIS + 5m rebuild.
+# 2026-11-03: post Shadow LIVE-preservation fix, rebuild the authoritative fresh bundle.
 # Keep the date/coverage publish gates enabled: never promote 11/02 quotes as 11/03.
 concurrency:
   group: dogson-pages
