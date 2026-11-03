@@ -1,0 +1,135 @@
+name: Radar - Intraday Liveness Watchdog
+
+# Independent 15-minute fallback. The primary intraday.yml still owns the
+# normal 5-minute quote cadence and all market-data publication.
+# Never manufacture an up-to-date quote, and never trigger on a closed session.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/intraday-watchdog.yml"
+  schedule:
+    # Taipei 09:07-13:52 weekdays. The script stops after 13:27.
+    - cron: "7,22,37,52 1-5 * * 1-5"
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: dogson-intraday-watchdog
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Verify official market is trading and restart only if Pages is stale
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+          import sys
+          import urllib.request
+          from datetime import datetime, time, timezone
+          from zoneinfo import ZoneInfo
+
+          TW = ZoneInfo("Asia/Taipei")
+          now = datetime.now(TW)
+          today = now.date().isoformat()
+          repo = os.environ["GITHUB_REPOSITORY"]
+          print("Watchdog", now.isoformat(), "repo", repo)
+          if now.weekday() >= 5 or not (time(9, 7) <= now.time() <= time(13, 27)):
+              print("Outside Taipei weekday cash recovery window; no action")
+              sys.exit(0)
+
+          def fetch_json(url):
+              req=urllib.request.Request(url,headers={
+                  "User-Agent": "DogsonRadar-Watchdog/1.0",
+                  "Accept": "application/json",
+                  "Cache-Control": "no-cache, no-store",
+                  "Referer": "https://mis.twse.com.tw/stock/index.jsp",
+              })
+              with urllib.request.urlopen(req,timeout=12) as resp:
+                  return json.load(resp)
+
+          # A weekday is not necessarily a trading day; official index activity
+          # and its own source date must confirm that the market is in session.
+          try:
+              url=("https://mis.twse.com.tw/stock/api/getStockInfo.jsp"
+                   "?ex_ch=tse_t00.tw&json=1&delay=0&watchdog="+str(int(now.timestamp())))
+              index=fetch_json(url).get("msgArray") or []
+              quote=index[0] if index else {}
+              actual=str(quote.get("d") or "").replace("-","").replace("/","")
+              volume=float(str(quote.get("v") or "0").replace(",",""))
+              if actual!=today.replace("-","") or volume<=0:
+                  print("Official MIS has no active same-day index trade; no dispatch", actual, volume)
+                  sys.exit(0)
+          except Exception as exc:
+              print("Official trading-day validation unavailable; fail closed:", str(exc)[:240])
+              sys.exit(0)
+
+          # Freshness is measured from the official quote source clock, NOT the
+          # file/Pages build timestamp. A successful download alone is not live.
+          stale=True
+          try:
+              status=fetch_json(
+                  "https://qqqbis-droid.github.io/dogson-stock-radar/data/system_status.json"
+                  "?watchdog="+str(int(now.timestamp()))
+              )
+              quality=((status.get("operational") or {}).get("intraday_quality") or {})
+              qtime=str(quality.get("latest_quote_time") or "")[:5]
+              data_date=str((status.get("dates") or {}).get("intraday") or "")[:10]
+              source_dt=datetime.fromisoformat(f"{data_date}T{qtime}:00+08:00")
+              age=(now-source_dt).total_seconds()/60
+              stale=bool(
+                  data_date!=today or
+                  age< -2 or age>11 or
+                  (status.get("operational") or {}).get("intraday_state")!="live"
+              )
+              print("Published MIS status:",{"date":data_date,"quote_time":qtime,
+                    "age_minutes":round(age,1),"state":(status.get("operational") or {}).get("intraday_state"),
+                    "stale":stale})
+          except Exception as exc:
+              print("Published status missing/invalid; inspect running producer:",str(exc)[:240])
+          if not stale:
+              print("Primary producer is healthy; watchdog does not publish")
+              sys.exit(0)
+
+          # Do not flood Actions while a primary tick is queued, running or
+          # recently deployed but the Pages CDN has not yet propagated.
+          try:
+              proc=subprocess.run(
+                  ["gh","api",f"repos/{repo}/actions/workflows/intraday.yml/runs?per_page=12"],
+                  check=True,capture_output=True,text=True,timeout=12)
+              runs=json.loads(proc.stdout).get("workflow_runs") or []
+          except Exception as exc:
+              print("Could not inspect producers; fail closed:",str(exc)[:240])
+              sys.exit(0)
+          for run in runs:
+              try:
+                  stamp=datetime.fromisoformat(str(run.get("created_at") or "").replace("Z","+00:00"))
+                  minutes=(now.astimezone(timezone.utc)-stamp).total_seconds()/60
+              except Exception:
+                  continue
+              state=str(run.get("status") or "")
+              if -2<=minutes<=22 and state in ("queued","in_progress","waiting","pending","requested"):
+                  print("Current primary producer already active; no duplicate",run.get("id"),state)
+                  sys.exit(0)
+              if -2<=minutes<=9 and run.get("conclusion")=="success":
+                  print("Recent successful primary build; allow Pages propagation",run.get("id"))
+                  sys.exit(0)
+
+          payload=json.dumps({"ref":"main","inputs":{"lane":"structure"}})
+          subprocess.run(
+              ["gh","api","--method","POST",f"repos/{repo}/actions/workflows/intraday.yml/dispatches","--input","-"],
+              input=payload,text=True,capture_output=True,check=True,timeout=15)
+          print("DISPATCHED verified structure recovery for",today,
+                "(official market active; stale Pages; no other producer)")
+          PY
