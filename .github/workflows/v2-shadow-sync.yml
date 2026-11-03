@@ -24,7 +24,8 @@ concurrency:
 
 jobs:
   sync-v2-shadow:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    # A workflow-file edit must not rebuild yesterday's branch from an in-flight public CDN.
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -100,6 +101,40 @@ jobs:
               obj=json.loads(Path(f'.shadow-main-data/{name}.json').read_text(encoding='utf-8'))
               print(name, obj.get('trade_date') or obj.get('source_trade_date') or obj.get('date'))
           PY
+
+      - name: Preserve exact upstream intraday Atomic Bundle (do not rebuild as POST_CLOSE)
+        if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Radar - Intraday Update' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s .shadow-pages/v2/data/current_manifest.json
+          python - <<'PY'
+          import json
+          from datetime import datetime, timedelta
+          from pathlib import Path
+          from zoneinfo import ZoneInfo
+          root=Path('.shadow-pages/v2/data')
+          mf=json.loads((root/'current_manifest.json').read_text(encoding='utf-8'))
+          source=json.loads(Path('.shadow-main-data/intraday.json').read_text(encoding='utf-8'))
+          day=json.loads(Path('.shadow-main-data/daytrade.json').read_text(encoding='utf-8'))
+          src=str(source.get('as_of') or '')
+          di=str((mf.get('datasets') or {}).get('decision_intraday_summary',{}).get('as_of') or '')
+          dd=str((mf.get('datasets') or {}).get('decision_daytrade_summary',{}).get('as_of') or '')
+          now=datetime.now(ZoneInfo('Asia/Taipei'))
+          if src != di or src != dd or str(day.get('as_of') or '') != src:
+              raise SystemExit(f'Unsafe shadow source mismatch: source={src} intraday={di} daytrade={dd}')
+          stamp=datetime.fromisoformat(src)
+          if stamp > now + timedelta(minutes=2):
+              raise SystemExit(f'Future-dated upstream quote blocked: {src} now={now}')
+          if str(mf.get('trade_date') or '')[:10] != src[:10]:
+              raise SystemExit('Atomic bundle session date differs from upstream MIS trade date')
+          if now.weekday()<5 and 9 <= now.hour < 13 and stamp.date()==now.date() and mf.get('session_phase')!='LIVE':
+              raise SystemExit('Active-session Shadow must preserve the upstream LIVE phase')
+          print('EXACT SOURCE BUNDLE LOCK',mf.get('active_build_id'),mf.get('session_phase'),src)
+          PY
+          rm -rf docs/v2/data
+          cp -a .shadow-pages/v2/data docs/v2/data
+          echo "Shadow reused the fully validated upstream V2 bundle; no artificial 13:30 source clock."
 
       - name: Locate last successful official Close Update
         id: verified_close
@@ -186,22 +221,34 @@ jobs:
           echo "Source-side scoring must include original tech6/chip7/sector6/liquidity5. No substitute legacy score allowed."
 
       - name: Build 2.0 canonical atomic bundle
+        # Legacy rebuild is for completed-close runs only. Intraday already supplied verified V2.
+        if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.name != 'Radar - Intraday Update' }}
         run: python scripts/v2/build_legacy_bundle.py --legacy-root .shadow-main-data --output docs/v2/data
 
       - name: Copy canonical quote snapshot into lightweight indexes
+        # Legacy rebuild is for completed-close runs only. Intraday already supplied verified V2.
+        if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.name != 'Radar - Intraday Update' }}
         run: python scripts/v2/enrich_quote_index.py --output docs/v2/data
 
       - name: Migrate structural support / resistance zones
+        # Legacy rebuild is for completed-close runs only. Intraday already supplied verified V2.
+        if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.name != 'Radar - Intraday Update' }}
         run: python scripts/v2/enrich_zones.py --legacy-root .shadow-main-data --output docs/v2/data
 
       - name: Enrich mission-specific stock detail evidence
+        # Legacy rebuild is for completed-close runs only. Intraday already supplied verified V2.
+        if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.name != 'Radar - Intraday Update' }}
         run: python scripts/v2/enrich_stock_detail_context.py --legacy-root .shadow-main-data --root docs/v2/data
 
       - name: Confirm full original score ledger survived detail import
+        # Legacy rebuild is for completed-close runs only. Intraday already supplied verified V2.
+        if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.name != 'Radar - Intraday Update' }}
         run: |
           python scripts/v2/validate_full_swing_source.py --source .shadow-main-data/close.json --atomic-root docs/v2/data
 
       - name: Restore market/capital and latest-close semantics
+        # Legacy rebuild is for completed-close runs only. Intraday already supplied verified V2.
+        if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.name != 'Radar - Intraday Update' }}
         run: |
           python scripts/v2/restore_market_capital_context.py --legacy-root .shadow-main-data --root docs/v2/data
           python scripts/v2/normalize_close_snapshot_by_close_date.py --root docs/v2/data --legacy-root .shadow-main-data
@@ -274,6 +321,34 @@ jobs:
             echo "Shadow publish attempt $attempt"
             git fetch origin clean-build-v2
             git reset --hard origin/clean-build-v2
+            # Never let an older completion event overwrite a newer verified LIVE or CLOSE session.
+            export SHADOW_CANDIDATE_MANIFEST=".shadow-generated-v2-data/current_manifest.json"
+            if python - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path('docs/v2/data/current_manifest.json')
+          q=Path(os.environ['SHADOW_CANDIDATE_MANIFEST'])
+          if not p.is_file(): raise SystemExit(1)
+          old=json.loads(p.read_text(encoding='utf-8')); new=json.loads(q.read_text(encoding='utf-8'))
+          def date(m,k):
+              return str(((m.get('datasets') or {}).get(k) or {}).get('as_of') or '')[:10]
+          od=date(old,'decision_close_summary'); nd=date(new,'decision_close_summary')
+          ot=str(old.get('trade_date') or '')[:10]; nt=str(new.get('trade_date') or '')[:10]
+          oi=str(((old.get('datasets') or {}).get('decision_intraday_summary') or {}).get('as_of') or '')
+          ni=str(((new.get('datasets') or {}).get('decision_intraday_summary') or {}).get('as_of') or '')
+          newer_close=bool(od and nd and od>nd)
+          newer_session=bool(ot and nt and ot>nt)
+          newer_live=bool(ot==nt and old.get('session_phase')=='LIVE' and new.get('session_phase')=='LIVE' and oi>ni)
+          if newer_close or newer_session or newer_live:
+              print('Preserve newer remote Shadow session', {'old':ot,'new':nt,'old_close':od,'new_close':nd,'old_intra':oi,'new_intra':ni})
+              raise SystemExit(0)
+          raise SystemExit(1)
+          PY
+            then
+              echo "Shadow publish skipped: canonical branch is newer."
+              echo 'changed=false' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             rm -rf docs/v2/data
             cp -a .shadow-generated-v2-data docs/v2/data
             rm -rf docs/v2/frozen-close/latest
