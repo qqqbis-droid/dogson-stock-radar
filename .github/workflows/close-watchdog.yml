@@ -1,0 +1,124 @@
+name: Radar - Evening Close Freshness Watchdog
+
+# Independent backstop if GitHub skips the planned 20:30/23:40 post-close
+# chip refresh. It never treats missing source data as a same-day success.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/close-watchdog.yml"
+  schedule:
+    # Taiwan 17:17, 18:17, ..., 23:17 on weekdays.
+    - cron: "17 9-15 * * 1-5"
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: dogson-evening-close-watchdog
+  cancel-in-progress: false
+
+jobs:
+  recover-missing-close:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check verified close and chip source dates before dispatch
+        shell: bash
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+          import sys
+          import urllib.request
+          from datetime import datetime, timezone
+          from zoneinfo import ZoneInfo
+
+          now = datetime.now(ZoneInfo('Asia/Taipei'))
+          if now.weekday() >= 5 or not (17 <= now.hour <= 23):
+              print('Not a Taiwan weekday evening; no action')
+              sys.exit(0)
+          today = now.date().isoformat()
+          base = 'https://qqqbis-droid.github.io/dogson-stock-radar/data/'
+          def fetch(name):
+              req=urllib.request.Request(
+                  base+name+'?watchdog='+str(int(now.timestamp())),
+                  headers={'Accept':'application/json','Cache-Control':'no-cache, no-store',
+                           'User-Agent':'Dogson-EOD-Freshness/1.0'})
+              with urllib.request.urlopen(req,timeout=15) as response:
+                  return json.load(response)
+
+          try:
+              status=fetch('system_status.json')
+              chip=fetch('chip_status.json')
+          except Exception as e:
+              print('Published source status unavailable; fail closed:',str(e)[:240])
+              sys.exit(0)
+
+          close_date=str((status.get('dates') or {}).get('close') or '')[:10]
+          newest=str(status.get('latest_completed_trade_date') or '')[:10]
+          if close_date!=today or newest!=today:
+              print('No validated same-day close; do not force another session',
+                    {'today':today,'close':close_date,'completed':newest})
+              sys.exit(0)
+
+          source=chip.get('latest_source_dates') or {}
+          # Official institution source dates, not file publication timestamps.
+          foreign=str(source.get('foreign') or '')[:10]
+          trust=str(source.get('trust') or '')[:10]
+          chip_day=str(source.get('chip') or '')[:10]
+          print('Actual close/chip provenance',{'close':close_date,'foreign':foreign,
+                                                'trust':trust,'chip':chip_day})
+          if foreign==today and trust==today:
+              print('Today institution sources are already available; no action')
+              sys.exit(0)
+
+          repo=os.environ['GITHUB_REPOSITORY']
+          try:
+              run=subprocess.run(
+                ['gh','api',f'repos/{repo}/actions/workflows/close.yml/runs?per_page=35'],
+                capture_output=True,text=True,check=True,timeout=15)
+              entries=json.loads(run.stdout).get('workflow_runs') or []
+          except Exception as e:
+              print('Cannot verify existing EOD runs, fail closed:',str(e)[:240])
+              sys.exit(0)
+
+          late=0
+          for item in entries:
+              try:
+                  stamp=datetime.fromisoformat(str(item['created_at']).replace('Z','+00:00')).astimezone(now.tzinfo)
+                  minutes=(now.astimezone(timezone.utc)-stamp.astimezone(timezone.utc)).total_seconds()/60
+              except Exception:
+                  continue
+              if stamp.date()!=now.date():
+                  continue
+              if item.get('status') in ('queued','pending','in_progress','requested','waiting'):
+                  print('EOD producer is already running',item.get('id'),item.get('status'))
+                  sys.exit(0)
+              if stamp.hour>=16 and item.get('conclusion')=='success':
+                  late+=1
+                  if minutes<95:
+                      print('Recent evening EOD update already completed; allow data propagation',
+                            item.get('id'),round(minutes,1))
+                      sys.exit(0)
+          if late>=2:
+              print('Safety cap: already ran two successful late EOD refreshes, do not loop')
+              sys.exit(0)
+
+          payload=json.dumps({'ref':'main'})
+          try:
+              subprocess.run(['gh','api','--method','POST',
+                f'repos/{repo}/actions/workflows/close.yml/dispatches',
+                '--input','-'],input=payload,capture_output=True,text=True,
+                check=True,timeout=18)
+          except Exception as e:
+              print('EOD dispatch failed:',str(e)[:240])
+              raise
+          print('DISPATCHED guarded late close refresh for',today,
+                'because same-day institution source dates are missing')
+          PY
