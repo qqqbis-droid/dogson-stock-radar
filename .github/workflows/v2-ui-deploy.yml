@@ -367,6 +367,7 @@ jobs:
           cp /tmp/v2-source/scripts/v2/test_portfolio_l_edge_sync.cjs scripts/v2/test_portfolio_l_edge_sync.cjs
           cp /tmp/v2-source/scripts/v2/test_intraday_quote_display.cjs scripts/v2/test_intraday_quote_display.cjs
           cp /tmp/v2-source/scripts/v2/test_live_rank_safety.cjs scripts/v2/test_live_rank_safety.cjs
+          cp /tmp/v2-source/scripts/v2/test_daytrade_risk_sop_v2.cjs scripts/v2/test_daytrade_risk_sop_v2.cjs
           cp /tmp/v2-source/scripts/v2/live_publish_patch.py scripts/v2/live_publish_patch.py
           cp /tmp/v2-source/scripts/v2/validate_mission_evidence.py scripts/v2/validate_mission_evidence.py
           cp /tmp/v2-source/scripts/v2/test_live_truth_gate.py scripts/v2/test_live_truth_gate.py
@@ -501,6 +502,10 @@ jobs:
               raise SystemExit(f'close S/R freshness contract failed: eligible={len(current)}, bad={bad[:8]}')
           print('close S/R freshness contract OK',date,len(current))
           PY
+          # Daytrade SOP 2.0 is independent from rankings; fail deploy on unsafe risk math or script syntax.
+          node --check docs/v2/daytrade-risk-engine-v2.js
+          node --check docs/v2/daytrade-risk-ui-v2.js
+          node scripts/v2/test_daytrade_risk_sop_v2.cjs
           node --check docs/v2/portfolio-cloud.js
           grep -q 'portfolio-weekly-review.js?v=20261009review2' docs/v2/index.html
           ! grep -q '這筆賣出是現股當沖' docs/v2/portfolio-fees.js
