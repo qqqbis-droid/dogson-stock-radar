@@ -4,6 +4,8 @@ name: Radar - Close Update
 # 2026-11-04 repair: explicitly re-run post-20:30 chips/market EOD after GitHub scheduled refresh was not delivered.
 # Recovery 2026-10-13: rebuild on isolated canonical queue after fixing nullable 5-day margin values and UI queue interference.
 on:
+  # Called directly by evening freshness watchdog without relying on API tokens.
+  workflow_call:
   workflow_dispatch:
   push:
     branches: ["main"]
