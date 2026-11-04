@@ -101,7 +101,7 @@ function start(){
 }
 function renderActive(){
   var dst=host&&host.querySelector('#sopActive');if(!dst)return;
-  var p=data.active;if(!p){dst.innerHTML='<p class="sop-note">目前沒有手動追蹤中的計畫；此工具不會向券商送單。</p>';return}
+  var p=data.active;if(!p){var last=data.archive[data.archive.length-1];dst.innerHTML='<p class="sop-note">目前沒有手動追蹤中的計畫；此工具不會向券商送單。</p>'+(last?'<div class="sop-status">上一筆 '+esc(last.code)+'：實際出場 '+fmt(last.exit,2)+'｜估算淨損益 '+signed(last.netPnl)+'｜低於最後防守價的成交偏差 '+fmt(last.adverseStopGap||0)+' 元（僅當成交價低於防守價）</div>':'');return}
   var a=E.protection({entry:p.entry,stop:p.initialStop,shares:p.shares,budget:p.budget,capitalLimit:p.capitalLimit,slippageTicks:p.slippageTicks,fees:p.fees},p.peak,p.last,p.defense);
   var stage={HOLD_INITIAL:'未達 1R｜維持原始結構',CHECK_BREAKEVEN:'已達 1R｜檢查費稅保本',PROTECT_HALF_PEAK:'已達 2R｜檢查最高浮盈回撤一半'};
   var log=p.events.slice(-6).reverse().map(function(x){return '<li>'+esc(x.at.slice(0,19).replace('T',' '))+' '+esc(x.kind)+' '+esc(x.reason||'')+(x.price!=null?'｜'+fmt(x.price,2):'')+'</li>'}).join('');
@@ -141,14 +141,16 @@ function click(e){
     if(!reason){alert('請填實際出場原因');return}
     if(!(price>0&&E.validTick(price))){alert('請填券商實際成交價；未成交不能結案。');return}
     if(!confirm('確定已實際全數成交於 '+price+' 元？這只會存入本機，不會向券商下單。'))return;
-    record(p,'MANUAL_EXIT',{price:price,reason:reason,netPnl:E.netPnl(p.entry,price,p.shares,p.fees)});
-    p.exit=price;p.closedAt=new Date().toISOString();data.archive.push(p);data.archive=data.archive.slice(-100);data.active=null;save();renderActive();preview();
+    var realized=E.netPnl(p.entry,price,p.shares,p.fees);
+    var adverseGap=price<p.defense?Math.round((p.defense-price)*p.shares):0;
+    record(p,'MANUAL_EXIT',{price:price,reason:reason,netPnl:realized,stopReference:p.defense,adverseStopGap:adverseGap});
+    p.exit=price;p.netPnl=realized;p.adverseStopGap=adverseGap;p.closedAt=new Date().toISOString();data.archive.push(p);data.archive=data.archive.slice(-100);data.active=null;save();renderActive();preview();
   }
 }
 function exportCsv(){
-  var rows=[['plan_id','code','entry','initial_stop','shares','initial_risk_including_fees_slippage','timestamp','event','price','defense','reason','estimated_net_pnl','source']];
+  var rows=[['plan_id','code','entry','initial_stop','shares','initial_risk_including_fees_slippage','timestamp','event','price','defense','reason','estimated_net_pnl','stop_reference','adverse_stop_gap_twd','source']];
   data.archive.concat(data.active?[data.active]:[]).forEach(function(p){
-    (p.events||[]).forEach(function(ev){rows.push([p.id,p.code,p.entry,p.initialStop,p.shares,p.initialRisk,ev.at,ev.kind,ev.price==null?'':ev.price,ev.defense==null?'':ev.defense,ev.reason||'',ev.netPnl==null?'':ev.netPnl,'MANUAL_ONLY_NOT_BROKER_VERIFIED'])});
+    (p.events||[]).forEach(function(ev){rows.push([p.id,p.code,p.entry,p.initialStop,p.shares,p.initialRisk,ev.at,ev.kind,ev.price==null?'':ev.price,ev.defense==null?'':ev.defense,ev.reason||'',ev.netPnl==null?'':ev.netPnl,ev.stopReference==null?'':ev.stopReference,ev.adverseStopGap==null?'':ev.adverseStopGap,'MANUAL_ONLY_NOT_BROKER_VERIFIED'])});
   });
   function quote(x){return '"'+String(x==null?'':x).replace(/"/g,'""')+'"'}
   var csv='\uFEFF'+rows.map(function(r){return r.map(quote).join(',')}).join('\r\n')+'\r\n';
