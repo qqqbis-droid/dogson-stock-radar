@@ -79,13 +79,24 @@ jobs:
               sys.exit(0)
 
           repo=os.environ['GITHUB_REPOSITORY']
-          try:
-              run=subprocess.run(
-                ['gh','api',f'repos/{repo}/actions/workflows/close.yml/runs?per_page=35'],
-                capture_output=True,text=True,check=True,timeout=15)
-              entries=json.loads(run.stdout).get('workflow_runs') or []
-          except Exception as e:
-              print('Cannot verify existing EOD runs, fail closed:',str(e)[:240])
+          # API permissions and named-workflow endpoints can vary. The
+          # repository-wide runs listing is a safe fallback, filtered by name.
+          entries=None
+          for path in (f'repos/{repo}/actions/workflows/close.yml/runs?per_page=35',
+                       f'repos/{repo}/actions/runs?per_page=70'):
+              try:
+                  run=subprocess.run(['gh','api',path],capture_output=True,
+                                     text=True,timeout=18)
+                  if run.returncode:
+                      print('GitHub run listing failed:',path,run.stderr[-220:])
+                      continue
+                  entries=[r for r in (json.loads(run.stdout).get('workflow_runs') or [])
+                           if r.get('name')=='Radar - Close Update']
+                  break
+              except Exception as e:
+                  print('GitHub run listing unavailable:',str(e)[:180])
+          if entries is None:
+              print('Cannot verify EOD runs from either API; fail closed')
               sys.exit(0)
 
           late=0
