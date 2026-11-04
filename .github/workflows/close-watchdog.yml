@@ -5,10 +5,6 @@ name: Radar - Evening Close Freshness Watchdog
 # job. No gh CLI/GITHUB_TOKEN API dispatch is needed.
 on:
   workflow_dispatch:
-  push:
-    branches: ["main"]
-    paths:
-      - ".github/workflows/close-watchdog.yml"
   schedule:
     # Taiwan 19:17, 21:17, 23:17 weekdays; complements 20:30/23:40 EOD.
     - cron: "17 11,13,15 * * 1-5"
@@ -27,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
-      refresh: \${{ steps.audit.outputs.refresh }}
+      refresh: ${{ steps.audit.outputs.refresh }}
     steps:
       - id: audit
         name: Verify current trading session and lagging source clocks
@@ -91,5 +87,5 @@ jobs:
 
   recover:
     needs: check
-    if: \${{ github.event_name != 'push' && needs.check.outputs.refresh == 'true' }}
+    if: ${{ github.event_name != 'push' && needs.check.outputs.refresh == 'true' }}
     uses: ./.github/workflows/close.yml
