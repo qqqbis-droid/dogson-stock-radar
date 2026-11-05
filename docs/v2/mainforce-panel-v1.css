@@ -50,3 +50,7 @@
 #mainforcePanelV1 #mfFeedback{font-size:12px;color:var(--green);line-height:1.55}
 #mainforcePanelV1 #mfFeedback.mf-error{color:#b3342b}
 @media(min-width:660px){#mainforcePanelV1 .mf-stats,#mainforcePanelV1 .mf-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}#mainforcePanelV1 .mf-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+#mainforcePanelV1~#radarPanel .mf-card-evidence{margin-top:9px;padding:8px 10px;border-top:1px dashed var(--line);display:grid;gap:3px;color:var(--green);font-size:11px;line-height:1.5}
+#mainforcePanelV1~#radarPanel .mf-card-evidence small{font-size:10px;color:var(--muted)}
+#mainforcePanelV1~#radarPanel .mf-card-evidence span{overflow-wrap:anywhere}
