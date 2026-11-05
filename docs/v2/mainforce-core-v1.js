@@ -116,7 +116,7 @@ function merge(existing,incoming){
  }
  return [...m.values()].sort((a,b)=>b.date.localeCompare(a.date)||a.code.localeCompare(b.code)).slice(0,MAX_ROWS);
 }
-function twDate(d=new Date()){return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(d).replace(/\//g,"-")}
+function twDate(d=new Date()){const parts=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(d);const v=k=>parts.find(p=>p.type===k)?.value||"";return v("year")+"-"+v("month")+"-"+v("day")}
 function summarize(rows,closeDate){
  const sorted=(rows||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
  if(!sorted.length)return null;
