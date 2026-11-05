@@ -11,6 +11,12 @@ git fetch origin clean-build-v2 --depth=1
 rm -rf docs/v2 scripts/v2 contracts
 git archive FETCH_HEAD docs/v2 scripts/v2 contracts requirements-contract.txt | tar -xf -
 
+# Weekly TDCC ownership is a static official licensed open-data series,
+# not an Atomic quote dataset. Some shadow rebuilds replace data/ entirely.
+tdcc_preserved="$(mktemp)"
+if test -s docs/v2/data/tdcc_weekly_concentration.json; then
+  cp docs/v2/data/tdcc_weekly_concentration.json "$tdcc_preserved"
+fi
 test -f docs/v2/index.html
 test -f docs/v2/detail-context-v2.js
 test -f docs/v2/detail-context-v3.js
@@ -135,6 +141,11 @@ case "$mode" in
     exit 1
     ;;
 esac
+
+if test -s "$tdcc_preserved"; then
+  cp "$tdcc_preserved" docs/v2/data/tdcc_weekly_concentration.json
+fi
+rm -f "$tdcc_preserved"
 
 # Every Pages publisher replaces the complete site artifact. Build the
 # SAME-DATE stock-member evidence on close and intraday updates, not only in
