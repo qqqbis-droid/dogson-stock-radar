@@ -1,0 +1,52 @@
+/* 犬子｜主力集中度獨立研究模組，手機優先，不更改其他任務 UI */
+#mainforcePanelV1[hidden]{display:none!important}
+#mainforcePanelV1 summary{display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;font-weight:800;line-height:1.35}
+#mainforcePanelV1 summary small{font-size:11px;color:var(--muted);font-weight:600;text-align:right}
+#mainforcePanelV1 .mf-tip{color:var(--muted);font-size:12px;line-height:1.6;margin:9px 0}
+#mainforcePanelV1 .mf-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+#mainforcePanelV1 .mf-metric{border:1px solid var(--line);background:var(--soft);border-radius:10px;padding:10px;min-width:0}
+#mainforcePanelV1 .mf-metric small{display:block;font-size:11px;color:var(--muted);margin-bottom:5px}
+#mainforcePanelV1 .mf-metric strong{display:block;font-size:17px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#mainforcePanelV1 .mf-toolbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(115px,38%);gap:7px;margin:12px 0}
+#mainforcePanelV1 input,#mainforcePanelV1 textarea,#mainforcePanelV1 select{min-width:0;width:100%;padding:10px 9px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;font:inherit;font-size:16px}
+#mainforcePanelV1 .mf-list{display:grid;gap:7px}
+#mainforcePanelV1 button{color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:9px;padding:9px 10px;font-weight:700;font-size:12px;cursor:pointer}
+#mainforcePanelV1 button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+#mainforcePanelV1 .mf-item{display:grid;text-align:left;gap:7px;width:100%;padding:11px;border-radius:12px;background:var(--soft)}
+#mainforcePanelV1 .mf-item.selected{border-color:var(--green);box-shadow:0 0 0 1px var(--green)}
+#mainforcePanelV1 .mf-line{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#mainforcePanelV1 .mf-line b{font-size:14px}
+#mainforcePanelV1 .mf-line small{font-size:10px;color:var(--muted);font-weight:550}
+#mainforcePanelV1 .mf-line span{font-size:12px;line-height:1.35}
+#mainforcePanelV1 .mf-positive{color:#147d5d}
+#mainforcePanelV1 .mf-negative{color:#bd3c2e}
+#mainforcePanelV1 .mf-muted{color:var(--muted)}
+#mainforcePanelV1 .mf-empty{border:1px dashed var(--line);padding:13px;border-radius:12px;font-size:12px;color:var(--muted);line-height:1.6}
+#mainforcePanelV1 .mf-detail{border:1px solid var(--line);margin:12px 0;padding:12px;border-radius:14px;background:var(--card)}
+#mainforcePanelV1 .mf-detail h3{font-size:14px;margin:0}
+#mainforcePanelV1 .mf-detail h3 small{font-size:11px;font-weight:550;color:var(--muted)}
+#mainforcePanelV1 .mf-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:12px 0}
+#mainforcePanelV1 .mf-warning{font-size:12px;background:rgba(182,70,42,.07);border:1px solid rgba(182,70,42,.32);padding:10px;border-radius:10px;line-height:1.55}
+#mainforcePanelV1 .mf-signal{border:1px solid var(--line);padding:10px;border-radius:10px;font-size:13px;line-height:1.6;margin:10px 0}
+#mainforcePanelV1 .mf-signal small{font-size:11px}
+#mainforcePanelV1 .mf-chart{width:100%;max-height:210px;display:block;overflow:visible}
+#mainforcePanelV1 .mf-legend{font-size:11px;color:#229d78;display:flex;gap:12px;margin:0 0 7px}
+#mainforcePanelV1 .mf-legend span{color:#d2934d}
+#mainforcePanelV1 .mf-table{width:100%;border-collapse:collapse;font-size:11px;font-variant-numeric:tabular-nums}
+#mainforcePanelV1 .mf-table td,#mainforcePanelV1 .mf-table th{text-align:right;padding:8px 2px;border-bottom:1px solid var(--line)}
+#mainforcePanelV1 .mf-table td:first-child,#mainforcePanelV1 .mf-table th:first-child{text-align:left}
+#mainforcePanelV1 #mfImport{border-top:1px solid var(--line);margin-top:13px;padding-top:12px}
+#mainforcePanelV1 #mfImport summary{font-size:13px;color:var(--green)}
+#mainforcePanelV1 .mf-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0}
+#mainforcePanelV1 .mf-actions .mf-primary{background:var(--green);color:#fff;border-color:var(--green)}
+#mainforcePanelV1 .mf-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+#mainforcePanelV1 .mf-grid label,#mainforcePanelV1 .mf-label{font-size:11px;color:var(--muted);display:grid;gap:4px;margin-top:8px}
+#mainforcePanelV1 #mfManualForm{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
+#mainforcePanelV1 #mfManualForm h3{font-size:13px;margin:0 0 5px}
+#mainforcePanelV1 .mf-upload{display:inline-flex;cursor:pointer;border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-size:12px;font-weight:700;color:var(--ink);background:var(--card)}
+#mainforcePanelV1 .mf-upload input{display:none}
+#mainforcePanelV1 .mf-critical{border-top:1px solid var(--line);padding-top:10px}
+#mainforcePanelV1 #mfClear{color:#b3342b;border-color:rgba(180,30,20,.35)}
+#mainforcePanelV1 #mfFeedback{font-size:12px;color:var(--green);line-height:1.55}
+#mainforcePanelV1 #mfFeedback.mf-error{color:#b3342b}
+@media(min-width:660px){#mainforcePanelV1 .mf-stats,#mainforcePanelV1 .mf-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}#mainforcePanelV1 .mf-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
