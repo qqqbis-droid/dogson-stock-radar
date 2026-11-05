@@ -78,6 +78,11 @@ jobs:
           git archive FETCH_HEAD docs/v2 scripts contracts requirements-contract.txt | tar -xf - -C /tmp/v2-source
           test -s /tmp/v2-source/docs/v2/index.html
           test -s /tmp/v2-source/docs/v2/data/current_manifest.json
+          # Capture the canonical weekly open dataset BEFORE a newer live V2
+          # Atomic bundle can replace the entire source data directory.
+          if test -s /tmp/v2-source/docs/v2/data/tdcc_weekly_concentration.json; then
+            cp /tmp/v2-source/docs/v2/data/tdcc_weekly_concentration.json /tmp/inuko-verified-tdcc-weekly.json
+          fi
           test -s /tmp/v2-source/scripts/v2/build_stock_shards.py
           test -s /tmp/v2-source/scripts/v2/enrich_zones.py
           test -s /tmp/v2-source/scripts/v2/normalize_close_snapshot_by_close_date.py
@@ -348,6 +353,10 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf docs/v2; cp -a /tmp/v2-source/docs/v2 docs/v2; mkdir -p scripts/v2
+          # TDCC is a separate weekly open-data dataset, never an Atomic quote.
+          if test -s /tmp/inuko-verified-tdcc-weekly.json; then
+            cp /tmp/inuko-verified-tdcc-weekly.json docs/v2/data/tdcc_weekly_concentration.json
+          fi
           cp /tmp/v2-source/scripts/v2/validate_single_writer_ui.py scripts/v2/validate_single_writer_ui.py
           cp /tmp/v2-source/scripts/v2/validate_product_surface.py scripts/v2/validate_product_surface.py
           cp /tmp/v2-source/scripts/v2/test_portfolio_ledger.js scripts/v2/test_portfolio_ledger.js
