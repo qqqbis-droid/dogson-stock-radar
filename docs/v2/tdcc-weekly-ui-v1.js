@@ -3,7 +3,7 @@
 "use strict";
 if(window.__INUKO_TDCC_WEEKLY_V1__)return;window.__INUKO_TDCC_WEEKLY_V1__=true;
 let host=null,loaded=null,error="",loading=false,query="",kind="GAIN",openCode="",lastFetch=0;
-const todayTW=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+const todayTW=()=>{const p=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());const v=k=>p.find(x=>x.type===k)?.value||"";return v("year")+"-"+v("month")+"-"+v("day")};
 const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=v=>v==null||!Number.isFinite(v)?"—":Number(v).toLocaleString("zh-TW",{maximumFractionDigits:2});
 const diff=v=>v==null?"—":(v>0?"+":"")+fmt(v)+" pp";
