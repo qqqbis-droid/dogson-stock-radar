@@ -349,8 +349,18 @@ jobs:
               echo 'changed=false' >> "$GITHUB_OUTPUT"
               exit 0
             fi
+            # Latest clean-build-v2 is authoritative for the independent TDCC
+            # weekly open dataset. Atomic quote rebuilds cannot erase it.
+            tdcc_previous="$(mktemp)"
+            if test -s docs/v2/data/tdcc_weekly_concentration.json; then
+              cp docs/v2/data/tdcc_weekly_concentration.json "$tdcc_previous"
+            fi
             rm -rf docs/v2/data
             cp -a .shadow-generated-v2-data docs/v2/data
+            if test -s "$tdcc_previous"; then
+              cp "$tdcc_previous" docs/v2/data/tdcc_weekly_concentration.json
+            fi
+            rm -f "$tdcc_previous"
             rm -rf docs/v2/frozen-close/latest
             mkdir -p docs/v2/frozen-close
             cp -a .shadow-generated-close-freeze docs/v2/frozen-close/latest
