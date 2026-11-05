@@ -368,6 +368,7 @@ jobs:
           cp /tmp/v2-source/scripts/v2/test_intraday_quote_display.cjs scripts/v2/test_intraday_quote_display.cjs
           cp /tmp/v2-source/scripts/v2/test_live_rank_safety.cjs scripts/v2/test_live_rank_safety.cjs
           cp /tmp/v2-source/scripts/v2/test_daytrade_risk_sop_v2.cjs scripts/v2/test_daytrade_risk_sop_v2.cjs
+          cp /tmp/v2-source/scripts/v2/test_mainforce_v1.cjs scripts/v2/test_mainforce_v1.cjs
           cp /tmp/v2-source/scripts/v2/live_publish_patch.py scripts/v2/live_publish_patch.py
           cp /tmp/v2-source/scripts/v2/validate_mission_evidence.py scripts/v2/validate_mission_evidence.py
           cp /tmp/v2-source/scripts/v2/test_live_truth_gate.py scripts/v2/test_live_truth_gate.py
@@ -506,6 +507,10 @@ jobs:
           node --check docs/v2/daytrade-risk-engine-v2.js
           node --check docs/v2/daytrade-risk-ui-v2.js
           node scripts/v2/test_daytrade_risk_sop_v2.cjs
+          # Never re-label institutional money as paid branch concentration.
+          node --check docs/v2/mainforce-core-v1.js
+          node --check docs/v2/mainforce-panel-v1.js
+          node scripts/v2/test_mainforce_v1.cjs
           node --check docs/v2/portfolio-cloud.js
           grep -q 'portfolio-weekly-review.js?v=20261009review2' docs/v2/index.html
           ! grep -q '這筆賣出是現股當沖' docs/v2/portfolio-fees.js
