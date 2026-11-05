@@ -10,6 +10,7 @@ on:
   workflow_run:
     workflows:
       - "Clean Build 2.0 Preview Gate"
+      - "Radar - TDCC Weekly Free Update"
     types: [completed]
 
 permissions:
