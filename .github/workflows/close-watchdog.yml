@@ -1,12 +1,14 @@
-name: Radar - Evening Close Freshness Watchdog
+name: Radar - Close Freshness Recovery Watchdog
 
-# Independent probe. If today's verified close is published but foreign/trust
-# institution sources still lag, invoke the SAME close workflow as a reusable
-# job. No gh CLI/GITHUB_TOKEN API dispatch is needed.
+# After 15:17 recover a missing same-day official close. In the evening,
+# recover late institutional chips separately. Reuse the production close
+# workflow, with all its verified date/coverage gates. No GitHub API dispatch.
 on:
   workflow_dispatch:
   schedule:
-    # Taiwan 19:17, 21:17, 23:17 weekdays; complements 20:30/23:40 EOD.
+    # Taiwan 15:17 and 16:17: validate delayed/missed after-close publishing.
+    - cron: "17 7,8 * * 1-5"
+    # Taiwan 19:17, 21:17, 23:17: late institution date recovery.
     - cron: "17 11,13,15 * * 1-5"
 
 permissions:
@@ -37,8 +39,8 @@ jobs:
           from zoneinfo import ZoneInfo
 
           now=datetime.now(ZoneInfo('Asia/Taipei'))
-          if now.weekday() >= 5 or not (19 <= now.hour <= 23):
-              print('Outside weekday evening recovery window')
+          if now.weekday() >= 5 or not (15 <= now.hour <= 23):
+              print('Outside weekday post-close recovery window')
               sys.exit(0)
           today=now.date().isoformat()
           root='https://qqqbis-droid.github.io/dogson-stock-radar/data/'
@@ -56,33 +58,63 @@ jobs:
               sys.exit(0)
           close_date=str((system.get('dates') or {}).get('close') or '')[:10]
           verified=str(system.get('latest_completed_trade_date') or '')[:10]
-          if close_date!=today or verified!=today:
-              print('No verified same-day close. No historical data promotion',
-                {'today':today,'close':close_date,'verified':verified})
-              sys.exit(0)
           source=chip.get('latest_source_dates') or {}
           foreign=str(source.get('foreign') or '')[:10]
           trust=str(source.get('trust') or '')[:10]
+          close_current=(close_date==today and verified==today)
           print('Official-source dates',
-                {'completed_close':close_date,'foreign':foreign,'trust':trust,
-                 'chip':source.get('chip')})
-          if foreign==today and trust==today:
-              print('Both institutional sources current; no refresh needed')
-              sys.exit(0)
+                {'completed_close':close_date,'verified':verified,'foreign':foreign,
+                 'trust':trust,'chip':source.get('chip'),'today':today})
+          if close_current:
+              if now.hour<19:
+                  print('Close is current; institution backfill is evening-only')
+                  sys.exit(0)
+              if foreign==today and trust==today:
+                  print('Both institution sources current; no action')
+                  sys.exit(0)
+          else:
+              # Guard against weekends, exchange holidays and typhoon closures:
+              # stale published close is NOT evidence that a newer session exists.
+              # Require an actual official TWSE MIS closing index dated today.
+              if not (close_date and close_date < today):
+                  print('Unknown/invalid close date; fail closed')
+                  sys.exit(0)
+              try:
+                  url=('https://mis.twse.com.tw/stock/api/getStockInfo.jsp'
+                       '?ex_ch=tse_t00.tw&json=1&delay=0&_='+str(int(now.timestamp())))
+                  req=urllib.request.Request(url,headers={
+                     'User-Agent':'Mozilla/5.0 DogsonRadar/1.3.6',
+                     'Referer':'https://mis.twse.com.tw/stock/index.jsp',
+                     'Accept':'application/json'})
+                  with urllib.request.urlopen(req,timeout=14) as response:
+                      quotes=json.load(response).get('msgArray') or []
+                  def valid(x):
+                      date=str(x.get('d') or '').replace('-','').replace('/','')
+                      raw=str(x.get('z') or '').replace(',','')
+                      try: val=float(raw)
+                      except (TypeError,ValueError):val=0
+                      return date==today.replace('-','') and val>0
+                  if not any(valid(x) for x in quotes):
+                      print('Official MIS has no same-day completed cash session; skip')
+                      sys.exit(0)
+              except Exception as exc:
+                  print('Official MIS session verification unavailable; fail closed',str(exc)[:180])
+                  sys.exit(0)
+              print('Confirmed same-day official market but published close is stale')
           generated=str(system.get('generated_at') or '')
           try:
               built=datetime.fromisoformat(generated)
               age=(now-built).total_seconds()/60 if built.tzinfo else -1
           except Exception:
               age=-1
-          if age<95:
+          if age< (45 if not close_current else 95):
               print('Recent close build or missing build clock: no duplicate',round(age,1))
               sys.exit(0)
           # The called workflow has the canonical dogson-pages concurrency
           # group and date/coverage gates. This probe never writes fake data.
           with open(os.environ['GITHUB_OUTPUT'],'a',encoding='utf-8') as f:
               f.write('refresh=true\n')
-          print('EOD source lag verified, reusable close run required',today)
+          print('Verified lagging close or institution source; reusable close run required',today)
           PY
 
   recover:
