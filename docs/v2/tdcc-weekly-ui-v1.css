@@ -1,0 +1,26 @@
+/* TDCC public official weekly ownership — independent from mainforce branch data */
+#tdccWeeklyPanelV1[hidden]{display:none!important}
+#tdccWeeklyPanelV1 summary{display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:9px;font-weight:800}
+#tdccWeeklyPanelV1 summary small{font-size:11px;color:var(--muted);font-weight:600}
+#tdccWeeklyPanelV1 .tdcc-desc{font-size:12px;color:var(--muted);line-height:1.6;margin:10px 0}
+#tdccWeeklyPanelV1 .tdcc-desc a{color:var(--green);text-decoration:underline}
+#tdccWeeklyPanelV1 .tdcc-stats,#tdccWeeklyPanelV1 .tdcc-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:11px 0}
+#tdccWeeklyPanelV1 .tdcc-stats>div,#tdccWeeklyPanelV1 .tdcc-metrics>div{min-width:0;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--soft)}
+#tdccWeeklyPanelV1 .tdcc-stats small,#tdccWeeklyPanelV1 .tdcc-metrics small{display:block;color:var(--muted);font-size:11px;margin-bottom:4px}
+#tdccWeeklyPanelV1 .tdcc-stats b,#tdccWeeklyPanelV1 .tdcc-metrics strong{font-size:16px;font-weight:850;overflow-wrap:anywhere}
+#tdccWeeklyPanelV1 .tdcc-filters{display:grid;grid-template-columns:1fr minmax(120px,39%);gap:8px;margin:11px 0}
+#tdccWeeklyPanelV1 input,#tdccWeeklyPanelV1 select{width:100%;min-width:0;border:1px solid var(--line);border-radius:9px;padding:10px;background:var(--card);color:var(--ink);font-size:16px}
+#tdccWeeklyPanelV1 .tdcc-rows{display:grid;gap:6px}
+#tdccWeeklyPanelV1 .tdcc-item{border:1px solid var(--line);background:var(--soft);width:100%;border-radius:11px;padding:11px 8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;color:var(--ink);text-align:left;align-items:center;cursor:pointer}
+#tdccWeeklyPanelV1 .tdcc-item>span{display:flex;flex-direction:column;gap:3px;min-width:0;overflow-wrap:anywhere}
+#tdccWeeklyPanelV1 .tdcc-item small{font-size:10px;color:var(--muted);font-weight:550}
+#tdccWeeklyPanelV1 .tdcc-item strong{font-size:14px;font-variant-numeric:tabular-nums}
+#tdccWeeklyPanelV1 .tdcc-item .tdcc-up{color:#188461}
+#tdccWeeklyPanelV1 .tdcc-item .tdcc-down{color:#bd4636}
+#tdccWeeklyPanelV1 .tdcc-empty{border:1px dashed var(--line);padding:12px;font-size:12px;line-height:1.6;border-radius:10px}
+#tdccWeeklyPanelV1 .tdcc-detail{padding:12px;margin-top:11px;border:1px solid var(--line);border-radius:12px}
+#tdccWeeklyPanelV1 .tdcc-detail h3{font-size:14px;margin:0 0 6px}
+#tdccWeeklyPanelV1 .tdcc-table{font-size:11px;border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+#tdccWeeklyPanelV1 .tdcc-table th,#tdccWeeklyPanelV1 .tdcc-table td{border-bottom:1px solid var(--line);padding:8px 2px;text-align:right}
+#tdccWeeklyPanelV1 .tdcc-table th:first-child,#tdccWeeklyPanelV1 .tdcc-table td:first-child{text-align:left}
+@media(min-width:660px){#tdccWeeklyPanelV1 .tdcc-stats,#tdccWeeklyPanelV1 .tdcc-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}}
