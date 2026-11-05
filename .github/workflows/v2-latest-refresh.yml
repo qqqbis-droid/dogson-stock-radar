@@ -357,6 +357,9 @@ jobs:
           cp docs/v2/data/current_manifest.json _site/v2/data/current_manifest.json
           test -f docs/v2/data/market-detail.json && cp docs/v2/data/market-detail.json _site/v2/data/market-detail.json
           test -f docs/v2/data/sector-members.json && cp docs/v2/data/sector-members.json _site/v2/data/sector-members.json
+          # Static official TDCC weekly dataset is not part of the Atomic market build.
+          # A partial-site publish must include it or the auto radar disappears.
+          test -s docs/v2/data/tdcc_weekly_concentration.json && cp docs/v2/data/tdcc_weekly_concentration.json _site/v2/data/tdcc_weekly_concentration.json
           ACTIVE_BUILD="$(python -c 'import json; print(json.load(open("docs/v2/data/current_manifest.json"))["active_build_id"])')"
           test -d "docs/v2/data/builds/$ACTIVE_BUILD"
           cp -a "docs/v2/data/builds/$ACTIVE_BUILD" "_site/v2/data/builds/$ACTIVE_BUILD"
