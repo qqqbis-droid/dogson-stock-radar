@@ -61,8 +61,10 @@ run('public UI only reads local CSV and public manifest',()=>{
  const index=fs.readFileSync(path.join(root,'index.html'),'utf8');
  for(const must of ['mfManualForm','mfPasteApply','mfFile','mfExport','mfClear','localStorage','SAME_DAY','radar:view-rendered','data-mf-code'])assert.ok(ui.includes(must),must);
  assert.ok(!ui.includes('api.finmind.com')&&!ui.includes('branchTrade')&&!ui.includes('github.com/repos'));
+ assert.ok(ui.includes('annotateCards')&&ui.includes('mf-card-evidence')&&ui.includes('radar:cards-rendered'));
+ assert.ok(!ui.includes('swing_quality_score =')&&!ui.includes('score = Number('));
  assert.ok(index.includes('mainforce-core-v1.js?v=20261106a'));
- assert.ok(index.includes('mainforce-panel-v1.js?v=20261106a'));
- assert.ok(index.includes('mainforce-panel-v1.css?v=20261106a'));
+ assert.ok(index.includes('mainforce-panel-v1.js?v=20261106b'));
+ assert.ok(index.includes('mainforce-panel-v1.css?v=20261106b'));
 });
 console.log('Mainforce concentration contract tests complete');
