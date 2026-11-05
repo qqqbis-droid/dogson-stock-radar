@@ -1,0 +1,86 @@
+name: Radar - TDCC Weekly Free Update
+
+# Official freely licensed TDCC ownership distribution, NOT branch mainforce.
+# Publishes only source-verified weeks; never changes daily close/selection scores.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/tdcc-weekly.yml"
+  schedule:
+    # Taiwan Friday 20:20, Saturday 10:20, Monday 09:20 catch-up
+    - cron: "20 12 * * 5"
+    - cron: "20 2 * * 6"
+    - cron: "20 1 * * 1"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dogson-tdcc-weekly-source
+  cancel-in-progress: false
+
+jobs:
+  tdcc-weekly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: clean-build-v2
+          persist-credentials: true
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: TDCC parser contract test
+        run: |
+          python - <<'PY'
+          import sys,io,csv
+          sys.path.insert(0,"scripts/v2")
+          from update_tdcc_weekly import parse_official_csv
+          out=io.StringIO();w=csv.writer(out)
+          w.writerow(["資料日期","證券代號","持股分級","人數","股數","占集保庫存數比例%"])
+          for code in range(1000,1900):
+            for level in range(1,18):
+              ratio=0 if level==16 else (100 if level==17 else 100/15)
+              w.writerow(["20261106",str(code),level,150,100000,str(ratio)])
+          parsed=parse_official_csv(out.getvalue().encode("utf-8-sig"))
+          assert len({v["code"] for v in parsed.values()})==900
+          assert len(parsed)==900
+          row=next(iter(parsed.values()))
+          assert abs(row["big400"]-4*100/15)<.001
+          assert abs(row["big1000"]-100/15)<.001
+          print("TDCC parser schema/level/coverage contract verified")
+          PY
+      - name: Fetch official TDCC weekly source and preserve verified history
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/v2/update_tdcc_weekly.py --out docs/v2/data/tdcc_weekly_concentration.json
+          test -s docs/v2/data/tdcc_weekly_concentration.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("docs/v2/data/tdcc_weekly_concentration.json").read_text())
+          assert d["schema"]=="tdcc-weekly-ownership-v1"
+          assert d["stock_count"]>=800
+          assert d["latest_week"]==max(d["weeks"])
+          assert all(len(v)<=12 for v in d["stocks"].values())
+          print("Source-verified TDCC weekly:",d["latest_week"],d["stock_count"],"stocks",len(d["weeks"]),"weeks")
+          PY
+      - name: Commit only verified TDCC source dataset
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/v2/data/tdcc_weekly_concentration.json
+          if git diff --cached --quiet; then
+            echo "TDCC latest official week unchanged; no commit"
+            exit 0
+          fi
+          git commit -m "data(tdcc): verified official weekly ownership snapshot [skip ci]"
+          git push origin HEAD:clean-build-v2
+          echo "Published verified weekly concentration in clean-build-v2; UI deploy triggered by workflow_run."
