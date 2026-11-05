@@ -131,6 +131,22 @@ function detail(x){
   curve(x.history)+table+
   '<p class="mf-tip">主力指券商分點統計，不等於辨認實際大戶。5日／20日數值依供應商原口徑，百分點變化以 pp 顯示。此模組不修改原選股分數與進場建議。</p></div>';
 }
+function annotateCards(){
+ if(!visible())return;
+ const map=new Map(E.allSummaries(rows,closeDate).map(x=>[x.code,x]));
+ for(const card of document.querySelectorAll("#cards .card[data-code]")){
+   card.querySelectorAll(".mf-card-evidence").forEach(x=>x.remove());
+   const x=map.get(String(card.dataset.code||"").toUpperCase());
+   if(!x)continue;
+   const el=document.createElement("div");
+   el.className="mf-card-evidence";
+   const current=x.freshness==="SAME_DAY";
+   el.innerHTML='<small>主力集中度｜'+esc(x.date)+' '+(current?'同收盤日':'歷史資料')+' · 本機匯入</small>'+
+      '<span>5日 '+esc(x.c5==null?'—':sign(x.c5)+'%')+' · 20日 '+esc(x.c20==null?'—':sign(x.c20)+'%')+
+      '｜'+esc(x.label)+'</span>';
+   card.appendChild(el);
+ }
+}
 function render(){
  if(!host||host.hidden)return;
  const s=stats(),a=listing();
@@ -150,6 +166,7 @@ function render(){
  host.querySelector("#mfList").innerHTML=html;
  const x=s.all.find(v=>v.code===selected);
  host.querySelector("#mfDetail").innerHTML=x?detail(x):"";
+ annotateCards();
 }
 function sync(){if(!host)return;host.hidden=!visible();if(!host.hidden){render();void checkDate()}}
 function commit(newRows){
@@ -199,6 +216,7 @@ function input(e){if(e.target.id==="mfSearch"){search=e.target.value;render()}}
 function boot(){
  setup();
  document.addEventListener("radar:view-rendered",sync);
+ document.addEventListener("radar:cards-rendered",annotateCards);
  document.addEventListener("radar:data-reloaded",()=>{clock=0;void checkDate(true);sync()});
  document.addEventListener("click",e=>{if(e.target.closest?.("#tabs .tab,[data-close-mode]"))setTimeout(sync,50)});
  window.InukoMainforcePanel={status:()=>({recordCount:rows.length,closeDate,selected}),refresh:()=>{clock=0;void checkDate(true)}};
