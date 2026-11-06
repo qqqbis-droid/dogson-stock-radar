@@ -68,20 +68,35 @@ doTest("HTML unsafe codes cannot inject script or attributes",()=>{
 doTest("Taiwan calendar date uses stable locale-independent parts",()=>{
  assert.equal(UI.todayTW(new Date("2026-11-05T16:07:00Z")),"2026-11-06");
 });
-doTest("UI integrates with existing stock-card and detail events, not global rankings",()=>{
+doTest("target is exactly 02 technical-chip-score accordion, not outside the modal",()=>{
+ const section={tagName:"DIV"},summary={tagName:"SUMMARY"};
+ const panel={children:[summary,section]};
+ const good={querySelector:sel=>sel===".inuko-detail-v4 details.inuko-dossier[data-inuko-technical]"?panel:null};
+ assert.strictEqual(UI.technicalContainer(good),section);
+ assert.strictEqual(UI.technicalContainer({querySelector:()=>null}),null);
+ assert.strictEqual(UI.technicalContainer(null),null);
+ assert.strictEqual(UI.technicalContainer({querySelector:()=>({children:[summary]})}),null);
+});
+doTest("weekly evidence is inside 02 only and never duplicated on ranking cards",()=>{
  const dir=path.resolve(__dirname,"../../docs/v2");
  const script=fs.readFileSync(path.join(dir,"tdcc-weekly-ui-v1.js"),"utf8");
  const css=fs.readFileSync(path.join(dir,"tdcc-weekly-ui-v1.css"),"utf8");
  const index=fs.readFileSync(path.join(dir,"index.html"),"utf8");
- for(const name of ["radar:cards-rendered","radar:open-stock","radar:detail-rendered","radar:detail-core-rendered","radar:data-reloaded","detailBody","data-tdcc-evidence","data-tdcc-detail"]){
+ const actualDetail=fs.readFileSync(path.join(dir,"detail-loading-guard-v2.js"),"utf8");
+ assert.ok(actualDetail.includes('data-inuko-technical'));
+ for(const name of ["radar:detail-rendered","radar:detail-core-rendered","radar:data-reloaded","detailBody","data-tdcc-detail","technicalContainer","target.appendChild(section)"]){
   assert.ok(script.includes(name),"missing integration "+name);
  }
+ assert.ok(script.includes('view!=="close"'));
  assert.ok(script.includes("./data/tdcc_weekly_concentration.json"));
  assert.ok(!script.includes('tdccWeeklyPanelV1')&&!script.includes("buildList(")&&!script.includes("const rank="));
  assert.ok(!script.includes('score=')&&!script.includes("swing_quality_score"));
- assert.ok(css.includes('#cards .card .tdcc-card-inline'));
- assert.ok(css.includes('#detailDialog .tdcc-in-stock'));
- assert.ok(index.includes('tdcc-weekly-ui-v1.js?v=20261106b'));
- assert.ok(index.includes('tdcc-weekly-ui-v1.css?v=20261106b'));
+ // The old 'append to outer cards' path must not come back.
+ assert.ok(!script.includes("card.appendChild("));
+ assert.ok(!script.includes('document.addEventListener("radar:cards-rendered"'));
+ assert.ok(!css.includes('#cards .card .tdcc-card-inline'));
+ assert.ok(css.includes('#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-in-stock'));
+ assert.ok(index.includes('tdcc-weekly-ui-v1.js?v=20261106c'));
+ assert.ok(index.includes('tdcc-weekly-ui-v1.css?v=20261106c'));
 });
-console.log("TDCC per-stock move contract tests passed");
+console.log("TDCC inside section 02 contract tests passed");
