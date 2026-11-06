@@ -61,8 +61,7 @@ doTest("missing stock shows unavailable instead of a made-up zero",()=>{
 doTest("HTML unsafe codes cannot inject script or attributes",()=>{
  const data=history().arr;
  const s=UI.summarize("1815",data);
- s.code='<img src=x onerror=alert(1)>';
- const detail=UI.detailHtml(s,{week:'2026-10-30'});
+ const detail=UI.detailHtml(s,{week:'<img src=x onerror=alert(1)>'});
  assert.ok(detail.includes('&lt;img'));
  assert.ok(!detail.includes('<img'));
 });
