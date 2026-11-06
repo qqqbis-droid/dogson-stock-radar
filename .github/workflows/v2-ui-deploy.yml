@@ -1,5 +1,6 @@
 name: Clean Build 2.0 UI-only Deploy
 # Portfolio integrated release: 2026-10-09 verified thesis, transaction review, fees and quotes. CI gate now scopes L2-L4 limits to actual priority rows.
+# Re-validate 2026-11-06 TDCC per-stock layout after correcting HTML escaping test input.
 
 on:
   workflow_dispatch:
