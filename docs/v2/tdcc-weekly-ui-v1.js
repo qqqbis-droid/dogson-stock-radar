@@ -1,115 +1,176 @@
-/* TDCC official open data weekly big-holder concentration: automatic, separate from branch data. */
-(function(){
+/* INUKO LAB: TDCC official ownership evidence in individual stock cards/details.
+   Independent weekly official open data; no changes to scores, ranks or trade signals.
+   No full-market leaderboard in the close view.
+*/
+(function(root){
 "use strict";
-if(window.__INUKO_TDCC_WEEKLY_V1__)return;window.__INUKO_TDCC_WEEKLY_V1__=true;
-let host=null,loaded=null,error="",loading=false,query="",kind="GAIN",openCode="",lastFetch=0;
-const todayTW=()=>{const p=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());const v=k=>p.find(x=>x.type===k)?.value||"";return v("year")+"-"+v("month")+"-"+v("day")};
-const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const fmt=v=>v==null||!Number.isFinite(v)?"—":Number(v).toLocaleString("zh-TW",{maximumFractionDigits:2});
-const diff=v=>v==null?"—":(v>0?"+":"")+fmt(v)+" pp";
-const visible=()=>Boolean(document.querySelector('.tab.active[data-view="close"]')&&!document.querySelector("#radarPanel")?.classList.contains("h60-screen-active"));
-function summarize(code,weeks){
- if(!Array.isArray(weeks)||!weeks.length)return null;
- const a=weeks.slice().sort((x,y)=>y.date.localeCompare(x.date)),newest=a[0];
- const earlier=(n,key)=>a[n]&&Number.isFinite(a[n][key])?+(newest[key]-a[n][key]).toFixed(3):null;
- const one=earlier(1,"big400"),four=earlier(4,"big400"),eight=earlier(8,"big400");
- const label=four==null?"歷史週次不足":four>0&&one!=null&&one>0?"大戶集中延續":four>0?"四週集中增加":four<0?"大戶持股比下降":"變化不大";
- return{code,latest:newest,rows:a,d1:one,d4:four,d8:eight,label};
+const esc=x=>String(x==null?"":x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=x=>x==null||!Number.isFinite(Number(x))?"—":Number(x).toLocaleString("zh-TW",{maximumFractionDigits:2});
+const pp=x=>x==null||!Number.isFinite(x)?"—":(x>0?"+":"")+fmt(x)+" pp";
+const pct=x=>x==null||!Number.isFinite(Number(x))?"—":fmt(x)+"%";
+const validDate=x=>/^\d{4}-\d{2}-\d{2}$/.test(String(x||""));
+function todayTW(d=new Date()){
+ const parts=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(d);
+ const get=k=>parts.find(p=>p.type===k)?.value||"";
+ return get("year")+"-"+get("month")+"-"+get("day");
 }
-function buildList(){
- const src=loaded?.stocks||{},arr=Object.entries(src).map(([k,w])=>summarize(k,w)).filter(Boolean);
- const q=query.trim().toUpperCase();
- let list=arr.filter(x=>!q||x.code.includes(q));
- if(kind==="GAIN")list=list.filter(x=>x.d4!=null&&x.d4>0).sort((a,b)=>b.d4-a.d4);
- if(kind==="FALL")list=list.filter(x=>x.d4!=null&&x.d4<0).sort((a,b)=>a.d4-b.d4);
- if(kind==="ALL")list=list.sort((a,b)=>(b.d4??-999)-(a.d4??-999)||a.code.localeCompare(b.code));
- return list;
+function normalizeCode(x){
+ return String(x||"").trim().toUpperCase().replace(/\.(TW|TWO)$/,"");
 }
-function setup(){
- if(host||!document.getElementById("mainforcePanelV1"))return;
- host=document.createElement("section");host.id="tdccWeeklyPanelV1";host.className="panel";host.hidden=true;
- host.innerHTML=[
- '<details id="tdccDetails" open><summary><strong>🏦 集保大戶｜全市場免費自動更新</strong><small id="tdccBadge">每週官方資料</small></summary>',
- '<p class="tdcc-desc">使用 <a href="https://data.gov.tw/dataset/11452" target="_blank" rel="noopener noreferrer">TDCC 集保戶股權分散表</a>（政府開放資料）自動更新。<strong>這不是每天的券商分點「主力集中度」</strong>，兩種資料不混用，也不更動原本選股評分。</p>',
- '<div id="tdccStats" class="tdcc-stats"></div>',
- '<div class="tdcc-filters"><input type="search" id="tdccSearch" placeholder="搜尋股票代號，例 2330" aria-label="搜尋集保股票代號">',
- '<select id="tdccType" aria-label="大戶籌碼篩選"><option value="GAIN">四週持股增加</option><option value="FALL">四週持股下降</option><option value="ALL">全部股票</option></select></div>',
- '<div id="tdccRows" class="tdcc-rows"></div><div id="tdccDetail"></div>',
- '<p class="tdcc-desc">400張級以上 = 集保級距第12～15級（400,001股起）；1,000張級以上 = 第15級（1,000,001股起）。週增減以百分點 pp 表示。集保戶含各類專戶，不能據此直接辨認受益人或認定主力吸貨。</p>',
- '<p class="tdcc-desc">資料來源：<a href="https://opendata.tdcc.com.tw/getOD.ashx?id=1-5" target="_blank" rel="noopener noreferrer">集保官方CSV</a>，使用政府資料開放授權條款第1版；歷史補檔如有使用，註明公開封存來源。</p>',
- '</details>'
- ].join("");
- document.getElementById("mainforcePanelV1").insertAdjacentElement("beforebegin",host);
- host.addEventListener("input",e=>{if(e.target.id==="tdccSearch"){query=e.target.value;render()}});
- host.addEventListener("change",e=>{if(e.target.id==="tdccType"){kind=e.target.value;render()}});
- host.addEventListener("click",e=>{
-  const card=e.target.closest("[data-tdcc-code]");
-  if(card){openCode=openCode===card.dataset.tdccCode?"":card.dataset.tdccCode;render()}
- });
- sync();
-}
-async function load(force=false){
- if(loading||(!force&&loaded&&Date.now()-lastFetch<6*60*60*1000))return;
- loading=true;error="";try{
-  const r=await fetch("./data/tdcc_weekly_concentration.json?source_v=1&ts="+Date.now(),{cache:"no-store"});
-  if(!r.ok)throw Error("官方週資料尚未發布（HTTP "+r.status+"）");
-  const j=await r.json();
-  if(j.schema!=="tdcc-weekly-ownership-v1"||!j.latest_week||!j.stocks||Object.keys(j.stocks).length<800)throw Error("官方週資料驗證失敗");
-  if(j.latest_week>todayTW())throw Error("來源週次晚於今天，已停止使用");
-  loaded=j;lastFetch=Date.now();
- }catch(e){error=e.message}finally{loading=false;render()}
-}
-function render(){
- if(!host||host.hidden)return;
- const banner=host.querySelector("#tdccStats");
- if(!loaded){
-  banner.innerHTML='<p class="tdcc-empty">'+esc(error||"正在取得官方集保資料…")+'</p>';
-  host.querySelector("#tdccRows").innerHTML="";
-  host.querySelector("#tdccDetail").innerHTML="";
-  return;
+function summarize(code,weekly){
+ if(!Array.isArray(weekly)||!weekly.length)return null;
+ const rows=weekly.filter(x=>validDate(x?.date)&&Number.isFinite(x?.big400)&&Number.isFinite(x?.big1000))
+   .slice().sort((a,b)=>b.date.localeCompare(a.date));
+ if(!rows.length)return null;
+ const latest=rows[0],change=(n,key)=>rows.length>n?+(latest[key]-rows[n][key]).toFixed(3):null;
+ const d1=change(1,"big400"),d4=change(4,"big400"),d8=change(8,"big400");
+ const kilo4=change(4,"big1000");
+ let label="週期不足，持續觀察";
+ if(d4!=null){
+   label=Math.abs(d4)>=20?"大幅變動，先核對原因":d4>0?"大戶持股比增加":d4<0?"大戶持股比下降":"大戶持股比持平";
  }
- const count=Object.keys(loaded.stocks).length,list=buildList(),latest=loaded.latest_week;
- host.querySelector("#tdccBadge").textContent="官方週次 "+latest;
- banner.innerHTML='<div><small>官方資料週次</small><b>'+esc(latest)+'</b></div>'+
-   '<div><small>涵蓋股票代號</small><b>'+count.toLocaleString()+" 檔</b></div>"+
-   '<div><small>歷史週次</small><b>'+esc(String(loaded.weeks?.length||1))+" 週</b></div>"+
-   '<div><small>符合目前篩選</small><b>'+list.length.toLocaleString()+" 檔</b></div>";
- let html="";
- for(const x of list.slice(0,40)){
-  html+='<button type="button" class="tdcc-item" data-tdcc-code="'+esc(x.code)+'">'+
-   '<span><b>'+esc(x.code)+'</b><small>'+esc(x.label)+'</small></span>'+
-   '<span><strong>'+fmt(x.latest.big400)+'%</strong><small>400張級以上</small></span>'+
-   '<span class="'+(x.d4!=null&&x.d4>0?"tdcc-up":x.d4!=null&&x.d4<0?"tdcc-down":"")+'">'+
-   '<strong>'+esc(diff(x.d4))+'</strong><small>4週變動</small></span></button>';
+ return{code:normalizeCode(code),latest,rows,d1,d4,d8,kilo4,label,extreme:d4!=null&&Math.abs(d4)>=20};
+}
+function cardHtml(summary,week){
+ if(!summary)return"";
+ const x=summary,cls=x.d4==null?"":x.d4>0?"tdcc-positive":x.d4<0?"tdcc-negative":"";
+ return '<div class="tdcc-card-inline" data-tdcc-evidence="1" aria-label="官方集保大戶持股週變化">'+
+  '<div class="tdcc-card-title">🏦 集保大戶 <small>官方週次 '+esc(x.latest.date||week||"—")+'</small></div>'+
+  '<div class="tdcc-card-values"><span>400張級以上 <b>'+pct(x.latest.big400)+'</b></span>'+
+  '<span>較前4期 <b class="'+cls+'">'+pp(x.d4)+'</b></span></div>'+
+  (x.extreme?'<small class="tdcc-card-warning">大幅變動，須核對公司行為</small>':"")+
+  '</div>';
+}
+function trendSvg(x){
+ const rows=x.rows.slice(0,9).reverse();
+ if(rows.length<2)return '<p class="tdcc-explain">尚不足兩期歷史，暫無趨勢圖。</p>';
+ const values=rows.map(r=>r.big400),min=Math.min(...values),max=Math.max(...values),spread=Math.max(0.4,max-min);
+ const path=values.map((value,i)=>{
+  const px=28+i*286/Math.max(1,values.length-1);
+  const py=100-70*((value-min)/spread);
+  return(i?"L":"M")+px.toFixed(1)+" "+py.toFixed(1);
+ }).join(" ");
+ return '<svg class="tdcc-detail-trend" viewBox="0 0 345 130" role="img" aria-label="400張級以上持股比歷史走勢圖">'+
+  '<line x1="27" y1="103" x2="321" y2="103" stroke="currentColor" opacity=".18"/>'+
+  '<path d="'+path+'" fill="none" stroke="#188663" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>'+
+  '<text x="1" y="23" font-size="10" fill="currentColor">'+fmt(max)+'%</text>'+
+  '<text x="1" y="104" font-size="10" fill="currentColor">'+fmt(min)+'%</text>'+
+  '<text x="28" y="125" font-size="10" fill="currentColor">'+esc(rows[0].date.slice(5))+'</text>'+
+  '<text x="271" y="125" font-size="10" fill="currentColor">'+esc(rows[rows.length-1].date.slice(5))+'</text></svg>';
+}
+function detailHtml(summary,options={}){
+ const x=summary,week=options.week||x?.latest.date||"—";
+ const intro='<section class="tdcc-in-stock" data-tdcc-detail="1"><div class="tdcc-in-stock-head">'+
+   '<h3>🏦 集保大戶持股變化</h3><small>官方週次 '+esc(week)+'</small></div>';
+ if(!x)return intro+'<p class="tdcc-explain">此檔目前未取得完整的集保持股級距資料，不能推論大戶集中趨勢。這不是每日券商分點買賣超。</p></section>';
+ const warning=options.stale?'<p class="tdcc-uncertain">此週資料已超過兩週未更新，僅供歷史研究，請勿當成最新籌碼。</p>':"";
+ const extreme=x.extreme?'<p class="tdcc-uncertain">近四期大戶持股比變化超過 20 個百分點，可能涉及新掛牌、股權或股本變動、持股級距重新分配，請先核對公司行為，不可直接判定為吸貨。</p>':"";
+ const tiles=[
+  ["400張級以上",pct(x.latest.big400)],
+  ["1,000張級以上",pct(x.latest.big1000)],
+  ["400張級 1期變動",pp(x.d1)],
+  ["400張級 4期變動",pp(x.d4)],
+  ["400張級 8期變動",pp(x.d8)],
+  ["1,000張級 4期變動",pp(x.kilo4)]
+ ].map(([k,v])=>'<div><small>'+esc(k)+'</small><b>'+esc(v)+'</b></div>').join("");
+ const table=x.rows.slice(0,10).map(r=>'<tr><td>'+esc(r.date)+'</td><td>'+pct(r.big400)+'</td><td>'+pct(r.big1000)+'</td><td>'+fmt(r.large_holders)+'</td></tr>').join("");
+ return intro+warning+'<div class="tdcc-stock-tiles">'+tiles+'</div>'+
+  '<p class="tdcc-in-stock-verdict">'+esc(x.label)+'。'+
+  '這是持股級距的週變化，不代表主力分點買賣或可直接進場。</p>'+extreme+
+  '<details class="tdcc-stock-history"><summary>查看最近集保週次與持股比例走勢</summary>'+trendSvg(x)+
+  '<div class="tdcc-stock-table-wrap"><table><thead><tr><th>週次</th><th>400張級+</th><th>1,000張級+</th><th>大額級距人數</th></tr></thead><tbody>'+table+'</tbody></table></div></details>'+
+  '<p class="tdcc-explain">資料：<a href="https://opendata.tdcc.com.tw/getOD.ashx?id=1-5" target="_blank" rel="noopener noreferrer">TDCC 集保官方開放資料</a>。400張級以上是各級距合計，分期比較按實際發布週次，假期可能不等於精確28日；與每日分點主力集中度不同。未納入原選股分數。</p></section>';
+}
+const helpers={summarize,cardHtml,detailHtml,todayTW,normalizeCode};
+if(typeof module==="object"&&module.exports)module.exports=helpers;
+if(!root||!root.document)return;
+if(root.__INUKO_TDCC_INDIVIDUAL_V2__)return;
+root.__INUKO_TDCC_INDIVIDUAL_V2__=true;
+const document=root.document;
+let loaded=null,error="",fetching=null,lastFetch=0,currentDetailCode="",currentDetailView="";
+function find(code){return summarize(code,loaded?.stocks?.[normalizeCode(code)])}
+function sourceAge(){
+ if(!validDate(loaded?.latest_week))return null;
+ return Math.floor((Date.parse(todayTW()+"T00:00:00Z")-Date.parse(loaded.latest_week+"T00:00:00Z"))/86400000);
+}
+function cardAllowed(){
+ // TDCC historical ownership evidence may be viewed in all mission cards,
+ // while it must never be presented as a same-day or actionable live signal.
+ return Boolean(document.querySelector("#cards .card[data-code]"));
+}
+function renderCards(){
+ if(!cardAllowed())return;
+ for(const card of document.querySelectorAll("#cards .card[data-code]")){
+   card.querySelectorAll("[data-tdcc-evidence]").forEach(el=>el.remove());
+   const code=normalizeCode(card.dataset.code);
+   const x=find(code);
+   if(!x)continue;
+   const wrapper=document.createElement("div");
+   wrapper.innerHTML=cardHtml(x,loaded?.latest_week);
+   const node=wrapper.firstElementChild;
+   if(node)card.appendChild(node);
  }
- if(!html)html='<p class="tdcc-empty">目前沒有符合條件的資料。首次建立歷史資料時，可能尚不足四週；可改選「全部股票」。</p>';
- if(list.length>40)html+='<p class="tdcc-desc">為避免手機負擔，僅顯示前40檔；可搜尋股票代號。</p>';
- host.querySelector("#tdccRows").innerHTML=html;
- const x=openCode?summarize(openCode,loaded.stocks[openCode]):null;
- host.querySelector("#tdccDetail").innerHTML=x?detail(x):"";
 }
-function detail(x){
- let rows=x.rows.slice(0,10),table=rows.map(w=>'<tr><td>'+esc(w.date)+'</td><td>'+fmt(w.big400)+'%</td><td>'+fmt(w.big1000)+'%</td><td>'+Number(w.large_holders||0).toLocaleString()+'</td></tr>').join("");
- const changed=x.d4==null?"四週歷史不足":x.d4>0?"大戶持股比增加，仍需量價與籌碼驗證":x.d4<0?"大戶持股比下降，留意籌碼分散":"四週持股比變動不大";
- return '<div class="tdcc-detail"><h3>'+esc(x.code)+'｜集保大戶週變化</h3>'+
-   '<div class="tdcc-metrics"><div><small>400張級以上</small><strong>'+fmt(x.latest.big400)+'%</strong></div>'+
-   '<div><small>1000張級以上</small><strong>'+fmt(x.latest.big1000)+'%</strong></div>'+
-   '<div><small>1週變動</small><strong>'+esc(diff(x.d1))+'</strong></div>'+
-   '<div><small>4週變動</small><strong>'+esc(diff(x.d4))+'</strong></div>'+
-   '<div><small>8週變動</small><strong>'+esc(diff(x.d8))+'</strong></div></div>'+
-   '<p class="tdcc-desc">'+esc(changed)+'；這是每週集保持股級距，不能推論單日券商分點買賣超。</p>'+
-   '<table class="tdcc-table"><thead><tr><th>週次</th><th>400張級+</th><th>1000張級+</th><th>大額級距人數</th></tr></thead><tbody>'+table+'</tbody></table></div>';
+function renderDetail(code,view){
+ if(!code||!["close","intraday","daytrade","portfolio"].includes(view||""))return;
+ const dialog=document.getElementById("detailDialog"),body=document.getElementById("detailBody");
+ if(!dialog?.open||!body||!currentDetailCode||normalizeCode(code)!==currentDetailCode)return;
+ body.querySelectorAll("[data-tdcc-detail]").forEach(el=>el.remove());
+ const x=find(code),wrap=document.createElement("div");
+ if(!loaded&&fetching)wrap.innerHTML='<section class="tdcc-in-stock" data-tdcc-detail="1"><h3>🏦 集保大戶持股變化</h3><p class="tdcc-explain">正在載入官方每週集保資料…</p></section>';
+ else if(!loaded)wrap.innerHTML='<section class="tdcc-in-stock" data-tdcc-detail="1"><h3>🏦 集保大戶持股變化</h3><p class="tdcc-explain">'+esc(error||"尚未取得官方集保週資料")+'；暫不提供大戶訊號。</p></section>';
+ else wrap.innerHTML=detailHtml(x,{week:loaded.latest_week,stale:sourceAge()>14});
+ const section=wrap.firstElementChild;
+ if(!section)return;
+ // Position next to the existing technical / chip evidence, not in a new dashboard.
+ const destination=body.querySelector(".detail-block")||body.querySelector(".chip2-card")||null;
+ if(destination)destination.insertAdjacentElement("beforebegin",section);
+ else body.appendChild(section);
 }
-function sync(){
- if(!host)return;host.hidden=!visible();
- if(!host.hidden){render();void load()}
+async function refresh(force=false){
+ if(fetching)return fetching;
+ if(!force&&loaded&&Date.now()-lastFetch<3600000)return loaded;
+ fetching=(async()=>{
+   try{
+     const response=await fetch("./data/tdcc_weekly_concentration.json?individual_v=2&t="+Date.now(),{cache:"no-store"});
+     if(!response.ok)throw Error("集保資料尚未成功發布（HTTP "+response.status+"）");
+     const data=await response.json();
+     if(data.schema!=="tdcc-weekly-ownership-v1"||!validDate(data.latest_week)||!data.stocks||Object.keys(data.stocks).length<800)
+       throw Error("來源資料不符官方週資料格式");
+     if(data.latest_week>todayTW())throw Error("官方來源日期晚於今天，拒絕使用");
+     loaded=data;error="";lastFetch=Date.now();
+   }catch(e){error=String(e.message||e);if(!loaded)lastFetch=0}
+   finally{
+     fetching=null;
+     renderCards();
+     if(currentDetailCode)renderDetail(currentDetailCode,currentDetailView);
+   }
+   return loaded;
+ })();
+ return fetching;
+}
+function onOpen(e){
+ const code=normalizeCode(e.detail?.code),view=String(e.detail?.view||"close");
+ if(!code)return;
+ currentDetailCode=code;currentDetailView=view;
+ void refresh();
+}
+function onDetail(e){
+ const code=normalizeCode(e.detail?.code),view=String(e.detail?.view||"");
+ if(!code||code!==currentDetailCode)return;
+ currentDetailView=view||currentDetailView;
+ renderDetail(code,currentDetailView);
 }
 function boot(){
- setup();
- document.addEventListener("radar:view-rendered",sync);
- document.addEventListener("radar:data-reloaded",()=>{lastFetch=0;void load(true)});
- document.addEventListener("click",e=>{if(e.target.closest?.("#tabs .tab,[data-close-mode]"))setTimeout(sync,50)});
- window.InukoTdccWeekly={status:()=>({latest:loaded?.latest_week||null,coverage:loaded?.stock_count||0,error})};
+ document.addEventListener("radar:cards-rendered",renderCards);
+ document.addEventListener("radar:open-stock",onOpen);
+ document.addEventListener("radar:detail-core-rendered",onDetail);
+ document.addEventListener("radar:detail-rendered",onDetail);
+ document.addEventListener("radar:view-rendered",()=>{renderCards();void refresh()});
+ document.addEventListener("radar:data-reloaded",()=>{lastFetch=0;void refresh(true)});
+ document.addEventListener("close",e=>{if(e.target?.id==="detailDialog"){currentDetailCode="";currentDetailView=""}},true);
+ root.InukoTdccWeekly={status:()=>({latest_week:loaded?.latest_week||null,count:Object.keys(loaded?.stocks||{}).length,error}),refresh:()=>refresh(true),summary:code=>find(code)};
+ void refresh();
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});else boot();
-})();
+})(typeof window!=="undefined"?window:null);
