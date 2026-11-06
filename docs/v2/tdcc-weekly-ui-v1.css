@@ -1,26 +1,30 @@
-/* TDCC public official weekly ownership — independent from mainforce branch data */
-#tdccWeeklyPanelV1[hidden]{display:none!important}
-#tdccWeeklyPanelV1 summary{display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:9px;font-weight:800}
-#tdccWeeklyPanelV1 summary small{font-size:11px;color:var(--muted);font-weight:600}
-#tdccWeeklyPanelV1 .tdcc-desc{font-size:12px;color:var(--muted);line-height:1.6;margin:10px 0}
-#tdccWeeklyPanelV1 .tdcc-desc a{color:var(--green);text-decoration:underline}
-#tdccWeeklyPanelV1 .tdcc-stats,#tdccWeeklyPanelV1 .tdcc-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:11px 0}
-#tdccWeeklyPanelV1 .tdcc-stats>div,#tdccWeeklyPanelV1 .tdcc-metrics>div{min-width:0;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--soft)}
-#tdccWeeklyPanelV1 .tdcc-stats small,#tdccWeeklyPanelV1 .tdcc-metrics small{display:block;color:var(--muted);font-size:11px;margin-bottom:4px}
-#tdccWeeklyPanelV1 .tdcc-stats b,#tdccWeeklyPanelV1 .tdcc-metrics strong{font-size:16px;font-weight:850;overflow-wrap:anywhere}
-#tdccWeeklyPanelV1 .tdcc-filters{display:grid;grid-template-columns:1fr minmax(120px,39%);gap:8px;margin:11px 0}
-#tdccWeeklyPanelV1 input,#tdccWeeklyPanelV1 select{width:100%;min-width:0;border:1px solid var(--line);border-radius:9px;padding:10px;background:var(--card);color:var(--ink);font-size:16px}
-#tdccWeeklyPanelV1 .tdcc-rows{display:grid;gap:6px}
-#tdccWeeklyPanelV1 .tdcc-item{border:1px solid var(--line);background:var(--soft);width:100%;border-radius:11px;padding:11px 8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;color:var(--ink);text-align:left;align-items:center;cursor:pointer}
-#tdccWeeklyPanelV1 .tdcc-item>span{display:flex;flex-direction:column;gap:3px;min-width:0;overflow-wrap:anywhere}
-#tdccWeeklyPanelV1 .tdcc-item small{font-size:10px;color:var(--muted);font-weight:550}
-#tdccWeeklyPanelV1 .tdcc-item strong{font-size:14px;font-variant-numeric:tabular-nums}
-#tdccWeeklyPanelV1 .tdcc-item .tdcc-up{color:#188461}
-#tdccWeeklyPanelV1 .tdcc-item .tdcc-down{color:#bd4636}
-#tdccWeeklyPanelV1 .tdcc-empty{border:1px dashed var(--line);padding:12px;font-size:12px;line-height:1.6;border-radius:10px}
-#tdccWeeklyPanelV1 .tdcc-detail{padding:12px;margin-top:11px;border:1px solid var(--line);border-radius:12px}
-#tdccWeeklyPanelV1 .tdcc-detail h3{font-size:14px;margin:0 0 6px}
-#tdccWeeklyPanelV1 .tdcc-table{font-size:11px;border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
-#tdccWeeklyPanelV1 .tdcc-table th,#tdccWeeklyPanelV1 .tdcc-table td{border-bottom:1px solid var(--line);padding:8px 2px;text-align:right}
-#tdccWeeklyPanelV1 .tdcc-table th:first-child,#tdccWeeklyPanelV1 .tdcc-table td:first-child{text-align:left}
-@media(min-width:660px){#tdccWeeklyPanelV1 .tdcc-stats,#tdccWeeklyPanelV1 .tdcc-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}}
+/* 集保大戶：個股小卡與個股詳情專屬資訊。不顯示全市場排行榜。 */
+#cards .card .tdcc-card-inline{margin-top:10px;border-top:1px dashed var(--line);padding:9px 0 1px;display:grid;gap:6px;line-height:1.45;font-variant-numeric:tabular-nums}
+#cards .card .tdcc-card-title{display:flex;justify-content:space-between;align-items:baseline;gap:7px;font-size:12px;font-weight:800}
+#cards .card .tdcc-card-title small{font-size:10px;color:var(--muted);font-weight:500}
+#cards .card .tdcc-card-values{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#cards .card .tdcc-card-values span{font-size:11px;color:var(--muted)}
+#cards .card .tdcc-card-values b{display:block;color:var(--ink);font-size:15px;font-weight:850}
+#cards .card .tdcc-card-values b.tdcc-positive{color:#168467}
+#cards .card .tdcc-card-values b.tdcc-negative{color:#b44d42}
+#cards .card .tdcc-card-warning{font-size:10px;color:#ad6d24}
+#detailDialog .tdcc-in-stock{margin:14px 0;border:1px solid var(--line);border-radius:13px;padding:12px;background:var(--card);min-width:0}
+#detailDialog .tdcc-in-stock-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
+#detailDialog .tdcc-in-stock-head h3{margin:0;font-size:.9rem}
+#detailDialog .tdcc-in-stock-head small{color:var(--muted);font-size:.68rem}
+#detailDialog .tdcc-stock-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#detailDialog .tdcc-stock-tiles>div{background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:9px;min-width:0;font-variant-numeric:tabular-nums}
+#detailDialog .tdcc-stock-tiles small{display:block;font-size:.67rem;color:var(--muted);margin-bottom:4px}
+#detailDialog .tdcc-stock-tiles b{display:block;font-size:.97rem;overflow-wrap:anywhere}
+#detailDialog .tdcc-in-stock-verdict{font-size:.77rem;line-height:1.55;margin:10px 0 6px}
+#detailDialog .tdcc-uncertain{border-left:3px solid #c98e44;padding:8px 9px;background:rgba(196,147,62,.08);border-radius:6px;font-size:.72rem;line-height:1.55}
+#detailDialog .tdcc-explain{font-size:.69rem;line-height:1.55;color:var(--muted);margin:9px 0 0}
+#detailDialog .tdcc-explain a{color:var(--green);text-decoration:underline}
+#detailDialog .tdcc-stock-history{margin-top:10px;border-top:1px dashed var(--line);padding-top:9px}
+#detailDialog .tdcc-stock-history summary{font-weight:750;font-size:.76rem;cursor:pointer;line-height:1.4}
+#detailDialog .tdcc-detail-trend{width:100%;height:auto;display:block;margin-top:9px}
+#detailDialog .tdcc-stock-table-wrap{overflow-x:auto;max-width:100%}
+#detailDialog .tdcc-stock-history table{border-collapse:collapse;width:100%;min-width:280px;font-size:.69rem;font-variant-numeric:tabular-nums;margin:8px 0}
+#detailDialog .tdcc-stock-history th,#detailDialog .tdcc-stock-history td{padding:8px 2px;border-bottom:1px solid var(--line);text-align:right}
+#detailDialog .tdcc-stock-history th:first-child,#detailDialog .tdcc-stock-history td:first-child{text-align:left}
+@media(min-width:580px){#detailDialog .tdcc-stock-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
