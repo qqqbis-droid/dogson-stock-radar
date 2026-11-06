@@ -1,30 +1,21 @@
-/* 集保大戶：個股小卡與個股詳情專屬資訊。不顯示全市場排行榜。 */
-#cards .card .tdcc-card-inline{margin-top:10px;border-top:1px dashed var(--line);padding:9px 0 1px;display:grid;gap:6px;line-height:1.45;font-variant-numeric:tabular-nums}
-#cards .card .tdcc-card-title{display:flex;justify-content:space-between;align-items:baseline;gap:7px;font-size:12px;font-weight:800}
-#cards .card .tdcc-card-title small{font-size:10px;color:var(--muted);font-weight:500}
-#cards .card .tdcc-card-values{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-#cards .card .tdcc-card-values span{font-size:11px;color:var(--muted)}
-#cards .card .tdcc-card-values b{display:block;color:var(--ink);font-size:15px;font-weight:850}
-#cards .card .tdcc-card-values b.tdcc-positive{color:#168467}
-#cards .card .tdcc-card-values b.tdcc-negative{color:#b44d42}
-#cards .card .tdcc-card-warning{font-size:10px;color:#ad6d24}
-#detailDialog .tdcc-in-stock{margin:14px 0;border:1px solid var(--line);border-radius:13px;padding:12px;background:var(--card);min-width:0}
-#detailDialog .tdcc-in-stock-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
-#detailDialog .tdcc-in-stock-head h3{margin:0;font-size:.9rem}
-#detailDialog .tdcc-in-stock-head small{color:var(--muted);font-size:.68rem}
-#detailDialog .tdcc-stock-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-#detailDialog .tdcc-stock-tiles>div{background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:9px;min-width:0;font-variant-numeric:tabular-nums}
-#detailDialog .tdcc-stock-tiles small{display:block;font-size:.67rem;color:var(--muted);margin-bottom:4px}
-#detailDialog .tdcc-stock-tiles b{display:block;font-size:.97rem;overflow-wrap:anywhere}
-#detailDialog .tdcc-in-stock-verdict{font-size:.77rem;line-height:1.55;margin:10px 0 6px}
-#detailDialog .tdcc-uncertain{border-left:3px solid #c98e44;padding:8px 9px;background:rgba(196,147,62,.08);border-radius:6px;font-size:.72rem;line-height:1.55}
-#detailDialog .tdcc-explain{font-size:.69rem;line-height:1.55;color:var(--muted);margin:9px 0 0}
-#detailDialog .tdcc-explain a{color:var(--green);text-decoration:underline}
-#detailDialog .tdcc-stock-history{margin-top:10px;border-top:1px dashed var(--line);padding-top:9px}
-#detailDialog .tdcc-stock-history summary{font-weight:750;font-size:.76rem;cursor:pointer;line-height:1.4}
-#detailDialog .tdcc-detail-trend{width:100%;height:auto;display:block;margin-top:9px}
-#detailDialog .tdcc-stock-table-wrap{overflow-x:auto;max-width:100%}
-#detailDialog .tdcc-stock-history table{border-collapse:collapse;width:100%;min-width:280px;font-size:.69rem;font-variant-numeric:tabular-nums;margin:8px 0}
-#detailDialog .tdcc-stock-history th,#detailDialog .tdcc-stock-history td{padding:8px 2px;border-bottom:1px solid var(--line);text-align:right}
-#detailDialog .tdcc-stock-history th:first-child,#detailDialog .tdcc-stock-history td:first-child{text-align:left}
-@media(min-width:580px){#detailDialog .tdcc-stock-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* 官方集保持股：只在個股詳情的 02 技術、籌碼與評分中顯示。 */
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-in-stock{margin:14px 0 0;border:0;border-top:1px dashed var(--line);border-radius:0;padding:14px 0 0;background:transparent;min-width:0}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-in-stock-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-in-stock-head h3{margin:0;font-size:.9rem}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-in-stock-head small{color:var(--muted);font-size:.68rem}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-stock-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-stock-tiles>div{background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:9px;min-width:0;font-variant-numeric:tabular-nums}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-stock-tiles small{display:block;font-size:.67rem;color:var(--muted);margin-bottom:4px}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-stock-tiles b{display:block;font-size:.97rem;overflow-wrap:anywhere}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-in-stock-verdict{font-size:.77rem;line-height:1.55;margin:10px 0 6px}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-uncertain{border-left:3px solid #c98e44;padding:8px 9px;background:rgba(196,147,62,.08);border-radius:6px;font-size:.72rem;line-height:1.55}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-explain{font-size:.69rem;line-height:1.55;color:var(--muted);margin:9px 0 0}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-explain a{color:var(--green);text-decoration:underline}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-stock-history{margin-top:10px;border-top:1px dashed var(--line);padding-top:9px}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-stock-history summary{font-weight:750;font-size:.76rem;cursor:pointer;line-height:1.4}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-detail-trend{width:100%;height:auto;display:block;margin-top:9px}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-stock-table-wrap{overflow-x:auto;max-width:100%}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-stock-history table{border-collapse:collapse;width:100%;min-width:280px;font-size:.69rem;font-variant-numeric:tabular-nums;margin:8px 0}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-stock-history th,#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-stock-history td{padding:8px 2px;border-bottom:1px solid var(--line);text-align:right}
+#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-stock-history th:first-child,#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-stock-history td:first-child{text-align:left}
+@media(min-width:580px){#detailDialog .inuko-dossier[data-inuko-technical] .tdcc-stock-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
