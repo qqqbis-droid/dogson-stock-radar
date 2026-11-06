@@ -81,7 +81,13 @@ function detailHtml(summary,options={}){
   '<div class="tdcc-stock-table-wrap"><table><thead><tr><th>週次</th><th>400張級+</th><th>1,000張級+</th><th>大額級距人數</th></tr></thead><tbody>'+table+'</tbody></table></div></details>'+
   '<p class="tdcc-explain">資料：<a href="https://opendata.tdcc.com.tw/getOD.ashx?id=1-5" target="_blank" rel="noopener noreferrer">TDCC 集保官方開放資料</a>。400張級以上是各級距合計，分期比較按實際發布週次，假期可能不等於精確28日；與每日分點主力集中度不同。未納入原選股分數。</p></section>';
 }
-const helpers={summarize,cardHtml,detailHtml,todayTW,normalizeCode};
+function technicalContainer(body){
+ // Official TDCC evidence lives INSIDE the 02 technical/chip/score accordion.
+ const panel=body?.querySelector?.(".inuko-detail-v4 details.inuko-dossier[data-inuko-technical]");
+ if(!panel)return null;
+ return Array.from(panel.children||[]).find(child=>child.tagName==="DIV")||null;
+}
+const helpers={summarize,cardHtml,detailHtml,todayTW,normalizeCode,technicalContainer};
 if(typeof module==="object"&&module.exports)module.exports=helpers;
 if(!root||!root.document)return;
 if(root.__INUKO_TDCC_INDIVIDUAL_V2__)return;
@@ -93,39 +99,24 @@ function sourceAge(){
  if(!validDate(loaded?.latest_week))return null;
  return Math.floor((Date.parse(todayTW()+"T00:00:00Z")-Date.parse(loaded.latest_week+"T00:00:00Z"))/86400000);
 }
-function cardAllowed(){
- // TDCC historical ownership evidence may be viewed in all mission cards,
- // while it must never be presented as a same-day or actionable live signal.
- return Boolean(document.querySelector("#cards .card[data-code]"));
-}
-function renderCards(){
- if(!cardAllowed())return;
- for(const card of document.querySelectorAll("#cards .card[data-code]")){
-   card.querySelectorAll("[data-tdcc-evidence]").forEach(el=>el.remove());
-   const code=normalizeCode(card.dataset.code);
-   const x=find(code);
-   if(!x)continue;
-   const wrapper=document.createElement("div");
-   wrapper.innerHTML=cardHtml(x,loaded?.latest_week);
-   const node=wrapper.firstElementChild;
-   if(node)card.appendChild(node);
- }
+function findTechnicalBody(){
+ return technicalContainer(document.getElementById("detailBody"));
 }
 function renderDetail(code,view){
- if(!code||!["close","intraday","daytrade","portfolio"].includes(view||""))return;
+ // The user requested 02. Technical, Chip & Scores; do not put it under
+ // the top-level stock card, below the dialog, or into the other sections.
+ if(!code||view!=="close")return;
  const dialog=document.getElementById("detailDialog"),body=document.getElementById("detailBody");
- if(!dialog?.open||!body||!currentDetailCode||normalizeCode(code)!==currentDetailCode)return;
+ if(!dialog?.open||!body||normalizeCode(code)!==currentDetailCode)return;
+ const target=findTechnicalBody();
+ if(!target)return; // Another detail mode without the 02 accordion.
  body.querySelectorAll("[data-tdcc-detail]").forEach(el=>el.remove());
  const x=find(code),wrap=document.createElement("div");
  if(!loaded&&fetching)wrap.innerHTML='<section class="tdcc-in-stock" data-tdcc-detail="1"><h3>🏦 集保大戶持股變化</h3><p class="tdcc-explain">正在載入官方每週集保資料…</p></section>';
  else if(!loaded)wrap.innerHTML='<section class="tdcc-in-stock" data-tdcc-detail="1"><h3>🏦 集保大戶持股變化</h3><p class="tdcc-explain">'+esc(error||"尚未取得官方集保週資料")+'；暫不提供大戶訊號。</p></section>';
  else wrap.innerHTML=detailHtml(x,{week:loaded.latest_week,stale:sourceAge()>14});
  const section=wrap.firstElementChild;
- if(!section)return;
- // Position next to the existing technical / chip evidence, not in a new dashboard.
- const destination=body.querySelector(".detail-block")||body.querySelector(".chip2-card")||null;
- if(destination)destination.insertAdjacentElement("beforebegin",section);
- else body.appendChild(section);
+ if(section)target.appendChild(section);
 }
 async function refresh(force=false){
  if(fetching)return fetching;
@@ -142,31 +133,28 @@ async function refresh(force=false){
    }catch(e){error=String(e.message||e);if(!loaded)lastFetch=0}
    finally{
      fetching=null;
-     renderCards();
      if(currentDetailCode)renderDetail(currentDetailCode,currentDetailView);
    }
    return loaded;
  })();
  return fetching;
 }
-function onOpen(e){
- const code=normalizeCode(e.detail?.code),view=String(e.detail?.view||"close");
- if(!code)return;
- currentDetailCode=code;currentDetailView=view;
- void refresh();
-}
 function onDetail(e){
  const code=normalizeCode(e.detail?.code),view=String(e.detail?.view||"");
- if(!code||code!==currentDetailCode)return;
- currentDetailView=view||currentDetailView;
- renderDetail(code,currentDetailView);
+ if(!code||!view)return;
+ // This event is dispatched AFTER the modal body has rendered. The stock
+ // router intercepts radar:open-stock in capture mode, so relying on that
+ // event for currentDetailCode misses the real 02 accordion on iPhone.
+ currentDetailCode=code;currentDetailView=view;
+ renderDetail(code,view);
+ if(!loaded&&!fetching)void refresh();
 }
 function boot(){
- document.addEventListener("radar:cards-rendered",renderCards);
- document.addEventListener("radar:open-stock",onOpen);
+ // Weekly ownership is now displayed exclusively in an individual stock's
+ // 02 accordion; never add it to the outer ranked card list.
  document.addEventListener("radar:detail-core-rendered",onDetail);
  document.addEventListener("radar:detail-rendered",onDetail);
- document.addEventListener("radar:view-rendered",()=>{renderCards();void refresh()});
+ document.addEventListener("radar:view-rendered",()=>{void refresh()});
  document.addEventListener("radar:data-reloaded",()=>{lastFetch=0;void refresh(true)});
  document.addEventListener("close",e=>{if(e.target?.id==="detailDialog"){currentDetailCode="";currentDetailView=""}},true);
  root.InukoTdccWeekly={status:()=>({latest_week:loaded?.latest_week||null,count:Object.keys(loaded?.stocks||{}).length,error}),refresh:()=>refresh(true),summary:code=>find(code)};
