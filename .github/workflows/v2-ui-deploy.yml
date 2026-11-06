@@ -379,6 +379,7 @@ jobs:
           cp /tmp/v2-source/scripts/v2/test_live_rank_safety.cjs scripts/v2/test_live_rank_safety.cjs
           cp /tmp/v2-source/scripts/v2/test_daytrade_risk_sop_v2.cjs scripts/v2/test_daytrade_risk_sop_v2.cjs
           cp /tmp/v2-source/scripts/v2/test_mainforce_v1.cjs scripts/v2/test_mainforce_v1.cjs
+          cp /tmp/v2-source/scripts/v2/test_tdcc_stock_cards.cjs scripts/v2/test_tdcc_stock_cards.cjs
           cp /tmp/v2-source/scripts/v2/live_publish_patch.py scripts/v2/live_publish_patch.py
           cp /tmp/v2-source/scripts/v2/validate_mission_evidence.py scripts/v2/validate_mission_evidence.py
           cp /tmp/v2-source/scripts/v2/test_live_truth_gate.py scripts/v2/test_live_truth_gate.py
@@ -521,6 +522,9 @@ jobs:
           node --check docs/v2/mainforce-core-v1.js
           node --check docs/v2/mainforce-panel-v1.js
           node scripts/v2/test_mainforce_v1.cjs
+          # Assert that weekly TDCC appears inside stock cards/details, never as daily branch data.
+          node --check docs/v2/tdcc-weekly-ui-v1.js
+          node scripts/v2/test_tdcc_stock_cards.cjs
           node --check docs/v2/portfolio-cloud.js
           grep -q 'portfolio-weekly-review.js?v=20261009review2' docs/v2/index.html
           ! grep -q '這筆賣出是現股當沖' docs/v2/portfolio-fees.js
