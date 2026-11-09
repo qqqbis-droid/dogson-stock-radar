@@ -1,0 +1,163 @@
+{
+  "shadow_schema_version": "1.1.0",
+  "captured_at": "2026-11-10T01:35:09+08:00",
+  "trade_date": "2026-11-09",
+  "build_id": "cb2-legacy-20261109-9ba6b1d1f5",
+  "previous_build_id": "cb2-legacy-20261109-ddcdcfd904",
+  "status": "PASS",
+  "source_dates": [
+    "2026-11-09"
+  ],
+  "source_counts": {
+    "close": 746,
+    "intraday": 724,
+    "daytrade": 724
+  },
+  "canonical_counts": {
+    "close": 746,
+    "intraday": 724,
+    "daytrade": 724
+  },
+  "coverage_ratio": {
+    "close": 1.0,
+    "intraday": 1.0,
+    "daytrade": 1.0
+  },
+  "safety_violations": [],
+  "warnings": [],
+  "payload_profile": {
+    "manifest_bytes": 5146,
+    "views": {
+      "intraday": {
+        "startup_dataset_keys": [
+          "market_summary",
+          "sector_intraday",
+          "decision_intraday_summary"
+        ],
+        "startup_dataset_bytes": 112567,
+        "initial_bytes": 117713,
+        "lazy_dataset_keys": [
+          "decision_intraday_index",
+          "decision_intraday_detail",
+          "zone_intraday",
+          "tradeplan_intraday",
+          "tradecase_swing"
+        ],
+        "lazy_dataset_bytes": 3579140
+      },
+      "close": {
+        "startup_dataset_keys": [
+          "market_summary",
+          "sector_close",
+          "decision_close_summary"
+        ],
+        "startup_dataset_bytes": 124792,
+        "initial_bytes": 129938,
+        "lazy_dataset_keys": [
+          "decision_close_index",
+          "decision_close_detail",
+          "zone_close",
+          "tradeplan_close",
+          "tradecase_swing"
+        ],
+        "lazy_dataset_bytes": 3762615
+      },
+      "portfolio": {
+        "startup_dataset_keys": [
+          "market_summary",
+          "sector_close"
+        ],
+        "startup_dataset_bytes": 69682,
+        "initial_bytes": 74828,
+        "lazy_dataset_keys": [
+          "portfolio_summary"
+        ],
+        "lazy_dataset_bytes": 3
+      },
+      "daytrade": {
+        "startup_dataset_keys": [
+          "market_summary",
+          "sector_intraday",
+          "decision_daytrade_summary"
+        ],
+        "startup_dataset_bytes": 125583,
+        "initial_bytes": 130729,
+        "lazy_dataset_keys": [
+          "decision_daytrade_index",
+          "decision_daytrade_detail",
+          "zone_daytrade",
+          "tradeplan_daytrade",
+          "tradecase_daytrade"
+        ],
+        "lazy_dataset_bytes": 4252825
+      }
+    },
+    "policy": "Summary/sector/market are startup payload; index/detail/zone/plan/case remain lazy and are excluded from initial bytes."
+  },
+  "distributions": {
+    "close": {
+      "lifecycle_stage": {
+        "FAILED": 463,
+        "LAUNCH": 3,
+        "OBSERVE": 34,
+        "PULLBACK_CONFIRMED": 7,
+        "SETUP": 33,
+        "TREND": 9,
+        "WEAKENING": 197
+      },
+      "action_state": {
+        "DATA_STALE": 746
+      },
+      "opportunity_bucket": {
+        "RESEARCH": 86,
+        "RISK": 660
+      },
+      "freshness": {
+        "STALE": 746
+      }
+    },
+    "intraday": {
+      "lifecycle_stage": {
+        "FAILED": 70,
+        "OBSERVE": 290,
+        "PULLBACK_CONFIRMED": 3,
+        "WEAKENING": 361
+      },
+      "action_state": {
+        "DATA_STALE": 9,
+        "DO_NOT_CHASE": 246,
+        "WAIT_TRIGGER": 3,
+        "WATCH": 466
+      },
+      "opportunity_bucket": {
+        "RESEARCH_ONLY": 47,
+        "RISK": 431,
+        "WAIT_PULLBACK": 246
+      },
+      "freshness": {
+        "FROZEN": 724
+      }
+    },
+    "daytrade": {
+      "lifecycle_stage": {
+        "FAILED": 70,
+        "OBSERVE": 290,
+        "PULLBACK_CONFIRMED": 3,
+        "WEAKENING": 361
+      },
+      "action_state": {
+        "DATA_STALE": 724
+      },
+      "opportunity_bucket": {
+        "STALE": 724
+      },
+      "freshness": {
+        "FROZEN": 724
+      }
+    }
+  },
+  "promotion": {
+    "eligible": false,
+    "reason": "Phase 5 requires 20–40 distinct trading-day Shadow reports and no unresolved P0/P1 divergence."
+  }
+}
