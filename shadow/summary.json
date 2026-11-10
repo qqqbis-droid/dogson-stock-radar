@@ -1,14 +1,14 @@
 {
   "shadow_summary_schema_version": "1.0.0",
-  "generated_at": "2026-11-10T01:35:09+08:00",
-  "total_report_files": 40,
-  "distinct_trading_days": 29,
+  "generated_at": "2026-11-10T23:42:36+08:00",
+  "total_report_files": 41,
+  "distinct_trading_days": 30,
   "first_trade_date": "2026-09-23",
-  "latest_trade_date": "2026-11-09",
-  "latest_build_id": "cb2-legacy-20261109-9ba6b1d1f5",
+  "latest_trade_date": "2026-11-10",
+  "latest_build_id": "cb2-legacy-20261110-aa3b4da6a5",
   "latest_status": "PASS",
   "daily_status_counts": {
-    "PASS": 24,
+    "PASS": 25,
     "WARN": 5
   },
   "unresolved_safety_violations": 0,
@@ -19,10 +19,10 @@
   },
   "payload": {
     "latest_initial_bytes": {
-      "intraday": 117713,
-      "close": 129938,
-      "portfolio": 74828,
-      "daytrade": 130729
+      "intraday": 117753,
+      "close": 128316,
+      "portfolio": 74762,
+      "daytrade": 130751
     },
     "max_initial_bytes": {
       "intraday": 117859,
