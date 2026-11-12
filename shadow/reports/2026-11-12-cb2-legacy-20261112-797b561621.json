@@ -1,0 +1,165 @@
+{
+  "shadow_schema_version": "1.1.0",
+  "captured_at": "2026-11-13T00:13:56+08:00",
+  "trade_date": "2026-11-12",
+  "build_id": "cb2-legacy-20261112-797b561621",
+  "previous_build_id": "cb2-legacy-20261112-43452df9c1",
+  "status": "PASS",
+  "source_dates": [
+    "2026-11-12"
+  ],
+  "source_counts": {
+    "close": 737,
+    "intraday": 724,
+    "daytrade": 724
+  },
+  "canonical_counts": {
+    "close": 737,
+    "intraday": 724,
+    "daytrade": 724
+  },
+  "coverage_ratio": {
+    "close": 1.0,
+    "intraday": 1.0,
+    "daytrade": 1.0
+  },
+  "safety_violations": [],
+  "warnings": [],
+  "payload_profile": {
+    "manifest_bytes": 5146,
+    "views": {
+      "intraday": {
+        "startup_dataset_keys": [
+          "market_summary",
+          "sector_intraday",
+          "decision_intraday_summary"
+        ],
+        "startup_dataset_bytes": 112441,
+        "initial_bytes": 117587,
+        "lazy_dataset_keys": [
+          "decision_intraday_index",
+          "decision_intraday_detail",
+          "zone_intraday",
+          "tradeplan_intraday",
+          "tradecase_swing"
+        ],
+        "lazy_dataset_bytes": 3557498
+      },
+      "close": {
+        "startup_dataset_keys": [
+          "market_summary",
+          "sector_close",
+          "decision_close_summary"
+        ],
+        "startup_dataset_bytes": 124665,
+        "initial_bytes": 129811,
+        "lazy_dataset_keys": [
+          "decision_close_index",
+          "decision_close_detail",
+          "zone_close",
+          "tradeplan_close",
+          "tradecase_swing"
+        ],
+        "lazy_dataset_bytes": 3718846
+      },
+      "portfolio": {
+        "startup_dataset_keys": [
+          "market_summary",
+          "sector_close"
+        ],
+        "startup_dataset_bytes": 68585,
+        "initial_bytes": 73731,
+        "lazy_dataset_keys": [
+          "portfolio_summary"
+        ],
+        "lazy_dataset_bytes": 3
+      },
+      "daytrade": {
+        "startup_dataset_keys": [
+          "market_summary",
+          "sector_intraday",
+          "decision_daytrade_summary"
+        ],
+        "startup_dataset_bytes": 126336,
+        "initial_bytes": 131482,
+        "lazy_dataset_keys": [
+          "decision_daytrade_index",
+          "decision_daytrade_detail",
+          "zone_daytrade",
+          "tradeplan_daytrade",
+          "tradecase_daytrade"
+        ],
+        "lazy_dataset_bytes": 4225080
+      }
+    },
+    "policy": "Summary/sector/market are startup payload; index/detail/zone/plan/case remain lazy and are excluded from initial bytes."
+  },
+  "distributions": {
+    "close": {
+      "lifecycle_stage": {
+        "FAILED": 397,
+        "LAUNCH": 4,
+        "OBSERVE": 178,
+        "PULLBACK_CONFIRMED": 16,
+        "SETUP": 50,
+        "TREND": 14,
+        "WEAKENING": 78
+      },
+      "action_state": {
+        "DATA_STALE": 737
+      },
+      "opportunity_bucket": {
+        "RESEARCH": 262,
+        "RISK": 475
+      },
+      "freshness": {
+        "STALE": 737
+      }
+    },
+    "intraday": {
+      "lifecycle_stage": {
+        "FAILED": 101,
+        "LAUNCH": 3,
+        "OBSERVE": 297,
+        "PULLBACK_CONFIRMED": 1,
+        "WEAKENING": 322
+      },
+      "action_state": {
+        "DATA_STALE": 4,
+        "DO_NOT_CHASE": 244,
+        "WAIT_TRIGGER": 4,
+        "WATCH": 472
+      },
+      "opportunity_bucket": {
+        "RESEARCH_ONLY": 57,
+        "RISK": 423,
+        "WAIT_PULLBACK": 244
+      },
+      "freshness": {
+        "FROZEN": 724
+      }
+    },
+    "daytrade": {
+      "lifecycle_stage": {
+        "FAILED": 101,
+        "LAUNCH": 3,
+        "OBSERVE": 297,
+        "PULLBACK_CONFIRMED": 1,
+        "WEAKENING": 322
+      },
+      "action_state": {
+        "DATA_STALE": 724
+      },
+      "opportunity_bucket": {
+        "STALE": 724
+      },
+      "freshness": {
+        "FROZEN": 724
+      }
+    }
+  },
+  "promotion": {
+    "eligible": false,
+    "reason": "Phase 5 requires 20–40 distinct trading-day Shadow reports and no unresolved P0/P1 divergence."
+  }
+}
